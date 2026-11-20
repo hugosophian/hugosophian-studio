@@ -87,6 +87,9 @@
     '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
+    /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
+       html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
+    '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
     '[data-hp] .hp-info-btns [data-hp-close] { display: none !important; }',
     /* Menü-Knopf wird beim About zu „close“: gleicher Effekt wie beim Öffnen des Menüs
        („menu“ blendet aus, „close“ kommt aus der Unschärfe, Werte --menu-dur, --menu-blur, --menu-ease-in/out
@@ -346,6 +349,7 @@
       }
       if (tick(iz, now)) more = true;
       if (tick(ix, now)) more = true;
+      if (infoClosing) more = true;
       render(dt);
       if (more) kick(); else last = 0;
     }
@@ -512,7 +516,7 @@
     //   Bei Mario endet der Zoom in einer Farbfläche. Wir lassen ihn darum bis zum letzten Bild weiterlaufen,
     //   bis die weisse Seite das Bild ganz zudeckt (sonst sieht man links, wie er stehen bleibt):
     //   in der ersten Sekunde wie Mario (Kurve .72,0,.11,1), danach weich weiter bis 1.5 s.
-    var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null };
+    var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null }, infoClosing = false;
     function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
     function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
@@ -524,7 +528,13 @@
     }
     function applyInfo() {
       var s = infoSlide; if (!s) return;
-      if (!iz.a && !ix.a && iz.v <= 0.0001 && Math.abs(ix.v) <= 0.0001) {
+      // Schliessen: Bildkante klebt an der weissen Seite (2 px darunter), damit nie eine Lücke entsteht
+      if (infoClosing) {
+        var pl = infoPanel.getBoundingClientRect().left - root.getBoundingClientRect().left;
+        if (pl >= W - 0.5) { ix.v = 0; infoClosing = false; }
+        else ix.v = Math.min(0, (pl + 2) / W - 1);
+      }
+      if (!iz.a && !ix.a && !infoClosing && iz.v <= 0.0001 && Math.abs(ix.v) <= 0.0001) {
         s.el.style.transform = 'translate3d(0,0,0)';
         if (s.media) s.media.style.transform = 'scale(' + CONFIG.imgBase + ')';
         infoSlide = null; root.classList.remove('hp-info-anim'); return;
@@ -559,7 +569,7 @@
         tClone.style.transform = 'translate3d(0,' + up.toFixed(1) + 'px,0)';
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
-      infoSlide = s;
+      infoSlide = s; infoClosing = false;
       ix.a = null; ix.v = 0;
       tween(iz, 1, CONFIG.infoMs, zoomOpen);
       root.classList.add('is-info'); setDialog(info, true);
@@ -572,7 +582,7 @@
       root.classList.remove('is-info'); setDialog(info, false);
       mbMorph(false);
       if (infoSlide) {
-        tween(ix, 0, CONFIG.infoMs, easeInfo, ix.v - 1);   // von links herein (aus der aktuellen Lage)
+        ix.a = null; infoClosing = true;                 // von links herein, geführt von der weissen Seite
         tween(iz, 0, 1000, easeDock);
       }
       if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
