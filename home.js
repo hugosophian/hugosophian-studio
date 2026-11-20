@@ -97,7 +97,8 @@
     /* Menü-Knopf: diese Seite steuert ihn selbst (Klasse lib-mb, Werte aus dem Website-Footer) */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     /* Close-Knopf beim About: bouncet von unten hoch wie die anderen Menü-Knöpfe, nur mit mehr Bounce */
-    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, .85s) var(--hp-mb-ease, cubic-bezier(.3, 2.2, .5, 1)); }',
+    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { scale: .55; }',
+    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 2.2, .5, 1)), scale var(--hp-mb-up, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 2.2, .5, 1)); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -635,6 +636,26 @@
       mbBtn = b;
       return b;
     }
+    // Federkurve (schwingt hin und zurück) als CSS linear()-Kurve: Hochbouncen und Grösse wackeln nach
+    (function () {
+      function spring(zeta, hz, dur, n) {
+        var w = 2 * Math.PI * hz, wd = w * Math.sqrt(1 - zeta * zeta), pts = [];
+        for (var i = 0; i <= n; i++) {
+          var t = dur * i / n;
+          var y = 1 - Math.exp(-zeta * w * t) * (Math.cos(wd * t) + zeta * w / wd * Math.sin(wd * t));
+          pts.push(y.toFixed(4));
+        }
+        pts[n] = '1';
+        return 'linear(' + pts.join(', ') + ')';
+      }
+      try {
+        if (CSS.supports('transition-timing-function', 'linear(0, 1)')) {
+          var hs = document.documentElement.style;
+          hs.setProperty('--hp-mb-ease', spring(0.32, 1.25, 1.3, 64));   // hoch: rund 35 % Überschwingen, dann zurück und nochmals
+          hs.setProperty('--hp-mb-ease2', spring(0.28, 1.6, 1.3, 64));   // Grösse: wackelt etwas schneller
+        }
+      } catch (e) {}
+    })();
     function mbPop(on) {
       var b = mbSetup(), w = mbWrap(); if (!b || !w) return;
       clearTimeout(mbT);
