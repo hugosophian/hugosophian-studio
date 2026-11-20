@@ -512,7 +512,11 @@
     //   Schliessen: Bild gleitet von links herein (x −Breite → 0 in 1.5 s, .6,0,.1,1) und zoomt dabei
     //              heraus (scaleImage → 0 in 1 s, .72,0,.11,1), die weisse Seite fährt nach rechts weg.
     //   Bildausschnitt · (1 − 0.5 · scaleImage) → Zoom = 1 / (1 − 0.5 · scaleImage)
+    //   Bei Mario endet der Zoom in einer Farbfläche. Wir lassen ihn darum bis zum letzten Bild weiterlaufen,
+    //   bis die weisse Seite das Bild ganz zudeckt (sonst sieht man links, wie er stehen bleibt):
+    //   in der ersten Sekunde wie Mario (Kurve .72,0,.11,1), danach weich weiter bis 1.5 s.
     var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null };
+    function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
     function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
       if (!o.a) return false;
@@ -530,7 +534,7 @@
       }
       root.classList.add('hp-info-anim');
       s.el.style.transform = 'translate3d(' + (ix.v * W).toFixed(1) + 'px,0,0)';
-      if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / Math.max(0.06, 1 - 0.5 * iz.v)).toFixed(4) + ')'; }
+      if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / (1 - 0.97 * iz.v)).toFixed(4) + ')'; }
     }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
@@ -560,7 +564,7 @@
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s;
       ix.a = null; ix.v = 0;
-      tween(iz, 2, 1000, easeDock);
+      tween(iz, 1, CONFIG.infoMs, zoomOpen);
       root.classList.add('is-info'); setDialog(info, true);
       mbShow();
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
