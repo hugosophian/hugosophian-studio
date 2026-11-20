@@ -94,17 +94,10 @@
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
     '[data-hp] .hp-info-btns [data-hp-close] { display: none !important; }',
-    /* Menü-Knopf wird beim About zu „close“: gleicher Effekt wie beim Öffnen des Menüs
-       („menu“ blendet aus, „close“ kommt aus der Unschärfe, Werte --menu-dur, --menu-blur, --menu-ease-in/out
-       aus dem Website-Footer), dazu ein Bounce (Kurve wie das Hochbouncen des Knopfs) */
-    '.hp-mb-btn { transition: opacity var(--menu-dur, .5s) var(--menu-ease-out, ease), filter var(--menu-dur, .5s) var(--menu-ease-out, ease) !important; }',
-    '.hp-mb-btn.hp-mb-out { opacity: 0; filter: blur(var(--menu-blur, 10px)); transition: opacity .25s var(--menu-ease-in, ease), filter .25s var(--menu-ease-in, ease) !important; }',
-    '.hp-mb-bounce { animation: hpMbBounce .7s cubic-bezier(.3,1.7,.55,1) both; }',
-    '@keyframes hpMbBounce { from { scale: .8; } to { scale: 1; } }',
-    '@media (prefers-reduced-motion: reduce) { .hp-mb-bounce { animation: none; } }',
     /* Menü-Knopf: diese Seite steuert ihn selbst (Klasse lib-mb, Werte aus dem Website-Footer) */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
-    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-up) var(--mh-ease-up); }',
+    /* Close-Knopf beim About: bouncet von unten hoch wie die anderen Menü-Knöpfe, nur mit mehr Bounce */
+    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, .85s) var(--hp-mb-ease, cubic-bezier(.3, 2.2, .5, 1)); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -628,9 +621,10 @@
       e.preventDefault(); e.stopImmediatePropagation();
       if (infoOpen.getAttribute('href') && infoOpen.getAttribute('href') !== '#') go(infoOpen.href);
     });
-    // ---------- Menü-Knopf wird zum Close-Knopf, solange das About offen ist ----------
-    // Gleicher Effekt wie beim Öffnen des Menüs: Knopf verschwindet in der Unschärfe, kommt als „close“
-    // aus der Unschärfe zurück (Werte --menu-dur, --menu-blur, --menu-ease-in/out aus dem Website-Footer), mit Bounce.
+    // ---------- Close-Knopf beim About ----------
+    // Auf der Homepage gibt es keinen Menü-Knopf. Beim About wird er unten (versteckt) zu „close“
+    // und bouncet gegen Ende der Animation von unten hoch, wie die anderen Menü-Knöpfe, nur mit mehr Bounce.
+    // Beim Schliessen fällt er wieder nach unten weg und heisst danach wieder „menu“.
     var mbBtn = null, mbOrig = '', mbClose = '', mbT = 0;
     function mbSetup() {
       if (mbBtn) return mbBtn;
@@ -638,40 +632,23 @@
       if (!b) return null;
       mbOrig = b.textContent.trim() || 'menu';
       mbClose = (inClose && inClose.textContent.trim()) || 'close';
-      b.classList.add('hp-mb-btn');
       mbBtn = b;
       return b;
     }
-    // Auf der Homepage gibt es keinen Menü-Knopf. Nur beim About poppt er gegen Ende der Animation
-    // als „close“ auf (aus der Unschärfe, mit Bounce) und verschwindet beim Schliessen wieder.
-    function mbPlace(on) {
-      var w = mbWrap(); if (!w) return;
-      w.classList.add('mh-now');
-      w.classList.toggle('lib-mb', on);
-      void w.offsetWidth;
-      w.classList.remove('mh-now');
-    }
     function mbPop(on) {
-      var b = mbSetup(); if (!b) return;
+      var b = mbSetup(), w = mbWrap(); if (!b || !w) return;
       clearTimeout(mbT);
-      b.classList.remove('hp-mb-bounce');
       if (on) {
         b.textContent = mbClose;
         b.setAttribute('aria-label', 'Bereich schliessen');
-        b.classList.add('hp-mb-out');
-        mbPlace(true);
-        mbT = setTimeout(function () {
-          b.classList.remove('hp-mb-out');
-          b.classList.add('hp-mb-bounce');
-          mbT = setTimeout(function () { b.classList.remove('hp-mb-bounce'); }, 750);
-        }, CONFIG.infoMs * 0.72);
+        mbT = setTimeout(function () { w.classList.add('lib-mb'); }, CONFIG.infoMs * 0.72);
       } else {
-        b.classList.add('hp-mb-out');
+        w.classList.remove('lib-mb');
         mbT = setTimeout(function () {
-          mbPlace(false);
+          if (root.classList.contains('is-info')) return;
           b.textContent = mbOrig;
           b.setAttribute('aria-label', 'Menü öffnen');
-        }, 260);
+        }, 700);
       }
     }
     // Klick auf den Menü-Knopf bei offenem About: schliesst das About statt das Menü zu öffnen
