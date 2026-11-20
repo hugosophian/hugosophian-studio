@@ -14,7 +14,7 @@ d.head.appendChild(d.createElement('style')).textContent=
 +'html.hs-vt-hero [data-pg] .pg-hero,html.hs-vt-hero [data-pg] .pg-hero-img{opacity:1!important;transform:none!important;transition:none!important}'
 +'html.hs-vt-out *{transition:none!important}'
 +'@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation-duration:.01s!important;animation-delay:0s!important}}';
-var H=['/lab-home'];   // Startseite(n). Zum Testen nur /lab-home, beim Umstellen '/' eintragen.
+var H=['/'];   // Startseite
 d.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');
 if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
 var u;try{u=new URL(a.href,location.href)}catch(x){return}
