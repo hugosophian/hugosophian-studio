@@ -46,11 +46,19 @@
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Glas-Kante beim Wechsel
     glassRadius: 34,    // px Rundung der Ecken in der Mitte des Wechsels
-    glassInset:  0.06,  // so viel schmaler wird das neue Bild unterwegs (Anteil)
+    glassInset:  0.03,  // so viel schmaler wird das neue Bild unterwegs (Anteil)
     glassStretch: 0.018,// Dehnung pro Bild/Sekunde Tempo
     glassMax:    0.07,  // höchstens so viel Dehnung
     jelly:       0.9,   // Nachfedern beim Ankommen: das Bild dehnt sich statt das nächste zu zeigen
-    lens:        1,     // Stärke des Glasrands (0 = aus)
+    lens:        0,     // Stärke des Glasrands (0 = aus)
+    // Wobbeln wie iOS 26: Bilder werden beim Anfassen zu Glaskarten und federn einzeln nach
+    press:       0.035,  // so viel kleiner wird das Bild, solange der Finger es hält
+    pressRadius: 28,    // px Rundung, solange der Finger es hält
+    pressK:      240,   // Feder fürs Kleiner/Grösserwerden
+    pressDamp:   0.42,  // kleiner = mehr Nachwippen
+    lagK:        220,   // Feder, mit der das neue Bild dem Finger folgt (kleiner = mehr Verzögerung)
+    lagDamp:     0.35,
+    lagDrag:     650,   // Feder, solange der Finger zieht (grösser = folgt enger)  // kleiner = mehr Nachwippen
     // Einflug
     introMs:    2000,   // Dauer
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
@@ -235,12 +243,12 @@
     }
 
     // ---------- Zeichnen ----------
-    function render() {
+    function render(dt) {
       W = stage.clientWidth || window.innerWidth;
       H = stage.clientHeight || window.innerHeight;
       if (introOn) renderIntro();
       else if (desk) renderDesk();
-      else renderMob();
+      else renderMob(dt || 0);
     }
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild
@@ -277,8 +285,18 @@
     }
 
     // Handy: senkrechter Wechsel mit Glas-Kante
-    function renderMob() {
+    var Pr = 0, PV = 0, mobMoving = false;
+    function renderMob(dt) {
       var vel = mode === 'drag' ? dragV : V;
+      mobMoving = false;
+      // Anfassen: das Bild wird zur Glaskarte (kleiner, runde Ecken), Loslassen: federt zurück
+      var pt = pressing() ? 1 : 0;
+      if (dt) {
+        var pk = CONFIG.pressK, pc = 2 * Math.sqrt(pk) * CONFIG.pressDamp;
+        PV += (pk * (pt - Pr) - pc * PV) * dt; Pr += PV * dt;
+        if (Math.abs(pt - Pr) > 0.0008 || Math.abs(PV) > 0.006) mobMoving = true; else { Pr = pt; PV = 0; }
+      } else { Pr = pt; PV = 0; }
+      var cs = 1 - CONFIG.press * Pr, pr = Math.max(0, CONFIG.pressRadius * Pr);
       // Überschwingen über das Ziel hinaus: nicht das nächste Bild zeigen, sondern das angekommene Bild federn lassen
       var f = F, jel = 0;
       if (mode === 'spring' && dir && (F - T) * dir > 0) { jel = Math.abs(F - T) * CONFIG.jelly; f = T; }
@@ -297,11 +315,22 @@
         } else if (r <= 0 && r > -1) {        // aktuelles Bild, läuft langsam nach oben weg
           y = r * H * CONFIG.parallax; my = 0; sc = 1 - r * CONFIG.oldScale; z = 2; vis = true;
         } else { vis = false; }
-        setVis(s, vis);
-        if (!vis) continue;
+        if (!vis) { setVis(s, false); continue; }
+        // jedes Bild folgt seinem Platz mit eigener Feder: das neue hängt etwas nach und wippt nach
+        if (!s.vis || !dt) { s.y = y; s.vy = 0; }
+        else {
+          var lk = z === 3 ? (mode === 'drag' ? CONFIG.lagDrag : CONFIG.lagK) : 900, lc = 2 * Math.sqrt(lk) * (z === 3 ? CONFIG.lagDamp : 0.9);
+          s.vy += (lk * (y - s.y) - lc * s.vy) * dt; s.y += s.vy * dt;
+          if (Math.abs(y - s.y) > 0.3 || Math.abs(s.vy) > 4) mobMoving = true; else { s.y = y; s.vy = 0; }
+        }
+        y = s.y;
+        if (z === 3 && lensOn) lens.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0) scale(' + (sx * cs).toFixed(4) + ',1)';
+        setVis(s, true);
         s.el.style.zIndex = z;
-        s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)' + (sx !== 1 ? ' scale(' + sx.toFixed(4) + ',1)' : '');
-        s.el.style.clipPath = rad > 0.5 ? 'inset(0 round ' + rad.toFixed(1) + 'px ' + rad.toFixed(1) + 'px 0 0)' : '';
+        var ex = sx * cs;
+        s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)' + (ex !== 1 || cs !== 1 ? ' scale(' + ex.toFixed(4) + ',' + cs.toFixed(4) + ')' : '');
+        var rt = Math.max(rad, pr);
+        s.el.style.clipPath = rt > 0.5 ? 'inset(0 round ' + rt.toFixed(1) + 'px ' + rt.toFixed(1) + 'px ' + pr.toFixed(1) + 'px ' + pr.toFixed(1) + 'px)' : '';
         if (r === 0 && jel) { sy = 1 + jel; }
         if (s.media) {
           s.media.style.transformOrigin = z === 3 ? '50% 0' : r === 0 && jel ? (dir > 0 ? '50% 0' : '50% 100%') : '50% 50%';
@@ -366,7 +395,8 @@
         if (Math.abs(T - F) < 0.0005 && Math.abs(V) < 0.005) { F = T; V = 0; mode = 'idle'; }
         more = mode === 'spring';
       } else if (mode === 'drag') { more = true; dragV *= Math.pow(0.02, dt); }
-      render();
+      render(dt);
+      if (!introOn && !desk && mobMoving) more = true;
       if (more) kick(); else last = 0;
     }
     function kick() { if (!raf) raf = requestAnimationFrame(step); }
@@ -445,6 +475,7 @@
 
     // ---------- Handy: Finger und Maus (senkrecht) ----------
     var down = null, moved = false, samples = [], dragV = 0;
+    function pressing() { return !!(down && moved) || wheelBase !== null; }
     root.addEventListener('pointerdown', function (e) {
       if (desk || busy() || e.target.closest('.hp-about-btn, a, button, [role="button"]')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
