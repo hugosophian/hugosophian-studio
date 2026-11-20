@@ -103,8 +103,9 @@
     var meta = root.querySelector('.lib-meta');
     var nameEl = root.querySelector('.lib-name');
     var yearEl = root.querySelector('.lib-year');
-    var curEl = root.querySelector('.ps-current');
-    var totEl = root.querySelector('.ps-total');
+    var idxSpans = root.querySelectorAll('.ps-index span');   // Zähler: „01 / 12“ (drei span)
+    var curEl = root.querySelector('.ps-current') || idxSpans[0];
+    var totEl = root.querySelector('.ps-total') || idxSpans[2];
     var fill = root.querySelector('.ps-progress-fill');
     var top = root.querySelector('.lib-top');
     var sortBtn = root.querySelector('.lib-sort');
