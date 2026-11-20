@@ -79,7 +79,11 @@
     '[data-hp] .hp-intro, [data-hp] .hp-about { display: none !important; }',
     '[data-hp] .hp-info { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; visibility: hidden; transition: visibility 0s linear 1.5s; }',
     '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
-    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    /* Text im About scrollt (Finger, Mausrad); unten Platz, damit er über den Close-Knopf hinaus geschoben werden kann */
+    '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
+    '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 4vh; flex: 0 0 auto; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
@@ -461,6 +465,7 @@
     // Mausrad und Trackpad (nur senkrechte Ansicht): Ziel verschieben, nach kurzer Ruhe einrasten
     var wheelT = 0;
     root.addEventListener('wheel', function (e) {
+      if (root.classList.contains('is-info') && e.target.closest && e.target.closest('.hp-info-panel')) return;   // About-Text scrollt selbst
       e.preventDefault();
       if (desk || busy()) return;
       var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -502,7 +507,9 @@
     infoClose.removeAttribute('id'); if (!inClose) infoClose.textContent = 'Close';
     infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '-1'); infoClose.setAttribute('data-hp-close', '');
     infoBtns.appendChild(infoOpen); infoBtns.appendChild(infoClose);
-    infoPanel.appendChild(infoText); infoPanel.appendChild(infoBtns);
+    var infoScroll = document.createElement('div'); infoScroll.className = 'hp-info-scroll';
+    infoScroll.appendChild(infoText); infoScroll.appendChild(infoBtns);
+    infoPanel.appendChild(infoScroll);
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
