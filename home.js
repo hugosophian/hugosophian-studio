@@ -99,7 +99,7 @@
     /* Close-Knopf beim About: bouncet von unten hoch wie die anderen Menü-Knöpfe, nur mit mehr Bounce */
     /* Klein (55 %) nur im versteckten Zustand vor dem Hochbouncen; beim Wegfallen bleibt er gross */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.hp-mb-small { scale: .55; }',
-    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 2.2, .5, 1)), scale var(--hp-mb-up, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 2.2, .5, 1)); }',
+    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); will-change: translate, scale; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -638,6 +638,8 @@
     }
     // Federkurve (schwingt hin und zurück) als CSS linear()-Kurve: Hochbouncen und Grösse wackeln nach
     (function () {
+      // Dauer so lang, bis die Feder wirklich steht (Rest unter 0.2 %), sonst springt sie am Ende sichtbar ins Ziel
+      function settle(zeta, hz) { return Math.log(500) / (zeta * 2 * Math.PI * hz); }
       function spring(zeta, hz, dur, n) {
         var w = 2 * Math.PI * hz, wd = w * Math.sqrt(1 - zeta * zeta), pts = [];
         for (var i = 0; i <= n; i++) {
@@ -651,8 +653,12 @@
       try {
         if (CSS.supports('transition-timing-function', 'linear(0, 1)')) {
           var hs = document.documentElement.style;
-          hs.setProperty('--hp-mb-ease', spring(0.32, 1.25, 1.3, 64));   // hoch: rund 35 % Überschwingen, dann zurück und nochmals
-          hs.setProperty('--hp-mb-ease2', spring(0.28, 1.6, 1.3, 64));   // Grösse: wackelt etwas schneller
+          var z1 = 0.45, f1 = 1.3, d1 = settle(z1, f1);   // hoch: rund 20 % Überschwingen, einmal zurück
+          var z2 = 0.42, f2 = 1.6, d2 = settle(z2, f2);   // Grösse: wackelt etwas schneller
+          hs.setProperty('--hp-mb-ease', spring(z1, f1, d1, 90));
+          hs.setProperty('--hp-mb-up', d1.toFixed(2) + 's');
+          hs.setProperty('--hp-mb-ease2', spring(z2, f2, d2, 90));
+          hs.setProperty('--hp-mb-up2', d2.toFixed(2) + 's');
         }
       } catch (e) {}
     })();
