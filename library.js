@@ -32,6 +32,7 @@
     maxSkip:    3,      // höchstens so viele Projekte pro Wisch
     edge:       0.35,   // Widerstand über den Anfang / das Ende hinaus
     wheelIdle:  140,    // ms nach Trackpad/Mausrad, dann einrasten
+    edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Kippen beim Bewegen (Wobble)
     tilt:       0.0045, // Grad pro px/s
     tiltMax:    7,      // höchstens so viele Grad
@@ -327,6 +328,14 @@
     window.addEventListener('pointerup', function (e) { release(e, false); });
     window.addEventListener('pointercancel', function (e) { release(e, true); });
     root.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    // iPhone: Wischen vom Bildschirmrand löst in Safari „Zurück/Vor“ aus. Beginnt ein Finger am Rand,
+    // wird das verhindert, damit das Rad dreht. (Knöpfe und Vorschau ausgenommen, dort bleiben Tipps möglich.)
+    root.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1 || root.classList.contains('is-pv')) return;
+      if (e.target.closest('.lib-top, .lib-pv, a:not(.lib-card), [role="button"]')) return;
+      var x = e.touches[0].clientX;
+      if (x < CONFIG.edgeGuard || x > window.innerWidth - CONFIG.edgeGuard) e.preventDefault();
+    }, { passive: false });
     // Ein Klick auf ein Bild öffnet nie direkt die Seite, sondern die Vorschau
     root.addEventListener('click', function (e) {
       var a = e.target.closest('a.lib-card');
