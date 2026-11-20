@@ -59,11 +59,11 @@
     deskStiff:  150,    // Feder beim Aufschieben
     deskDamp:   0.6,    // kleiner = mehr Nachwippen
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
-    pause:      2000    // Menü-Knopf kommt nach so vielen ms Ruhe
+    infoMs:     1500    // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
   };
 
   var css = [
-    'html.hp-on, html.hp-on body { height: 100%; overflow: hidden; overscroll-behavior: none; }',
+    'html.hp-on, html.hp-on body { height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; }',
     '[data-hp] { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }',
     '[data-hp] .hp-stage { overflow: hidden; }',
     '[data-hp] .hp-slide { position: absolute; inset: 0; overflow: hidden; visibility: hidden; will-change: transform; backface-visibility: hidden; }',
@@ -74,26 +74,21 @@
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
     '[data-hp] .hp-data { display: none !important; }',
     '[data-hp].is-mouse .hp-stage { cursor: pointer; }',
-    /* Intro (Handy) */
-    '[data-hp] .hp-intro { visibility: hidden; opacity: 0; transition: opacity .5s ease, visibility 0s linear .5s; }',
-    '[data-hp].is-intro .hp-intro { visibility: visible; opacity: 1; transition-delay: 0s; }',
-    '[data-hp] .hp-intro-panel > * { opacity: 0; transform: translateY(1.2em); transition: opacity .4s ease, transform .6s cubic-bezier(.2,.7,.2,1); }',
-    '[data-hp].is-intro .hp-intro-panel > * { opacity: 1; transform: none; }',
-    '[data-hp].is-intro .hp-intro-panel > :nth-child(2) { transition-delay: .06s; }',
-    '[data-hp].is-intro .hp-intro-panel > :nth-child(3) { transition-delay: .12s; }',
-    '[data-hp].is-intro .hp-intro-panel > :nth-child(4) { transition-delay: .18s; }',
-    '[data-hp].is-intro .hp-stage { filter: blur(8px) brightness(.55); }',
-    /* About: Bild schrumpft zum Streifen links, Text kommt von rechts */
-    '[data-hp] .hp-about { visibility: hidden; transition: visibility 0s linear .9s; }',
-    '[data-hp].is-about .hp-about { visibility: visible; transition-delay: 0s; }',
-    '[data-hp] .hp-about-panel { transform: translateX(101%); transition: transform .9s cubic-bezier(.7,0,.2,1); }',
-    '[data-hp].is-about .hp-about-panel { transform: none; }',
-    '[data-hp] .hp-about-panel > * { opacity: 0; transition: opacity .3s ease; }',
-    '[data-hp].is-about .hp-about-panel > * { opacity: 1; transition: opacity .6s ease .55s; }',
-    '[data-hp] .hp-stage { clip-path: inset(0 0 0 0); transition: clip-path .9s cubic-bezier(.7,0,.2,1), filter .5s ease; }',
-    '[data-hp].is-about .hp-stage { clip-path: inset(0 calc(100% - var(--hp-strip, 22vw)) 0 0); }',
-    '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .4s ease, color .6s ease; }',
-    '[data-hp].is-about .hp-about-btn { opacity: 0; pointer-events: none; }',
+    /* About wie bei Mario: Bilder gleiten nach links weg, weisse Seite mit Text kommt von rechts,
+       der Bereichstitel fährt nach oben. Alte Ebenen .hp-intro und .hp-about werden nicht mehr gebraucht. */
+    '[data-hp] .hp-intro, [data-hp] .hp-about { display: none !important; }',
+    '[data-hp] .hp-info { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; visibility: hidden; transition: visibility 0s linear 1.5s; }',
+    '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh; background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); transition: transform 1.5s cubic-bezier(.6,0,.1,1); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    '[data-hp].is-info .hp-info-panel { transform: none; }',
+    '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
+    '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
+    '[data-hp] .hp-stage { transition: transform 1.5s cubic-bezier(.6,0,.1,1); }',
+    '[data-hp].is-info .hp-stage { transform: translate3d(-100%,0,0); }',
+    '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
+    '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
+    '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
+    '[data-hp].is-desk .hp-about-btn { display: none; }',
     /* Desktop: nebeneinander */
     '[data-hp] .hp-side { display: none; }',
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
@@ -106,7 +101,7 @@
     /* Menü-Knopf: diese Seite steuert ihn selbst (Klasse lib-mb, Werte aus dem Website-Footer) */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-up) var(--mh-ease-up); }',
-    '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-about-panel, [data-hp] .hp-stage { transition-duration: .01s !important; } }'
+    '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -346,7 +341,7 @@
         // Anzeige läuft dem Ziel nach (Mario: lastY = lerp(lastY, currentY, 0.15) pro Bild)
         var a = 1 - Math.pow(1 - CONFIG.ease, dt * 60);
         F += (C - F) * a;
-        if (Math.abs(C - F) < 0.0004) F = C;
+        if (Math.abs(C - F) < 0.0004) { F = C; if (!down && !busy()) mbShow(); }
         else more = true;
         if (down && moved) more = true;
       }
@@ -361,7 +356,7 @@
       clearInline();
       root.classList.remove('hp-run');
       fitTitles();
-      if (desk) mbShow(); else mbWait();
+      mbShow();
     }
     function startIntro() {
       if (!introOn) { render(); return; }
@@ -376,19 +371,13 @@
       render();
     }
 
-    // ---------- Menü-Knopf ----------
-    var mbTimer = 0, mbPending = false, held = false;
+    // ---------- Menü-Knopf: weg, solange sich etwas bewegt; da, sobald alles steht ----------
     function mbWrap() { return document.querySelector('.menu-toggle-wrap'); }
-    function mbShow() { clearTimeout(mbTimer); mbPending = false; var w = mbWrap(); if (w) w.classList.add('lib-mb'); }
-    function mbHide() { clearTimeout(mbTimer); var w = mbWrap(); if (w) w.classList.remove('lib-mb'); }
-    function mbWait() { clearTimeout(mbTimer); mbPending = true; if (!held) mbTimer = setTimeout(mbShow, CONFIG.pause); }
-    function activity() { if (busy() || desk) return; mbHide(); mbWait(); }
-    window.addEventListener('pointerdown', function () { held = true; clearTimeout(mbTimer); }, true);
-    window.addEventListener('pointerup', function () { held = false; if (mbPending) mbWait(); }, true);
-    window.addEventListener('pointercancel', function () { held = false; if (mbPending) mbWait(); }, true);
-    window.addEventListener('keydown', function (e) { if (e.key === 'Tab') mbShow(); });
+    function mbShow() { var w = mbWrap(); if (w) w.classList.add('lib-mb'); }
+    function mbHide() { var w = mbWrap(); if (w) w.classList.remove('lib-mb'); }
+    function activity() { if (busy() || desk) return; mbHide(); }
 
-    function busy() { return introOn || root.classList.contains('is-intro') || root.classList.contains('is-about'); }
+    function busy() { return introOn || root.classList.contains('is-info'); }
 
     // ---------- Zur Galerie ----------
     function go(href) {
@@ -452,7 +441,7 @@
       var wasMoved = moved;
       down = null;
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
-      else openIntro();
+      else openInfo();
     }
     window.addEventListener('pointerup', function (e) { release(e, false); });
     window.addEventListener('pointercancel', function (e) { release(e, true); });
@@ -481,7 +470,7 @@
     // Tastatur
     document.addEventListener('keydown', function (e) {
       if (html.classList.contains('menu-open')) return;
-      if (e.key === 'Escape') { if (root.classList.contains('is-intro')) closeIntro(); else if (root.classList.contains('is-about')) closeAbout(); else if (desk) setHov(-1); return; }
+      if (e.key === 'Escape') { if (root.classList.contains('is-info')) closeInfo(); else if (desk) setHov(-1); return; }
       if (busy()) return;
       if (desk) {
         if (e.key === 'ArrowRight') { e.preventDefault(); setHov(hov < 0 ? 0 : Math.min(n - 1, hov + 1)); }
@@ -491,58 +480,84 @@
       }
       if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(Math.round(C) + 1); activity(); }
       else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(Math.round(C) - 1); activity(); }
-      else if (e.key === 'Enter' && document.activeElement === document.body) openIntro();
+      else if (e.key === 'Enter' && document.activeElement === document.body) openInfo();
     });
 
-    // ---------- Intro (Handy) ----------
-    var openedAt = 0;
+    // ---------- About (Bereichs-Text) wie bei Mario ----------
     function setDialog(el, on) { if (!el) return; el.setAttribute('aria-hidden', on ? 'false' : 'true'); if ('inert' in el) el.inert = !on; }
-    if (intro) { intro.setAttribute('role', 'dialog'); intro.setAttribute('aria-modal', 'true'); setDialog(intro, false); }
-    function openIntro() {
-      if (!intro || desk || Math.abs(C - F) > 0.02) return;
+    var info = document.createElement('div'); info.className = 'hp-info';
+    info.setAttribute('role', 'dialog'); info.setAttribute('aria-modal', 'true');
+    var infoPanel = document.createElement('div'); infoPanel.className = 'hp-info-panel';
+    var infoText = inText ? inText.cloneNode(false) : document.createElement('div');
+    infoText.removeAttribute('id'); if (!inText) infoText.className = 'hp-intro-text';
+    var infoBtns = document.createElement('div'); infoBtns.className = 'hp-info-btns';
+    var infoOpen = inOpen ? inOpen.cloneNode(true) : document.createElement('a');
+    infoOpen.removeAttribute('id'); if (!inOpen) infoOpen.textContent = 'Galerie öffnen';
+    var infoClose = inClose ? inClose.cloneNode(true) : document.createElement('div');
+    infoClose.removeAttribute('id'); if (!inClose) infoClose.textContent = 'Close';
+    infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '0');
+    infoBtns.appendChild(infoOpen); infoBtns.appendChild(infoClose);
+    infoPanel.appendChild(infoText); infoPanel.appendChild(infoBtns);
+    info.appendChild(infoPanel); root.appendChild(info);
+    setDialog(info, false);
+
+    var tClone = null, tOrig = null, infoT = 0;
+    function openInfo() {
+      if (desk || busy() || Math.abs(C - F) > 0.02) return;
       var s = slides[current()];
-      if (inTitle) inTitle.textContent = s.label;
-      if (inText) inText.innerHTML = s.intro;
-      if (inOpen) { inOpen.setAttribute('href', s.href || '#'); if (s.btn) inOpen.textContent = s.btn; }
-      root.classList.add('is-intro'); setDialog(intro, true); openedAt = performance.now();
+      clearTimeout(infoT);
+      if (tClone) { tClone.remove(); tClone = null; }
+      if (tOrig) tOrig.style.visibility = '';
+      infoText.innerHTML = s.intro;
+      infoOpen.setAttribute('href', s.href || '#'); if (s.btn) infoOpen.textContent = s.btn;
+      infoOpen.style.display = s.href ? '' : 'none';
+      infoPanel.scrollTop = 0;
+      // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben fahren
+      var up = 0, top = Math.max(12, W * 0.03);
+      if (s.title) {
+        tOrig = s.title;
+        tClone = s.title.cloneNode(true);
+        tClone.removeAttribute('id'); tClone.classList.add('hp-info-title'); tClone.setAttribute('aria-hidden', 'true');
+        tClone.style.transform = 'translate3d(0,0,0)';
+        root.appendChild(tClone);
+        tOrig.style.visibility = 'hidden';
+        var r = tClone.getBoundingClientRect(), rr = root.getBoundingClientRect();
+        up = top - (r.top - rr.top);
+        root.style.setProperty('--hp-info-top', (top + r.height + H * 0.05).toFixed(0) + 'px');
+        tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
+        tClone.style.transform = 'translate3d(0,' + up.toFixed(1) + 'px,0)';
+      }
+      root.classList.add('is-info'); setDialog(info, true);
       mbShow();
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
-      if (inClose) setTimeout(function () { inClose.focus({ preventScroll: true }); }, 400);
+      setTimeout(function () { if (root.classList.contains('is-info')) infoClose.focus({ preventScroll: true }); }, CONFIG.infoMs * 0.6);
     }
-    function closeIntro() { root.classList.remove('is-intro'); setDialog(intro, false); activity(); }
-    if (intro) intro.addEventListener('click', function (e) {
-      if (performance.now() - openedAt < 450) return;
-      if (e.target.closest('.hp-intro-close') || !e.target.closest('.hp-intro-panel')) { e.preventDefault(); closeIntro(); }
-    });
-
-    // ---------- About ----------
-    var aboutBtn = root.querySelector('.hp-about-btn');
-    var about = root.querySelector('.hp-about');
-    var aboutClose = about && about.querySelector('.hp-about-close');
-    if (about) { about.setAttribute('role', 'dialog'); setDialog(about, false); }
-    var aboutPanel = about && about.querySelector('.hp-about-panel');
-    function openAbout() {
-      if (!about) return;
-      closeIntro(); setHov(-1);
-      if (aboutPanel) root.style.setProperty('--hp-strip', Math.max(0, aboutPanel.offsetLeft) + 'px');
-      root.classList.add('is-about'); setDialog(about, true); mbShow();
+    function closeInfo() {
+      if (!root.classList.contains('is-info')) return;
+      root.classList.remove('is-info'); setDialog(info, false);
+      if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
+      clearTimeout(infoT);
+      infoT = setTimeout(function () {
+        if (root.classList.contains('is-info')) return;
+        if (tClone) { tClone.remove(); tClone = null; }
+        if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
+      }, CONFIG.infoMs + 50);
+      mbShow();
     }
-    function closeAbout() { root.classList.remove('is-about'); setDialog(about, false); activity(); }
-    [aboutBtn, aboutClose].forEach(function (b) {
-      if (!b) return;
-      b.setAttribute('role', 'button'); b.setAttribute('tabindex', '0');
-      function act(e) { e.preventDefault(); if (b === aboutBtn) openAbout(); else closeAbout(); }
-      b.addEventListener('click', act);
-      b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') act(e); });
-    });
+    infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
+    infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
     // „Galerie öffnen“: Übergang anmelden (alte Seite blendet aus, Library startet schwarz) und selbst navigieren
-    if (inOpen) inOpen.addEventListener('click', function (e) {
+    infoOpen.addEventListener('click', function (e) {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
-      if (!inOpen.href || inOpen.getAttribute('href') === '#') { e.preventDefault(); return; }
       e.preventDefault(); e.stopImmediatePropagation();
-      go(inOpen.href);
+      if (infoOpen.getAttribute('href') && infoOpen.getAttribute('href') !== '#') go(infoOpen.href);
     });
-    if (inClose) { inClose.setAttribute('role', 'button'); inClose.setAttribute('tabindex', '0'); inClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeIntro(); } }); }
+    var aboutBtn = root.querySelector('.hp-about-btn');
+    if (aboutBtn) {
+      aboutBtn.setAttribute('role', 'button'); aboutBtn.setAttribute('tabindex', '0');
+      aboutBtn.addEventListener('click', function (e) { e.preventDefault(); openInfo(); });
+      aboutBtn.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInfo(); } });
+    }
 
     // ---------- Wechsel Handy ↔ Desktop ----------
     function setMode() {
@@ -550,13 +565,13 @@
       if (d === desk) return;
       desk = d;
       root.classList.toggle('is-desk', desk);
-      closeIntro(); setHov(-1);
+      closeInfo(); setHov(-1);
       slides.forEach(function (s) { s.o = 0; s.ov = 0; });
       F = C = Math.round(F);
       clearInline();
       slides.forEach(function (s) { if (s.title) s.title.style.fontSize = ''; });
       fitTitles(); render();
-      if (desk) mbShow(); else mbWait();
+      mbShow();
     }
     if (deskMQ.addEventListener) deskMQ.addEventListener('change', setMode); else if (deskMQ.addListener) deskMQ.addListener(setMode);
 
@@ -571,9 +586,9 @@
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitTitles(); render(); });
     root.classList.add('is-ready');
     startIntro();
-    if (!introOn) { if (desk) mbShow(); else mbWait(); }
+    if (!introOn) mbShow();
     window.addEventListener('resize', function () { fitTitles(); render(); });
-    window.addEventListener('pageshow', function (e) { if (e.persisted) { render(); if (!busy() && !desk) mbWait(); } });
+    window.addEventListener('pageshow', function (e) { if (e.persisted) { render(); if (!introOn) mbShow(); } });
   }
 
   // Stil und Seitenklasse sofort setzen (vor dem ersten Bild, auch für Seitenübergänge: schwarzer Grund)
