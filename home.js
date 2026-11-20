@@ -97,7 +97,8 @@
     /* Menü-Knopf: diese Seite steuert ihn selbst (Klasse lib-mb, Werte aus dem Website-Footer) */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     /* Close-Knopf beim About: bouncet von unten hoch wie die anderen Menü-Knöpfe, nur mit mehr Bounce */
-    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { scale: .55; }',
+    /* Klein (55 %) nur im versteckten Zustand vor dem Hochbouncen; beim Wegfallen bleibt er gross */
+    'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.hp-mb-small { scale: .55; }',
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 2.2, .5, 1)), scale var(--hp-mb-up, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 2.2, .5, 1)); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
@@ -595,7 +596,6 @@
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
-      setTimeout(function () { if (root.classList.contains('is-info') && mbBtn) mbBtn.focus({ preventScroll: true }); }, CONFIG.infoMs);
     }
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
@@ -662,7 +662,8 @@
       if (on) {
         b.textContent = mbClose;
         b.setAttribute('aria-label', 'Bereich schliessen');
-        mbT = setTimeout(function () { w.classList.add('lib-mb'); }, CONFIG.infoMs * 0.72);
+        if (!w.classList.contains('lib-mb')) { w.classList.add('mh-now', 'hp-mb-small'); void w.offsetWidth; w.classList.remove('mh-now'); }
+        mbT = setTimeout(function () { w.classList.remove('hp-mb-small'); w.classList.add('lib-mb'); }, CONFIG.infoMs * 0.72);
       } else {
         w.classList.remove('lib-mb');
         mbT = setTimeout(function () {
