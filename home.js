@@ -284,7 +284,14 @@
     var about = root.querySelector('.hp-about');
     var aboutClose = about && about.querySelector('.hp-about-close');
     if (about) { about.setAttribute('role', 'dialog'); setDialog(about, false); }
-    function openAbout() { if (!about) return; closeIntro(); root.classList.add('is-about'); setDialog(about, true); mbShow(); }
+    var aboutPanel = about && about.querySelector('.hp-about-panel');
+    function openAbout() {
+      if (!about) return;
+      closeIntro();
+      // Breite des Bildstreifens = linker Rand des Panels (im Designer an hp-about-panel einstellbar)
+      if (aboutPanel) root.style.setProperty('--hp-strip', Math.max(0, aboutPanel.offsetLeft) + 'px');
+      root.classList.add('is-about'); setDialog(about, true); mbShow();
+    }
     function closeAbout() { root.classList.remove('is-about'); setDialog(about, false); activity(); }
     [aboutBtn, aboutClose].forEach(function (b) {
       if (!b) return;
