@@ -495,7 +495,9 @@
       // Endplatz des Bilds im Panel: Panel ist noch oben ausserhalb, darum seine Höhe dazurechnen
       var mr = pvMedia.getBoundingClientRect();
       var ar = it.img.naturalWidth ? it.img.naturalWidth / it.img.naturalHeight : it.w / it.h;
-      var h = mr.height, w = Math.min(mr.width, h * ar); h = w / ar;
+      // Feld hat feste Höhe, Breite automatisch (höchstens max-width)
+      var maxW = parseFloat(getComputedStyle(pvMedia).maxWidth) || Infinity;
+      var h = mr.height, w = Math.min(maxW, h * ar); h = w / ar;
       var shift = pvPanel ? pvPanel.offsetHeight * 1.01 : 0;
       var b = { left: mr.left, top: mr.top + shift, width: w, height: h };
       var a = rect(it.img.getBoundingClientRect());
