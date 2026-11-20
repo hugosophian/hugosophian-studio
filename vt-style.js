@@ -7,7 +7,7 @@ d.head.appendChild(d.createElement('style')).textContent=
 +'::view-transition-old(hs-hero),::view-transition-new(hs-hero){height:100%;object-fit:cover;animation:none}'
 +'::view-transition-new(hs-hero){animation:hsvi .35s ease .6s both}'
 +'html.hs-vt-hero'+O+'{animation:hsvo .45s ease both}html.hs-vt-hero'+N+'{animation:hsvi .6s ease .55s both}'
-+'html.hs-vt-fade'+O+'{animation:hsvo .4s ease both}html.hs-vt-fade'+N+'{animation:hsvi .3s ease .35s both}'
++'html.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}html.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
 +'html.hs-vt-studio'+O+'{z-index:2;animation:hsso .9s '+E+' both}html.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}'
 +'@keyframes hsvi{from{opacity:0}}@keyframes hsvo{to{opacity:0}}'
 +'@keyframes hsso{to{transform:translateX(100%)}}@keyframes hssi{from{transform:translateX(-30%);filter:brightness(.5)}}'
