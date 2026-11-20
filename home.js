@@ -5,9 +5,8 @@
 
    Handy und Tablet (schmaler als CONFIG.desk):
      Einflug: alle Bilder erscheinen als schmale Säule in der Mitte und ziehen sich dann auf
-     Vollbild auf. Danach senkrecht wischen, ein Bild pro Geste. Die Kante des neuen Bildes ist
-     wie ein Glaselement: runde Ecken, leicht eingezogen, ein Glasrand, der das Bild darunter
-     verschwimmen lässt, und ein federndes Nachwippen.
+     Vollbild auf. Danach senkrecht wischen wie bei Mario: durchgehender Bilderstreifen, der dem
+     Finger weich nachläuft. Je schneller, desto stärker zoomt das Bild in seinem Rahmen (Verziehen).
      Tippen zeigt den Intro-Text mit „Galerie öffnen“.
    Desktop (ab CONFIG.desk breit, mit Maus):
      Feste Seite, alle Bilder nebeneinander. Fährt die Maus auf ein Bild, schiebt es die anderen
@@ -35,30 +34,19 @@
 
   var CONFIG = {
     // Senkrecht (Handy)
-    parallax:   0.32,   // wie weit das alte Bild nach oben mitläuft (Anteil der Bildschirmhöhe)
-    imgLag:     0.45,   // das neue Bild läuft in seinem Rahmen langsamer mit (0 = fest, 1 = gleich schnell)
-    oldScale:   0.06,   // das alte Bild zoomt beim Wegfahren leicht heran
-    stiffness:  130,    // Feder beim Einrasten (grösser = schneller)
-    damping:    0.45,   // kleiner = mehr Nachwippen
-    flick:      0.22,   // wie stark ein schneller Wisch zählt (Sekunden Schwung)
-    wheelIdle:  120,    // ms nach Mausrad/Trackpad, dann einrasten
-    wheelStep:  700,    // Mausrad-Weg (px) für ein ganzes Bild
+    // Senkrecht (Handy) – nachgebaut nach marioroudil.com (main.js, Klasse Slider + WebGL-Shader):
+    //   Die Bilder liegen als durchgehender Streifen untereinander. Der Finger bewegt das Ziel
+    //   (mal speed), die Anzeige läuft dem Ziel mit einer Glättung pro Bild hinterher (ease).
+    //   Der Abstand zwischen Ziel und Anzeige ist das Tempo: Daraus zoomt das Bild in seinem Rahmen
+    //   (Mario: progress = 0.25 · Abstand / Bildschirmhöhe, Bildausschnitt · (1 − 0.5 · progress)).
+    //   Schnell ziehen = grosser Abstand = starkes Verziehen, langsam = wenig. Loslassen rastet auf das nächste Bild ein.
+    speed:      3,      // Mario am Handy: 3 (Finger-Weg mal 3), Desktop 1.5
+    ease:       0.15,   // Mario: 0.15 pro Bild (60 fps), kleiner = träger und mehr Verziehen
+    zoom:       0.25,   // Mario: 0.25 (Stärke des Verziehens)
+    zoomMax:    0.24,   // Begrenzung, damit beim Herauszoomen nie ein Rand sichtbar wird
+    imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
+    wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
-    // Glas-Kante beim Wechsel
-    glassRadius: 0,     // px Rundung der Ecken in der Mitte des Wechsels
-    glassInset:  0,     // so viel schmaler wird das neue Bild unterwegs (Anteil)
-    glassStretch: 0,   // Dehnung pro Bild/Sekunde Tempo
-    glassMax:    0.07,  // höchstens so viel Dehnung
-    jelly:       0,     // Nachfedern beim Ankommen: das Bild dehnt sich statt das nächste zu zeigen
-    lens:        0,     // Stärke des Glasrands (0 = aus)
-    // Wobbeln wie iOS 26: Bilder werden beim Anfassen zu Glaskarten und federn einzeln nach
-    press:       0,      // so viel kleiner wird das Bild, solange der Finger es hält
-    pressRadius: 0,     // px Rundung, solange der Finger es hält
-    pressK:      240,   // Feder fürs Kleiner/Grösserwerden
-    pressDamp:   0.42,  // kleiner = mehr Nachwippen
-    lagK:        220,   // Feder, mit der das neue Bild dem Finger folgt (kleiner = mehr Verzögerung)
-    lagDamp:     0.35,
-    lagDrag:     650,   // Feder, solange der Finger zieht (grösser = folgt enger)  // kleiner = mehr Nachwippen
     // Einflug
     introMs:    2000,   // Dauer
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
@@ -86,12 +74,6 @@
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
     '[data-hp] .hp-data { display: none !important; }',
     '[data-hp].is-mouse .hp-stage { cursor: pointer; }',
-    /* Glasrand an der Kante des neuen Bildes */
-    '[data-hp] .hp-lens { position: absolute; left: 0; right: 0; top: 0; height: 12vh; z-index: 4; pointer-events: none; opacity: 0; will-change: transform, opacity;',
-    '  -webkit-backdrop-filter: blur(14px) saturate(1.9) brightness(1.12); backdrop-filter: blur(14px) saturate(1.9) brightness(1.12);',
-    '  background: linear-gradient(to bottom, rgba(255,255,255,.22), rgba(255,255,255,.06) 30%, rgba(255,255,255,0) 70%);',
-    '  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.65), inset 0 6px 14px -6px rgba(255,255,255,.35);',
-    '  -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent); mask-image: linear-gradient(to bottom, #000 35%, transparent); }',
     /* Intro (Handy) */
     '[data-hp] .hp-intro { visibility: hidden; opacity: 0; transition: opacity .5s ease, visibility 0s linear .5s; }',
     '[data-hp].is-intro .hp-intro { visibility: visible; opacity: 1; transition-delay: 0s; }',
@@ -117,7 +99,6 @@
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
     '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
     '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; }',
-    '[data-hp].is-desk .hp-lens { display: none; }',
     '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 2; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
     '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: flex-end; gap: 3vh; }',
     '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; }',
@@ -186,7 +167,6 @@
     var n = slides.length;
     if (!n) return;
 
-    var lens = document.createElement('div'); lens.className = 'hp-lens'; stage.appendChild(lens);
 
     var desk = deskMQ.matches;
     root.classList.toggle('is-desk', desk);
@@ -217,12 +197,11 @@
       if (best < Infinity) slides.forEach(function (s) { if (s.title) s.title.style.fontSize = best.toFixed(2) + 'px'; });
     }
 
-    var F = 0, V = 0, T = 0, W = 1, H = 1, mode = 'idle', raf = 0, last = 0;
+    var F = 0, C = 0, W = 1, H = 1, raf = 0, last = 0;   // F = angezeigt, C = Ziel (in Bildern)
     var hov = -1, deskMoving = false;
     var introOn = !reduce, introT0 = 0, introP = 0;
     function wrap(x) { return ((x % n) + n) % n; }
-    function rel(j, f) { var d = wrap(j - (f === undefined ? F : f)); return d > n / 2 ? d - n : d; }
-    var dir = 0;
+    function rel(j) { var d = wrap(j - F); return d > n / 2 ? d - n : d; }
     function current() { return wrap(Math.round(F)); }
 
     function setVis(s, on) { if (on !== !!s.vis) { s.el.classList.toggle('is-vis', on); s.vis = on; } }
@@ -239,7 +218,6 @@
         if (s.title) { s.title.style.transform = ''; s.title.style.left = ''; s.title.style.width = ''; }
         s.side.style.width = '';
       });
-      lens.style.opacity = 0;
     }
 
     // ---------- Zeichnen ----------
@@ -284,61 +262,21 @@
       }
     }
 
-    // Handy: senkrechter Wechsel mit Glas-Kante
-    var Pr = 0, PV = 0, mobMoving = false;
-    function renderMob(dt) {
-      var vel = mode === 'drag' ? dragV : V;
-      mobMoving = false;
-      // Anfassen: das Bild wird zur Glaskarte (kleiner, runde Ecken), Loslassen: federt zurück
-      var pt = pressing() ? 1 : 0;
-      if (dt) {
-        var pk = CONFIG.pressK, pc = 2 * Math.sqrt(pk) * CONFIG.pressDamp;
-        PV += (pk * (pt - Pr) - pc * PV) * dt; Pr += PV * dt;
-        if (Math.abs(pt - Pr) > 0.0008 || Math.abs(PV) > 0.006) mobMoving = true; else { Pr = pt; PV = 0; }
-      } else { Pr = pt; PV = 0; }
-      var cs = 1 - CONFIG.press * Pr, pr = Math.max(0, CONFIG.pressRadius * Pr);
-      // Überschwingen über das Ziel hinaus: nicht das nächste Bild zeigen, sondern das angekommene Bild federn lassen
-      var f = F, jel = 0;
-      if (mode === 'spring' && dir && (F - T) * dir > 0) { jel = Math.abs(F - T) * CONFIG.jelly; f = T; }
-      var stretch = Math.min(CONFIG.glassMax, Math.abs(vel) * CONFIG.glassStretch);
-      var lensOn = false;
+    // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario)
+    function renderMob() {
+      var p = clamp(CONFIG.zoom * (F - C), -CONFIG.zoomMax, CONFIG.zoomMax);
+      var z = CONFIG.imgBase / (1 - 0.5 * p);
       for (var j = 0; j < n; j++) {
-        var s = slides[j], r = rel(j, f), y, my, sc = 1, sy = 1, sx = 1, rad = 0, z, vis;
-        if (r > 0 && r < 1) {                 // kommt von unten herein, liegt oben
-          var bump = Math.sin(Math.PI * r);
-          y = r * H; my = -y * (1 - CONFIG.imgLag); z = 3; vis = true;
-          sx = 1 - CONFIG.glassInset * bump; rad = CONFIG.glassRadius * bump; sy = 1 + stretch;
-          lens.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0) scale(' + sx.toFixed(4) + ',1)';
-          lens.style.borderRadius = rad.toFixed(1) + 'px ' + rad.toFixed(1) + 'px 0 0';
-          lens.style.opacity = (CONFIG.lens * Math.pow(bump, 0.6)).toFixed(3);
-          lensOn = true;
-        } else if (r <= 0 && r > -1) {        // aktuelles Bild, läuft langsam nach oben weg
-          y = r * H * CONFIG.parallax; my = 0; sc = 1 - r * CONFIG.oldScale; z = 2; vis = true;
-        } else { vis = false; }
-        if (!vis) { setVis(s, false); continue; }
-        // jedes Bild folgt seinem Platz mit eigener Feder: das neue hängt etwas nach und wippt nach
-        if (!s.vis || !dt) { s.y = y; s.vy = 0; }
-        else {
-          var lk = z === 3 ? (mode === 'drag' ? CONFIG.lagDrag : CONFIG.lagK) : 900, lc = 2 * Math.sqrt(lk) * (z === 3 ? CONFIG.lagDamp : 0.9);
-          s.vy += (lk * (y - s.y) - lc * s.vy) * dt; s.y += s.vy * dt;
-          if (Math.abs(y - s.y) > 0.3 || Math.abs(s.vy) > 4) mobMoving = true; else { s.y = y; s.vy = 0; }
-        }
-        y = s.y;
-        if (z === 3 && lensOn) lens.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0) scale(' + (sx * cs).toFixed(4) + ',1)';
+        var s = slides[j], r = rel(j);
+        if (r <= -1 || r >= 1) { setVis(s, false); continue; }
+        var y = r * H;
         setVis(s, true);
-        s.el.style.zIndex = z;
-        var ex = sx * cs;
-        s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)' + (ex !== 1 || cs !== 1 ? ' scale(' + ex.toFixed(4) + ',' + cs.toFixed(4) + ')' : '');
-        var rt = Math.max(rad, pr);
-        s.el.style.clipPath = rt > 0.5 ? 'inset(0 round ' + rt.toFixed(1) + 'px ' + rt.toFixed(1) + 'px ' + pr.toFixed(1) + 'px ' + pr.toFixed(1) + 'px)' : '';
-        if (r === 0 && jel) { sy = 1 + jel; }
-        if (s.media) {
-          s.media.style.transformOrigin = z === 3 ? '50% 0' : r === 0 && jel ? (dir > 0 ? '50% 0' : '50% 100%') : '50% 50%';
-          s.media.style.transform = 'translate3d(0,' + my.toFixed(2) + 'px,0) scale(' + sc.toFixed(4) + ',' + (sc * sy).toFixed(4) + ')';
-        }
-        if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)' + (sx !== 1 ? ' scale(' + (1 / sx).toFixed(4) + ',1)' : '');
+        s.el.style.zIndex = r > 0 ? 3 : 2;
+        s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
+        s.el.style.clipPath = '';
+        if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
+        if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)';
       }
-      if (!lensOn) lens.style.opacity = 0;
     }
 
     // Desktop: nebeneinander, das Bild unter der Maus schiebt die anderen weg
@@ -388,19 +326,19 @@
           if (Math.abs(t - s.o) < 0.0008 && Math.abs(s.ov) < 0.004) { s.o = t; s.ov = 0; } else deskMoving = true;
         });
         more = deskMoving;
-      } else if (mode === 'spring') {
-        var k2 = CONFIG.stiffness, c2 = 2 * Math.sqrt(k2) * CONFIG.damping;
-        V += (k2 * (T - F) - c2 * V) * dt;
-        F += V * dt;
-        if (Math.abs(T - F) < 0.0005 && Math.abs(V) < 0.005) { F = T; V = 0; mode = 'idle'; }
-        more = mode === 'spring';
-      } else if (mode === 'drag') { more = true; dragV *= Math.pow(0.02, dt); }
+      } else {
+        // Anzeige läuft dem Ziel nach (Mario: lastY = lerp(lastY, currentY, 0.15) pro Bild)
+        var a = 1 - Math.pow(1 - CONFIG.ease, dt * 60);
+        F += (C - F) * a;
+        if (Math.abs(C - F) < 0.0004) F = C;
+        else more = true;
+        if (down && moved) more = true;
+      }
       render(dt);
-      if (!introOn && !desk && mobMoving) more = true;
       if (more) kick(); else last = 0;
     }
     function kick() { if (!raf) raf = requestAnimationFrame(step); }
-    function goTo(t) { dir = t > F ? 1 : t < F ? -1 : 0; T = t; mode = 'spring'; kick(); }
+    function goTo(t) { C = t; kick(); }
 
     function endIntro() {
       introOn = false;
@@ -474,46 +412,31 @@
     });
 
     // ---------- Handy: Finger und Maus (senkrecht) ----------
-    var down = null, moved = false, samples = [], dragV = 0;
-    function pressing() { return !!(down && moved) || wheelBase !== null; }
+    var down = null, moved = false;
     root.addEventListener('pointerdown', function (e) {
       if (desk || busy() || e.target.closest('.hp-about-btn, a, button, [role="button"]')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      down = { x: e.clientX, y: e.clientY, f0: F, id: e.pointerId };
-      moved = false; samples = [{ t: performance.now(), y: e.clientY }];
+      down = { x: e.clientX, y: e.clientY, c0: C, id: e.pointerId, sp: e.pointerType === 'touch' ? CONFIG.speed : CONFIG.speed / 2 };
+      moved = false;
     });
     window.addEventListener('pointermove', function (e) {
       if (!down || e.pointerId !== down.id) return;
       var dy = e.clientY - down.y;
       if (!moved) {
         if (Math.abs(dy) < 6 && Math.abs(e.clientX - down.x) < 6) return;
-        moved = true; mode = 'drag'; down.y = e.clientY; down.f0 = F; dy = 0;
+        moved = true; down.y = e.clientY; down.c0 = C; dy = 0;
         root.classList.add('is-dragging'); activity();
       }
-      var now = performance.now();
-      samples.push({ t: now, y: e.clientY });
-      while (samples.length > 2 && now - samples[0].t > 90) samples.shift();
-      var s0 = samples[0];
-      if (now > s0.t) dragV = -(e.clientY - s0.y) / H / ((now - s0.t) / 1000);
-      var nf = down.f0 - dy / H;
-      nf = Math.max(Math.round(down.f0) - 1, Math.min(Math.round(down.f0) + 1, nf));
-      F = nf; kick();
+      C = down.c0 - dy * down.sp / H;
+      kick();
     });
     function release(e, cancel) {
       if (!down || (e && e.pointerId !== down.id)) return;
       root.classList.remove('is-dragging');
-      if (moved || cancel) {
-        var s0 = samples[0], s1 = samples[samples.length - 1];
-        var vy = s1.t > s0.t ? (s1.y - s0.y) / ((s1.t - s0.t) / 1000) : 0;
-        if (performance.now() - s1.t > 80) vy = 0;
-        V = -vy / H;
-        var base = Math.round(down.f0), proj = F + V * CONFIG.flick;
-        var t = proj - base > 0.25 ? base + 1 : proj - base < -0.25 ? base - 1 : base;
-        goTo(t); activity();
-      } else {
-        openIntro();
-      }
+      var wasMoved = moved;
       down = null;
+      if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
+      else openIntro();
     }
     window.addEventListener('pointerup', function (e) { release(e, false); });
     window.addEventListener('pointercancel', function (e) { release(e, true); });
@@ -525,26 +448,18 @@
       if (x < CONFIG.edgeGuard || x > window.innerWidth - CONFIG.edgeGuard) e.preventDefault();
     }, { passive: false });
 
-    // Mausrad und Trackpad: ein Bild pro Geste (nur senkrechte Ansicht)
-    var wheelT = 0, wheelBase = null, wheelLast = 0;
+    // Mausrad und Trackpad (nur senkrechte Ansicht): Ziel verschieben, nach kurzer Ruhe einrasten
+    var wheelT = 0;
     root.addEventListener('wheel', function (e) {
       e.preventDefault();
       if (desk || busy()) return;
       var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       if (e.deltaMode === 1) d *= 32;
       if (!d) return;
-      if (wheelBase === null) wheelBase = Math.round(F);
-      var now = performance.now();
-      if (wheelLast && now > wheelLast) dragV = (d / CONFIG.wheelStep) / ((now - wheelLast) / 1000) * 0.5;
-      wheelLast = now;
-      mode = 'drag';
-      F = Math.max(wheelBase - 1, Math.min(wheelBase + 1, F + d / CONFIG.wheelStep));
+      C += d / H;
       kick(); activity();
       clearTimeout(wheelT);
-      wheelT = setTimeout(function () {
-        var t = F - wheelBase > 0.15 ? wheelBase + 1 : F - wheelBase < -0.15 ? wheelBase - 1 : wheelBase;
-        V = dragV * 0.5; wheelBase = null; wheelLast = 0; goTo(t);
-      }, CONFIG.wheelIdle);
+      wheelT = setTimeout(function () { goTo(Math.round(C)); }, CONFIG.wheelIdle);
     }, { passive: false });
 
     // Tastatur
@@ -558,8 +473,8 @@
         else if (e.key === 'Enter' && hov >= 0 && document.activeElement === document.body) go(slides[hov].href);
         return;
       }
-      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(Math.round(T === F ? F : T) + 1); activity(); }
-      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(Math.round(T === F ? F : T) - 1); activity(); }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(Math.round(C) + 1); activity(); }
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(Math.round(C) - 1); activity(); }
       else if (e.key === 'Enter' && document.activeElement === document.body) openIntro();
     });
 
@@ -568,7 +483,7 @@
     function setDialog(el, on) { if (!el) return; el.setAttribute('aria-hidden', on ? 'false' : 'true'); if ('inert' in el) el.inert = !on; }
     if (intro) { intro.setAttribute('role', 'dialog'); intro.setAttribute('aria-modal', 'true'); setDialog(intro, false); }
     function openIntro() {
-      if (!intro || desk || mode === 'spring' && Math.abs(T - F) > 0.02) return;
+      if (!intro || desk || Math.abs(C - F) > 0.02) return;
       var s = slides[current()];
       if (inTitle) inTitle.textContent = s.label;
       if (inText) inText.innerHTML = s.intro;
@@ -621,7 +536,7 @@
       root.classList.toggle('is-desk', desk);
       closeIntro(); setHov(-1);
       slides.forEach(function (s) { s.o = 0; s.ov = 0; });
-      F = T = Math.round(F); V = 0; mode = 'idle';
+      F = C = Math.round(F);
       clearInline();
       slides.forEach(function (s) { if (s.title) s.title.style.fontSize = ''; });
       fitTitles(); render();
