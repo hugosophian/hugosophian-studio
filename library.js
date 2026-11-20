@@ -559,11 +559,17 @@
       }
     }
     // „Galerie öffnen“: Flug in die Projektseite anmelden (Website-Head, Block SEITENÜBERGÄNGE)
-    if (pvOpen) pvOpen.addEventListener('click', function () {
+    // Selbst navigieren: Andere Klick-Handler auf Knöpfen (z. B. Webflow-Interaktionen) verhindern sonst den Übergang.
+    if (pvOpen) pvOpen.addEventListener('click', function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;   // neuer Tab: normal
       var img = pvMedia && pvMedia.firstChild;
-      var to = '';
-      try { to = new URL(pvOpen.href, location.href).pathname; } catch (e) {}
-      if (img && to) window.hsVT = { to: to, el: img, sel: '.pg-hero-media' };
+      var href = pvOpen.href, to = '';
+      try { to = new URL(href, location.href).pathname; } catch (er) {}
+      if (!to) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (img) window.hsVT = { to: to, el: img, sel: '.pg-hero-media' };
+      location.href = href;
     });
 
     // ---------- Start ----------
