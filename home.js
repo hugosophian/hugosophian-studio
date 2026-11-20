@@ -83,8 +83,6 @@
     '[data-hp].is-info .hp-info-panel { transform: none; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
-    '[data-hp] .hp-stage { transition: transform 1.5s cubic-bezier(.6,0,.1,1); }',
-    '[data-hp].is-info .hp-stage { transform: translate3d(-100%,0,0); }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
     '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
@@ -123,6 +121,7 @@
     };
   }
   var easeDock = bezier(0.72, 0, 0.11, 1);
+  var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
 
   function init(root) {
     if (root.__hp) return;
@@ -236,7 +235,7 @@
       H = stage.clientHeight || window.innerHeight;
       if (introOn) renderIntro();
       else if (desk) renderDesk();
-      else renderMob(dt || 0);
+      else { renderMob(dt || 0); applyInfo(); }
     }
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild
@@ -344,6 +343,11 @@
         if (Math.abs(C - F) < 0.0004) { F = C; if (!down && !busy()) mbShow(); }
         else more = true;
         if (down && moved) more = true;
+      }
+      if (infoA) {
+        var it = clamp((now - infoA.t0) / CONFIG.infoMs, 0, 1);
+        infoE = infoA.from + (infoA.to - infoA.from) * easeInfo(it);
+        if (it >= 1) infoA = null; else more = true;
       }
       render(dt);
       if (more) kick(); else last = 0;
@@ -502,6 +506,21 @@
     setDialog(info, false);
 
     var tClone = null, tOrig = null, infoT = 0;
+    // Bild beim About: wird zum Streifen am linken Rand und zoomt dabei hinein (Mario: Mesh schmaler,
+    // Shader-Wert scaleImage 0 → 2, Bildausschnitt · (1 − 0.5 · scaleImage))
+    var infoE = 0, infoA = null, infoSlide = null;
+    function infoAnim(to) { infoA = { from: infoE, to: to, t0: performance.now() }; kick(); }
+    function applyInfo() {
+      var s = infoSlide; if (!s) return;
+      var e = infoE;
+      if (e <= 0.0005 && !infoA) {
+        s.el.style.right = '';
+        if (s.media) s.media.style.transform = 'scale(' + CONFIG.imgBase + ')';
+        infoSlide = null; return;
+      }
+      s.el.style.right = (W * e).toFixed(1) + 'px';
+      if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / Math.max(0.08, 1 - e)).toFixed(4) + ')'; }
+    }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
       var s = slides[current()];
@@ -527,6 +546,8 @@
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
         tClone.style.transform = 'translate3d(0,' + up.toFixed(1) + 'px,0)';
       }
+      if (infoSlide && infoSlide !== s) { infoSlide.el.style.right = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; infoE = 0; }
+      infoSlide = s; infoAnim(1);
       root.classList.add('is-info'); setDialog(info, true);
       mbShow();
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
@@ -535,6 +556,7 @@
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
+      infoAnim(0);
       if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
       clearTimeout(infoT);
       infoT = setTimeout(function () {
