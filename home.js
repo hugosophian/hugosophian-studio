@@ -104,8 +104,10 @@
 
     // Titel auf volle Breite (nur mit Attribut data-hp-fit am Abschnitt): jedes Wort füllt die Breite
     var fit = root.hasAttribute('data-hp-fit');
+    // Alle Titel gleich gross: der längste füllt die Breite, die anderen sind entsprechend kürzer
     function fitTitles() {
       if (!fit) return;
+      var best = Infinity;
       slides.forEach(function (s) {
         var t = s.title; if (!t) return;
         t.style.fontSize = ''; t.style.whiteSpace = 'nowrap';
@@ -113,8 +115,9 @@
         var avail = t.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         var r = document.createRange(); r.selectNodeContents(t);
         var w = r.getBoundingClientRect().width;
-        if (w > 0 && avail > 0) t.style.fontSize = (fs * avail / w).toFixed(2) + 'px';
+        if (w > 0 && avail > 0) best = Math.min(best, fs * avail / w);
       });
+      if (best < Infinity) slides.forEach(function (s) { if (s.title) s.title.style.fontSize = best.toFixed(2) + 'px'; });
     }
     fitTitles();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitles);
@@ -324,15 +327,21 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) { render(); if (!busy()) mbWait(); } });
   }
 
-  function boot() {
-    var roots = document.querySelectorAll('[data-hp]');
-    if (!roots.length) return;
+  // Stil und Seitenklasse sofort setzen (vor dem ersten Bild, auch für Seitenübergänge: schwarzer Grund)
+  var styled = false;
+  function style() {
+    if (styled || !document.querySelector('[data-hp]')) return;
+    styled = true;
     var s = document.createElement('style');
     s.textContent = css;
     document.head.appendChild(s);
     document.documentElement.classList.add('hp-on');
-    [].forEach.call(roots, init);
   }
+  function boot() {
+    style();
+    [].forEach.call(document.querySelectorAll('[data-hp]'), init);
+  }
+  style();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

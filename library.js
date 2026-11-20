@@ -628,15 +628,21 @@
     });
   }
 
-  function boot() {
-    var roots = document.querySelectorAll('[data-lib]');
-    if (!roots.length) return;
+  // Stil und Seitenklasse sofort setzen (vor dem ersten Bild, auch für Seitenübergänge: schwarzer Grund)
+  var styled = false;
+  function style() {
+    if (styled || !document.querySelector('[data-lib]')) return;
+    styled = true;
     var s = document.createElement('style');
     s.textContent = css;
     document.head.appendChild(s);
     document.documentElement.classList.add('lib-on');
-    [].forEach.call(roots, init);
   }
+  function boot() {
+    style();
+    [].forEach.call(document.querySelectorAll('[data-lib]'), init);
+  }
+  style();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
