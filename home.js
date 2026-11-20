@@ -300,6 +300,17 @@
       b.addEventListener('click', act);
       b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') act(e); });
     });
+    // „Galerie öffnen“: Übergang anmelden (alte Seite blendet aus, Library startet schwarz) und selbst navigieren
+    if (inOpen) inOpen.addEventListener('click', function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
+      var href = inOpen.href;
+      if (!href || inOpen.getAttribute('href') === '#') { e.preventDefault(); return; }
+      var to = ''; try { to = new URL(href, location.href).pathname; } catch (er) {}
+      if (!to) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      window.hsVT = { to: to, type: 'fade' };
+      location.href = href;
+    });
     if (inClose) { inClose.setAttribute('role', 'button'); inClose.setAttribute('tabindex', '0'); inClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeIntro(); } }); }
 
     // ---------- Start ----------
