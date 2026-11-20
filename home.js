@@ -88,25 +88,14 @@
     '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
     '[data-hp] .hp-info-btns [data-hp-close] { display: none !important; }',
-    /* Menü-Knopf wird beim About zu „close“: Text rollt mit Bounce, Breite federt mit */
-    '.hp-mb-vp { display: block; overflow: hidden; height: var(--hp-mb-h, 1.2em); }',
-    '.hp-mb-roll { display: flex; flex-direction: column; transition: transform .7s cubic-bezier(.3,1.7,.55,1); will-change: transform; }',
-    '.hp-mb-roll > span { display: block; height: var(--hp-mb-h, 1.2em); line-height: var(--hp-mb-h, 1.2em); white-space: nowrap; text-align: center; }',
-    '.hp-mb-close .hp-mb-roll { transform: translate3d(0,-50%,0); }',
-    '.hp-mb-btn { transition: width .7s cubic-bezier(.3,1.7,.55,1), scale .5s cubic-bezier(.3,1.7,.55,1) !important; }',
-    '.hp-mb-pop { scale: .9; transition: width .7s cubic-bezier(.3,1.7,.55,1), scale .12s ease-out !important; }',
-    /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz (kein dunkler Streifen an der Kante).
-       html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
-    '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
-    /* Desktop: nebeneinander */
-    '[data-hp] .hp-side { display: none; }',
-    '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
-    '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
-    '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; }',
-    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 2; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
-    '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: flex-end; gap: 3vh; }',
-    '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; }',
-    '[data-hp] .hp-side-in a { align-self: flex-start; }',
+    /* Menü-Knopf wird beim About zu „close“: gleicher Effekt wie beim Öffnen des Menüs
+       („menu“ blendet aus, „close“ kommt aus der Unschärfe, Werte --menu-dur, --menu-blur, --menu-ease-in/out
+       aus dem Website-Footer), dazu ein Bounce (Kurve wie das Hochbouncen des Knopfs) */
+    '.hp-mb-btn { transition: opacity var(--menu-dur, .5s) var(--menu-ease-out, ease), filter var(--menu-dur, .5s) var(--menu-ease-out, ease) !important; }',
+    '.hp-mb-btn.hp-mb-out { opacity: 0; filter: blur(var(--menu-blur, 10px)); transition: opacity .25s var(--menu-ease-in, ease), filter .25s var(--menu-ease-in, ease) !important; }',
+    '.hp-mb-bounce { animation: hpMbBounce .7s cubic-bezier(.3,1.7,.55,1) both; }',
+    '@keyframes hpMbBounce { from { scale: .8; } to { scale: 1; } }',
+    '@media (prefers-reduced-motion: reduce) { .hp-mb-bounce { animation: none; } }',
     /* Menü-Knopf: diese Seite steuert ihn selbst (Klasse lib-mb, Werte aus dem Website-Footer) */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-up) var(--mh-ease-up); }',
@@ -604,42 +593,34 @@
       if (infoOpen.getAttribute('href') && infoOpen.getAttribute('href') !== '#') go(infoOpen.href);
     });
     // ---------- Menü-Knopf wird zum Close-Knopf, solange das About offen ist ----------
-    var mbBtn = null, mbA = null, mbC = null, mbOrig = '';
+    // Gleicher Effekt wie beim Öffnen des Menüs: Knopf verschwindet in der Unschärfe, kommt als „close“
+    // aus der Unschärfe zurück (Werte --menu-dur, --menu-blur, --menu-ease-in/out aus dem Website-Footer), mit Bounce.
+    var mbBtn = null, mbOrig = '', mbClose = '', mbT = 0;
     function mbSetup() {
       if (mbBtn) return mbBtn;
       var b = document.querySelector('.menu-toggle-wrap [data-menu-open]') || document.querySelector('.menu-toggle-wrap .is-menu');
       if (!b) return null;
       mbOrig = b.textContent.trim() || 'menu';
-      var cs = getComputedStyle(b);
-      var lh = parseFloat(cs.lineHeight); if (!lh) lh = parseFloat(cs.fontSize) * 1.2;
-      b.style.setProperty('--hp-mb-h', lh + 'px');
-      b.textContent = '';
-      var vp = document.createElement('span'); vp.className = 'hp-mb-vp';
-      var roll = document.createElement('span'); roll.className = 'hp-mb-roll';
-      mbA = document.createElement('span'); mbA.textContent = mbOrig;
-      mbC = document.createElement('span'); mbC.textContent = (inClose && inClose.textContent.trim()) || 'close';
-      roll.appendChild(mbA); roll.appendChild(mbC); vp.appendChild(roll); b.appendChild(vp);
+      mbClose = (inClose && inClose.textContent.trim()) || 'close';
       b.classList.add('hp-mb-btn');
       mbBtn = b;
       return b;
     }
-    function mbWidth(label) {
-      var b = mbBtn, cs = getComputedStyle(b);
-      var r = document.createRange(); r.selectNodeContents(label);
-      return Math.ceil(r.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth));
-    }
     function mbMorph(toClose) {
       var b = mbSetup(); if (!b) return;
-      b.style.width = b.getBoundingClientRect().width + 'px';
-      b.getBoundingClientRect();
-      b.classList.toggle('hp-mb-close', toClose);
-      b.style.width = mbWidth(toClose ? mbC : mbA) + 'px';
-      b.setAttribute('aria-label', toClose ? 'Bereich schliessen' : 'Menü öffnen');
-      clearTimeout(b.__hpT);
-      if (!toClose) b.__hpT = setTimeout(function () { if (!b.classList.contains('hp-mb-close')) b.style.width = ''; }, 750);
-      // kurzer Druck-Moment, dann federt er zurück
-      b.classList.add('hp-mb-pop');
-      setTimeout(function () { b.classList.remove('hp-mb-pop'); }, 120);
+      if (b.__hpTo === toClose) return;
+      b.__hpTo = toClose;
+      clearTimeout(mbT);
+      b.classList.remove('hp-mb-bounce');
+      b.classList.add('hp-mb-out');
+      mbT = setTimeout(function () {
+        b.textContent = toClose ? mbClose : mbOrig;
+        b.setAttribute('aria-label', toClose ? 'Bereich schliessen' : 'Menü öffnen');
+        b.getBoundingClientRect();
+        b.classList.remove('hp-mb-out');
+        b.classList.add('hp-mb-bounce');
+        mbT = setTimeout(function () { b.classList.remove('hp-mb-bounce'); }, 750);
+      }, 250);
     }
     // Klick auf den Menü-Knopf bei offenem About: schliesst das About statt das Menü zu öffnen
     function mbIntercept(e) {
