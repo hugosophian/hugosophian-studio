@@ -87,6 +87,14 @@
     '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
+    '[data-hp] .hp-info-btns [data-hp-close] { display: none !important; }',
+    /* Menü-Knopf wird beim About zu „close“: Text rollt mit Bounce, Breite federt mit */
+    '.hp-mb-vp { display: block; overflow: hidden; height: var(--hp-mb-h, 1.2em); }',
+    '.hp-mb-roll { display: flex; flex-direction: column; transition: transform .7s cubic-bezier(.3,1.7,.55,1); will-change: transform; }',
+    '.hp-mb-roll > span { display: block; height: var(--hp-mb-h, 1.2em); line-height: var(--hp-mb-h, 1.2em); white-space: nowrap; text-align: center; }',
+    '.hp-mb-close .hp-mb-roll { transform: translate3d(0,-50%,0); }',
+    '.hp-mb-btn { transition: width .7s cubic-bezier(.3,1.7,.55,1), scale .5s cubic-bezier(.3,1.7,.55,1) !important; }',
+    '.hp-mb-pop { scale: .9; transition: width .7s cubic-bezier(.3,1.7,.55,1), scale .12s ease-out !important; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz (kein dunkler Streifen an der Kante).
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -499,7 +507,7 @@
     infoOpen.removeAttribute('id'); if (!inOpen) infoOpen.textContent = 'Galerie öffnen';
     var infoClose = inClose ? inClose.cloneNode(true) : document.createElement('div');
     infoClose.removeAttribute('id'); if (!inClose) infoClose.textContent = 'Close';
-    infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '0');
+    infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '-1'); infoClose.setAttribute('data-hp-close', '');
     infoBtns.appendChild(infoOpen); infoBtns.appendChild(infoClose);
     infoPanel.appendChild(infoText); infoPanel.appendChild(infoBtns);
     info.appendChild(infoPanel); root.appendChild(info);
@@ -566,13 +574,14 @@
       ix.a = null; ix.v = 0;
       tween(iz, 1, CONFIG.infoMs, zoomOpen);
       root.classList.add('is-info'); setDialog(info, true);
-      mbShow();
+      mbShow(); mbMorph(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
-      setTimeout(function () { if (root.classList.contains('is-info')) infoClose.focus({ preventScroll: true }); }, CONFIG.infoMs * 0.6);
+      setTimeout(function () { if (root.classList.contains('is-info') && mbBtn) mbBtn.focus({ preventScroll: true }); }, CONFIG.infoMs * 0.6);
     }
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
+      mbMorph(false);
       if (infoSlide) {
         tween(ix, 0, CONFIG.infoMs, easeInfo, ix.v - 1);   // von links herein (aus der aktuellen Lage)
         tween(iz, 0, 1000, easeDock);
@@ -594,6 +603,56 @@
       e.preventDefault(); e.stopImmediatePropagation();
       if (infoOpen.getAttribute('href') && infoOpen.getAttribute('href') !== '#') go(infoOpen.href);
     });
+    // ---------- Menü-Knopf wird zum Close-Knopf, solange das About offen ist ----------
+    var mbBtn = null, mbA = null, mbC = null, mbOrig = '';
+    function mbSetup() {
+      if (mbBtn) return mbBtn;
+      var b = document.querySelector('.menu-toggle-wrap [data-menu-open]') || document.querySelector('.menu-toggle-wrap .is-menu');
+      if (!b) return null;
+      mbOrig = b.textContent.trim() || 'menu';
+      var cs = getComputedStyle(b);
+      var lh = parseFloat(cs.lineHeight); if (!lh) lh = parseFloat(cs.fontSize) * 1.2;
+      b.style.setProperty('--hp-mb-h', lh + 'px');
+      b.textContent = '';
+      var vp = document.createElement('span'); vp.className = 'hp-mb-vp';
+      var roll = document.createElement('span'); roll.className = 'hp-mb-roll';
+      mbA = document.createElement('span'); mbA.textContent = mbOrig;
+      mbC = document.createElement('span'); mbC.textContent = (inClose && inClose.textContent.trim()) || 'close';
+      roll.appendChild(mbA); roll.appendChild(mbC); vp.appendChild(roll); b.appendChild(vp);
+      b.classList.add('hp-mb-btn');
+      mbBtn = b;
+      return b;
+    }
+    function mbWidth(label) {
+      var b = mbBtn, cs = getComputedStyle(b);
+      var r = document.createRange(); r.selectNodeContents(label);
+      return Math.ceil(r.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth));
+    }
+    function mbMorph(toClose) {
+      var b = mbSetup(); if (!b) return;
+      b.style.width = b.getBoundingClientRect().width + 'px';
+      b.getBoundingClientRect();
+      b.classList.toggle('hp-mb-close', toClose);
+      b.style.width = mbWidth(toClose ? mbC : mbA) + 'px';
+      b.setAttribute('aria-label', toClose ? 'Bereich schliessen' : 'Menü öffnen');
+      clearTimeout(b.__hpT);
+      if (!toClose) b.__hpT = setTimeout(function () { if (!b.classList.contains('hp-mb-close')) b.style.width = ''; }, 750);
+      // kurzer Druck-Moment, dann federt er zurück
+      b.classList.add('hp-mb-pop');
+      setTimeout(function () { b.classList.remove('hp-mb-pop'); }, 120);
+    }
+    // Klick auf den Menü-Knopf bei offenem About: schliesst das About statt das Menü zu öffnen
+    function mbIntercept(e) {
+      if (!root.classList.contains('is-info')) return;
+      var t = e.target.closest && e.target.closest('.menu-toggle-wrap');
+      if (!t) return;
+      if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      closeInfo();
+    }
+    window.addEventListener('click', mbIntercept, true);
+    window.addEventListener('keydown', mbIntercept, true);
+
     var aboutBtn = root.querySelector('.hp-about-btn');
     if (aboutBtn) {
       aboutBtn.setAttribute('role', 'button'); aboutBtn.setAttribute('tabindex', '0');
