@@ -107,6 +107,14 @@
     '[data-hp] .hp-brand { transition: color .25s ease; }',
     '[data-hp] .hp-brand.hp-on-white { color: var(--hp-info-fg, #000) !important; mix-blend-mode: normal !important; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
+    /* Desktop: nebeneinander, Textspalte neben dem geöffneten Bild (nur Text und Link zur Galerie) */
+    '[data-hp] .hp-side { display: none; }',
+    '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
+    '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
+    '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; }',
+    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 2; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
+    '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: flex-end; gap: 2.2vh; }',
+    '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; color: inherit; opacity: 1; transform: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -182,8 +190,12 @@
       txt.removeAttribute('id'); txt.innerHTML = s.intro;
       sin.appendChild(txt);
       if (s.href) {
-        var a = inOpen ? inOpen.cloneNode(false) : document.createElement('a');
-        a.removeAttribute('id'); a.href = s.href; a.textContent = s.btn || 'Galerie öffnen'; a.tabIndex = -1;
+        // Link zur Galerie im Stil von „Alle Projekte ↓“ (wie im About am Handy), Pfeil nach rechts
+        var a = document.createElement('a'); a.className = 'lib-sort hp-info-go';
+        a.href = s.href; a.tabIndex = -1;
+        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Galerie öffnen';
+        var ar = document.createElement('span'); ar.className = 'lib-sort-arrow'; ar.setAttribute('aria-hidden', 'true'); ar.textContent = '\u2192';
+        a.appendChild(al); a.appendChild(ar);
         a.addEventListener('click', function (e) { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); go(s.href); } });
         sin.appendChild(a); s.sideLink = a;
       }
