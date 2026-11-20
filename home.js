@@ -79,8 +79,7 @@
     '[data-hp] .hp-intro, [data-hp] .hp-about { display: none !important; }',
     '[data-hp] .hp-info { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; visibility: hidden; transition: visibility 0s linear 1.5s; }',
     '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
-    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh; background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); transition: transform 1.5s cubic-bezier(.6,0,.1,1); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
-    '[data-hp].is-info .hp-info-panel { transform: none; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh; background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
@@ -349,6 +348,8 @@
       }
       if (tick(iz, now)) more = true;
       if (tick(ix, now)) more = true;
+      if (tick(ip, now)) more = true;
+      applyPanel();
       if (infoClosing) more = true;
       render(dt);
       if (more) kick(); else last = 0;
@@ -517,6 +518,8 @@
     //   bis die weisse Seite das Bild ganz zudeckt (sonst sieht man links, wie er stehen bleibt):
     //   in der ersten Sekunde wie Mario (Kurve .72,0,.11,1), danach weich weiter bis 1.5 s.
     var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null }, infoClosing = false;
+    var ip = { v: 1, a: null };   // weisse Seite: 1 = rechts draussen, 0 = ganz da (im selben Takt wie das Bild)
+    function applyPanel() { infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)'; }
     function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
     function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
@@ -530,9 +533,8 @@
       var s = infoSlide; if (!s) return;
       // Schliessen: Bildkante klebt an der weissen Seite (2 px darunter), damit nie eine Lücke entsteht
       if (infoClosing) {
-        var pl = infoPanel.getBoundingClientRect().left - root.getBoundingClientRect().left;
-        if (pl >= W - 0.5) { ix.v = 0; infoClosing = false; }
-        else ix.v = Math.min(0, (pl + 2) / W - 1);
+        if (ip.v >= 1 && !ip.a) { ix.v = 0; infoClosing = false; }
+        else ix.v = Math.min(0, ip.v - 1 + 2 / W);
       }
       if (!iz.a && !ix.a && !infoClosing && iz.v <= 0.0001 && Math.abs(ix.v) <= 0.0001) {
         s.el.style.transform = 'translate3d(0,0,0)';
@@ -572,6 +574,7 @@
       infoSlide = s; infoClosing = false;
       ix.a = null; ix.v = 0;
       tween(iz, 1, CONFIG.infoMs, zoomOpen);
+      tween(ip, 0, CONFIG.infoMs, easeInfo);
       root.classList.add('is-info'); setDialog(info, true);
       mbShow(); mbMorph(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
@@ -585,6 +588,7 @@
         ix.a = null; infoClosing = true;                 // von links herein, geführt von der weissen Seite
         tween(iz, 0, 1000, easeDock);
       }
+      tween(ip, 1, CONFIG.infoMs, easeInfo);
       if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
       clearTimeout(infoT);
       infoT = setTimeout(function () {
