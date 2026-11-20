@@ -39,21 +39,21 @@
     imgLag:     0.45,   // das neue Bild läuft in seinem Rahmen langsamer mit (0 = fest, 1 = gleich schnell)
     oldScale:   0.06,   // das alte Bild zoomt beim Wegfahren leicht heran
     stiffness:  130,    // Feder beim Einrasten (grösser = schneller)
-    damping:    0.55,   // kleiner = mehr Nachwippen
+    damping:    0.45,   // kleiner = mehr Nachwippen
     flick:      0.22,   // wie stark ein schneller Wisch zählt (Sekunden Schwung)
     wheelIdle:  120,    // ms nach Mausrad/Trackpad, dann einrasten
     wheelStep:  700,    // Mausrad-Weg (px) für ein ganzes Bild
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Glas-Kante beim Wechsel
-    glassRadius: 34,    // px Rundung der Ecken in der Mitte des Wechsels
-    glassInset:  0.03,  // so viel schmaler wird das neue Bild unterwegs (Anteil)
-    glassStretch: 0.018,// Dehnung pro Bild/Sekunde Tempo
+    glassRadius: 0,     // px Rundung der Ecken in der Mitte des Wechsels
+    glassInset:  0,     // so viel schmaler wird das neue Bild unterwegs (Anteil)
+    glassStretch: 0,   // Dehnung pro Bild/Sekunde Tempo
     glassMax:    0.07,  // höchstens so viel Dehnung
-    jelly:       0.9,   // Nachfedern beim Ankommen: das Bild dehnt sich statt das nächste zu zeigen
+    jelly:       0,     // Nachfedern beim Ankommen: das Bild dehnt sich statt das nächste zu zeigen
     lens:        0,     // Stärke des Glasrands (0 = aus)
     // Wobbeln wie iOS 26: Bilder werden beim Anfassen zu Glaskarten und federn einzeln nach
-    press:       0.035,  // so viel kleiner wird das Bild, solange der Finger es hält
-    pressRadius: 28,    // px Rundung, solange der Finger es hält
+    press:       0,      // so viel kleiner wird das Bild, solange der Finger es hält
+    pressRadius: 0,     // px Rundung, solange der Finger es hält
     pressK:      240,   // Feder fürs Kleiner/Grösserwerden
     pressDamp:   0.42,  // kleiner = mehr Nachwippen
     lagK:        220,   // Feder, mit der das neue Bild dem Finger folgt (kleiner = mehr Verzögerung)
