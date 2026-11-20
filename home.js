@@ -83,7 +83,12 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
-    '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 4vh; flex: 0 0 auto; }',
+    '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
+    /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
+    '[data-hp] .hp-info-go { color: inherit; text-decoration: none; align-self: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; }',
+    '[data-hp] .hp-info-go .lib-sort-label, [data-hp] .hp-info-go .lib-sort-arrow { color: inherit; }',
+    '[data-hp] .hp-info-go .lib-sort-arrow { transition: transform .45s cubic-bezier(.3,1.7,.55,1); }',
+    '[data-hp] .hp-info-go:hover .lib-sort-arrow, [data-hp] .hp-info-go:focus-visible .lib-sort-arrow { transform: translateX(.35em); }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
@@ -501,8 +506,10 @@
     var infoText = inText ? inText.cloneNode(false) : document.createElement('div');
     infoText.removeAttribute('id'); if (!inText) infoText.className = 'hp-intro-text';
     var infoBtns = document.createElement('div'); infoBtns.className = 'hp-info-btns';
-    var infoOpen = inOpen ? inOpen.cloneNode(true) : document.createElement('a');
-    infoOpen.removeAttribute('id'); if (!inOpen) infoOpen.textContent = 'Galerie öffnen';
+    var infoOpen = document.createElement('a'); infoOpen.className = 'lib-sort hp-info-go';
+    var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Galerie öffnen';
+    var infoGoArrow = document.createElement('span'); infoGoArrow.className = 'lib-sort-arrow'; infoGoArrow.setAttribute('aria-hidden', 'true'); infoGoArrow.textContent = '\u2192';
+    infoOpen.appendChild(infoGoLabel); infoOpen.appendChild(infoGoArrow);
     var infoClose = inClose ? inClose.cloneNode(true) : document.createElement('div');
     infoClose.removeAttribute('id'); if (!inClose) infoClose.textContent = 'Close';
     infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '-1'); infoClose.setAttribute('data-hp-close', '');
@@ -563,7 +570,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); if (s.btn) infoOpen.textContent = s.btn;
+      infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
       // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben rechts neben
