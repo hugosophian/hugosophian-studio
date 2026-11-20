@@ -344,11 +344,8 @@
         else more = true;
         if (down && moved) more = true;
       }
-      if (infoA) {
-        var it = clamp((now - infoA.t0) / CONFIG.infoMs, 0, 1);
-        infoE = infoA.from + (infoA.to - infoA.from) * easeInfo(it);
-        if (it >= 1) infoA = null; else more = true;
-      }
+      if (tick(iz, now)) more = true;
+      if (tick(ix, now)) more = true;
       render(dt);
       if (more) kick(); else last = 0;
     }
@@ -506,20 +503,30 @@
     setDialog(info, false);
 
     var tClone = null, tOrig = null, infoT = 0;
-    // Bild beim About: wird zum Streifen am linken Rand und zoomt dabei hinein (Mario: Mesh schmaler,
-    // Shader-Wert scaleImage 0 → 2, Bildausschnitt · (1 − 0.5 · scaleImage))
-    var infoE = 0, infoA = null, infoSlide = null;
-    function infoAnim(to) { infoA = { from: infoE, to: to, t0: performance.now() }; kick(); }
+    // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
+    //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
+    //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
+    //   Schliessen: Bild gleitet von links herein (x −Breite → 0 in 1.5 s, .6,0,.1,1) und zoomt dabei
+    //              heraus (scaleImage → 0 in 1 s, .72,0,.11,1), die weisse Seite fährt nach rechts weg.
+    //   Bildausschnitt · (1 − 0.5 · scaleImage) → Zoom = 1 / (1 − 0.5 · scaleImage)
+    var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null };
+    function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
+    function tick(o, now) {
+      if (!o.a) return false;
+      var t = clamp((now - o.a.t0) / o.a.ms, 0, 1);
+      o.v = o.a.from + (o.a.to - o.a.from) * o.a.ease(t);
+      if (t >= 1) { o.a = null; return false; }
+      return true;
+    }
     function applyInfo() {
       var s = infoSlide; if (!s) return;
-      var e = infoE;
-      if (e <= 0.0005 && !infoA) {
-        s.el.style.right = '';
+      if (!iz.a && !ix.a && iz.v <= 0.0001 && Math.abs(ix.v) <= 0.0001) {
+        s.el.style.transform = 'translate3d(0,0,0)';
         if (s.media) s.media.style.transform = 'scale(' + CONFIG.imgBase + ')';
         infoSlide = null; return;
       }
-      s.el.style.right = (W * e).toFixed(1) + 'px';
-      if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / Math.max(0.08, 1 - e)).toFixed(4) + ')'; }
+      s.el.style.transform = 'translate3d(' + (ix.v * W).toFixed(1) + 'px,0,0)';
+      if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / Math.max(0.06, 1 - 0.5 * iz.v)).toFixed(4) + ')'; }
     }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
@@ -546,8 +553,10 @@
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
         tClone.style.transform = 'translate3d(0,' + up.toFixed(1) + 'px,0)';
       }
-      if (infoSlide && infoSlide !== s) { infoSlide.el.style.right = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; infoE = 0; }
-      infoSlide = s; infoAnim(1);
+      if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
+      infoSlide = s;
+      ix.a = null; ix.v = 0;
+      tween(iz, 2, 1000, easeDock);
       root.classList.add('is-info'); setDialog(info, true);
       mbShow();
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
@@ -556,7 +565,10 @@
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
-      infoAnim(0);
+      if (infoSlide) {
+        tween(ix, 0, CONFIG.infoMs, easeInfo, ix.v - 1);   // von links herein (aus der aktuellen Lage)
+        tween(iz, 0, 1000, easeDock);
+      }
       if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
       clearTimeout(infoT);
       infoT = setTimeout(function () {
