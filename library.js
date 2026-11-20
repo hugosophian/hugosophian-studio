@@ -516,6 +516,7 @@
       if (!root.classList.contains('is-pv')) return;
       var it = pvItem, target = pvMedia && pvMedia.firstChild;
       pvItem = null;
+      window.hsVT = null;
       root.classList.remove('is-pv-in');
       pv.setAttribute('aria-hidden', 'true'); if ('inert' in pv) pv.inert = true;
       mode = 'idle'; render();
@@ -541,6 +542,7 @@
       if (!e.target.closest('.lib-pv-panel')) closePreview();
     });
 
+    // Projektseite und ihr Titelbild vorladen (gleiche Grösse wie dort: sizes der Projekt-Galerie)
     var prefetched = {};
     function prefetch(href) {
       if (!href || prefetched[href]) return;
@@ -548,7 +550,21 @@
       var l = document.createElement('link');
       l.rel = 'prefetch'; l.href = href;
       document.head.appendChild(l);
+      if (pvItem && pvItem.img) {
+        var pre = new Image();
+        pre.sizes = '(max-width: 767px) 100vw, 34vw';
+        if (pvItem.img.srcset) pre.srcset = pvItem.img.srcset;
+        pre.src = pvItem.img.src;
+        if (pre.decode) pre.decode().catch(function () {});
+      }
     }
+    // „Galerie öffnen“: Flug in die Projektseite anmelden (Website-Head, Block SEITENÜBERGÄNGE)
+    if (pvOpen) pvOpen.addEventListener('click', function () {
+      var img = pvMedia && pvMedia.firstChild;
+      var to = '';
+      try { to = new URL(pvOpen.href, location.href).pathname; } catch (e) {}
+      if (img && to) window.hsVT = { to: to, el: img, sel: '.pg-hero-media' };
+    });
 
     // ---------- Start ----------
     root.classList.toggle('is-mouse', window.matchMedia('(hover: hover) and (pointer: fine)').matches);
@@ -592,7 +608,7 @@
     });
     window.addEventListener('pageshow', function (e) {
       if (!e.persisted) return;
-      if (root.classList.contains('is-pv')) closePreview();
+      // Zurück aus der Projektseite: Vorschau bleibt offen, das Bild fliegt dorthin zurück
       measure(); P = T = items[idx] ? items[idx].c : 0; render();
     });
   }
