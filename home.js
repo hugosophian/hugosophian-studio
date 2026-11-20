@@ -79,12 +79,16 @@
     '[data-hp] .hp-intro, [data-hp] .hp-about { display: none !important; }',
     '[data-hp] .hp-info { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; visibility: hidden; transition: visibility 0s linear 1.5s; }',
     '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
-    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh; background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw 16vh var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; gap: 4vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
-    '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
-    '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
+    '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
+    '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
+    /* „Hugo Sophian Studio“ bleibt beim About oben links stehen und wird dunkel, sobald die weisse Seite darunter ist */
+    '[data-hp].is-info .hp-brand, [data-hp].hp-info-anim .hp-brand { z-index: 8; }',
+    '[data-hp] .hp-brand { transition: color .25s ease; }',
+    '[data-hp] .hp-brand.hp-on-white { color: var(--hp-info-fg, #000) !important; mix-blend-mode: normal !important; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
@@ -379,7 +383,7 @@
 
     // ---------- Menü-Knopf: weg, solange sich etwas bewegt; da, sobald alles steht ----------
     function mbWrap() { return document.querySelector('.menu-toggle-wrap'); }
-    function mbShow() { var w = mbWrap(); if (w) w.classList.add('lib-mb'); }
+    function mbShow() {}   // Homepage: kein Menü-Knopf (nur als Close beim About, siehe mbPop)
     function mbHide() { var w = mbWrap(); if (w) w.classList.remove('lib-mb'); }
     function activity() { if (busy() || desk) return; mbHide(); }
 
@@ -519,7 +523,12 @@
     //   in der ersten Sekunde wie Mario (Kurve .72,0,.11,1), danach weich weiter bis 1.5 s.
     var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null }, infoClosing = false;
     var ip = { v: 1, a: null };   // weisse Seite: 1 = rechts draussen, 0 = ganz da (im selben Takt wie das Bild)
-    function applyPanel() { infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)'; }
+    var brand = root.querySelector('.hp-brand');
+    function applyPanel() {
+      infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
+      // Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
+      if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
+    }
     function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
     function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
@@ -555,8 +564,16 @@
       infoOpen.setAttribute('href', s.href || '#'); if (s.btn) infoOpen.textContent = s.btn;
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
-      // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben fahren
-      var up = 0, top = Math.max(12, W * 0.03);
+      // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben rechts neben
+      // „Hugo Sophian Studio“ fahren. Der Text steht ebenfalls rechts davon, unter dem Schriftzug bleibt es leer.
+      var rr = root.getBoundingClientRect();
+      var top = Math.max(12, W * 0.03), left = W * 0.05, gap = Math.max(14, W * 0.045), right = W * 0.05;
+      if (brand) {
+        var br = brand.getBoundingClientRect();
+        top = br.top - rr.top; left = br.right - rr.left + gap;
+      }
+      root.style.setProperty('--hp-info-left', left.toFixed(0) + 'px');
+      root.style.setProperty('--hp-info-top', (top + H * 0.12).toFixed(0) + 'px');
       if (s.title) {
         tOrig = s.title;
         tClone = s.title.cloneNode(true);
@@ -564,11 +581,17 @@
         tClone.style.transform = 'translate3d(0,0,0)';
         root.appendChild(tClone);
         tOrig.style.visibility = 'hidden';
-        var r = tClone.getBoundingClientRect(), rr = root.getBoundingClientRect();
-        up = top - (r.top - rr.top);
-        root.style.setProperty('--hp-info-top', (top + r.height + H * 0.05).toFixed(0) + 'px');
+        var cr = tClone.getBoundingClientRect();
+        var rg = document.createRange(); rg.selectNodeContents(tClone);
+        var tr = rg.getBoundingClientRect();
+        var sc = Math.min(1, (W - left - right) / Math.max(1, tr.width));
+        var ox = tr.left - cr.left, oy = tr.top - cr.top;   // Textanfang innerhalb der Kopie
+        var dx = left - (cr.left - rr.left) - sc * ox;
+        var dy = top - (cr.top - rr.top) - sc * oy;
+        tClone.style.transformOrigin = '0 0';
+        root.style.setProperty('--hp-info-top', (top + tr.height * sc + H * 0.035).toFixed(0) + 'px');
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
-        tClone.style.transform = 'translate3d(0,' + up.toFixed(1) + 'px,0)';
+        tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')';
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
@@ -576,14 +599,14 @@
       tween(iz, 1, CONFIG.infoMs, zoomOpen);
       tween(ip, 0, CONFIG.infoMs, easeInfo);
       root.classList.add('is-info'); setDialog(info, true);
-      mbShow(); mbMorph(true);
+      mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
-      setTimeout(function () { if (root.classList.contains('is-info') && mbBtn) mbBtn.focus({ preventScroll: true }); }, CONFIG.infoMs * 0.6);
+      setTimeout(function () { if (root.classList.contains('is-info') && mbBtn) mbBtn.focus({ preventScroll: true }); }, CONFIG.infoMs);
     }
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
-      mbMorph(false);
+      mbPop(false);
       if (infoSlide) {
         ix.a = null; infoClosing = true;                 // von links herein, geführt von der weissen Seite
         tween(iz, 0, 1000, easeDock);
@@ -596,7 +619,6 @@
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
       }, CONFIG.infoMs + 50);
-      mbShow();
     }
     infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
     infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
@@ -620,21 +642,37 @@
       mbBtn = b;
       return b;
     }
-    function mbMorph(toClose) {
+    // Auf der Homepage gibt es keinen Menü-Knopf. Nur beim About poppt er gegen Ende der Animation
+    // als „close“ auf (aus der Unschärfe, mit Bounce) und verschwindet beim Schliessen wieder.
+    function mbPlace(on) {
+      var w = mbWrap(); if (!w) return;
+      w.classList.add('mh-now');
+      w.classList.toggle('lib-mb', on);
+      void w.offsetWidth;
+      w.classList.remove('mh-now');
+    }
+    function mbPop(on) {
       var b = mbSetup(); if (!b) return;
-      if (b.__hpTo === toClose) return;
-      b.__hpTo = toClose;
       clearTimeout(mbT);
       b.classList.remove('hp-mb-bounce');
-      b.classList.add('hp-mb-out');
-      mbT = setTimeout(function () {
-        b.textContent = toClose ? mbClose : mbOrig;
-        b.setAttribute('aria-label', toClose ? 'Bereich schliessen' : 'Menü öffnen');
-        b.getBoundingClientRect();
-        b.classList.remove('hp-mb-out');
-        b.classList.add('hp-mb-bounce');
-        mbT = setTimeout(function () { b.classList.remove('hp-mb-bounce'); }, 750);
-      }, 250);
+      if (on) {
+        b.textContent = mbClose;
+        b.setAttribute('aria-label', 'Bereich schliessen');
+        b.classList.add('hp-mb-out');
+        mbPlace(true);
+        mbT = setTimeout(function () {
+          b.classList.remove('hp-mb-out');
+          b.classList.add('hp-mb-bounce');
+          mbT = setTimeout(function () { b.classList.remove('hp-mb-bounce'); }, 750);
+        }, CONFIG.infoMs * 0.72);
+      } else {
+        b.classList.add('hp-mb-out');
+        mbT = setTimeout(function () {
+          mbPlace(false);
+          b.textContent = mbOrig;
+          b.setAttribute('aria-label', 'Menü öffnen');
+        }, 260);
+      }
     }
     // Klick auf den Menü-Knopf bei offenem About: schliesst das About statt das Menü zu öffnen
     function mbIntercept(e) {
