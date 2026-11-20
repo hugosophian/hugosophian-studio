@@ -91,7 +91,12 @@
     '[data-hp] .hp-info-go .lib-sort-arrow { font-size: 1.1em; line-height: 1; font-weight: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-label, [data-hp] .hp-info-go .lib-sort-arrow { color: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { transition: transform .45s cubic-bezier(.3,1.7,.55,1); }',
-    '[data-hp] .hp-info-go:hover .lib-sort-arrow, [data-hp] .hp-info-go:focus-visible .lib-sort-arrow { transform: translateX(.35em); }',
+    /* Hover nur mit echter Maus: am iPhone würde der erste Tipp sonst nur den Hover auslösen statt den Link */
+    '@media (hover: hover) and (pointer: fine) { [data-hp] .hp-info-go:hover .lib-sort-arrow { transform: translateX(.35em); } }',
+    '[data-hp] .hp-info-go:focus-visible .lib-sort-arrow { transform: translateX(.35em); }',
+    /* grössere Tippfläche, ohne dass sich das Aussehen ändert */
+    '[data-hp] .hp-info-go { position: relative; touch-action: manipulation; }',
+    '[data-hp] .hp-info-go::after { content: ""; position: absolute; inset: -14px -16px; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
@@ -634,6 +639,18 @@
     infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
     infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
     // „Galerie öffnen“: Übergang anmelden (alte Seite blendet aus, Library startet schwarz) und selbst navigieren
+    // Am Handy: direkt beim Loslassen des Fingers öffnen (ohne auf den Klick zu warten), wenn nicht gescrollt wurde
+    var goDown = null;
+    infoOpen.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch') goDown = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    infoOpen.addEventListener('pointerup', function (e) {
+      if (!goDown || e.pointerType !== 'touch') return;
+      var moved = Math.abs(e.clientX - goDown.x) > 10 || Math.abs(e.clientY - goDown.y) > 10;
+      goDown = null;
+      if (moved || !root.classList.contains('is-info')) return;
+      var h = infoOpen.getAttribute('href');
+      if (h && h !== '#') { e.preventDefault(); go(infoOpen.href); }
+    });
+    infoOpen.addEventListener('pointercancel', function () { goDown = null; });
     infoOpen.addEventListener('click', function (e) {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
       e.preventDefault(); e.stopImmediatePropagation();
