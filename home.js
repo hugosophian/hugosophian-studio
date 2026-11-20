@@ -48,7 +48,7 @@
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Einflug
-    introMs:    2000,   // Dauer
+    introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
@@ -112,7 +112,22 @@
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
-  function easeInOutExpo(t) { return t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2; }
+  // Kurve wie Marios Einflug: cubic-bezier(.72, 0, .11, 1) – langsamer Anlauf, sehr weiches Andocken
+  function bezier(x1, y1, x2, y2) {
+    function a(p1, p2) { return 1 - 3 * p2 + 3 * p1; }
+    function b(p1, p2) { return 3 * p2 - 6 * p1; }
+    function c(p1) { return 3 * p1; }
+    function f(t, p1, p2) { return ((a(p1, p2) * t + b(p1, p2)) * t + c(p1)) * t; }
+    function d(t, p1, p2) { return 3 * a(p1, p2) * t * t + 2 * b(p1, p2) * t + c(p1); }
+    return function (x) {
+      if (x <= 0) return 0; if (x >= 1) return 1;
+      var t = x;
+      for (var i = 0; i < 8; i++) { var dx = f(t, x1, x2) - x, dd = d(t, x1, x2); if (Math.abs(dx) < 1e-5 || !dd) break; t -= dx / dd; }
+      if (Math.abs(f(t, x1, x2) - x) > 1e-4) { var lo = 0, hi = 1; t = x; for (i = 0; i < 30; i++) { var v = f(t, x1, x2); if (v < x) lo = t; else hi = t; t = (lo + hi) / 2; } }
+      return f(t, y1, y2);
+    };
+  }
+  var easeDock = bezier(0.72, 0, 0.11, 1);
 
   function init(root) {
     if (root.__hp) return;
@@ -240,24 +255,25 @@
           k = j;
           ax = W / 2 + (j - (n - 1) / 2) * (aw + g) - aw / 2;
           bx = j * W / n; by = 0; bw = W / n; bh = H;
-          E = easeInOutExpo(clamp((P - 0.4 - 0.025 * j) / 0.55, 0, 1));
+          E = easeDock(clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1));
         } else {
           var r = rel(j);
           aw = W * CONFIG.stripW; ah = H * CONFIG.stripH;
           k = r + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
-          E = easeInOutExpo(clamp((P - 0.38) / 0.62, 0, 1));
+          E = easeDock(clamp((P - 0.25) / 0.75, 0, 1));
           ay = H / 2 + r * (ah + 4);
         }
-        var ap = easeOut(clamp((P - 0.05 * k) / 0.3, 0, 1));
+        var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
         rect(s, lerp(ax, bx, E), lerp(ay, by, E), lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
         s.el.style.zIndex = (!desk && rel(j) === 0) ? 3 : 2;
-        if (s.media) { s.media.style.transform = 'none'; s.media.style.width = ''; }
+        // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
+        if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
       }
     }
