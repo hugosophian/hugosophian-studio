@@ -87,6 +87,9 @@
     '[data-hp] .hp-about-btn, [data-hp] .hp-brand { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn, [data-hp].is-info .hp-brand { opacity: 0; pointer-events: none; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
+    /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz (kein dunkler Streifen an der Kante).
+       html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
+    '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
     /* Desktop: nebeneinander */
     '[data-hp] .hp-side { display: none; }',
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
@@ -523,8 +526,9 @@
       if (!iz.a && !ix.a && iz.v <= 0.0001 && Math.abs(ix.v) <= 0.0001) {
         s.el.style.transform = 'translate3d(0,0,0)';
         if (s.media) s.media.style.transform = 'scale(' + CONFIG.imgBase + ')';
-        infoSlide = null; return;
+        infoSlide = null; root.classList.remove('hp-info-anim'); return;
       }
+      root.classList.add('hp-info-anim');
       s.el.style.transform = 'translate3d(' + (ix.v * W).toFixed(1) + 'px,0,0)';
       if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / Math.max(0.06, 1 - 0.5 * iz.v)).toFixed(4) + ')'; }
     }
