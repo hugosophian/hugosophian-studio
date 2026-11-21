@@ -46,23 +46,22 @@
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
     // jede Karte blendet in 0.4 s ein, sobald sie rechts ins Bild kommt; beim Landen der Rest
-    introDelay: 120,    // ms schwarz, bevor es losgeht (CRL: 0.45 s nach dem Vorhang; hier kürzer, Hugo 21.11.)
-    introWait:  900,    // höchstens so lange auf die ersten Bilder warten, der Rest lädt während des Eintritts
+    introWait:  900,    // höchstens so lange auf das erste Bild warten
+    introHold:  700,    // das erste Bild blendet aus dem Schwarz auf (sine), erst dann rollt die Reihe
+    introAll:   2000,   // höchstens so lange warten, bis alle Bilder auf dem Grafikchip sind (dann rollt es ohne Ruckeln)
+    introItems: 20,     // so viele Karten ziehen beim Abrollen vorbei, wie CRL Projekte hat (ganze Runden, Landen auf dem ersten)
     introMs:    3000,
     introBack:  0.54,
-    introSkip:  0.18,   // Anteil am Anfang der Kurve überspringen (dort holt sie nur aus): früher Bilder, weniger Schwarz
-    fadeMs:     800,    // jede Karte blendet so lange weich ein (CRL 0.4 s; Hugo 21.11.: weicher)
-    introFade:  600,    // die ganze Reihe blendet am Anfang zusätzlich weich auf
-    introLoops: 1.6,    // so viele Runden zieht die Reihe beim Eintritt durch (CRL 1; Hugo: schneller in gleicher Zeit)
-    // Auswahl wechseln: die Reihe dreht hoch, bei voller Fahrt kommen die neuen Projekte, dann bremst sie auf das erste
-    spinSpeed:  2.6,    // Höchsttempo in Bildschirmbreiten pro Sekunde
-    spinUpMs:   550,    // Anlauf
-    spinDownMs: 1600,   // Auslaufen (easeOutCubic, ohne Ruck beim Übergang)
-    swapMs:     160,    // kurzes Abblenden um den Wechsel herum
+    fadeMs:     600,    // jede Karte blendet weich ein, bevor sie rechts ins Bild kommt (CRL 0.4 s, sine)
+    fadeAhead:  1.6,    // … und zwar schon 1.6 Bildschirmbreiten vor dem Rand (wie CRL bei 0.85 rad), damit sie voll da ist
+    // Auswahl wechseln (Hugo 21.11.): alle Bilder ziehen sich zu einem zusammen, der Stapel blendet aus,
+    // dann kommt die neue Auswahl wie beim ersten Laden (erstes Bild blendet auf, dann rollt es wie CRL)
+    gatherMs:   650,    // Zusammenziehen (in-out cubic)
+    gatherFade: 300,    // Stapel blendet aus
     // Vorschau
-    pvMs:       750,    // Vorschau öffnen, Teil 1: Bild mit weissem Rahmen fliegt hoch und heftet sich oben an
-    pvOpenMs:   700,    // Teil 2: der Rahmen geht auf und zeigt den Text
-    pvCloseMs:  550,    // Schliessen: Rahmen zieht sich zuerst wieder um das Bild zusammen
+    pvMs:       1000,   // Vorschau öffnen: Bild fliegt an seinen Platz, gleichzeitig geht der weisse Rahmen zur Vorschau auf (Hugo 21.11.)
+    pvOpenMs:   0,      // (früher zweiter Teil nach dem Flug, jetzt alles gleichzeitig)
+    pvCloseMs:  850,    // Schliessen: Rahmen und Bild gleichzeitig zurück ins Rad
     pvGap:      .05     // Abstand Vorschau zum Menü-Knopf (Anteil der Bildschirmhöhe); mehr Inhalt scrollt
   };
 
@@ -176,7 +175,7 @@
         year: txt('.lib-d-year'),
         html: textEl ? textEl.innerHTML : '',
         cats: [].slice.call(el.querySelectorAll('.lib-d-cat')).map(function (c) { return c.textContent.trim(); }),
-        w: 0, h: 0, op: 1, vis: false
+        w: 0, h: 0, op: 0, vis: false
       };
     }).filter(function (it) {
       var ok = it.img && (!folder || it.path.indexOf(folder) === 0);
@@ -195,7 +194,7 @@
     var mode = 'idle';           // idle | drag | intro | outro | pv
     var idx = 0, shownIdx = -1;
     var n = 1, L = 1, H = 1, W = 1, cx = 0, cy = 0, loop = true, gapPx = 0;
-    var raf = 0, last = 0, intro = null, wheelT = 0, dirty = false;
+    var raf = 0, last = 0, intro = null, wheelT = 0, dirty = false, sq = 0, touchNow = false;
 
     // ---------- Masse ----------
     function measure() {
@@ -352,17 +351,9 @@
           c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
           c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
           it.el.classList.add('is-gl');
-          // Kleine Kopie auch für Karte, Flug und Vorschau
-          if (cv2.toBlob && !it.small) cv2.toBlob(function (bl) {
-            if (!bl) return;
-            it.small = URL.createObjectURL(bl);
-            var pre = new Image(); pre.src = it.small;
-            (pre.decode ? pre.decode() : Promise.resolve()).then(function () {
-              if (it.img.srcset) { it.img.removeAttribute('srcset'); it.img.removeAttribute('sizes'); }
-              it.img.src = it.small;
-            }, function () {});
-          }, 'image/jpeg', 0.9);
-          if (started) kick();
+          // Kleine Kopie für Karte, Flug und Vorschau: erst nach dem Eintritt (afterIntro), damit das Abrollen ruhig bleibt
+          if (cv2.toBlob) it.cv2 = cv2;
+          if (started && mode !== 'intro' && mode !== 'outro') { afterIntro(); kick(); }
           res();
         }
         function toCanvas(srcImg, w0, h0) {
@@ -395,10 +386,11 @@
             var go = function () { upload(toCanvas(im, im.naturalWidth, im.naturalHeight), im.naturalWidth / im.naturalHeight); };
             if (im.decode) im.decode().then(go, go); else go();
           };
-          im.onerror = function () { res(); };
+          im.onerror = function () { it.texFail = true; res(); };
           im.src = url;
         }
         if (window.createImageBitmap && window.fetch) viaBitmap().catch(viaImage); else viaImage();
+        if (!gl) it.texFail = true;
       });
       return it.texP;
     }
@@ -457,7 +449,7 @@
     function render() {
       var list = gl ? [] : null, reach = W / 2 + 40;
       for (var i = 0; i < items.length; i++) {
-        var it = items[i], x = rel(i);
+        var it = items[i], x = rel(i) * (1 - sq);
         if (Math.abs(x) - it.w / 2 > reach) {
           if (it.vis) { it.el.classList.remove('is-vis'); it.vis = false; }
           continue;
@@ -465,9 +457,10 @@
         var px = cx + x - it.w / 2, py = cy - it.h / 2;
         it.el.style.transform = 'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0)';
         if (!it.vis) { it.el.classList.add('is-vis'); it.vis = true; }
-        if (list) list.push({ it: it, x: cx + x, y: cy });
+        it.el.style.zIndex = Math.round(1000 - Math.abs(x) / 10);
+        if (list) list.push({ it: it, x: cx + x, y: cy, z: -Math.abs(x) });
       }
-      if (list) glDraw(list);
+      if (list) { list.sort(function (a, b) { return a.z - b.z; }); glDraw(list); }
       idx = nearestTo(P);
       if (idx !== shownIdx && mode !== 'intro' && mode !== 'outro') showMeta(idx);
       if (fill && items.length) {
@@ -507,11 +500,11 @@
     // ---------- Bewegung (Mario dt.update: lastX = lerp(lastX, currentX, ease); progress = (currentX − lastX) / Breite · velo) ----------
     function frame(now) {
       raf = 0;
-      if (dirty) { dirty = false; var keepC = mode === 'idle' && P === T ? items[idx] : null; measure(); if (keepC) P = T = keepC.c; }
+      if (dirty && mode !== 'intro' && mode !== 'outro') { dirty = false; var keepC = mode === 'idle' && P === T ? items[idx] : null; measure(); if (keepC) P = T = keepC.c; }
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
       var busy = false;
-      if (mode === 'outro' && intro && intro.step) {
+      if ((mode === 'outro' || mode === 'intro') && intro && intro.step) {
         busy = true;
         if (intro.step(now, dt)) { var dn = intro.done; intro = null; mode = 'idle'; if (dn) dn(); }
       } else if ((mode === 'intro' || mode === 'outro') && intro) {
@@ -527,6 +520,7 @@
         if (mode !== 'drag' && Math.abs(T - P) < 0.3) P = T;
         // Biegen auf Marios Grenze (±0.4) und weich nachgeführt, damit ein Schwung am Handy nicht springt oder überdreht
         var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, (P - T) / W * velo));
+        if (touchNow && mode !== 'drag') pt = 0;   // Handy: verzerrt nur, solange der Finger hält (schnelles Hin-und-her), nicht im Schwung
         prog += (pt - prog) * (1 - Math.pow(1 - 0.2, dt * 60));
         if (P === T && Math.abs(prog) < 0.0005) prog = 0;
         busy = mode === 'drag' || P !== T || prog !== 0;
@@ -609,6 +603,7 @@
       if (e.target.closest('.lib-top, .lib-pv')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       down = { x: e.clientX, y: e.clientY, p0: T, id: e.pointerId, touch: e.pointerType !== 'mouse', s: [] };
+      touchNow = down.touch;
       moved = false; startIdx = idx;
     });
     window.addEventListener('pointermove', function (e) {
@@ -693,6 +688,7 @@
       if (e.deltaMode === 1) d *= 32;
       if (!d) return;
       T = clampT(T + d);
+      touchNow = false;
       velo = CONFIG.veloWheel; mode = 'idle'; kick();
       clearTimeout(wheelT);
       wheelT = setTimeout(function () { velo = CONFIG.velo; if (mode === 'idle') { snapT(); kick(); } }, CONFIG.wheelIdle);
@@ -713,46 +709,77 @@
     });
 
     // ---------- Eintritt: Bilder kommen zusammen ----------
+    // Eintritt (Hugo 21.11.): das erste Bild blendet aus dem Schwarz auf, dann rollt die Reihe wie bei CRL (_spinIntro):
+    // ganze Runden in 3 s mit back.inOut(.54), Karten blenden ein, sobald sie rechts ins Bild kommen, Landen auf dem ersten.
+    function allTex() { return !gl || items.every(function (it) { return it.tex || it.texFail; }); }
     function runIntro(done) {
       measure();
       wheel.style.opacity = '';
-      velo = CONFIG.velo; prog = 0;
-      if (reduce || !items.length) { P = T = 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
-      // CRL _spinIntro auf der Reihe: einmal die ganze Reihe von rechts nach links durch (3 s, back.inOut(.54)).
-      // Alle Karten starten unsichtbar und blenden in 0.4 s ein, sobald sie rechts ins Bild kommen; beim Landen der Rest.
-      var from = loop ? -L * CONFIG.introLoops : -Math.max(L, W + 200) * CONFIG.introLoops;
+      velo = CONFIG.velo; prog = 0; sq = 0;
+      if (reduce || !items.length) { P = T = items.length ? items[0].c : 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
+      var loops = Math.max(1, Math.round(CONFIG.introItems / n));
+      var from = loop ? items[0].c - L * loops : items[0].c - Math.max(L, W + 200);
+      var to = items[0].c;
       items.forEach(function (it) { setOp(it, 0); it.px = null; it.fade = 0; });
-      P = T = from;
-      // Start so verschieben, dass gleich die nächste Karte am rechten Rand steht: sofort etwas zu sehen statt Schwarz
-      var minX = Infinity;
-      for (var q = 0; q < items.length; q++) { var xq = rel(q), eq = W / 2 + items[q].w / 2; if (xq > eq) minX = Math.min(minX, xq - eq); }
-      if (minX < Infinity) { from += Math.max(0, minX - 2); P = T = from; }
-      mode = 'intro';
-      render();
-      var tf0 = 0;
-      wheel.style.opacity = '0';
-      function fades(now) {
-        if (!tf0) tf0 = now;
-        wheel.style.opacity = Math.min(1, sineInOut(Math.min(1, (now - tf0) / CONFIG.introFade))).toFixed(3);
-        for (var i = 0; i < items.length; i++) {
-          var it = items[i], x = rel(i), edge = W / 2 + it.w / 2;
-          if (!it.fade && it.px !== null && it.px > edge && x <= edge && it.px - x < L / 2) it.fade = now;
-          it.px = x;
-          if (it.fade) setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs))));
-        }
-      }
-      intro = { from: from, to: 0, t0: performance.now() + CONFIG.introDelay - CONFIG.introSkip * CONFIG.introMs, ms: CONFIG.introMs, tick: fades,
-        done: function () {
-          var t0 = performance.now(), rest = items.filter(function (it) { return it.op < 1; });
+      P = T = from; mode = 'intro';
+      var t0 = performance.now(), phase = loop ? 0 : 1, tr = 0, first = items[0];
+      function fadeIn(it, now) { setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs)))); }
+      intro = { done: function () {
+          var t1 = performance.now(), rest = items.filter(function (it) { return it.op < 1; });
+          rest.forEach(function (it) { if (!it.fade) it.fade = t1; });
           if (rest.length) (function f() {
             var now = performance.now();
-            rest.forEach(function (it) { if (!it.fade) it.fade = t0; setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs)))); });
+            rest.forEach(function (it) { fadeIn(it, now); });
             render();
             if (rest.some(function (it) { return it.op < 1; })) requestAnimationFrame(f);
           })();
+          afterIntro();
           if (done) done();
+        }, step: function (now) {
+          if (phase === 0) {
+            // erstes Bild aus dem Schwarz (die Reihe steht so, dass es in der Mitte ist)
+            setOp(first, sineInOut(Math.min(1, (now - t0) / CONFIG.introHold)));
+            if (now - t0 >= CONFIG.introHold && (allTex() || now - t0 >= CONFIG.introAll)) {
+              if (dirty) { dirty = false; measure(); from = loop ? items[0].c - L * loops : from; to = items[0].c; P = T = from; }
+              phase = 1; tr = now;
+              // Beim Losrollen blenden alle Karten diesseits der Einblend-Linie gleich auf, die übrigen kurz bevor sie hereinkommen
+              items.forEach(function (it, i) { it.px = rel(i); if (it !== first && it.px <= W / 2 + it.w / 2 + W * CONFIG.fadeAhead) it.fade = now; });
+            }
+            return false;
+          }
+          if (!tr) tr = now;
+          var t = Math.min(1, (now - tr) / CONFIG.introMs);
+          P = T = from + (to - from) * backInOut(t, CONFIG.introBack);
+          for (var i = 0; i < items.length; i++) {
+            var it = items[i], x = rel(i), edge = W / 2 + it.w / 2 + W * CONFIG.fadeAhead;
+            if (!it.fade && it !== first && it.px !== null && it.px > edge && x <= edge && it.px - x < L / 2) it.fade = now;
+            if (!it.fade && it === first && it.op >= 1) it.fade = -1;
+            it.px = x;
+            if (it.fade > 0) fadeIn(it, now);
+          }
+          if (t >= 1) { P = T = to; return true; }
+          return false;
         } };
       last = 0; kick();
+    }
+    // Nach dem Eintritt: Karten auf die kleinen Bildkopien umstellen (vorher nicht, sonst ruckelt das Abrollen)
+    function afterIntro() {
+      var list = all.filter(function (it) { return it.cv2 && !it.small; }), k = 0;
+      (function next() {
+        if (k >= list.length || mode === 'intro' || mode === 'outro') return;
+        var it = list[k++];
+        it.cv2.toBlob(function (bl) {
+          if (bl) {
+            it.small = URL.createObjectURL(bl);
+            var pre = new Image(); pre.src = it.small;
+            (pre.decode ? pre.decode() : Promise.resolve()).then(function () {
+              if (it.img.srcset) { it.img.removeAttribute('srcset'); it.img.removeAttribute('sizes'); }
+              it.img.src = it.small;
+            }, function () {});
+          }
+          setTimeout(next, 60);
+        }, 'image/jpeg', 0.9);
+      })();
     }
 
     // ---------- Sortierung ----------
@@ -801,44 +828,30 @@
       s.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') pick(e); });
     });
     // Auswahl wechseln: zuerst drehen die Bilder weich davon und blenden aus, dann kommt die neue Auswahl
-    // Auswahl wechseln (Hugo 21.11.): alles dreht hoch, bei voller Fahrt kommen die neuen Projekte,
-    // dann bremst die Reihe weich auf das erste (Tempo beim Übergang gleich, darum kein Ruck)
+    // Auswahl wechseln (Hugo 21.11.): alle Bilder ziehen sich zu einem zusammen, der Stapel blendet aus,
+    // dann kommt die neue Auswahl wie beim ersten Laden (erstes Bild blendet auf, dann rollt es wie CRL)
+    function inOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
     function applyFilter() {
       if (mode === 'outro') return;
       if (meta) meta.classList.add('is-swap');
-      if (reduce || !items.length) { swapNow(); runIntro(function () { showMeta(nearestTo(P), true); }); return; }
       clearTimeout(wheelT); velo = CONFIG.velo;
-      var vmax = CONFIG.spinSpeed * W, Tu = CONFIG.spinUpMs / 1000, Td = CONFIG.spinDownMs / 1000, sw = CONFIG.swapMs / 1000;
-      var t0 = performance.now(), P0 = P, phase = 0, Pb = 0, D = vmax * Td / 3;
+      if (reduce || !items.length) { swapNow(); runIntro(function () { showMeta(nearestTo(P), true); }); return; }
+      if (mode === 'intro') { intro = null; }
+      P = T = P; prog = 0;
+      var t0 = performance.now(), op0 = items.map(function (it) { return it.op; });
       mode = 'outro';
-      function bend(v) {   // gleiches Mass wie beim Ziehen: Abstand Ziel–Anzeige bei diesem Tempo, mal velo
-        var lag = v / 60 * (1 - CONFIG.ease) / CONFIG.ease;
-        var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, -lag / W * velo));
-        prog += (pt - prog) * 0.2;
-      }
-      intro = { done: function () { prog = 0; wheel.style.opacity = ''; showMeta(nearestTo(P), true); }, step: function (now) {
-        var t = (now - t0) / 1000;
-        if (phase === 0) {
-          var u = Math.min(1, t / Tu);
-          P = T = P0 + vmax * Tu * u * u * u / 3;   // Tempo steigt mit u², am Ende vmax
-          bend(vmax * u * u);
-          wheel.style.opacity = Math.max(0, 1 - Math.max(0, t - (Tu - sw)) / sw).toFixed(3);
-          if (u >= 1) {
-            phase = 1;
-            swapNow();
-            Pb = (items.length ? items[0].c : 0) - D;   // so gewählt, dass die Reihe genau auf dem ersten Projekt landet
-            P = T = Pb; t0 = now;
-            items.forEach(function (it) { setOp(it, 1); });
-          }
-        } else {
-          var w = Math.min(1, t / Td), k = 1 - w;
-          P = T = Pb + D * (1 - k * k * k);
-          bend(vmax * k * k);
-          wheel.style.opacity = Math.min(1, t / sw).toFixed(3);
-          if (w >= 1) { P = T = Pb + D; return true; }
-        }
-        return false;
-      } };
+      intro = { done: function () {
+          sq = 0;
+          swapNow();
+          runIntro(function () { showMeta(nearestTo(P), true); });
+        }, step: function (now) {
+          var t = now - t0;
+          sq = inOutCubic(Math.min(1, t / CONFIG.gatherMs));
+          var f = Math.max(0, (t - CONFIG.gatherMs * 0.75) / CONFIG.gatherFade);
+          var o = 1 - sineInOut(Math.min(1, f));
+          items.forEach(function (it, i) { setOp(it, Math.min(op0[i], o)); });
+          return f >= 1;
+        } };
       last = 0; kick();
     }
     function swapNow() {
@@ -948,7 +961,7 @@
       if (pvText) pvText.innerHTML = it.html;
       if (pvOpen) pvOpen.setAttribute('href', it.href);
       pv.setAttribute('aria-hidden', 'false'); if ('inert' in pv) pv.inert = false;
-      mbSwap(true, reduce ? 0 : (CONFIG.pvMs + CONFIG.pvOpenMs) * 0.72);
+      mbSwap(true, reduce ? 0 : CONFIG.pvMs * 0.72);
       prefetch(it.href);
       pvPanel.scrollTop = 0;
       var panelR = fitPanel();
@@ -958,31 +971,32 @@
       var b = mediaRect(it);
       var a = rect(it.img.getBoundingClientRect());
       var cardR = rect((it.a || it.img).getBoundingClientRect());
-      var att = attachRect(b, cardPad(it));
-      var D1 = CONFIG.pvMs, D2 = CONFIG.pvOpenMs, k = D1 / (D1 + D2);
+      var D = CONFIG.pvMs;
+      // Bild in der Vorschau genau so gross wie es zu sehen ist (kein leeres Feld): der Flug in die Projektseite gleitet dann sauber
+      target.style.width = b.width + 'px'; target.style.height = b.height + 'px'; target.style.maxWidth = 'none';
       target.classList.add('is-wait');
       it.el.style.visibility = 'hidden';
       mode = 'pv'; pvState = 'opening';
       render();
       pvFrame.style.transform = box(cardR);
       root.classList.add('is-pv', 'is-pv-dim');
-      // 1) Bild und Rahmen fliegen zusammen hoch und heften sich oben an · 2) der Rahmen geht auf
+      // Bild fliegt an seinen Platz und der weisse Rahmen geht gleichzeitig zur Vorschau auf: gleiche Dauer, gleiche Kurve,
+      // darum liegt das Bild auf dem ganzen Weg im Rahmen. Text blendet ab gut der Hälfte ein.
       frameTo([
         { transform: box(cardR), easing: EASE },
-        { transform: box(att), offset: k, easing: EASE_OPEN },
         { transform: box(panelR) }
-      ], D1 + D2, function () { pvFrame.style.transform = box(panelR); if (pvState === 'opening') pvState = 'open'; });
-      fly(it.img, a, b, D1, function () { target.classList.remove('is-wait'); });
+      ], D, function () { pvFrame.style.transform = box(panelR); if (pvState === 'opening') pvState = 'open'; });
+      fly(it.img, a, b, D, function () { target.classList.remove('is-wait'); });
       pvTimer2 = setTimeout(function () {
         if (pvItem !== it || !root.classList.contains('is-pv')) return;
         root.classList.add('is-pv-in');
-      }, reduce ? 0 : D1 + D2 * .3);
+      }, reduce ? 0 : D * 0.55);
     }
     function closePreview() {
       if (!root.classList.contains('is-pv') || pvState === 'closing') return;
       var it = pvItem, target = pvMedia && pvMedia.firstChild;
       pvItem = null; pvState = 'closing';
-      mbSwap(false, reduce ? 0 : (CONFIG.pvCloseMs + CONFIG.pvMs) * 0.72);
+      mbSwap(false, reduce ? 0 : CONFIG.pvCloseMs * 0.72 + 300);
       clearTimeout(pvTimer2);
       window.hsVT = null;
       root.classList.remove('is-pv-in', 'is-pv-dim');
@@ -1001,22 +1015,20 @@
       var b = mediaRect(it);
       var cardR = rect((it.a || it.img).getBoundingClientRect());
       var a = rect(it.img.getBoundingClientRect());
-      var att = attachRect(b, cardPad(it));
-      var D1 = CONFIG.pvCloseMs, D2 = CONFIG.pvMs, k = D1 / (D1 + D2);
-      // 1) Rahmen zieht sich ums Bild zusammen · 2) Bild und Rahmen fliegen zurück ins Rad
+      var D = CONFIG.pvCloseMs;
+      // Rahmen und Bild gleichzeitig zurück ins Rad (gleiche Dauer und Kurve)
       var from = getComputedStyle(pvFrame).transform;   // auch mitten im Öffnen ohne Sprung
       frameTo([
-        { transform: from && from !== 'none' ? from : box(panelR), easing: EASE_OPEN },
-        { transform: box(att), offset: k, easing: EASE },
+        { transform: from && from !== 'none' ? from : box(panelR), easing: EASE },
         { transform: box(cardR) }
-      ], D1 + D2, function () {
+      ], D, function () {
         it.el.style.visibility = '';
         render();
         requestAnimationFrame(finish);
       });
       // gleiche Uhr wie der Rahmen (verzögert statt Timer), damit Bild und Rahmen nie auseinanderlaufen
       target.classList.add('is-wait');
-      fly(it.img, b, a, D2, null, D1);
+      fly(it.img, b, a, D);
       if (lastFocus && lastFocus.focus && lastFocus !== document.body) lastFocus.focus({ preventScroll: true });
     }
     if (pvClose) {
@@ -1089,13 +1101,11 @@
       if (gl) return glTex(it);   // Textur lädt sofort und unabhängig vom Bild auf der Seite
       return it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
     }
-    // Beim Eintritt kommen die Bilder 3, 4, 5 … zuerst von rechts herein; die ersten zwei erscheinen beim Landen.
-    var firstN = Math.min(all.length, 6);
-    Promise.all(all.slice(0, firstN).map(prep)).then(function () {
-      start();
-      all.forEach(prep);
-    });
-    setTimeout(function () { start(); all.forEach(prep); }, CONFIG.introWait);
+    // Alle Bilder laden sofort parallel; gestartet wird, sobald das erste da ist (es blendet zuerst auf).
+    // Abgerollt wird erst, wenn alle auf dem Grafikchip sind (siehe runIntro), darum ruckelt es nicht.
+    all.forEach(prep);
+    (items[0] ? prep(items[0]) : Promise.resolve()).then(start);
+    setTimeout(start, CONFIG.introWait);
     // Später geladene Bilder: Breiten neu messen, ohne Sprung
     all.forEach(function (it) {
       it.img.addEventListener('load', function () {

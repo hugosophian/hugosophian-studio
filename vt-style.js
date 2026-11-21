@@ -1,19 +1,20 @@
 /* SEITENÜBERGÄNGE, Website-Head, Teil 2: Aussehen und „zum studio“.
-   hero: Bild fliegt (.9 s), Rest blendet. fade: alte Seite blendet aus. studio: alte Seite gleitet nach rechts weg,
-   die Startseite kommt von links nach. Links auf die Startseite melden „studio“ selbst an. */
+   hero: Bild fliegt (.9 s), Rest blendet. fade: alte Seite blendet aus. studio: alte Seite gleitet nach rechts weg (Handy: nach oben),
+   die Startseite kommt von links nach (Handy: von unten). Links auf die Startseite melden „studio“ selbst an. */
 (function(){var d=document,E='cubic-bezier(.7,0,.2,1)',O='::view-transition-old(root)',N='::view-transition-new(root)';
 d.head.appendChild(d.createElement('style')).textContent=
 '::view-transition-group(hs-hero){animation-duration:.9s;animation-timing-function:'+E+'}'
 +'::view-transition-old(hs-hero),::view-transition-new(hs-hero){height:100%;object-fit:cover;animation:none}'
 +'::view-transition-new(hs-hero){animation:hsvi .35s ease .6s both}'
-+'html.hs-vt-hero'+O+'{animation:hsvo .45s ease both}html.hs-vt-hero'+N+'{animation:hsvi .6s ease .55s both}'
-+'html.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}html.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
-+'html.hs-vt-studio'+O+'{z-index:2;animation:hsso .9s '+E+' both}html.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}'
++'.hs-vt-hero'+O+'{animation:hsvo .45s ease both}.hs-vt-hero'+N+'{animation:hsvi .6s ease .55s both}'
++'.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
++'.hs-vt-studio'+O+'{z-index:2;animation:hsso .9s '+E+' both}.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}'
 +'@keyframes hsvi{from{opacity:0}}@keyframes hsvo{to{opacity:0}}'
-+'@keyframes hsso{to{transform:translateX(100%)}}@keyframes hssi{from{transform:translateX(-30%);filter:brightness(.5)}}'
-+'html.hs-vt-hero [data-pg] .pg-hero,html.hs-vt-hero [data-pg] .pg-hero-img{opacity:1!important;transform:none!important;transition:none!important}'
-+'html.hs-vt-out *{transition:none!important}'
-+'@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation-duration:.01s!important;animation-delay:0s!important}}';
++'@keyframes hsso{to{transform:translate(var(--ho,100%))}}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5)}}'
++'@media (max-width:767px){:root{--ho:0,-100%;--hi:0,30%}}'
++'.hs-vt-hero [data-pg] :is(.pg-hero,.pg-hero-img){opacity:1!important;transform:none!important;transition:none!important}'
++'.hs-vt-out *{transition:none!important}'
++'@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}';
 var H=['/'];   // Startseite
 d.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');
 if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
