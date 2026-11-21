@@ -56,7 +56,7 @@
     // jede Karte blendet in 0.4 s (sine) auf, sobald sie von rechts 0.85 rad unterschreitet; Landen auf dem ersten.
     // Am Schluss legt sich das Rad in die gerade Reihe (Wischen danach wie Mario).
     introWait:  2000,   // höchstens so lange auf das erste Bild warten
-    introAll:   700,    // höchstens so lange warten, bis alle Bilder bereit sind; später geladene blenden einfach dann ein (Hugo 15:16: schneller sichtbar)
+    introAll:   350,    // höchstens so lange warten, bis alle Bilder bereit sind; später geladene blenden einfach dann ein (Hugo 15:16: schneller sichtbar)
     introSkip:  0.17,   // langsames Ausholen am Anfang der Kurve überspringen: die Galerie ist sofort in Fahrt
     vtStart:    650,    // nach dem Ausblenden der Homepage (Übergang „fade“ 0.8 s) so früh starten, die ersten Karten kommen ohnehin erst nach ~0.5 s
     introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
