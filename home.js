@@ -50,6 +50,7 @@
     // Einflug
     introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
+    vtDelay:    250,    // nach „zum Studio“: Animation so viel später, als die alte Seite zu gleiten beginnt (ms)
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
     // Desktop
@@ -397,7 +398,12 @@
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
       var done = false;
-      function go2() { if (done) return; done = true; introT0 = 0; kick(); }
+      function go2() {
+        if (done) return; done = true;
+        // Kommt man über „zum Studio“ (Seite gleitet nach oben weg), setzt die Animation leicht versetzt ein
+        var d = document.documentElement.classList.contains('hs-vt-studio') ? CONFIG.vtDelay : 0;
+        setTimeout(function () { introT0 = 0; kick(); }, d);
+      }
       Promise.all(imgs.map(function (im) {
         return im.decode ? im.decode().catch(function () {}) : Promise.resolve();
       })).then(go2);

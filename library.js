@@ -32,6 +32,10 @@
     flickMax:   8,      // höchstens so viele Karten Schwung
     bendTouch:  0.7,    // Tiefe des Biegens am Handy (Anteil vom Desktop; vorher Breite / 1440 ≈ 0.27)
     bendCurve:  2,      // Handy: Biegen wächst mit dem Tempo hoch 2 (langsam kaum, schnell stark), Desktop linear wie Mario
+    energyMin:  0.3,    // Handy: so viel Biegen kommt bei einem einzelnen normalen Wisch an …
+    energyFull: 2.5,    // … volles Biegen ab so viel gesammelter Schwung-Energie (ein kräftiger Wisch ≈ 1)
+    energyFlick: 1400,  // Fingertempo (px/s), das einem Wisch die Energie 1 gibt (höchstens 1.5 pro Wisch)
+    energyDecay: 0.9,   // Energie klingt mit dieser Zeitkonstante (s) wieder ab
     ease:       0.1,    // Glättung pro Bild bei 60 fps (Mario: 0.1, über 65 Hz 0.09; hier bildratenunabhängig)
     velo:       0.75,   // Biegen = (Ziel − Anzeige) / Breite · velo (Mario; beim Mausrad 0.4)
     veloWheel:  0.4,
@@ -53,6 +57,7 @@
     // Am Schluss legt sich das Rad in die gerade Reihe (Wischen danach wie Mario).
     introWait:  2000,   // höchstens so lange auf das erste Bild warten
     introAll:   2000,   // höchstens so lange schwarz warten, bis alle Bilder bereit sind
+    vtStart:    650,    // nach dem Ausblenden der Homepage (Übergang „fade“ 0.8 s) so früh starten, die ersten Karten kommen ohnehin erst nach ~0.5 s
     introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
     radius:     1.8,    // CRL: Radius = 1.8 · Bildschirmhöhe
     ringMin:    20,     // CRL: Abstand = 360° / Anzahl; bei weniger als 20 Projekten wie bei 20 (18°)
@@ -197,12 +202,13 @@
     });
 
     var items = all.slice();     // aktuelle Auswahl (Sortierung)
+    all.forEach(function (it) { it.el.style.opacity = '0'; });   // auch die normalen Karten bis zum Eintritt unsichtbar
     // Position auf der Reihe in px: P = Anzeige (Mario lastX), T = Ziel (Mario currentX), beide mit umgekehrtem Vorzeichen
     var P = 0, T = 0, velo = CONFIG.velo, prog = 0;
     var mode = 'idle';           // idle | drag | intro | outro | pv
     var idx = 0, shownIdx = -1;
     var n = 1, L = 1, H = 1, W = 1, cx = 0, cy = 0, loop = true, gapPx = 0;
-    var raf = 0, last = 0, intro = null, wheelT = 0, dirty = false, sq = 0, touchNow = false;
+    var raf = 0, last = 0, intro = null, wheelT = 0, dirty = false, sq = 0, touchNow = false, energy = 0;
 
     // ---------- Masse ----------
     function measure() {
@@ -466,7 +472,9 @@
       if (loop) { d = d % n; if (d > n / 2) d -= n; else if (d < -n / 2) d += n; }
       return d * ringStep();
     }
+    var drawn = false;   // erst zeichnen, wenn der Eintritt aufgesetzt ist (sonst landet eine Karte ungemessen oben links: Aufblitzen)
     function render() {
+      if (!drawn) return;
       var list = gl ? [] : null, reach = W / 2 + 40, R = CONFIG.radius * H;
       for (var i = 0; i < items.length; i++) {
         var it = items[i], x = rel(i) * (1 - sq), y = 0, r = 0, z = -Math.abs(x);
@@ -551,7 +559,13 @@
         if (mode !== 'drag' && Math.abs(T - P) < 0.3) P = T;
         // Biegen auf Marios Grenze (±0.4) und weich nachgeführt, damit ein Schwung am Handy nicht springt oder überdreht
         var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, (P - T) / W * velo));
-        if (touchNow && mode !== 'drag') pt = 0;   // Handy: verzerrt nur, solange der Finger hält (schnelles Hin-und-her), nicht im Schwung
+        // Handy (Hugo 21.11. 15:00): ein normaler Wisch verzerrt wenig, viele schnelle Wische hintereinander immer stärker.
+        // „Schwung-Energie“ wächst mit jedem Wisch und klingt ab; sie bestimmt, wie viel vom Biegen ankommt.
+        if (touchNow) {
+          energy *= Math.exp(-dt / CONFIG.energyDecay);
+          var amp = CONFIG.energyMin + (1 - CONFIG.energyMin) * sineInOut(Math.min(1, energy / CONFIG.energyFull));
+          pt *= amp;
+        }
         prog += (pt - prog) * (1 - Math.pow(1 - 0.2, dt * 60));
         if (P === T && Math.abs(prog) < 0.0005) prog = 0;
         busy = mode === 'drag' || P !== T || prog !== 0;
@@ -665,6 +679,7 @@
           if (dtS > 0.008) {
             var v = (b[0] - a[0]) / dtS, step = items.length ? L / items.length : W;
             var throwPx = Math.max(-CONFIG.flickMax * step, Math.min(CONFIG.flickMax * step, -v * CONFIG.speedTouch * CONFIG.flick));
+            energy += Math.min(1.5, Math.abs(v) / CONFIG.energyFlick);
             T = clampT(T + throwPx);
             if (!loop && items.length) T = Math.max(items[0].c, Math.min(items[items.length - 1].c, T));
           }
@@ -747,6 +762,7 @@
       wheel.style.opacity = '';
       velo = CONFIG.velo; prog = 0; sq = 0;
       var c0 = items.length ? items[0].c : 0;
+      drawn = true;
       if (reduce || !items.length) { ring = 0; P = T = c0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
       var k = Math.max(1, Math.round(CONFIG.introItems / n));
       var q0 = -Math.max(n * k, CONFIG.introItems);
@@ -1124,7 +1140,7 @@
       if (!vt) { go(); return; }
       var t0 = performance.now();
       (function wait() {
-        if (!html.classList.contains('hs-vt-fade') || performance.now() - t0 > 1500) go();
+        if (!html.classList.contains('hs-vt-fade') || performance.now() - t0 > CONFIG.vtStart) go();
         else requestAnimationFrame(wait);
       })();
     }
