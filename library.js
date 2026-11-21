@@ -59,9 +59,11 @@
     introAll:   350,    // höchstens so lange warten, bis alle Bilder bereit sind; später geladene blenden einfach dann ein (Hugo 15:16: schneller sichtbar)
     introSkip:  0,      // nicht mehr nötig: die Kurve beginnt jetzt direkt mit der höchsten Geschwindigkeit
     vtStart:    650,    // nach dem Ausblenden der Homepage (Übergang „fade“ 0.8 s) so früh starten, die ersten Karten kommen ohnehin erst nach ~0.5 s
-    introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
+    // CRL-Quelle (Rx/_buildPlanes): Karte 0.35·H hoch, 0.78 so breit, 20 Projekte auf 360° (18°), Eintritt = genau eine
+    // Umdrehung, jede Karte kommt nur einmal und blendet beim Überqueren der Linie auf. Hugos Karten sind breiter
+    // (Querformat ~0.46·H statt 0.27·H), deshalb Abstand nach Kartenbreite statt fix 18°: gleiche Lücke wie CRL.
+    ringGap:    2.063,  // Mitte-zu-Mitte-Abstand auf dem Rad in Kartenbreiten (CRL: 2·1.8·sin 9° / 0.273 = 2.063)
     radius:     1.8,    // CRL: Radius = 1.8 · Bildschirmhöhe
-    ringMin:    20,     // CRL: Abstand = 360° / Anzahl; bei weniger als 20 Projekten wie bei 20 (18°)
     tilt:       1.2,    // CRL: Karte dreht 1.2 × so stark wie ihr Platz auf dem Rad
     fadeAt:     0.85,   // CRL: Einblenden, sobald eine Karte von rechts unter 0.85 rad kommt
     settle:     0.25,   // letzter Anteil des Eintritts, in dem sich das Rad in die gerade Reihe legt
@@ -475,7 +477,15 @@
     // CRL-Rad (Klasse Rx): Radius 1.8 · H, Karte i auf Winkel t = wrap(i − q) · Abstand, x = R · sin t, y = R · (1 − cos t),
     // Drehung 1.2 · t. ring = 1: ganz Rad, 0: ganz Reihe (beim Eintritt legt sich das Rad am Schluss in die Reihe).
     var ring = 0, ringQ = 0;
-    function ringStep() { return 2 * Math.PI / Math.max(n, CONFIG.ringMin); }
+    var rStep = Math.PI / 10;
+    function ringStep() { return rStep; }
+    // Abstand auf dem Rad aus der mittleren Kartenbreite (wie CRL: Lücke ≈ 1 Kartenbreite)
+    function calcStep() {
+      var sw = 0;
+      for (var i = 0; i < items.length; i++) sw += items[i].w;
+      var avg = items.length ? sw / items.length : H * 0.273, R = CONFIG.radius * H;
+      rStep = 2 * Math.asin(Math.min(1, CONFIG.ringGap * avg / (2 * R)));
+    }
     function ringTh(i) {
       var d = i - ringQ;
       if (loop) { d = d % n; if (d > n / 2) d -= n; else if (d < -n / 2) d += n; }
@@ -775,8 +785,9 @@
       var c0 = items.length ? items[0].c : 0;
       drawn = true;
       if (reduce || !items.length) { ring = 0; P = T = c0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
-      var k = Math.max(1, Math.round(CONFIG.introItems / n));
-      var q0 = -Math.max(n * k, CONFIG.introItems);
+      calcStep();
+      // CRL: genau eine Umdrehung
+      var q0 = -Math.max(1, Math.round(2 * Math.PI / rStep));
       var perItem = L / n;
       items.forEach(function (it) { setOp(it, 0); it.th = null; it.fade = 0; it.want = false; });
       ring = 1; ringQ = q0; P = T = c0 + q0 * perItem;
@@ -801,10 +812,10 @@
           if (!tr) {
             // kurz auf die Bilder warten (höchstens introAll), dann losdrehen
             if (!(allTex() || performance.now() - t0 >= CONFIG.introAll)) return false;
-            if (dirty) { dirty = false; measure(); c0 = items[0].c; perItem = L / n; }
+            if (dirty) { dirty = false; measure(); c0 = items[0].c; perItem = L / n; calcStep(); }
             tr = now - CONFIG.introSkip * CONFIG.introMs;
-            // Karten, die beim Losdrehen schon diesseits der Einblend-Linie stehen, gleich einblenden
-            for (var j = 0; j < items.length; j++) { var tj = ringTh(j); items[j].th = tj; if (tj <= fadeAt && tj > -1.45) items[j].want = true; }
+            // wie CRL: keine Karte ist beim Losdrehen schon da, alle kommen von rechts über die Einblend-Linie
+            for (var j = 0; j < items.length; j++) items[j].th = ringTh(j);
           }
           var t = Math.max(0, Math.min(1, (now - tr) / CONFIG.introMs));
           ringQ = q0 * (1 - backOut(t, CONFIG.introBack));
@@ -814,6 +825,8 @@
           ring = 1 - (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
           for (var i = 0; i < items.length; i++) {
             var it = items[i], th = ringTh(i);
+            // hinten ums Rad gesprungen (weniger Projekte als eine Umdrehung): kommt wie neu von rechts
+            if (loop && it.th !== null && th - it.th > Math.max(0.5, n * rStep / 2)) { it.fade = 0; it.want = false; setOp(it, 0); }
             if (!it.fade && it.th !== null && it.th > fadeAt && th <= fadeAt && it.th - th < 1) it.want = true;
             // Bild noch nicht bereit: einblenden, sobald es da ist
             if (it.want && !it.fade && (!gl || it.tex || it.texFail)) it.fade = now;
