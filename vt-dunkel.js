@@ -2,13 +2,13 @@
    1) Die alte Seite klappt nach oben weg (Desktop: nach rechts) und blendet dabei aus, noch auf der alten Seite selbst.
       Erst wenn sie ganz weg ist (schwarz), wechselt es zur Startseite, die von unten hereinkommt (Teil 2).
       So passiert Safaris aufklappende Leiste erst auf Schwarz: kein Sprung, kein Streifen, keine Kanten.
-      Ausgelöst von MenueWeich (mw-go, Wechsel nach 0.56 s) und von Links auf die Startseite (hs-vt-out).
+      Ausgelöst von MenueWeich (mw-go, Laden startet nach 0.25 s, während die Seite noch wegklappt) und von Links auf die Startseite (hs-vt-out).
    2) Vorladen: Sobald das Menü aufgeht, lädt die Startseite im Hintergrund vor (Seite, ihr Skript und die Bilder).
       (Echtes Vorab-Darstellen kann Safari noch nicht, nur Chrome.) */
 (function(){var d=document,R=d.documentElement,E='cubic-bezier(.7,0,.2,1)',Z='cubic-bezier(.22,1,.36,1)';
 d.head.appendChild(d.createElement('style')).textContent=
 ':root{--hgo:100vw 0}@media (max-width:767px){:root{--hgo:0 -100vh}}:root:is(.mw-go,.hs-vt-out){background:#000!important}'
-+':root:is(.mw-go,.hs-vt-out) body{translate:var(--hgo)!important;opacity:0!important;transition:translate .55s '+E+',opacity .55s cubic-bezier(.5,0,.75,0),filter .35s '+Z+',scale .35s '+Z+'!important}';
++':root:is(.mw-go,.hs-vt-out) body{translate:var(--hgo)!important;opacity:0!important;transition:translate .45s '+E+',opacity .45s cubic-bezier(.4,0,1,1),filter .35s '+Z+',scale .35s '+Z+'!important}';
 var warm=0;
 function pre(){if(warm||(location.pathname.replace(/\/$/,'')||'/')==='/')return;warm=1;
 fetch('/',{credentials:'same-origin'}).then(function(r){return r.text()}).then(function(h){

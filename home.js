@@ -50,7 +50,7 @@
     // Einflug
     introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
-    vtDelay:    250,    // nach „zum Studio“: Animation so viel später, als die alte Seite zu gleiten beginnt (ms)
+    vtDelay:    0,      // nach „zum Studio“: Animation so viel später (ms); 0 = sofort, die alte Seite ist dann schon weg (Hugo 17:12)
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
     // Desktop
