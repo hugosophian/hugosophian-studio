@@ -1,14 +1,14 @@
-/* SEITENÜBERGÄNGE, Teil 3 (Website-Head): „zum Studio“ (Hugo 21.11.).
-   1) Vor dem Wechsel zur Startseite wird die alte Seite in 0.35 s ganz schwarz (gleichzeitig schliesst das Menü),
-      dann blendet die Startseite ein. Ausgelöst von MenueWeich (mw-go) und von Links auf die Startseite (hs-vt-out).
-      Auch die Seite selbst blendet aus: Safari (iOS 26) zeichnet feste Flächen nicht unter seine untere Leiste.
-   2) Vorladen: Sobald das Menü aufgeht, lädt die Startseite im Hintergrund vor (Seite, ihr Skript und die Bilder
-      in der Grösse, die sie braucht). Beim Tippen auf „zum Studio“ ist dann fast alles schon da.
+/* SEITENÜBERGÄNGE, Teil 3 (Website-Head): „zum Studio“ (Hugo 21.11. 17:09).
+   1) Die alte Seite klappt nach oben weg (Desktop: nach rechts) und blendet dabei aus, noch auf der alten Seite selbst.
+      Erst wenn sie ganz weg ist (schwarz), wechselt es zur Startseite, die von unten hereinkommt (Teil 2).
+      So passiert Safaris aufklappende Leiste erst auf Schwarz: kein Sprung, kein Streifen, keine Kanten.
+      Ausgelöst von MenueWeich (mw-go, Wechsel nach 0.56 s) und von Links auf die Startseite (hs-vt-out).
+   2) Vorladen: Sobald das Menü aufgeht, lädt die Startseite im Hintergrund vor (Seite, ihr Skript und die Bilder).
       (Echtes Vorab-Darstellen kann Safari noch nicht, nur Chrome.) */
-(function(){var d=document,R=d.documentElement,T='opacity .35s cubic-bezier(.3,.6,.3,1),filter .35s cubic-bezier(.22,1,.36,1),scale .35s cubic-bezier(.22,1,.36,1)';
+(function(){var d=document,R=d.documentElement,E='cubic-bezier(.7,0,.2,1)',Z='cubic-bezier(.22,1,.36,1)';
 d.head.appendChild(d.createElement('style')).textContent=
-':root:is(.mw-go,.hs-vt-out){background:#000!important}:root:is(.mw-go,.hs-vt-out) body{opacity:0!important;transition:'+T+'!important}'
-+':root:is(.mw-go,.hs-vt-out)::after{content:"";position:fixed;left:0;right:0;top:-50vh;bottom:-50vh;background:#000;z-index:2147483647;pointer-events:none;animation:hsdk .35s cubic-bezier(.3,.6,.3,1) both}@keyframes hsdk{from{opacity:0}}';
+':root{--hgo:100vw 0}@media (max-width:767px){:root{--hgo:0 -100vh}}:root:is(.mw-go,.hs-vt-out){background:#000!important}'
++':root:is(.mw-go,.hs-vt-out) body{translate:var(--hgo)!important;opacity:0!important;transition:translate .55s '+E+',opacity .55s cubic-bezier(.5,0,.75,0),filter .35s '+Z+',scale .35s '+Z+'!important}';
 var warm=0;
 function pre(){if(warm||(location.pathname.replace(/\/$/,'')||'/')==='/')return;warm=1;
 fetch('/',{credentials:'same-origin'}).then(function(r){return r.text()}).then(function(h){
