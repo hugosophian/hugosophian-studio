@@ -673,7 +673,12 @@
       // Alle Karten starten unsichtbar und blenden in 0.4 s ein, sobald sie rechts ins Bild kommen; beim Landen der Rest.
       var from = loop ? -L : -Math.max(L, W + 200);
       items.forEach(function (it) { setOp(it, 0); it.px = null; it.fade = 0; });
-      P = T = from; mode = 'intro';
+      P = T = from;
+      // Start so verschieben, dass gleich die nächste Karte am rechten Rand steht: sofort etwas zu sehen statt Schwarz
+      var minX = Infinity;
+      for (var q = 0; q < items.length; q++) { var xq = rel(q), eq = W / 2 + items[q].w / 2; if (xq > eq) minX = Math.min(minX, xq - eq); }
+      if (minX < Infinity) { from += Math.max(0, minX - 2); P = T = from; }
+      mode = 'intro';
       render();
       function fades(now) {
         for (var i = 0; i < items.length; i++) {
