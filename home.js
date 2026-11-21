@@ -536,6 +536,8 @@
     var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Galerie öffnen';
     var infoGoArrow = document.createElement('span'); infoGoArrow.className = 'lib-sort-arrow'; infoGoArrow.setAttribute('aria-hidden', 'true'); infoGoArrow.textContent = '\u2192';
     infoOpen.appendChild(infoGoLabel); infoOpen.appendChild(infoGoArrow);
+    // gleich ein echtes Ziel, damit Suchmaschinen dem Link folgen können (später je nach Bild gesetzt)
+    var firstHref = slides.filter(function (x) { return x.href; })[0]; infoOpen.setAttribute('href', firstHref ? firstHref.href : '/creator');
     var infoClose = inClose ? inClose.cloneNode(true) : document.createElement('div');
     infoClose.removeAttribute('id'); if (!inClose) infoClose.textContent = 'Close';
     infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '-1'); infoClose.setAttribute('data-hp-close', '');
@@ -767,6 +769,8 @@
     if (deskMQ.addEventListener) deskMQ.addEventListener('change', setMode); else if (deskMQ.addListener) deskMQ.addListener(setMode);
 
     // ---------- Start ----------
+    // Barrierefreiheit (Lighthouse 21.11.): Webflow-Listenrollen passen nicht mehr, weil die Einträge umgebaut werden
+    [].forEach.call(root.querySelectorAll('[role="list"],[role="listitem"]'), function (e) { e.removeAttribute('role'); });
     root.classList.toggle('is-mouse', window.matchMedia('(hover: hover) and (pointer: fine)').matches);
     slides.forEach(function (s, i) {
       if (!s.img) return;

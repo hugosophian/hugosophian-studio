@@ -1149,6 +1149,8 @@
     });
 
     // ---------- Start ----------
+    // Barrierefreiheit (Lighthouse 21.11.): Webflow-Listenrollen passen nicht mehr, weil die Einträge umgebaut werden
+    [].forEach.call(root.querySelectorAll('[role="list"],[role="listitem"]'), function (e) { e.removeAttribute('role'); });
     root.classList.toggle('is-mouse', window.matchMedia('(hover: hover) and (pointer: fine)').matches);
     if (totEl) totEl.textContent = pad(items.length);
     if (curEl) curEl.textContent = pad(items.length ? 1 : 0);
