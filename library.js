@@ -306,56 +306,87 @@
       gl.c.viewport(0, 0, gl.cv.width, gl.cv.height);
     }
     // Textur laden (Webflow-CDN erlaubt das). Klappt es nicht, bleibt die normale Karte sichtbar.
+    // Bild für den Grafikchip vorbereiten. Die Originale sind sehr gross (z. B. 3000 × 4500 px = 54 MB pro Bild auf dem Chip,
+    // Entpacken blockiert die Seite). Darum: Datei holen, im Hintergrund direkt auf die nötige Höhe entpacken
+    // (createImageBitmap mit resizeHeight), auf ein kleines Canvas zeichnen und daraus die Textur machen.
+    // Dieselbe kleine Kopie bekommen Karte und Vorschau, damit dort nichts Grosses mehr entpackt werden muss.
+    function needH() {
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      var card = (items[0] && items[0].img.offsetHeight) || window.innerHeight * 0.32;
+      var pvh = pvMedia ? pvMedia.offsetHeight : 0;
+      return Math.round(Math.max(card * 1.25, pvh * 1.05, 300) * dpr);
+    }
     function glTex(it) {
       if (!gl) return Promise.resolve();
       if (it.texP) return it.texP;
       it.texP = new Promise(function (res) {
-        var im = new Image();
-        im.crossOrigin = 'anonymous';
-        im.onload = function () {
-          var done = function () {
-            if (!gl) return res();
-            var c = gl.c, t = c.createTexture();
-            c.bindTexture(c.TEXTURE_2D, t);
-            try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, src); } catch (e) { return res(); }
-            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
-            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
-            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
-            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
-            it.tex = t; it.ar = im.naturalWidth / im.naturalHeight;
-            // Format der Karte schon kennen, auch wenn das Bild auf der Seite noch lädt (sonst stimmen die Abstände nicht)
-            if (!it.img.naturalWidth) { it.img.style.aspectRatio = im.naturalWidth + ' / ' + im.naturalHeight; dirty = true; }
-            glMeasure(it);
-            // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt (sonst ruckelt es)
-            c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
-            c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1);
-            c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
-            c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
-            it.el.classList.add('is-gl');
-            if (started) kick();
-            res();
+        var url = texSrc(it), H0 = needH();
+        function upload(cv2, ar) {
+          if (!gl) return res();
+          var c = gl.c, t = c.createTexture();
+          c.bindTexture(c.TEXTURE_2D, t);
+          try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, cv2); } catch (e) { return res(); }
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
+          it.tex = t; it.ar = ar;
+          // Format der Karte schon kennen, auch wenn das Bild auf der Seite noch lädt (sonst stimmen die Abstände nicht)
+          if (!it.img.naturalWidth) { it.img.style.aspectRatio = String(ar); dirty = true; }
+          glMeasure(it);
+          // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt
+          c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
+          c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1);
+          c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
+          c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
+          it.el.classList.add('is-gl');
+          // Kleine Kopie auch für Karte, Flug und Vorschau
+          if (cv2.toBlob && !it.small) cv2.toBlob(function (bl) {
+            if (!bl) return;
+            it.small = URL.createObjectURL(bl);
+            var pre = new Image(); pre.src = it.small;
+            (pre.decode ? pre.decode() : Promise.resolve()).then(function () {
+              if (it.img.srcset) { it.img.removeAttribute('srcset'); it.img.removeAttribute('sizes'); }
+              it.img.src = it.small;
+            }, function () {});
+          }, 'image/jpeg', 0.9);
+          if (started) kick();
+          res();
+        }
+        function toCanvas(srcImg, w0, h0) {
+          var k = Math.min(1, H0 / h0, 2048 / Math.max(w0, h0));
+          var w = Math.max(1, Math.round(w0 * k)), h = Math.max(1, Math.round(h0 * k));
+          var cv2 = document.createElement('canvas'); cv2.width = w; cv2.height = h;
+          var x2 = cv2.getContext('2d'); x2.imageSmoothingEnabled = true; x2.imageSmoothingQuality = 'high';
+          x2.drawImage(srcImg, 0, 0, w, h);
+          return cv2;
+        }
+        // Weg 1: im Hintergrund verkleinert entpacken (Chrome, neueres Safari)
+        function viaBitmap() {
+          return fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) {
+            if (!r.ok) throw new Error('http');
+            return r.blob();
+          }).then(function (bl) {
+            return createImageBitmap(bl, { resizeHeight: H0, resizeQuality: 'high' }).catch(function () { return createImageBitmap(bl); });
+          }).then(function (bm) {
+            var ar = bm.width / bm.height;
+            var cv2 = toCanvas(bm, bm.width, bm.height);   // ist schon klein: schnell; sonst hier verkleinert
+            if (bm.close) bm.close();
+            upload(cv2, ar);
+          });
+        }
+        // Weg 2: klassisch über ein Bild
+        function viaImage() {
+          var im = new Image();
+          im.crossOrigin = 'anonymous';
+          im.onload = function () {
+            var go = function () { upload(toCanvas(im, im.naturalWidth, im.naturalHeight), im.naturalWidth / im.naturalHeight); };
+            if (im.decode) im.decode().then(go, go); else go();
           };
-          // Auf die Grösse verkleinern, die die Karte braucht (Originale sind z. B. 3000 × 4500 px = 54 MB auf dem Grafikchip)
-          var src = im;
-          function shrink() {
-            var nw = im.naturalWidth, nh = im.naturalHeight;
-            var dpr = Math.min(2, window.devicePixelRatio || 1);
-            var needH = (it.img.offsetHeight || window.innerHeight * 0.32) * dpr * 1.25;
-            var k = Math.min(1, needH / nh, 2048 / Math.max(nw, nh));
-            if (k >= 0.95) { done(); return; }
-            var w = Math.max(1, Math.round(nw * k)), h = Math.max(1, Math.round(nh * k));
-            // Über ein Canvas (ImageBitmap würde das Spiegeln für WebGL ignorieren und in Safari nicht überall verkleinern)
-            try {
-              var cv2 = document.createElement('canvas'); cv2.width = w; cv2.height = h;
-              var x2 = cv2.getContext('2d'); x2.imageSmoothingEnabled = true; x2.imageSmoothingQuality = 'high'; x2.drawImage(im, 0, 0, w, h);
-              src = cv2;
-            } catch (e) { src = im; }
-            done();
-          }
-          if (im.decode) im.decode().then(shrink, shrink); else shrink();
-        };
-        im.onerror = function () { res(); };
-        im.src = texSrc(it);
+          im.onerror = function () { res(); };
+          im.src = url;
+        }
+        if (window.createImageBitmap && window.fetch) viaBitmap().catch(viaImage); else viaImage();
       });
       return it.texP;
     }
