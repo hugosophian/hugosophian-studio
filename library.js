@@ -1017,14 +1017,13 @@
       })();
     }
     // Die ersten Bilder abwarten (höchstens introWait), alle übrigen laden während des Eintritts weiter.
-    // Beim Eintritt kommen zuerst die Bilder vom Ende der Reihe, die ersten erst am Schluss: Zeit genug.
     function prep(it) {
       if (gl) return glTex(it);   // Textur lädt sofort und unabhängig vom Bild auf der Seite
       return it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
     }
-    var firstN = Math.min(all.length, 4);
-    var tail = all.slice(Math.max(firstN, all.length - 3));
-    Promise.all(all.slice(0, firstN).concat(tail).map(prep)).then(function () {
+    // Beim Eintritt kommen die Bilder 3, 4, 5 … zuerst von rechts herein; die ersten zwei erscheinen beim Landen.
+    var firstN = Math.min(all.length, 6);
+    Promise.all(all.slice(0, firstN).map(prep)).then(function () {
       start();
       all.forEach(prep);
     });
