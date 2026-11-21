@@ -31,6 +31,7 @@
     flick:      0.35,   // Schwung: Fingertempo beim Loslassen (px/s) · speedTouch · flick = zusätzlicher Weg in px
     flickMax:   8,      // höchstens so viele Karten Schwung
     bendTouch:  0.7,    // Tiefe des Biegens am Handy (Anteil vom Desktop; vorher Breite / 1440 ≈ 0.27)
+    bendCurve:  2,      // Handy: Biegen wächst mit dem Tempo hoch 2 (langsam kaum, schnell stark), Desktop linear wie Mario
     ease:       0.1,    // Glättung pro Bild bei 60 fps (Mario: 0.1, über 65 Hz 0.09; hier bildratenunabhängig)
     velo:       0.75,   // Biegen = (Ziel − Anzeige) / Breite · velo (Mario; beim Mausrad 0.4)
     veloWheel:  0.4,
@@ -45,12 +46,17 @@
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
     // jede Karte blendet in 0.4 s ein, sobald sie rechts ins Bild kommt; beim Landen der Rest
-    introDelay: 450,    // ms schwarz, bevor es losgeht (CRL: 0.45 s nach dem Vorhang)
+    introDelay: 120,    // ms schwarz, bevor es losgeht (CRL: 0.45 s nach dem Vorhang; hier kürzer, Hugo 21.11.)
+    introWait:  900,    // höchstens so lange auf die ersten Bilder warten, der Rest lädt während des Eintritts
     introMs:    3000,
     introBack:  0.54,
+    introSkip:  0.18,   // Anteil am Anfang der Kurve überspringen (dort holt sie nur aus): früher Bilder, weniger Schwarz
     fadeMs:     400,
-    // Auswahl wechseln: Reihe zieht beschleunigt weiter und blendet aus, dann Eintritt mit der neuen Auswahl
-    outroMs:    750,
+    // Auswahl wechseln: die Reihe dreht hoch, bei voller Fahrt kommen die neuen Projekte, dann bremst sie auf das erste
+    spinSpeed:  2.6,    // Höchsttempo in Bildschirmbreiten pro Sekunde
+    spinUpMs:   550,    // Anlauf
+    spinDownMs: 1600,   // Auslaufen (easeOutCubic, ohne Ruck beim Übergang)
+    swapMs:     160,    // kurzes Abblenden um den Wechsel herum
     // Vorschau
     pvMs:       750,    // Vorschau öffnen, Teil 1: Bild mit weissem Rahmen fliegt hoch und heftet sich oben an
     pvOpenMs:   700,    // Teil 2: der Rahmen geht auf und zeigt den Text
@@ -315,8 +321,14 @@
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
             it.tex = t; it.ar = im.naturalWidth / im.naturalHeight;
-            it.el.classList.add('is-gl');
             glMeasure(it);
+            // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt (sonst ruckelt es)
+            c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
+            c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1);
+            c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
+            c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
+            it.el.classList.add('is-gl');
+            if (mode !== 'intro' && mode !== 'outro') render();
             res();
           };
           if (im.decode) im.decode().then(done, done); else done();
@@ -339,13 +351,15 @@
     function glDraw(list) {
       if (!gl) return;
       var c = gl.c, U = gl.U, sz = Math.max(W < 768 ? CONFIG.bendTouch : 0, Math.min(1, W / 1440));   // Mario rechnet in px für den Desktop
-      var pc = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, prog));
+      var pe = prog;
+      if (W < 768) { var q = Math.min(1, Math.abs(prog) / CONFIG.bendMax); pe = (prog < 0 ? -1 : 1) * CONFIG.bendMax * Math.pow(q, CONFIG.bendCurve); }
+      var pc = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, pe));
       c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
       c.uniform2f(U.uView, gl.w, gl.h);
-      c.uniform1f(U.uP, prog);
+      c.uniform1f(U.uP, pe);
       c.uniform1f(U.uPc, pc);
       c.uniform4f(U.uK, CONFIG.depth * sz, CONFIG.twist * sz, CONFIG.bow * sz, CONFIG.camera);
-      c.uniform1f(U.uZoom, 1 - CONFIG.zoom * prog);
+      c.uniform1f(U.uZoom, 1 - CONFIG.zoom * pe);
       for (var k = 0; k < list.length; k++) {
         var it = list[k].it;
         if (!it.tex || !it.box || it.el.style.visibility === 'hidden' || !(it.op > 0)) continue;
@@ -417,7 +431,10 @@
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
       var busy = false;
-      if ((mode === 'intro' || mode === 'outro') && intro) {
+      if (mode === 'outro' && intro && intro.step) {
+        busy = true;
+        if (intro.step(now, dt)) { var dn = intro.done; intro = null; mode = 'idle'; if (dn) dn(); }
+      } else if ((mode === 'intro' || mode === 'outro') && intro) {
         var t = Math.max(0, Math.min(1, (now - intro.t0) / intro.ms));
         var e = mode === 'intro' ? backInOut(t, CONFIG.introBack) : t * t * t;
         P = T = intro.from + (intro.to - intro.from) * e;
@@ -598,7 +615,7 @@
           if (it.fade) setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs))));
         }
       }
-      intro = { from: from, to: 0, t0: performance.now() + CONFIG.introDelay, ms: CONFIG.introMs, tick: fades,
+      intro = { from: from, to: 0, t0: performance.now() + CONFIG.introDelay - CONFIG.introSkip * CONFIG.introMs, ms: CONFIG.introMs, tick: fades,
         done: function () {
           var t0 = performance.now(), rest = items.filter(function (it) { return it.op < 1; });
           if (rest.length) (function f() {
@@ -658,25 +675,52 @@
       s.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') pick(e); });
     });
     // Auswahl wechseln: zuerst drehen die Bilder weich davon und blenden aus, dann kommt die neue Auswahl
-    function runOutro(done) {
-      if (reduce || !items.length) { done(); return; }
-      mode = 'outro';
-      intro = { from: P, to: P + W * 1.3, t0: performance.now(), ms: CONFIG.outroMs, done: done,
-        tick: function (now, t) { wheel.style.opacity = (1 - Math.max(0, (t - 0.35) / 0.65)).toFixed(3); } };
-      last = 0; kick();
-    }
+    // Auswahl wechseln (Hugo 21.11.): alles dreht hoch, bei voller Fahrt kommen die neuen Projekte,
+    // dann bremst die Reihe weich auf das erste (Tempo beim Übergang gleich, darum kein Ruck)
     function applyFilter() {
       if (mode === 'outro') return;
       if (meta) meta.classList.add('is-swap');
-      runOutro(swapItems);
+      if (reduce || !items.length) { swapNow(); runIntro(function () { showMeta(nearestTo(P), true); }); return; }
+      clearTimeout(wheelT); velo = CONFIG.velo;
+      var vmax = CONFIG.spinSpeed * W, Tu = CONFIG.spinUpMs / 1000, Td = CONFIG.spinDownMs / 1000, sw = CONFIG.swapMs / 1000;
+      var t0 = performance.now(), P0 = P, phase = 0, Pb = 0, D = vmax * Td / 3;
+      mode = 'outro';
+      function bend(v) {   // gleiches Mass wie beim Ziehen: Abstand Ziel–Anzeige bei diesem Tempo, mal velo
+        var lag = v / 60 * (1 - CONFIG.ease) / CONFIG.ease;
+        var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, -lag / W * velo));
+        prog += (pt - prog) * 0.2;
+      }
+      intro = { done: function () { prog = 0; wheel.style.opacity = ''; showMeta(nearestTo(P), true); }, step: function (now) {
+        var t = (now - t0) / 1000;
+        if (phase === 0) {
+          var u = Math.min(1, t / Tu);
+          P = T = P0 + vmax * Tu * u * u * u / 3;   // Tempo steigt mit u², am Ende vmax
+          bend(vmax * u * u);
+          wheel.style.opacity = Math.max(0, 1 - Math.max(0, t - (Tu - sw)) / sw).toFixed(3);
+          if (u >= 1) {
+            phase = 1;
+            swapNow();
+            Pb = (items.length ? items[0].c : 0) - D;   // so gewählt, dass die Reihe genau auf dem ersten Projekt landet
+            P = T = Pb; t0 = now;
+            items.forEach(function (it) { setOp(it, 1); });
+          }
+        } else {
+          var w = Math.min(1, t / Td), k = 1 - w;
+          P = T = Pb + D * (1 - k * k * k);
+          bend(vmax * k * k);
+          wheel.style.opacity = Math.min(1, t / sw).toFixed(3);
+          if (w >= 1) { P = T = Pb + D; return true; }
+        }
+        return false;
+      } };
+      last = 0; kick();
     }
-    function swapItems() {
+    function swapNow() {
       items.forEach(function (it) { it.el.classList.remove('is-vis'); it.vis = false; });
       items = all.filter(function (it) { return !current || it.cats.indexOf(current) > -1; });
       all.forEach(function (it) { it.el.style.display = items.indexOf(it) > -1 ? '' : 'none'; });
       shownIdx = -1;
-      if (meta) meta.classList.add('is-swap');
-      runIntro(function () { showMeta(nearest(P)); });
+      measure();
     }
 
     // ---------- Vorschau ----------
@@ -746,6 +790,15 @@
       return { s: Math.max(0, (r.left - c.left) / h), b: Math.max(0, (c.bottom - r.bottom) / h) };
     }
 
+    // Wo das Bild in der Vorschau wirklich steht: Feld hat feste Höhe, Breite höchstens max-width, Bild oben links eingepasst.
+    // (Das img-Feld selbst kann bei Querformat höher sein als das Bild, darum nicht dessen Rechteck nehmen.)
+    function mediaRect(it) {
+      var mr = pvMedia.getBoundingClientRect();
+      var ar = it.img.naturalWidth ? it.img.naturalWidth / it.img.naturalHeight : it.w / it.h;
+      var maxW = parseFloat(getComputedStyle(pvMedia).maxWidth) || Infinity;
+      var h = mr.height, w = Math.min(maxW, h * ar); h = w / ar;
+      return { left: mr.left, top: mr.top, width: w, height: h };
+    }
     function openPreview(i) {
       var it = items[i];
       if (!it || root.classList.contains('is-pv')) return;
@@ -766,12 +819,7 @@
 
       var target = pvMedia && pvMedia.firstChild;
       if (!target) { pvFrame.style.transform = box(panelR); root.classList.add('is-pv', 'is-pv-dim', 'is-pv-in'); mode = 'pv'; return; }
-      // Endplatz des Bilds im Panel (Feld hat feste Höhe, Breite automatisch, höchstens max-width)
-      var mr = pvMedia.getBoundingClientRect();
-      var ar = it.img.naturalWidth ? it.img.naturalWidth / it.img.naturalHeight : it.w / it.h;
-      var maxW = parseFloat(getComputedStyle(pvMedia).maxWidth) || Infinity;
-      var h = mr.height, w = Math.min(maxW, h * ar); h = w / ar;
-      var b = { left: mr.left, top: mr.top, width: w, height: h };
+      var b = mediaRect(it);
       var a = rect(it.img.getBoundingClientRect());
       var cardR = rect((it.a || it.img).getBoundingClientRect());
       var att = attachRect(b, cardPad(it));
@@ -814,7 +862,7 @@
       if (!it || !target) { finish(); return; }
       pvPanel.scrollTop = 0;
       var panelR = { left: 0, top: 0, width: pvPanel.offsetWidth, height: pvPanel.offsetHeight };
-      var b = rect(target.getBoundingClientRect());
+      var b = mediaRect(it);
       var cardR = rect((it.a || it.img).getBoundingClientRect());
       var a = rect(it.img.getBoundingClientRect());
       var att = attachRect(b, cardPad(it));
@@ -900,12 +948,19 @@
         else requestAnimationFrame(wait);
       })();
     }
-    // Erst alle Bilder laden und dekodieren (höchstens 2.5 s), damit beim Eintritt nichts nachlädt oder springt
-    Promise.all(all.map(function (it) {
+    // Die ersten Bilder abwarten (höchstens introWait), alle übrigen laden während des Eintritts weiter.
+    // Beim Eintritt kommen zuerst die Bilder vom Ende der Reihe, die ersten erst am Schluss: Zeit genug.
+    function prep(it) {
       var dec = it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
       return dec.then(function () { return glTex(it); });
-    })).then(start);
-    setTimeout(start, 2500);
+    }
+    var firstN = Math.min(all.length, 4);
+    var tail = all.slice(Math.max(firstN, all.length - 3));
+    Promise.all(all.slice(0, firstN).concat(tail).map(prep)).then(function () {
+      start();
+      all.forEach(prep);
+    });
+    setTimeout(function () { start(); all.forEach(prep); }, CONFIG.introWait);
     // Später geladene Bilder: Breiten neu messen, ohne Sprung
     all.forEach(function (it) {
       it.img.addEventListener('load', function () {
