@@ -10,8 +10,8 @@ V+'group(hs-hero){animation-duration:.9s;animation-timing-function:'+E+'}'
 +'.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
 +'.hs-vt-studio'+O+'{z-index:2;animation:hsso .9s '+E+' both}.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}'
 +'@keyframes hsvi{from{opacity:0}}@keyframes hsvo{to{opacity:0}}'
-// zum Studio (Hugo 16:34): alte Seite verschwimmt beim Hochfahren, die Farben laufen weich in die Startseite über
-+'@keyframes hsso{20%{filter:blur(14px)}45%{opacity:0}to{transform:translate(var(--ho,100%));opacity:0;filter:blur(28px)}}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5) blur(10px)}}'
+// zum Studio: die alte Seite ist schon schwarz (vt-dunkel.js), sie fährt nur noch unsichtbar weg
++'@keyframes hsso{45%{opacity:0}to{transform:translate(var(--ho,100%));opacity:0}}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5)}}'
 +'@media (max-width:767px){:root{--ho:0,-100%;--hi:0,12%}}'
 +'.hs-vt-out *{transition:none!important}'
 +'@media (prefers-reduced-motion:reduce){'+V+'group(*),'+V+'old(*),'+V+'new(*){animation:none!important}}';
