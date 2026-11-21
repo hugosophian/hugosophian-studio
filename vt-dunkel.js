@@ -1,14 +1,20 @@
-/* SEITENÜBERGÄNGE, Teil 3 (Website-Head): „zum Studio“ (Hugo 21.11. 17:09).
-   1) Die alte Seite klappt nach oben weg (Desktop: nach rechts) und blendet dabei aus, noch auf der alten Seite selbst.
-      Erst wenn sie ganz weg ist (schwarz), wechselt es zur Startseite, die von unten hereinkommt (Teil 2).
-      So passiert Safaris aufklappende Leiste erst auf Schwarz: kein Sprung, kein Streifen, keine Kanten.
-      Ausgelöst von MenueWeich (mw-go, Laden startet nach 0.25 s, während die Seite noch wegklappt) und von Links auf die Startseite (hs-vt-out).
+/* SEITENÜBERGÄNGE, Teil 3 (Website-Head): „zum Studio“ (Hugo 21.11. 17:15: „wie beim Model“).
+   1) Nur der sichtbare Ausschnitt der alten Seite klappt als Ganzes nach oben weg (Desktop: nach rechts), ohne
+      Ausblenden, darunter ist Schwarz. Wie auf der schwarzen Model-Seite: kein Grau, und auf langen Seiten rutscht
+      kein weiterer Inhalt von unten nach. Das passiert noch auf der alten Seite selbst; Safaris aufklappende Leiste
+      kommt erst danach auf Schwarz. Dann kommt die Startseite von unten (Teil 2).
+      Ausgelöst von MenueWeich (mw-go, Laden startet nach 0.25 s) und von Links auf die Startseite (hs-vt-out).
    2) Vorladen: Sobald das Menü aufgeht, lädt die Startseite im Hintergrund vor (Seite, ihr Skript und die Bilder).
       (Echtes Vorab-Darstellen kann Safari noch nicht, nur Chrome.) */
 (function(){var d=document,R=d.documentElement,E='cubic-bezier(.7,0,.2,1)',Z='cubic-bezier(.22,1,.36,1)';
 d.head.appendChild(d.createElement('style')).textContent=
-':root{--hgo:100vw 0}@media (max-width:767px){:root{--hgo:0 -100vh}}:root:is(.mw-go,.hs-vt-out){background:#000!important}'
-+':root:is(.mw-go,.hs-vt-out) body{translate:var(--hgo)!important;opacity:0!important;transition:translate .45s '+E+',opacity .45s cubic-bezier(.4,0,1,1),filter .35s '+Z+',scale .35s '+Z+'!important}';
+':root{--hgo:115vw 0}@media (max-width:767px){:root{--hgo:0 -115vh}}:root:is(.mw-go,.hs-vt-out){background:#000!important}'
++':root:is(.mw-go,.hs-vt-out) body{translate:var(--hgo)!important;clip-path:inset(var(--hct,0) 0 var(--hcb,0) 0)!important;transition:translate .45s '+E+',filter .35s '+Z+',scale .35s '+Z+'!important}';
+// sichtbaren Ausschnitt festhalten (auch den Teil unter Safaris durchsichtiger Leiste: grosse Viewport-Höhe)
+var lv=d.createElement('div');lv.style.cssText='position:absolute;top:0;width:1px;height:100lvh;visibility:hidden;pointer-events:none';
+function clip(){var b=d.body;if(!b)return;if(!lv.parentNode)b.appendChild(lv);var y=window.scrollY-b.offsetTop,h=Math.max(window.innerHeight,lv.offsetHeight);
+R.style.setProperty('--hct',Math.max(0,y)+'px');R.style.setProperty('--hcb',Math.max(0,b.offsetHeight-y-h)+'px');}
+var was=0;new MutationObserver(function(){var on=R.classList.contains('mw-go')||R.classList.contains('hs-vt-out');if(on&&!was)clip();was=on}).observe(R,{attributes:true,attributeFilter:['class']});
 var warm=0;
 function pre(){if(warm||(location.pathname.replace(/\/$/,'')||'/')==='/')return;warm=1;
 fetch('/',{credentials:'same-origin'}).then(function(r){return r.text()}).then(function(h){
