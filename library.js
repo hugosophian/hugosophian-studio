@@ -46,7 +46,7 @@
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
     // jede Karte blendet in 0.4 s ein, sobald sie rechts ins Bild kommt; beim Landen der Rest
-    introWait:  900,    // höchstens so lange auf das erste Bild warten
+    introWait:  2000,   // höchstens so lange auf das erste Bild warten (meist nach 0.2 s da)
     introHold:  700,    // das erste Bild blendet aus dem Schwarz auf (sine), erst dann rollt die Reihe
     introAll:   2000,   // höchstens so lange warten, bis alle Bilder auf dem Grafikchip sind (dann rollt es ohne Ruckeln)
     introItems: 20,     // so viele Karten ziehen beim Abrollen vorbei, wie CRL Projekte hat (ganze Runden, Landen auf dem ersten)
