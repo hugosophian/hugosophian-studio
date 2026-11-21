@@ -46,7 +46,10 @@
     introSpin:  0.9,    // wie viel vom Rad vorbeiläuft (1 = alle Bilder)
     dim:        0.0009, // wie stark schnelle Bilder beim Eintritt abdunkeln
     // Vorschau
-    pvMs:       650     // Flug des Bilds in die Vorschau (gleich lang wie das Panel)
+    pvMs:       750,    // Vorschau öffnen, Teil 1: Bild mit weissem Rahmen fliegt hoch und heftet sich oben an
+    pvOpenMs:   700,    // Teil 2: der Rahmen geht auf und zeigt den Text
+    pvCloseMs:  550,    // Schliessen: Rahmen zieht sich zuerst wieder um das Bild zusammen
+    pvGap:      .05     // Abstand Vorschau zum Menü-Knopf (Anteil der Bildschirmhöhe); mehr Inhalt scrollt
   };
 
   var EASE = 'cubic-bezier(.7,0,.2,1)';
@@ -80,20 +83,28 @@
     /* Vorschau */
     '[data-lib] .lib-pv { visibility: hidden; transition: visibility 0s linear .65s; }',
     '[data-lib].is-pv .lib-pv { visibility: visible; transition-delay: 0s; }',
-    '[data-lib] .lib-pv-panel { transform: translateY(-101%); transition: transform .65s ' + EASE + '; }',
-    '[data-lib].is-pv .lib-pv-panel { transform: none; }',
+    /* Weiss kommt vom Rahmen (lib-pv-frame), der mit dem Bild hochfliegt und dann aufgeht. Das Panel selbst ist durchsichtig und scrollt. */
+    '[data-lib] .lib-pv-panel { box-sizing: border-box; background-color: transparent !important; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: none; }',
+    '[data-lib] .lib-pv-panel::-webkit-scrollbar { display: none; }',
+    '[data-lib] .lib-pv-frame { position: absolute; left: 0; top: 0; width: 100px; height: 100px; background-color: #fff; transform-origin: 0 0; will-change: transform; pointer-events: none; visibility: hidden; }',
+    '[data-lib].is-pv .lib-pv-frame { visibility: visible; }',
+    '[data-lib] .lib-pv-media img.is-wait { visibility: hidden; }',
+    /* Menü-Knopf und Menü liegen über der Vorschau, damit man sie immer antippen kann */
+    'html.lib-on .menu-toggle-wrap { z-index: 30; }',
+    'html.lib-on .menu-panel { z-index: 31; }',
     '[data-lib] .lib-pv-name, [data-lib] .lib-pv-year, [data-lib] .lib-pv-text, [data-lib] .lib-pv-open, [data-lib] .lib-pv-close { opacity: 0; transition: opacity .25s ease; }',
     '[data-lib].is-pv-in .lib-pv-name, [data-lib].is-pv-in .lib-pv-year, [data-lib].is-pv-in .lib-pv-text, [data-lib].is-pv-in .lib-pv-open, [data-lib].is-pv-in .lib-pv-close { opacity: 1; transition: opacity .5s ease; }',
     '[data-lib] .lib-pv-media img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: left top; }',
     '[data-lib] .lib-wheel { transition: opacity .65s ease, filter .65s ease; }',
-    '[data-lib].is-pv .lib-wheel { opacity: .3; filter: blur(8px); }',
+    '[data-lib].is-pv-dim .lib-wheel { opacity: .3; filter: blur(8px); }',
+    '[data-lib].is-pv-dim .lib-meta, [data-lib].is-pv-dim .lib-bottom { opacity: 0; }',
     '.lib-fly { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; transform-origin: 0 0; will-change: transform; overflow: hidden; }',
     '.lib-fly img { display: block; width: 100%; height: 100%; object-fit: cover; }',
     /* Menü-Knopf: auf der Library steuert dieser Code ihn (Klasse lib-mb), nicht das Scrollen.
        Tempo und Kurven kommen aus dem Website-Footer (--mh-up, --mh-down, --mh-ease-up, --mh-ease-down). */
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); scale: .55; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; will-change: translate, scale; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, .85s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, .85s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); }',
-    '@media (prefers-reduced-motion: reduce) { [data-lib] .lib-pv-panel, [data-lib] .lib-wheel { transition-duration: .01s; } }'
+    '@media (prefers-reduced-motion: reduce) { [data-lib] .lib-wheel { transition-duration: .01s; } }'
   ].join('\n');
 
   function init(root) {
@@ -375,6 +386,7 @@
     // Trackpad und Mausrad (seitlich und senkrecht)
     var wheelT = 0;
     root.addEventListener('wheel', function (e) {
+      if (e.target.closest && e.target.closest('.lib-pv-panel')) return;   // Vorschau scrollt selbst
       e.preventDefault();
       if (mode === 'intro' || mode === 'outro' || root.classList.contains('is-pv')) return;
       if (e.target.closest('.lib-sort-list')) return;
@@ -496,7 +508,7 @@
       return c;
     }
     // Ein Bild fliegt von Rechteck a nach Rechteck b
-    function fly(img, a, b, ms, done) {
+    function fly(img, a, b, ms, done, delay) {
       var f = document.createElement('div');
       f.className = 'lib-fly';
       f.style.width = b.width + 'px'; f.style.height = b.height + 'px';
@@ -506,10 +518,42 @@
       root.appendChild(f);
       var from = 'translate(' + a.left + 'px,' + a.top + 'px) scale(' + (a.width / b.width) + ',' + (a.height / b.height) + ')';
       var to = 'translate(' + b.left + 'px,' + b.top + 'px) scale(1,1)';
-      var an = f.animate([{ transform: from }, { transform: to }], { duration: reduce ? 1 : ms, easing: EASE, fill: 'forwards' });
+      var an = f.animate([{ transform: from }, { transform: to }], { duration: reduce ? 1 : ms, delay: reduce ? 0 : (delay || 0), easing: EASE, fill: 'both' });
       an.onfinish = function () { if (done) done(); requestAnimationFrame(function () { f.remove(); }); };
     }
     function rect(r) { return { left: r.left, top: r.top, width: r.width, height: r.height }; }
+
+    // Weisser Rahmen: ein Kästchen von 100 × 100 px, per transform auf jedes Rechteck gezogen
+    var pvFrame = null, pvAnim = null, pvTimer2 = 0, pvState = '';
+    if (pv) { pvFrame = document.createElement('div'); pvFrame.className = 'lib-pv-frame'; pvFrame.setAttribute('aria-hidden', 'true'); pv.insertBefore(pvFrame, pv.firstChild); }
+    var EASE_OPEN = 'cubic-bezier(.6,0,.1,1)';
+    function box(r) { return 'translate(' + r.left + 'px,' + r.top + 'px) scale(' + (r.width / 100) + ',' + (r.height / 100) + ')'; }
+    function frameTo(keys, ms, done) {
+      if (pvAnim) pvAnim.cancel();
+      pvAnim = pvFrame.animate(keys, { duration: reduce ? 1 : ms, fill: 'forwards' });
+      pvAnim.onfinish = function () { if (done) done(); };
+    }
+    // Oberkante des Menü-Knopfs, wenn er steht (ohne seine Bewegung mitzurechnen)
+    function mbTop() {
+      var w = mbWrap(), H = window.innerHeight;
+      if (!w) return H;
+      return H - (parseFloat(getComputedStyle(w).bottom) || 0) - w.offsetHeight;
+    }
+    // Vorschau höchstens bis 5 % über den Menü-Knopf, mehr Inhalt scrollt
+    function fitPanel() {
+      pvPanel.style.maxHeight = Math.max(200, mbTop() - window.innerHeight * CONFIG.pvGap) + 'px';
+      return { left: 0, top: 0, width: pvPanel.offsetWidth, height: pvPanel.offsetHeight };
+    }
+    // Rahmen eng ums Bild, oben angeheftet; Rand im gleichen Verhältnis wie bei der Karte im Rad
+    function attachRect(b, pad) {
+      var side = Math.min(pad.s * b.height, b.left);
+      var bottom = Math.max(side, pad.b * b.height);
+      return { left: b.left - side, top: 0, width: b.width + 2 * side, height: b.top + b.height + bottom };
+    }
+    function cardPad(it) {
+      var c = (it.a || it.img).getBoundingClientRect(), r = it.img.getBoundingClientRect(), h = r.height || 1;
+      return { s: Math.max(0, (r.left - c.left) / h), b: Math.max(0, (c.bottom - r.bottom) / h) };
+    }
 
     function openPreview(i) {
       var it = items[i];
@@ -517,7 +561,7 @@
       if (!pv) { location.href = it.href; return; }
       pvItem = it; lastFocus = document.activeElement; pvAt = performance.now();
       setOpen(false);
-      clearTimeout(pvTimer);
+      clearTimeout(pvTimer); clearTimeout(pvTimer2);
       if (pvMedia) { pvMedia.innerHTML = ''; pvMedia.appendChild(cloneImg(it.img)); }
       if (pvName) pvName.textContent = it.name;
       if (pvYear) pvYear.textContent = it.year;
@@ -526,46 +570,76 @@
       pv.setAttribute('aria-hidden', 'false'); if ('inert' in pv) pv.inert = false;
       mbShow();
       prefetch(it.href);
+      pvPanel.scrollTop = 0;
+      var panelR = fitPanel();
 
       var target = pvMedia && pvMedia.firstChild;
-      if (!target) { root.classList.add('is-pv', 'is-pv-in'); mode = 'pv'; return; }
-      // Endplatz des Bilds im Panel: Panel ist noch oben ausserhalb, darum seine Höhe dazurechnen
+      if (!target) { pvFrame.style.transform = box(panelR); root.classList.add('is-pv', 'is-pv-dim', 'is-pv-in'); mode = 'pv'; return; }
+      // Endplatz des Bilds im Panel (Feld hat feste Höhe, Breite automatisch, höchstens max-width)
       var mr = pvMedia.getBoundingClientRect();
       var ar = it.img.naturalWidth ? it.img.naturalWidth / it.img.naturalHeight : it.w / it.h;
-      // Feld hat feste Höhe, Breite automatisch (höchstens max-width)
       var maxW = parseFloat(getComputedStyle(pvMedia).maxWidth) || Infinity;
       var h = mr.height, w = Math.min(maxW, h * ar); h = w / ar;
-      var shift = pvPanel ? pvPanel.offsetHeight * 1.01 : 0;
-      var b = { left: mr.left, top: mr.top + shift, width: w, height: h };
+      var b = { left: mr.left, top: mr.top, width: w, height: h };
       var a = rect(it.img.getBoundingClientRect());
-      target.style.visibility = 'hidden';
+      var cardR = rect((it.a || it.img).getBoundingClientRect());
+      var att = attachRect(b, cardPad(it));
+      var D1 = CONFIG.pvMs, D2 = CONFIG.pvOpenMs, k = D1 / (D1 + D2);
+      target.classList.add('is-wait');
       it.el.style.visibility = 'hidden';
-      mode = 'pv';
-      root.classList.add('is-pv');
-      fly(it.img, a, b, CONFIG.pvMs, function () {
-        target.style.visibility = '';
+      mode = 'pv'; pvState = 'opening';
+      pvFrame.style.transform = box(cardR);
+      root.classList.add('is-pv', 'is-pv-dim');
+      // 1) Bild und Rahmen fliegen zusammen hoch und heften sich oben an · 2) der Rahmen geht auf
+      frameTo([
+        { transform: box(cardR), easing: EASE },
+        { transform: box(att), offset: k, easing: EASE_OPEN },
+        { transform: box(panelR) }
+      ], D1 + D2, function () { pvFrame.style.transform = box(panelR); if (pvState === 'opening') pvState = 'open'; });
+      fly(it.img, a, b, D1, function () { target.classList.remove('is-wait'); });
+      pvTimer2 = setTimeout(function () {
         if (pvItem !== it || !root.classList.contains('is-pv')) return;
         root.classList.add('is-pv-in');
-        if (pvClose) pvClose.focus({ preventScroll: true });
-      });
+        if (pvClose && !reduce) pvClose.focus({ preventScroll: true, focusVisible: false });
+      }, reduce ? 0 : D1 + D2 * .3);
     }
     function closePreview() {
-      if (!root.classList.contains('is-pv')) return;
+      if (!root.classList.contains('is-pv') || pvState === 'closing') return;
       var it = pvItem, target = pvMedia && pvMedia.firstChild;
-      pvItem = null;
+      pvItem = null; pvState = 'closing';
+      clearTimeout(pvTimer2);
       window.hsVT = null;
-      root.classList.remove('is-pv-in');
+      root.classList.remove('is-pv-in', 'is-pv-dim');
       pv.setAttribute('aria-hidden', 'true'); if ('inert' in pv) pv.inert = true;
+      if (document.activeElement && pv.contains(document.activeElement)) document.activeElement.blur();
       mode = 'idle'; render();
-      if (it && target) {
-        var a = rect(target.getBoundingClientRect());
-        var b = rect(it.img.getBoundingClientRect());
-        target.style.visibility = 'hidden';
-        it.el.style.visibility = 'hidden';
-        fly(it.img, a, b, CONFIG.pvMs, function () { it.el.style.visibility = ''; });
+      function finish() {
+        if (pvAnim) { pvAnim.cancel(); pvAnim = null; }
+        root.classList.remove('is-pv');
+        pvState = '';
+        activity();
       }
-      root.classList.remove('is-pv');
-      activity();
+      if (!it || !target) { finish(); return; }
+      pvPanel.scrollTop = 0;
+      var panelR = { left: 0, top: 0, width: pvPanel.offsetWidth, height: pvPanel.offsetHeight };
+      var b = rect(target.getBoundingClientRect());
+      var cardR = rect((it.a || it.img).getBoundingClientRect());
+      var a = rect(it.img.getBoundingClientRect());
+      var att = attachRect(b, cardPad(it));
+      var D1 = CONFIG.pvCloseMs, D2 = CONFIG.pvMs, k = D1 / (D1 + D2);
+      // 1) Rahmen zieht sich ums Bild zusammen · 2) Bild und Rahmen fliegen zurück ins Rad
+      var from = getComputedStyle(pvFrame).transform;   // auch mitten im Öffnen ohne Sprung
+      frameTo([
+        { transform: from && from !== 'none' ? from : box(panelR), easing: EASE_OPEN },
+        { transform: box(att), offset: k, easing: EASE },
+        { transform: box(cardR) }
+      ], D1 + D2, function () {
+        it.el.style.visibility = '';
+        requestAnimationFrame(finish);
+      });
+      // gleiche Uhr wie der Rahmen (verzögert statt Timer), damit Bild und Rahmen nie auseinanderlaufen
+      target.classList.add('is-wait');
+      fly(it.img, b, a, D2, null, D1);
       if (lastFocus && lastFocus.focus && lastFocus !== document.body) lastFocus.focus({ preventScroll: true });
     }
     if (pvClose) {
@@ -657,6 +731,7 @@
         measure();
         if (mode !== 'intro' && keep) { P = T = keep.c; V = 0; if (mode !== 'pv') mode = 'idle'; }
         render();
+        if (pvState === 'open' && pvFrame) { if (pvAnim) { pvAnim.cancel(); pvAnim = null; } pvFrame.style.transform = box(fitPanel()); }
       }, 80);
     });
     window.addEventListener('pageshow', function (e) {
