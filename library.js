@@ -183,7 +183,7 @@
     var mode = 'idle';           // idle | drag | intro | outro | pv
     var idx = 0, shownIdx = -1;
     var n = 1, L = 1, H = 1, W = 1, cx = 0, cy = 0, loop = true, gapPx = 0;
-    var raf = 0, last = 0, intro = null, wheelT = 0;
+    var raf = 0, last = 0, intro = null, wheelT = 0, dirty = false;
 
     // ---------- Masse ----------
     function measure() {
@@ -299,7 +299,9 @@
       gl.ox = -sr.left; gl.oy = -sr.top;
       gl.cv.style.left = gl.ox + 'px'; gl.cv.style.top = gl.oy + 'px';
       gl.cv.style.width = W + 'px'; gl.cv.style.height = H + 'px';
-      gl.cv.width = Math.round(W * dpr); gl.cv.height = Math.round(H * dpr);
+      var cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+      if (gl.cv.width !== cw) gl.cv.width = cw;
+      if (gl.cv.height !== ch) gl.cv.height = ch;
       gl.w = W; gl.h = H;
       gl.c.viewport(0, 0, gl.cv.width, gl.cv.height);
     }
@@ -321,6 +323,8 @@
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
             it.tex = t; it.ar = im.naturalWidth / im.naturalHeight;
+            // Format der Karte schon kennen, auch wenn das Bild auf der Seite noch lädt (sonst stimmen die Abstände nicht)
+            if (!it.img.naturalWidth) { it.img.style.aspectRatio = im.naturalWidth + ' / ' + im.naturalHeight; dirty = true; }
             glMeasure(it);
             // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt (sonst ruckelt es)
             c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
@@ -328,15 +332,30 @@
             c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
             c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
             it.el.classList.add('is-gl');
-            if (mode !== 'intro' && mode !== 'outro') render();
+            if (started) kick();
             res();
           };
           if (im.decode) im.decode().then(done, done); else done();
         };
         im.onerror = function () { res(); };
-        im.src = it.img.currentSrc || it.img.src;
+        im.src = texSrc(it);
       });
       return it.texP;
+    }
+    // Passende Grösse aus dem srcset von Webflow (…-p-500, -p-800, …): so klein wie möglich, so scharf wie nötig.
+    // Das spart Laden und Entpacken (vorher kam das grosse Bild ein zweites Mal).
+    function texSrc(it) {
+      var img = it.img, dpr = Math.min(2, window.devicePixelRatio || 1);
+      var need = Math.max(img.offsetWidth || 0, (img.offsetHeight || window.innerHeight * 0.3) * 1.6) * dpr * 1.15;
+      var best = null, max = null;
+      (img.getAttribute('srcset') || '').split(',').forEach(function (part) {
+        var m = part.trim().match(/^(\S+)\s+(\d+)w$/);
+        if (!m) return;
+        var w = +m[2];
+        if (!max || w > max.w) max = { u: m[1], w: w };
+        if (w >= need && (!best || w < best.w)) best = { u: m[1], w: w };
+      });
+      return (best || max || {}).u || img.currentSrc || img.src;
     }
     // Weisser Rand als Anteil der Karte (aus den Abständen im Designer)
     function glMeasure(it) {
@@ -428,6 +447,7 @@
     // ---------- Bewegung (Mario dt.update: lastX = lerp(lastX, currentX, ease); progress = (currentX − lastX) / Breite · velo) ----------
     function frame(now) {
       raf = 0;
+      if (dirty) { dirty = false; var keepC = mode === 'idle' && P === T ? items[idx] : null; measure(); if (keepC) P = T = keepC.c; }
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
       var busy = false;
@@ -951,8 +971,8 @@
     // Die ersten Bilder abwarten (höchstens introWait), alle übrigen laden während des Eintritts weiter.
     // Beim Eintritt kommen zuerst die Bilder vom Ende der Reihe, die ersten erst am Schluss: Zeit genug.
     function prep(it) {
-      var dec = it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
-      return dec.then(function () { return glTex(it); });
+      if (gl) return glTex(it);   // Textur lädt sofort und unabhängig vom Bild auf der Seite
+      return it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
     }
     var firstN = Math.min(all.length, 4);
     var tail = all.slice(Math.max(firstN, all.length - 3));
