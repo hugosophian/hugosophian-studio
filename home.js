@@ -808,13 +808,32 @@
         });
       }
     } catch (e) {}
-    var t0 = Date.now();
+    var t0 = Date.now(), lastH = 0, nudgeT = 0;
+    // Safari (Messung Hugo 16:18): Die Seite wird richtig 692 hoch, Safari zeichnet aber nur die alten 624 px
+    // (Höhe mit aufgeklappter oberer Leiste), darunter bleibt es schwarz. Das korrigiert sich erst beim Scrollen,
+    // und die Startseite lässt sich nicht scrollen. Darum bei jeder Höhenänderung einmal unsichtbar um 1 px
+    // scrollen und gleich zurück: Safari zeichnet dann die ganze Fläche neu.
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    function nudge() {
+      if (!touch) return;
+      clearTimeout(nudgeT);
+      nudgeT = setTimeout(function () {
+        var de = document.documentElement, b = document.body;
+        de.style.overflow = 'auto'; b.style.overflow = 'visible'; b.style.height = 'calc(100% + 2px)';
+        window.scrollTo(0, 1);
+        requestAnimationFrame(function () {
+          window.scrollTo(0, 0);
+          de.style.removeProperty('overflow'); b.style.removeProperty('overflow'); b.style.removeProperty('height');
+        });
+      }, 60);
+    }
     function sync() {
       var h = probe.offsetHeight;
       if (h > 100 && Math.abs(hp.offsetHeight - h) > 1) {
         hp.style.height = h + 'px';
         window.dispatchEvent(new Event('resize'));
       }
+      if (h > 100 && h !== lastH) { if (lastH) nudge(); lastH = h; }
       if (diag) {
         var v = window.visualViewport;
         diag.textContent = 'fix ' + h + '  hp ' + hp.offsetHeight + '\ninner ' + window.innerHeight + '  vv ' + (v ? Math.round(v.height) + '/' + Math.round(v.offsetTop) : '-') +
@@ -825,6 +844,9 @@
     sync();
     ['resize', 'orientationchange', 'pageshow', 'load', 'touchend'].forEach(function (ev) { window.addEventListener(ev, function () { sync(); setTimeout(sync, 120); }); });
     if (window.visualViewport) window.visualViewport.addEventListener('resize', sync);
+    // nach dem Laden bzw. nach dem Seitenübergang (≈ 0.9 s) sicherheitshalber auch einmal
+    window.addEventListener('pageshow', nudge);
+    setTimeout(nudge, 400); setTimeout(nudge, 1300);
     setInterval(sync, 400);
   }
 
