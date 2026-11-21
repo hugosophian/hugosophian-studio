@@ -8,9 +8,9 @@ V+'group(hs-hero){animation-duration:.9s;animation-timing-function:'+E+'}'
 +'@keyframes hsvz{to{height:var(--zh,100%);top:var(--zt,0%)}}'+V+'old(hs-hero){animation:hsvz .9s '+E+' both}'+V+'new(hs-hero){animation:hsvi .45s ease .35s both}'
 +'.hs-vt-hero'+O+'{animation:hsvo .45s ease both}.hs-vt-hero'+N+'{animation:hsvi .6s ease .55s both}'
 +'.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
-+'.hs-vt-studio'+O+'{animation:hsvo .2s linear both}.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5)}}@media (max-width:767px){:root{--hi:0,12%}}'
++'.hs-vt-studio'+O+',.hs-vt-studio'+N+'{animation:none}'
 +'@keyframes hsvi{from{opacity:0}}@keyframes hsvo{to{opacity:0}}'
-// zum Studio (Hugo 17:09): alte Seite klappt auf sich selbst nach oben weg (vt-dunkel.js), die Startseite kommt von unten (Desktop: von links)
+// zum Studio (Hugo 17:20, einfach): alte Seite klappt auf sich selbst nach oben weg (vt-dunkel.js), danach steht sofort die Startseite mit ihrer eigenen Animation da
 +'.hs-vt-out *{transition:none!important}'
 +'@media (prefers-reduced-motion:reduce){'+V+'group(*),'+V+'old(*),'+V+'new(*){animation:none!important}}';
 var H=['/'];   // Startseite
