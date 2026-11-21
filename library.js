@@ -25,7 +25,12 @@
     // Aufbau und Bewegung wie marioroudil.com am Desktop (main.js, Slider „dt“ und Vertex-Shader):
     // die Bilder liegen in einer geraden Reihe, die Anzeige läuft dem Ziel mit Glättung nach, Loslassen rastet ein.
     gap:        { desktop: 3, mobile: 6 },   // Abstand zwischen den Karten in vw
-    speed:      1.5,    // Finger-/Mausweg mal speed (Mario Desktop: 1.5)
+    speed:      1.5,    // Mausweg mal speed (Mario Desktop: 1.5)
+    // Handy: der Finger bewegt mehr (Mario Handy: 3) und ein schneller Wisch läuft weiter, bevor er einrastet
+    speedTouch: 3,      // Fingerweg mal speedTouch
+    flick:      0.35,   // Schwung: Fingertempo beim Loslassen (px/s) · speedTouch · flick = zusätzlicher Weg in px
+    flickMax:   8,      // höchstens so viele Karten Schwung
+    bendTouch:  0.7,    // Tiefe des Biegens am Handy (Anteil vom Desktop; vorher Breite / 1440 ≈ 0.27)
     ease:       0.1,    // Glättung pro Bild bei 60 fps (Mario: 0.1, über 65 Hz 0.09; hier bildratenunabhängig)
     velo:       0.75,   // Biegen = (Ziel − Anzeige) / Breite · velo (Mario; beim Mausrad 0.4)
     veloWheel:  0.4,
@@ -333,7 +338,7 @@
     }
     function glDraw(list) {
       if (!gl) return;
-      var c = gl.c, U = gl.U, sz = Math.min(1, W / 1440);   // Mario rechnet in px für den Desktop: am Handy entsprechend weniger tief
+      var c = gl.c, U = gl.U, sz = Math.max(W < 768 ? CONFIG.bendTouch : 0, Math.min(1, W / 1440));   // Mario rechnet in px für den Desktop
       var pc = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, prog));
       c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
       c.uniform2f(U.uView, gl.w, gl.h);
@@ -423,8 +428,11 @@
       } else if (mode !== 'pv') {
         P += (T - P) * (1 - Math.pow(1 - CONFIG.ease, dt * 60));
         if (mode !== 'drag' && Math.abs(T - P) < 0.3) P = T;
-        prog = (P - T) / W * velo;
-        busy = mode === 'drag' || P !== T;
+        // Biegen auf Marios Grenze (±0.4) und weich nachgeführt, damit ein Schwung am Handy nicht springt oder überdreht
+        var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, (P - T) / W * velo));
+        prog += (pt - prog) * (1 - Math.pow(1 - 0.2, dt * 60));
+        if (P === T && Math.abs(prog) < 0.0005) prog = 0;
+        busy = mode === 'drag' || P !== T || prog !== 0;
       }
       render();
       if (busy) kick(); else { last = 0; prog = 0; }
@@ -466,7 +474,7 @@
       if (mode === 'intro' || mode === 'outro' || root.classList.contains('is-pv')) return;
       if (e.target.closest('.lib-top, .lib-pv')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      down = { x: e.clientX, y: e.clientY, p0: T, id: e.pointerId };
+      down = { x: e.clientX, y: e.clientY, p0: T, id: e.pointerId, touch: e.pointerType !== 'mouse', s: [] };
       moved = false; startIdx = idx;
     });
     window.addEventListener('pointermove', function (e) {
@@ -479,7 +487,10 @@
         last = 0;
         root.classList.add('is-dragging');
       }
-      T = clampT(down.p0 - dx * CONFIG.speed);   // Mario: currentX = offX + (x − onX) · 1.5
+      T = clampT(down.p0 - dx * (down.touch ? CONFIG.speedTouch : CONFIG.speed));   // Mario: currentX = offX + (x − onX) · speed
+      var now = performance.now();
+      down.s.push([e.clientX, now]);
+      while (down.s.length > 2 && now - down.s[0][1] > 100) down.s.shift();   // Tempo aus den letzten 100 ms
       kick();
     });
     function release(e, cancelled) {
@@ -487,7 +498,18 @@
       root.classList.remove('is-dragging');
       if (moved || cancelled) {
         mode = 'idle';
-        snapT();   // Mario: ohne Schwung auf die Karte, die der Mitte am nächsten ist
+        // Handy: Schwung aus dem Fingertempo, dann auf die nächste Karte (Maus wie Mario: ohne Schwung)
+        var sm = down.s, now = performance.now();
+        if (down.touch && !cancelled && sm.length > 1 && now - sm[sm.length - 1][1] < 80) {
+          var a = sm[0], b = sm[sm.length - 1], dtS = (b[1] - a[1]) / 1000;
+          if (dtS > 0.008) {
+            var v = (b[0] - a[0]) / dtS, step = items.length ? L / items.length : W;
+            var throwPx = Math.max(-CONFIG.flickMax * step, Math.min(CONFIG.flickMax * step, -v * CONFIG.speedTouch * CONFIG.flick));
+            T = clampT(T + throwPx);
+            if (!loop && items.length) T = Math.max(items[0].c, Math.min(items[items.length - 1].c, T));
+          }
+        }
+        snapT();
         kick();
       } else {
         tap(down.x, down.y);
