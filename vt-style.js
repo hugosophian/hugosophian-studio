@@ -10,7 +10,7 @@ d.head.appendChild(d.createElement('style')).textContent=
 +'.hs-vt-fade'+O+'{animation:hsvo .8s ease-in-out both}.hs-vt-fade'+N+'{animation:hsvi .2s linear .75s both}'
 +'.hs-vt-studio'+O+'{z-index:2;animation:hsso .9s '+E+' both}.hs-vt-studio'+N+'{animation:hssi .9s '+E+' both}'
 +'@keyframes hsvi{from{opacity:0}}@keyframes hsvo{to{opacity:0}}'
-+'@keyframes hsso{to{transform:translate(var(--ho,100%))}}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5)}}'
++'@keyframes hsso{to{transform:translate(var(--ho,100%));opacity:0}}@keyframes hssi{from{transform:translate(var(--hi,-30%));filter:brightness(.5)}}'
 +'@media (max-width:767px){:root{--ho:0,-100%;--hi:0,30%}}'
 +'.hs-vt-hero [data-pg] :is(.pg-hero,.pg-hero-img){opacity:1!important;transform:none!important;transition:none!important}'
 +'.hs-vt-out *{transition:none!important}'

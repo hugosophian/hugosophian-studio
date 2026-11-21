@@ -46,14 +46,22 @@
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
     // jede Karte blendet in 0.4 s ein, sobald sie rechts ins Bild kommt; beim Landen der Rest
-    introWait:  2000,   // höchstens so lange auf das erste Bild warten (meist nach 0.2 s da)
-    introHold:  700,    // das erste Bild blendet aus dem Schwarz auf (sine), erst dann rollt die Reihe
-    introAll:   2000,   // höchstens so lange warten, bis alle Bilder auf dem Grafikchip sind (dann rollt es ohne Ruckeln)
-    introItems: 20,     // so viele Karten ziehen beim Abrollen vorbei, wie CRL Projekte hat (ganze Runden, Landen auf dem ersten)
+    // Eintritt exakt wie CRL (main.js: Ux._spinIntro + Rx), Hugo 21.11. 13:41:
+    // schwarz, bis alle Bilder auf dem Grafikchip sind; dann drehen die Karten auf dem grossen Rad herein
+    // (Radius 1.8 · H, Abstand wie bei CRLs 20 Projekten = 18°, Drehung 1.2 × Winkel), 3 s back.inOut(.54),
+    // jede Karte blendet in 0.4 s (sine) auf, sobald sie von rechts 0.85 rad unterschreitet; Landen auf dem ersten.
+    // Am Schluss legt sich das Rad in die gerade Reihe (Wischen danach wie Mario).
+    introWait:  2000,   // höchstens so lange auf das erste Bild warten
+    introAll:   2000,   // höchstens so lange schwarz warten, bis alle Bilder bereit sind
+    introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
+    radius:     1.8,    // CRL: Radius = 1.8 · Bildschirmhöhe
+    ringMin:    20,     // CRL: Abstand = 360° / Anzahl; bei weniger als 20 Projekten wie bei 20 (18°)
+    tilt:       1.2,    // CRL: Karte dreht 1.2 × so stark wie ihr Platz auf dem Rad
+    fadeAt:     0.85,   // CRL: Einblenden, sobald eine Karte von rechts unter 0.85 rad kommt
+    settle:     0.25,   // letzter Anteil des Eintritts, in dem sich das Rad in die gerade Reihe legt
     introMs:    3000,
     introBack:  0.54,
-    fadeMs:     600,    // jede Karte blendet weich ein, bevor sie rechts ins Bild kommt (CRL 0.4 s, sine)
-    fadeAhead:  1.6,    // … und zwar schon 1.6 Bildschirmbreiten vor dem Rand (wie CRL bei 0.85 rad), damit sie voll da ist
+    fadeMs:     400,    // CRL: Karte blendet in 0.4 s (sine.inOut) ein
     // Auswahl wechseln (Hugo 21.11.): alle Bilder ziehen sich zu einem zusammen, der Stapel blendet aus,
     // dann kommt die neue Auswahl wie beim ersten Laden (erstes Bild blendet auf, dann rollt es wie CRL)
     gatherMs:   650,    // Zusammenziehen (in-out cubic)
@@ -247,12 +255,14 @@
       if (!c) return;
       var VS = [
         'attribute vec2 aUv;',
-        'uniform vec2 uCenter; uniform vec2 uSize; uniform vec2 uView; uniform float uP; uniform float uPc; uniform vec4 uK;',
+        'uniform vec2 uCenter; uniform vec2 uSize; uniform vec2 uView; uniform float uP; uniform float uPc; uniform vec4 uK; uniform float uRot;',
         'varying vec2 vUv;',
         'void main() {',
         '  vUv = aUv;',
         '  vec3 p = vec3((aUv.x - 0.5) * uSize.x, (aUv.y - 0.5) * uSize.y, 0.0);',
         '  p.x += sin(aUv.y * 3.14159265) * uP * uK.z * uSize.x;',               // Mario: pos.x += sin(uv.y·π)·progress·5·0.125
+        '  float rc = cos(uRot), rs = sin(uRot);',                                // Drehung (CRL-Rad beim Eintritt)
+        '  p.xy = vec2(p.x * rc - p.y * rs, p.x * rs + p.y * rc);',
         '  vec2 w = p.xy + uCenter;',
         '  float dfc = abs(w.x - uView.x * 0.5);',
         '  p.z += cos(dfc * 1.8 / uView.x * 3.14159265) * uPc * uK.x;',          // Mario: cos(dfc·1.8/res.x·π)·clamp(progress)·800
@@ -289,7 +299,7 @@
       var vb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, vb); c.bufferData(c.ARRAY_BUFFER, new Float32Array(uv), c.STATIC_DRAW);
       var ib = c.createBuffer(); c.bindBuffer(c.ELEMENT_ARRAY_BUFFER, ib); c.bufferData(c.ELEMENT_ARRAY_BUFFER, new Uint16Array(ix), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aUv'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform1i(U.uTex, 0);
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true);
@@ -348,7 +358,7 @@
           // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt
           c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
           c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1);
-          c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1);
+          c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1); c.uniform1f(gl.U.uRot, 0);
           c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
           it.el.classList.add('is-gl');
           // Kleine Kopie für Karte, Flug und Vorschau: erst nach dem Eintritt (afterIntro), damit das Abrollen ruhig bleibt
@@ -436,6 +446,7 @@
         if (!it.tex || !it.box || it.el.style.visibility === 'hidden' || !(it.op > 0)) continue;
         c.bindTexture(c.TEXTURE_2D, it.tex);
         c.uniform2f(U.uCenter, list[k].x - gl.ox, gl.h - (list[k].y - gl.oy));
+        c.uniform1f(U.uRot, -(list[k].r || 0));
         c.uniform2f(U.uSize, it.cw, it.ch);
         c.uniform1f(U.uOpacity, it.op);
         c.uniform4f(U.uBox, it.box[0], it.box[1], it.box[2], it.box[3]);
@@ -446,19 +457,39 @@
     }
 
     // ---------- Zeichnen ----------
+    // CRL-Rad (Klasse Rx): Radius 1.8 · H, Karte i auf Winkel t = wrap(i − q) · Abstand, x = R · sin t, y = R · (1 − cos t),
+    // Drehung 1.2 · t. ring = 1: ganz Rad, 0: ganz Reihe (beim Eintritt legt sich das Rad am Schluss in die Reihe).
+    var ring = 0, ringQ = 0;
+    function ringStep() { return 2 * Math.PI / Math.max(n, CONFIG.ringMin); }
+    function ringTh(i) {
+      var d = i - ringQ;
+      if (loop) { d = d % n; if (d > n / 2) d -= n; else if (d < -n / 2) d += n; }
+      return d * ringStep();
+    }
     function render() {
-      var list = gl ? [] : null, reach = W / 2 + 40;
+      var list = gl ? [] : null, reach = W / 2 + 40, R = CONFIG.radius * H;
       for (var i = 0; i < items.length; i++) {
-        var it = items[i], x = rel(i) * (1 - sq);
-        if (Math.abs(x) - it.w / 2 > reach) {
+        var it = items[i], x = rel(i) * (1 - sq), y = 0, r = 0, z = -Math.abs(x);
+        if (ring > 0) {
+          var th = ringTh(i);
+          z = Math.cos(th) * 1000;
+          if (Math.abs(th) > 1.45) {
+            if (ring >= 1) { if (it.vis) { it.el.classList.remove('is-vis'); it.vis = false; } continue; }
+            th = th < 0 ? -1.45 : 1.45;
+          }
+          var xr = R * Math.sin(th), yr = R * (1 - Math.cos(th));
+          x = x + (xr - x) * ring; y = yr * ring; r = CONFIG.tilt * th * ring;
+        }
+        var ext = (it.w + it.h) / 2;
+        if (Math.abs(x) - ext > reach || y - ext > H) {
           if (it.vis) { it.el.classList.remove('is-vis'); it.vis = false; }
           continue;
         }
-        var px = cx + x - it.w / 2, py = cy - it.h / 2;
-        it.el.style.transform = 'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0)';
+        var px = cx + x - it.w / 2, py = cy + y - it.h / 2;
+        it.el.style.transform = 'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0)' + (r ? ' rotate(' + r.toFixed(4) + 'rad)' : '');
         if (!it.vis) { it.el.classList.add('is-vis'); it.vis = true; }
-        it.el.style.zIndex = Math.round(1000 - Math.abs(x) / 10);
-        if (list) list.push({ it: it, x: cx + x, y: cy, z: -Math.abs(x) });
+        it.el.style.zIndex = Math.round(1000 + z / 10);
+        if (list) list.push({ it: it, x: cx + x, y: cy + y, r: r, z: z });
       }
       if (list) { list.sort(function (a, b) { return a.z - b.z; }); glDraw(list); }
       idx = nearestTo(P);
@@ -709,55 +740,56 @@
     });
 
     // ---------- Eintritt: Bilder kommen zusammen ----------
-    // Eintritt (Hugo 21.11.): das erste Bild blendet aus dem Schwarz auf, dann rollt die Reihe wie bei CRL (_spinIntro):
-    // ganze Runden in 3 s mit back.inOut(.54), Karten blenden ein, sobald sie rechts ins Bild kommen, Landen auf dem ersten.
+    // Eintritt exakt wie CRL (Ux._spinIntro): siehe CONFIG
     function allTex() { return !gl || items.every(function (it) { return it.tex || it.texFail; }); }
     function runIntro(done) {
       measure();
       wheel.style.opacity = '';
       velo = CONFIG.velo; prog = 0; sq = 0;
-      if (reduce || !items.length) { P = T = items.length ? items[0].c : 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
-      var loops = Math.max(1, Math.round(CONFIG.introItems / n));
-      var from = loop ? items[0].c - L * loops : items[0].c - Math.max(L, W + 200);
-      var to = items[0].c;
-      items.forEach(function (it) { setOp(it, 0); it.px = null; it.fade = 0; });
-      P = T = from; mode = 'intro';
-      var t0 = performance.now(), phase = loop ? 0 : 1, tr = 0, first = items[0];
-      function fadeIn(it, now) { setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs)))); }
+      var c0 = items.length ? items[0].c : 0;
+      if (reduce || !items.length) { ring = 0; P = T = c0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
+      var k = Math.max(1, Math.round(CONFIG.introItems / n));
+      var q0 = -Math.max(n * k, CONFIG.introItems);
+      var perItem = L / n;
+      items.forEach(function (it) { setOp(it, 0); it.th = null; it.fade = 0; });
+      ring = 1; ringQ = q0; P = T = c0 + q0 * perItem;
+      mode = 'intro';
+      var t0 = performance.now(), tr = 0;
+      // Einblend-Linie: CRL 0.85 rad; bei wenigen Projekten ist der Kreis kürzer, dann knapp vor dessen Ende
+      var fadeAt = loop ? Math.min(CONFIG.fadeAt, (n / 2 - 0.5) * ringStep()) : CONFIG.fadeAt;
+      function fadeOp(it, now) { setOp(it, sineInOut(Math.max(0, Math.min(1, (now - it.fade) / CONFIG.fadeMs)))); }
       intro = { done: function () {
+          ring = 0; ringQ = 0;
           var t1 = performance.now(), rest = items.filter(function (it) { return it.op < 1; });
-          rest.forEach(function (it) { if (!it.fade) it.fade = t1; });
+          rest.forEach(function (it) { if (!it.fade || it.fade > t1) it.fade = t1; });
           if (rest.length) (function f() {
             var now = performance.now();
-            rest.forEach(function (it) { fadeIn(it, now); });
+            rest.forEach(function (it) { fadeOp(it, now); });
             render();
             if (rest.some(function (it) { return it.op < 1; })) requestAnimationFrame(f);
           })();
           afterIntro();
           if (done) done();
         }, step: function (now) {
-          if (phase === 0) {
-            // erstes Bild aus dem Schwarz (die Reihe steht so, dass es in der Mitte ist)
-            setOp(first, sineInOut(Math.min(1, (now - t0) / CONFIG.introHold)));
-            if (now - t0 >= CONFIG.introHold && (allTex() || now - t0 >= CONFIG.introAll)) {
-              if (dirty) { dirty = false; measure(); from = loop ? items[0].c - L * loops : from; to = items[0].c; P = T = from; }
-              phase = 1; tr = now;
-              // Beim Losrollen blenden alle Karten diesseits der Einblend-Linie gleich auf, die übrigen kurz bevor sie hereinkommen
-              items.forEach(function (it, i) { it.px = rel(i); if (it !== first && it.px <= W / 2 + it.w / 2 + W * CONFIG.fadeAhead) it.fade = now; });
-            }
-            return false;
+          if (!tr) {
+            // schwarz, bis alle Bilder bereit sind (CRL wartet ebenso auf das Laden)
+            if (!(allTex() || performance.now() - t0 >= CONFIG.introAll)) return false;
+            if (dirty) { dirty = false; measure(); c0 = items[0].c; perItem = L / n; }
+            tr = now;
           }
-          if (!tr) tr = now;
-          var t = Math.min(1, (now - tr) / CONFIG.introMs);
-          P = T = from + (to - from) * backInOut(t, CONFIG.introBack);
+          var t = Math.max(0, Math.min(1, (now - tr) / CONFIG.introMs));
+          ringQ = q0 * (1 - backInOut(t, CONFIG.introBack));
+          P = T = c0 + ringQ * perItem;
+          // am Schluss legt sich das Rad in die gerade Reihe
+          var u = Math.max(0, (t - (1 - CONFIG.settle)) / CONFIG.settle);
+          ring = 1 - (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
           for (var i = 0; i < items.length; i++) {
-            var it = items[i], x = rel(i), edge = W / 2 + it.w / 2 + W * CONFIG.fadeAhead;
-            if (!it.fade && it !== first && it.px !== null && it.px > edge && x <= edge && it.px - x < L / 2) it.fade = now;
-            if (!it.fade && it === first && it.op >= 1) it.fade = -1;
-            it.px = x;
-            if (it.fade > 0) fadeIn(it, now);
+            var it = items[i], th = ringTh(i);
+            if (!it.fade && it.th !== null && it.th > fadeAt && th <= fadeAt && it.th - th < 1) it.fade = now;
+            it.th = th;
+            if (it.fade) fadeOp(it, now);
           }
-          if (t >= 1) { P = T = to; return true; }
+          if (t >= 1) { ringQ = 0; P = T = c0; ring = 0; return true; }
           return false;
         } };
       last = 0; kick();
