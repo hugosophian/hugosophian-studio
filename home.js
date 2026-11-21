@@ -780,6 +780,52 @@
     if (!introOn) mbShow();
     window.addEventListener('resize', function () { fitTitles(); render(); });
     window.addEventListener('pageshow', function (e) { if (e.persisted) { render(); if (!introOn) mbShow(); } });
+    fitViewport();
+  }
+
+  // Safari (Hugo 21.11. 16:05): kommt man aus einer gescrollten Seite über „zum Studio“, bleibt 100dvh manchmal
+  // auf einer alten (zu kleinen) Höhe stehen, unten bleibt ein schwarzer Balken. Darum die Höhe laufend an den
+  // wirklich sichtbaren Bereich binden (ein unsichtbares, festes Element über die ganze Höhe misst ihn).
+  // Prüfwerte einblenden: einmal hugosophian.studio/#diag öffnen (wieder aus: #nodiag).
+  function fitViewport() {
+    var hp = document.querySelector('[data-hp]');
+    if (!hp || !document.body) return;
+    var probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:0;top:0;bottom:0;width:1px;visibility:hidden;pointer-events:none;z-index:-1';
+    document.body.appendChild(probe);
+    var diag = null, unit = {};
+    try {
+      if (location.hash === '#diag') sessionStorage.setItem('hs-diag', '1');
+      if (location.hash === '#nodiag') sessionStorage.removeItem('hs-diag');
+      if (sessionStorage.getItem('hs-diag')) {
+        diag = document.createElement('div');
+        diag.style.cssText = 'position:fixed;left:8px;top:45%;z-index:99999;background:rgba(255,0,0,.85);color:#fff;font:12px/1.35 monospace;padding:6px 8px;white-space:pre;pointer-events:none;text-transform:none';
+        document.body.appendChild(diag);
+        ['dvh', 'svh', 'lvh'].forEach(function (u) {
+          var p = document.createElement('div');
+          p.style.cssText = 'position:absolute;top:0;width:1px;visibility:hidden;height:100' + u;
+          document.body.appendChild(p); unit[u] = p;
+        });
+      }
+    } catch (e) {}
+    var t0 = Date.now();
+    function sync() {
+      var h = probe.offsetHeight;
+      if (h > 100 && Math.abs(hp.offsetHeight - h) > 1) {
+        hp.style.height = h + 'px';
+        window.dispatchEvent(new Event('resize'));
+      }
+      if (diag) {
+        var v = window.visualViewport;
+        diag.textContent = 'fix ' + h + '  hp ' + hp.offsetHeight + '\ninner ' + window.innerHeight + '  vv ' + (v ? Math.round(v.height) + '/' + Math.round(v.offsetTop) : '-') +
+          '\ndvh ' + unit.dvh.offsetHeight + '  svh ' + unit.svh.offsetHeight + '  lvh ' + unit.lvh.offsetHeight +
+          '\nscrY ' + window.scrollY + '  scr ' + screen.height + '  t ' + ((Date.now() - t0) / 1000).toFixed(1);
+      }
+    }
+    sync();
+    ['resize', 'orientationchange', 'pageshow', 'load', 'touchend'].forEach(function (ev) { window.addEventListener(ev, function () { sync(); setTimeout(sync, 120); }); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', sync);
+    setInterval(sync, 400);
   }
 
   // Stil und Seitenklasse sofort setzen (vor dem ersten Bild, auch für Seitenübergänge: schwarzer Grund)
