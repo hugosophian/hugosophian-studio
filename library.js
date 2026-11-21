@@ -317,7 +317,7 @@
             if (!gl) return res();
             var c = gl.c, t = c.createTexture();
             c.bindTexture(c.TEXTURE_2D, t);
-            try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, im); } catch (e) { return res(); }
+            try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, src); } catch (e) { return res(); }
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
             c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
@@ -335,7 +335,24 @@
             if (started) kick();
             res();
           };
-          if (im.decode) im.decode().then(done, done); else done();
+          // Auf die Grösse verkleinern, die die Karte braucht (Originale sind z. B. 3000 × 4500 px = 54 MB auf dem Grafikchip)
+          var src = im;
+          function shrink() {
+            var nw = im.naturalWidth, nh = im.naturalHeight;
+            var dpr = Math.min(2, window.devicePixelRatio || 1);
+            var needH = (it.img.offsetHeight || window.innerHeight * 0.32) * dpr * 1.25;
+            var k = Math.min(1, needH / nh, 2048 / Math.max(nw, nh));
+            if (k >= 0.95) { done(); return; }
+            var w = Math.max(1, Math.round(nw * k)), h = Math.max(1, Math.round(nh * k));
+            // Über ein Canvas (ImageBitmap würde das Spiegeln für WebGL ignorieren und in Safari nicht überall verkleinern)
+            try {
+              var cv2 = document.createElement('canvas'); cv2.width = w; cv2.height = h;
+              var x2 = cv2.getContext('2d'); x2.imageSmoothingEnabled = true; x2.imageSmoothingQuality = 'high'; x2.drawImage(im, 0, 0, w, h);
+              src = cv2;
+            } catch (e) { src = im; }
+            done();
+          }
+          if (im.decode) im.decode().then(shrink, shrink); else shrink();
         };
         im.onerror = function () { res(); };
         im.src = texSrc(it);
