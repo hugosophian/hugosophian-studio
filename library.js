@@ -56,7 +56,8 @@
     // jede Karte blendet in 0.4 s (sine) auf, sobald sie von rechts 0.85 rad unterschreitet; Landen auf dem ersten.
     // Am Schluss legt sich das Rad in die gerade Reihe (Wischen danach wie Mario).
     introWait:  2000,   // höchstens so lange auf das erste Bild warten
-    introAll:   2000,   // höchstens so lange schwarz warten, bis alle Bilder bereit sind
+    introAll:   700,    // höchstens so lange warten, bis alle Bilder bereit sind; später geladene blenden einfach dann ein (Hugo 15:16: schneller sichtbar)
+    introSkip:  0.17,   // langsames Ausholen am Anfang der Kurve überspringen: die Galerie ist sofort in Fahrt
     vtStart:    650,    // nach dem Ausblenden der Homepage (Übergang „fade“ 0.8 s) so früh starten, die ersten Karten kommen ohnehin erst nach ~0.5 s
     introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
     radius:     1.8,    // CRL: Radius = 1.8 · Bildschirmhöhe
@@ -772,7 +773,7 @@
       var k = Math.max(1, Math.round(CONFIG.introItems / n));
       var q0 = -Math.max(n * k, CONFIG.introItems);
       var perItem = L / n;
-      items.forEach(function (it) { setOp(it, 0); it.th = null; it.fade = 0; });
+      items.forEach(function (it) { setOp(it, 0); it.th = null; it.fade = 0; it.want = false; });
       ring = 1; ringQ = q0; P = T = c0 + q0 * perItem;
       mode = 'intro';
       var t0 = performance.now(), tr = 0;
@@ -793,10 +794,12 @@
           if (done) done();
         }, step: function (now) {
           if (!tr) {
-            // schwarz, bis alle Bilder bereit sind (CRL wartet ebenso auf das Laden)
+            // kurz auf die Bilder warten (höchstens introAll), dann losdrehen
             if (!(allTex() || performance.now() - t0 >= CONFIG.introAll)) return false;
             if (dirty) { dirty = false; measure(); c0 = items[0].c; perItem = L / n; }
-            tr = now;
+            tr = now - CONFIG.introSkip * CONFIG.introMs;
+            // Karten, die beim Losdrehen schon diesseits der Einblend-Linie stehen, gleich einblenden
+            for (var j = 0; j < items.length; j++) { var tj = ringTh(j); items[j].th = tj; if (tj <= fadeAt && tj > -1.45) items[j].want = true; }
           }
           var t = Math.max(0, Math.min(1, (now - tr) / CONFIG.introMs));
           ringQ = q0 * (1 - backInOut(t, CONFIG.introBack));
@@ -806,7 +809,9 @@
           ring = 1 - (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
           for (var i = 0; i < items.length; i++) {
             var it = items[i], th = ringTh(i);
-            if (!it.fade && it.th !== null && it.th > fadeAt && th <= fadeAt && it.th - th < 1) it.fade = now;
+            if (!it.fade && it.th !== null && it.th > fadeAt && th <= fadeAt && it.th - th < 1) it.want = true;
+            // Bild noch nicht bereit: einblenden, sobald es da ist
+            if (it.want && !it.fade && (!gl || it.tex || it.texFail)) it.fade = now;
             it.th = th;
             if (it.fade) fadeOp(it, now);
           }
@@ -1142,7 +1147,7 @@
           mbShow();
         });
       }
-      if (!vt) { go(); return; }
+      go(); return;   // nicht mehr auf das Ende des Homepage-Übergangs warten: dreht schon, während die Homepage ausblendet
       var t0 = performance.now();
       (function wait() {
         if (!html.classList.contains('hs-vt-fade') || performance.now() - t0 > CONFIG.vtStart) go();
