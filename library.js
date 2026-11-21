@@ -32,7 +32,7 @@
     flickMax:   8,      // höchstens so viele Karten Schwung
     bendTouch:  0.7,    // Tiefe des Biegens am Handy (Anteil vom Desktop; vorher Breite / 1440 ≈ 0.27)
     bendCurve:  2,      // Handy: Biegen wächst mit dem Tempo hoch 2 (langsam kaum, schnell stark), Desktop linear wie Mario
-    energyMin:  0.3,    // Handy: so viel Biegen kommt bei einem einzelnen normalen Wisch an …
+    energyMin:  0.5,    // Handy: so viel Biegen kommt bei einem einzelnen normalen Wisch an (Hugo 15:10: etwas sichtbarer) …
     energyFull: 2.5,    // … volles Biegen ab so viel gesammelter Schwung-Energie (ein kräftiger Wisch ≈ 1)
     energyFlick: 1400,  // Fingertempo (px/s), das einem Wisch die Energie 1 gibt (höchstens 1.5 pro Wisch)
     energyDecay: 0.9,   // Energie klingt mit dieser Zeitkonstante (s) wieder ab
@@ -430,8 +430,13 @@
       if (!it.a) return;
       var cw = it.a.offsetWidth, ch = it.a.offsetHeight;
       if (!cw || !ch) return;
-      var il = it.img.offsetLeft, itp = it.img.offsetTop, iw = it.img.offsetWidth, ih = it.img.offsetHeight;
-      if (it.img.offsetParent !== it.a) { var ar = it.a.getBoundingClientRect(), rr = it.img.getBoundingClientRect(); il = rr.left - ar.left; itp = rr.top - ar.top; }
+      // Lage des Fotos im weissen Rahmen aus den Innenabständen der Karte (nicht aus Bildschirm-Rechtecken:
+      // die stimmen nicht, wenn die Karte gerade gedreht ist oder Safari beim Scrollen die Leiste bewegt)
+      var cs = getComputedStyle(it.a);
+      var il = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.borderLeftWidth) || 0);
+      var itp = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.borderTopWidth) || 0);
+      var iw = it.img.offsetWidth, ih = it.img.offsetHeight;
+      if (!iw || !ih) return;
       it.cw = cw; it.ch = ch;
       it.box = [il / cw, (il + iw) / cw, 1 - (itp + ih) / ch, 1 - itp / ch];
     }
