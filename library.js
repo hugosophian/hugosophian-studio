@@ -51,7 +51,9 @@
     introMs:    3000,
     introBack:  0.54,
     introSkip:  0.18,   // Anteil am Anfang der Kurve überspringen (dort holt sie nur aus): früher Bilder, weniger Schwarz
-    fadeMs:     400,
+    fadeMs:     800,    // jede Karte blendet so lange weich ein (CRL 0.4 s; Hugo 21.11.: weicher)
+    introFade:  600,    // die ganze Reihe blendet am Anfang zusätzlich weich auf
+    introLoops: 1.6,    // so viele Runden zieht die Reihe beim Eintritt durch (CRL 1; Hugo: schneller in gleicher Zeit)
     // Auswahl wechseln: die Reihe dreht hoch, bei voller Fahrt kommen die neuen Projekte, dann bremst sie auf das erste
     spinSpeed:  2.6,    // Höchsttempo in Bildschirmbreiten pro Sekunde
     spinUpMs:   550,    // Anlauf
@@ -108,6 +110,14 @@
     'html.lib-on .menu-panel { z-index: 31; }',
     '[data-lib] .lib-pv-name, [data-lib] .lib-pv-year, [data-lib] .lib-pv-text, [data-lib] .lib-pv-open, [data-lib] .lib-pv-close { opacity: 0; transition: opacity .25s ease; }',
     '[data-lib].is-pv-in .lib-pv-name, [data-lib].is-pv-in .lib-pv-year, [data-lib].is-pv-in .lib-pv-text, [data-lib].is-pv-in .lib-pv-open, [data-lib].is-pv-in .lib-pv-close { opacity: 1; transition: opacity .5s ease; }',
+    /* „Galerie öffnen“ wie auf der Homepage: Text mit Pfeil im Stil von „Alle Projekte“, kein Knopf. Close übernimmt der Menü-Knopf. */
+    '[data-lib] .lib-pv-go { display: flex; align-items: center; gap: .5em; align-self: flex-start; color: inherit; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: "Oswald Studio", sans-serif; font-size: .8rem; font-weight: 500; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; position: relative; touch-action: manipulation; background: none; border: 0; outline: 0; box-shadow: none; text-shadow: none; padding: 0; border-radius: 0; }',
+    '[data-lib] .lib-pv-go::after { content: ""; position: absolute; inset: -14px -16px; }',
+    '[data-lib] .lib-pv-go .lib-sort-label { font: inherit; letter-spacing: inherit; color: inherit; }',
+    '[data-lib] .lib-pv-go .lib-sort-arrow { font-size: 1.1em; line-height: 1; color: inherit; transition: transform .45s cubic-bezier(.3,1.7,.55,1); }',
+    '@media (hover: hover) and (pointer: fine) { [data-lib] .lib-pv-go:hover .lib-sort-arrow { transform: translateX(.35em); } }',
+    '[data-lib] .lib-pv-go:focus-visible .lib-sort-arrow { transform: translateX(.35em); }',
+    '[data-lib] .lib-pv-close { display: none !important; }',
     '[data-lib] .lib-pv-media img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: left top; }',
     '[data-lib] .lib-wheel { transition: opacity .65s ease, filter .65s ease; }',
     '[data-lib].is-pv-dim .lib-wheel { opacity: .25; }',
@@ -117,7 +127,9 @@
     '.lib-fly img { display: block; width: 100%; height: 100%; object-fit: cover; }',
     /* Menü-Knopf: auf der Library steuert dieser Code ihn (Klasse lib-mb), nicht das Scrollen.
        Tempo und Kurven kommen aus dem Website-Footer (--mh-up, --mh-down, --mh-ease-up, --mh-ease-down). */
-    'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); scale: .55; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
+    'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
+    /* Klein (55 %) nur im versteckten Zustand vor dem Hochbouncen; beim Wegfallen bleibt er gross (wie Homepage) */
+    'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb-small { scale: .55; }',
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; will-change: translate, scale; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, .85s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, .85s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); }',
     '@media (prefers-reduced-motion: reduce) { [data-lib] .lib-wheel { transition-duration: .01s; } }'
   ].join('\n');
@@ -534,7 +546,44 @@
     // Immer sichtbar. Beim Laden versteckt; sobald die Galerie geladen ist, bouncet er von unten hoch
     // wie der Close-Knopf im About der Homepage (Feder, wächst dabei und wackelt nach).
     function mbWrap() { return document.querySelector('.menu-toggle-wrap'); }
-    function mbShow() { var w = mbWrap(); if (w) w.classList.add('lib-mb'); }
+    function mbShow() {
+      var w = mbWrap(); if (!w || w.classList.contains('lib-mb')) return;
+      w.classList.add('mh-now', 'lib-mb-small'); void w.offsetWidth; w.classList.remove('mh-now');
+      requestAnimationFrame(function () { w.classList.remove('lib-mb-small'); w.classList.add('lib-mb'); });
+    }
+    // Vorschau offen: Menü-Knopf wird zum Close-Knopf, genau wie beim About der Homepage.
+    // Er fällt weg, heisst dann „close“, wird klein und bouncet bei 72 % der Öffnung mit der Feder hoch. Beim Schliessen umgekehrt.
+    var mbBtn = null, mbOrig = 'menu', mbT = 0, mbT2 = 0;
+    function mbButton() {
+      if (mbBtn) return mbBtn;
+      mbBtn = document.querySelector('.menu-toggle-wrap [data-menu-open]') || document.querySelector('.menu-toggle-wrap .is-menu');
+      if (mbBtn) mbOrig = mbBtn.textContent.trim() || 'menu';
+      return mbBtn;
+    }
+    function mbSwap(toClose, popAt) {
+      var w = mbWrap(), b = mbButton(); if (!w || !b) return;
+      clearTimeout(mbT); clearTimeout(mbT2);
+      w.classList.remove('lib-mb');                              // fällt in voller Grösse weg (Website-Footer: --mh-down)
+      var drop = 500;
+      try { var v = getComputedStyle(document.documentElement).getPropertyValue('--mh-down').trim(); drop = parseFloat(v) * (v.indexOf('ms') > -1 ? 1 : 1000) || 500; } catch (e) {}
+      mbT = setTimeout(function () {
+        b.textContent = toClose ? (pvClose && pvClose.textContent.trim()) || 'close' : mbOrig;
+        b.setAttribute('aria-label', toClose ? 'Vorschau schliessen' : 'Menü öffnen');
+        w.classList.add('mh-now', 'lib-mb-small'); void w.offsetWidth; w.classList.remove('mh-now');
+      }, Math.min(drop, popAt - 30));
+      mbT2 = setTimeout(function () { w.classList.remove('lib-mb-small'); w.classList.add('lib-mb'); }, Math.max(popAt, drop + 40));
+    }
+    // Klick auf den Menü-Knopf bei offener Vorschau: schliesst die Vorschau statt das Menü zu öffnen
+    function mbIntercept(e) {
+      if (!root.classList.contains('is-pv')) return;
+      var t = e.target.closest && e.target.closest('.menu-toggle-wrap');
+      if (!t) return;
+      if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      closePreview();
+    }
+    window.addEventListener('click', mbIntercept, true);
+    window.addEventListener('keydown', mbIntercept, true);
     function activity() {}
     (function () {
       function settle(z, hz) { return Math.log(500) / (z * 2 * Math.PI * hz); }
@@ -671,7 +720,7 @@
       if (reduce || !items.length) { P = T = 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
       // CRL _spinIntro auf der Reihe: einmal die ganze Reihe von rechts nach links durch (3 s, back.inOut(.54)).
       // Alle Karten starten unsichtbar und blenden in 0.4 s ein, sobald sie rechts ins Bild kommen; beim Landen der Rest.
-      var from = loop ? -L : -Math.max(L, W + 200);
+      var from = loop ? -L * CONFIG.introLoops : -Math.max(L, W + 200) * CONFIG.introLoops;
       items.forEach(function (it) { setOp(it, 0); it.px = null; it.fade = 0; });
       P = T = from;
       // Start so verschieben, dass gleich die nächste Karte am rechten Rand steht: sofort etwas zu sehen statt Schwarz
@@ -680,7 +729,11 @@
       if (minX < Infinity) { from += Math.max(0, minX - 2); P = T = from; }
       mode = 'intro';
       render();
+      var tf0 = 0;
+      wheel.style.opacity = '0';
       function fades(now) {
+        if (!tf0) tf0 = now;
+        wheel.style.opacity = Math.min(1, sineInOut(Math.min(1, (now - tf0) / CONFIG.introFade))).toFixed(3);
         for (var i = 0; i < items.length; i++) {
           var it = items[i], x = rel(i), edge = W / 2 + it.w / 2;
           if (!it.fade && it.px !== null && it.px > edge && x <= edge && it.px - x < L / 2) it.fade = now;
@@ -804,6 +857,16 @@
     var pvText = pv && pv.querySelector('.lib-pv-text');
     var pvOpen = pv && pv.querySelector('.lib-pv-open');
     var pvClose = pv && pv.querySelector('.lib-pv-close');
+    // „Galerie öffnen“ wie auf der Homepage aufbauen: Text + Pfeil →
+    if (pvOpen) {
+      var goTxt = pvOpen.textContent.trim() || 'Galerie öffnen';
+      pvOpen.classList.remove('grey', 'is-menu');
+      pvOpen.classList.add('lib-pv-go');
+      pvOpen.textContent = '';
+      var gl1 = document.createElement('span'); gl1.className = 'lib-sort-label'; gl1.textContent = goTxt;
+      var gl2 = document.createElement('span'); gl2.className = 'lib-sort-arrow'; gl2.setAttribute('aria-hidden', 'true'); gl2.textContent = '\u2192';
+      pvOpen.appendChild(gl1); pvOpen.appendChild(gl2);
+    }
     var pvItem = null, lastFocus = null, pvTimer = 0, pvAt = 0;
     if (pv) { pv.setAttribute('role', 'dialog'); pv.setAttribute('aria-modal', 'true'); pv.setAttribute('aria-hidden', 'true'); if ('inert' in pv) pv.inert = true; }
 
@@ -885,7 +948,7 @@
       if (pvText) pvText.innerHTML = it.html;
       if (pvOpen) pvOpen.setAttribute('href', it.href);
       pv.setAttribute('aria-hidden', 'false'); if ('inert' in pv) pv.inert = false;
-      mbShow();
+      mbSwap(true, reduce ? 0 : (CONFIG.pvMs + CONFIG.pvOpenMs) * 0.72);
       prefetch(it.href);
       pvPanel.scrollTop = 0;
       var panelR = fitPanel();
@@ -913,13 +976,13 @@
       pvTimer2 = setTimeout(function () {
         if (pvItem !== it || !root.classList.contains('is-pv')) return;
         root.classList.add('is-pv-in');
-        if (pvClose && !reduce) pvClose.focus({ preventScroll: true, focusVisible: false });
       }, reduce ? 0 : D1 + D2 * .3);
     }
     function closePreview() {
       if (!root.classList.contains('is-pv') || pvState === 'closing') return;
       var it = pvItem, target = pvMedia && pvMedia.firstChild;
       pvItem = null; pvState = 'closing';
+      mbSwap(false, reduce ? 0 : (CONFIG.pvCloseMs + CONFIG.pvMs) * 0.72);
       clearTimeout(pvTimer2);
       window.hsVT = null;
       root.classList.remove('is-pv-in', 'is-pv-dim');
@@ -1048,6 +1111,7 @@
     window.addEventListener('resize', function () {
       clearTimeout(rT);
       rT = setTimeout(function () {
+        if (!started) return;   // vor dem Eintritt nichts zeichnen (iPhone meldet beim Laden Grössenänderungen; sonst blitzt die Galerie auf)
         var keep = items[idx];
         measure();
         if (mode !== 'intro' && mode !== 'outro' && keep) { P = T = near(items.indexOf(keep)); if (mode !== 'pv') mode = 'idle'; }
