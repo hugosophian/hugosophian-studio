@@ -22,28 +22,30 @@
   'use strict';
 
   var CONFIG = {
-    // Rad und Bewegung wie CRL (crl-2k26.vercel.app/main.js, Klassen Rx und Nv), Masse in Bildschirmhöhen H
-    radius:     1.8,    // Radius des Rads = 1.8 · H (CRL)
-    ringMin:    20,     // Abstand der Bilder: ein Kreis hat mindestens so viele Plätze (CRL: 20 Projekte = 18°)
-    tilt:       1.2,    // Bild dreht sich 1.2 × so stark wie sein Platz auf dem Kreis (CRL)
-    drag:       0.005,  // Bilder pro px Finger-/Mausweg (CRL dragSensitivity)
-    wheelK:     0.0005, // Bilder pro px Mausrad/Trackpad (CRL: 0.5 · 0.001)
-    lerp:       0.08,   // Nachlaufzeit in s (CRL lerpFactor, exponentiell)
-    snap:       0.1,    // Einrasten pro Bild (60 fps), wenn nicht gezogen wird (CRL snapStrength)
-    pullMax:    1.2,    // Biegen: Abstand Ziel–Anzeige, begrenzt (CRL)
-    pullEase:   0.15,   // Biegen folgt pro Bild (CRL)
-    gl:         true,   // Bilder per WebGL wie CRL (Biegen, Bewegungsunschärfe); ohne WebGL normale Karten
+    // Aufbau und Bewegung wie marioroudil.com am Desktop (main.js, Slider „dt“ und Vertex-Shader):
+    // die Bilder liegen in einer geraden Reihe, die Anzeige läuft dem Ziel mit Glättung nach, Loslassen rastet ein.
+    gap:        { desktop: 3, mobile: 6 },   // Abstand zwischen den Karten in vw
+    speed:      1.5,    // Finger-/Mausweg mal speed (Mario Desktop: 1.5)
+    ease:       0.1,    // Glättung pro Bild bei 60 fps (Mario: 0.1, über 65 Hz 0.09; hier bildratenunabhängig)
+    velo:       0.75,   // Biegen = (Ziel − Anzeige) / Breite · velo (Mario; beim Mausrad 0.4)
+    veloWheel:  0.4,
+    wheelIdle:  150,    // ms nach Mausrad/Trackpad, dann einrasten (Mario)
+    camera:     600,    // Mario: Kamera 600 px vor der Bildebene
+    depth:      800,    // Mario-Vertex: Tiefe cos(Abstand · 1.8 / Breite · π) · Biegen · 800
+    twist:      200,    // … plus sin(u − 10) · Biegen · 200 (Drehung über die Kartenbreite)
+    bow:        0.625,  // … plus seitlich sin(v · π) · Biegen · 5 · 0.125 Kartenbreiten
+    bendMax:    0.4,    // Biegen in die Tiefe begrenzt (Mario ±0.4)
+    zoom:       0.5,    // Bild zoomt im Rahmen mit (1 − 0.5 · Biegen) (Mario-Fragment-Shader)
+    gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
-    // Eintritt wie CRL (_spinIntro): das Rad dreht eine ganze Runde in 3 s (back.inOut(.54)),
-    // jedes Bild blendet ein, wenn es von rechts bei 0.85 rad ankommt (0.4 s sine.inOut)
-    introDelay: 450,    // ms schwarz, bevor das Rad dreht (CRL: 0.45 s nach dem Vorhang)
+    // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
+    // jede Karte blendet in 0.4 s ein, sobald sie rechts ins Bild kommt; beim Landen der Rest
+    introDelay: 450,    // ms schwarz, bevor es losgeht (CRL: 0.45 s nach dem Vorhang)
     introMs:    3000,
     introBack:  0.54,
-    fadeAt:     0.85,
     fadeMs:     400,
-    // Auswahl wechseln: Rad dreht beschleunigt weiter und blendet aus, dann Eintritt mit der neuen Auswahl
+    // Auswahl wechseln: Reihe zieht beschleunigt weiter und blendet aus, dann Eintritt mit der neuen Auswahl
     outroMs:    750,
-    outroSpin:  4,      // Bilder, die dabei vorbeidrehen
     // Vorschau
     pvMs:       750,    // Vorschau öffnen, Teil 1: Bild mit weissem Rahmen fliegt hoch und heftet sich oben an
     pvOpenMs:   700,    // Teil 2: der Rahmen geht auf und zeigt den Text
@@ -97,7 +99,8 @@
     '[data-lib].is-pv-in .lib-pv-name, [data-lib].is-pv-in .lib-pv-year, [data-lib].is-pv-in .lib-pv-text, [data-lib].is-pv-in .lib-pv-open, [data-lib].is-pv-in .lib-pv-close { opacity: 1; transition: opacity .5s ease; }',
     '[data-lib] .lib-pv-media img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: left top; }',
     '[data-lib] .lib-wheel { transition: opacity .65s ease, filter .65s ease; }',
-    '[data-lib].is-pv-dim .lib-wheel { opacity: .3; filter: blur(8px); }',
+    '[data-lib].is-pv-dim .lib-wheel { opacity: .25; }',
+    '@media (hover: hover) and (pointer: fine) { [data-lib].is-pv-dim .lib-wheel { filter: blur(8px); } }',
     '[data-lib].is-pv-dim .lib-meta, [data-lib].is-pv-dim .lib-bottom { opacity: 0; }',
     '.lib-fly { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; transform-origin: 0 0; will-change: transform; overflow: hidden; }',
     '.lib-fly img { display: block; width: 100%; height: 100%; object-fit: cover; }',
@@ -164,41 +167,52 @@
     });
 
     var items = all.slice();     // aktuelle Auswahl (Sortierung)
-    // Position in Bildern: P = Anzeige, T = Ziel (CRL: current / target, Vorzeichen umgedreht)
-    var P = 0, T = 0;
-    var pull = 0;                // Biegen (CRL: pull)
+    // Position auf der Reihe in px: P = Anzeige (Mario lastX), T = Ziel (Mario currentX), beide mit umgekehrtem Vorzeichen
+    var P = 0, T = 0, velo = CONFIG.velo, prog = 0;
     var mode = 'idle';           // idle | drag | intro | outro | pv
     var idx = 0, shownIdx = -1;
-    var n = 1, step = 0.3, ringR = 1, H = 1, cx = 0, cy = 0, loop = true;
-    var raf = 0, last = 0, intro = null, settleT = 0;
+    var n = 1, L = 1, H = 1, W = 1, cx = 0, cy = 0, loop = true, gapPx = 0;
+    var raf = 0, last = 0, intro = null, wheelT = 0;
 
     // ---------- Masse ----------
     function measure() {
-      H = window.innerHeight;
+      W = window.innerWidth; H = window.innerHeight;
       n = Math.max(1, items.length);
-      step = 2 * Math.PI / Math.max(n, CONFIG.ringMin);
-      ringR = CONFIG.radius * H;
+      gapPx = (W < 768 ? CONFIG.gap.mobile : CONFIG.gap.desktop) * W / 100;
       cx = stage.clientWidth / 2;
       cy = stage.clientHeight / 2;
-      var maxW = 0;
-      items.forEach(function (it) {
+      var acc = 0, maxW = 0;
+      items.forEach(function (it, i) {
         var h = it.img.offsetHeight, w = it.img.offsetWidth;
         if ((!w || w < 2) && h) w = it.img.naturalWidth ? h * it.img.naturalWidth / it.img.naturalHeight : h * 0.8;
         it.w = Math.max(it.el.offsetWidth, w); it.h = Math.max(it.el.offsetHeight, h);
+        if (i > 0) acc += items[i - 1].w / 2 + gapPx + it.w / 2;
+        it.c = acc;
         maxW = Math.max(maxW, it.w);
       });
+      L = items.length ? acc + items[items.length - 1].w / 2 + gapPx + items[0].w / 2 : 1;   // eine ganze Runde
+      // Endlos wie CRL, sobald die Reihe breiter ist als der Bildschirm (sonst sähe man den Übergang)
+      loop = n > 2 && L > W + 2 * maxW + gapPx;
       if (gl) { glSize(); items.forEach(glMeasure); }
-      // Endlos wie CRL, ausser bei so wenigen Bildern, dass man den Sprung am Rand sehen würde
-      var edge = Math.min(Math.PI / 2, (n / 2 - 0.5) * step);
-      loop = n > 2 && (ringR * Math.sin(edge) - maxW > window.innerWidth / 2 || ringR * (1 - Math.cos(edge)) > H);
     }
-    function wrap(d) { var i = d % n; if (Math.abs(i) > n / 2) i = i > 0 ? i - n : i + n; return i; }
-    function rel(i) { return loop ? wrap(i - P) : i - P; }                 // Abstand von Bild i zur Mitte, in Bildern
-    function near(i) { return loop ? P + wrap(i - P) : i; }                // Ziel, um Bild i in die Mitte zu holen
-    function nearest(p) { var r = Math.round(p); return loop ? ((r % n) + n) % n : Math.max(0, Math.min(n - 1, r)); }
-    function clampT(t) { return loop ? t : Math.max(-1, Math.min(n, t)); }  // CRL bounceLimit: 1 Bild über den Rand
+    function wrapL(d) { var r = d % L; if (r > L / 2) r -= L; else if (r < -L / 2) r += L; return r; }
+    function rel(i) { var d = items[i].c - P; return loop ? wrapL(d) : d; }   // Abstand Karte i zur Mitte in px
+    function near(i) { return P + rel(i); }                                   // Ziel, um Karte i in die Mitte zu holen
+    function nearestTo(p) {
+      var best = 0, bd = Infinity;
+      for (var i = 0; i < items.length; i++) { var d = items[i].c - p; if (loop) d = wrapL(d); d = Math.abs(d); if (d < bd) { bd = d; best = i; } }
+      return best;
+    }
+    function snapT() { if (items.length) { var i = nearestTo(T), d = items[i].c - T; T += loop ? wrapL(d) : d; } }
+    function clampT(t) {
+      if (loop || !items.length) return t;
+      var lo = items[0].c, hi = items[items.length - 1].c;
+      if (t < lo) return lo - (lo - t) * 0.35;
+      if (t > hi) return hi + (t - hi) * 0.35;
+      return t;
+    }
 
-    // ---------- Bilder als WebGL-Flächen wie CRL (Shader Lx / Dx): Biegen, weisser Rahmen, Bewegungsunschärfe ----------
+    // ---------- Bilder als WebGL-Flächen wie Mario (Vertex-Shader: Biegen in die Tiefe, Fragment: Zoom im Rahmen) ----------
     // Die normalen Karten bleiben unsichtbar darunter (für Tippen, Vorschau und als Ersatz ohne WebGL).
     var gl = null;
     (function () {
@@ -211,19 +225,23 @@
       if (!c) return;
       var VS = [
         'attribute vec2 aUv;',
-        'uniform vec2 uCenter; uniform vec2 uSize; uniform float uRot; uniform vec2 uBend; uniform vec2 uView;',
+        'uniform vec2 uCenter; uniform vec2 uSize; uniform vec2 uView; uniform float uP; uniform float uPc; uniform vec4 uK;',
         'varying vec2 vUv;',
         'void main() {',
         '  vUv = aUv;',
-        '  float s = sin(aUv.y * 3.14159265);',
-        '  vec2 p = vec2((aUv.x - 0.5) * uSize.x - s * uBend.x, (aUv.y - 0.5) * uSize.y + s * uBend.y);',
-        '  float cs = cos(uRot), sn = sin(uRot);',
-        '  p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs) + uCenter;',
-        '  gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, p.y / uView.y * 2.0 - 1.0, 0.0, 1.0);',
+        '  vec3 p = vec3((aUv.x - 0.5) * uSize.x, (aUv.y - 0.5) * uSize.y, 0.0);',
+        '  p.x += sin(aUv.y * 3.14159265) * uP * uK.z * uSize.x;',               // Mario: pos.x += sin(uv.y·π)·progress·5·0.125
+        '  vec2 w = p.xy + uCenter;',
+        '  float dfc = abs(w.x - uView.x * 0.5);',
+        '  p.z += cos(dfc * 1.8 / uView.x * 3.14159265) * uPc * uK.x;',          // Mario: cos(dfc·1.8/res.x·π)·clamp(progress)·800
+        '  p.z += sin(aUv.x - 10.0) * uPc * uK.y;',                               // Mario: sin(uv.x − 10)·clamp(progress)·200
+        '  vec2 c = uView * 0.5;',
+        '  vec2 s = c + (w - c) * (uK.w / (uK.w - p.z));',                        // Kamera uK.w px vor der Ebene
+        '  gl_Position = vec4(s.x / uView.x * 2.0 - 1.0, s.y / uView.y * 2.0 - 1.0, -p.z / (uK.w * 4.0), 1.0);',
         '}'].join('\n');
       var FS = [
         'precision mediump float;',
-        'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform vec2 uOffset;',
+        'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform float uZoom;',
         'varying vec2 vUv;',
         'void main() {',
         '  float x0 = uBox.x, x1 = uBox.y, y0 = uBox.z, y1 = uBox.w;',
@@ -232,11 +250,8 @@
         '  float ia = uCardAspect * ((x1 - x0) / (y1 - y0));',
         '  vec2 uv = p;',
         '  if (uImageAspect > ia) { uv.x = 0.5 + (p.x - 0.5) * ia / uImageAspect; } else { uv.y = 0.5 + (p.y - 0.5) * uImageAspect / ia; }',
-        '  float sp = length(uOffset);',
-        '  vec2 st = sp > 1e-4 ? (uOffset / sp) * min(sp, 0.1) : vec2(0.0);',
-        '  vec3 col = vec3(0.0);',
-        '  for (int i = 0; i < 10; i++) { float t = float(i) / 9.0 - 0.5; col += texture2D(uTex, clamp(uv + st * t, 0.0, 1.0)).rgb; }',
-        '  col /= 10.0;',
+        '  uv = (uv - 0.5) * uZoom + 0.5;',                                        // Mario: (uv − 0.5)·(1 − 0.5·progress) + 0.5
+        '  vec3 col = texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb;',
         '  gl_FragColor = vec4(col * uOpacity, uOpacity);',
         '}'].join('\n');
       function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
@@ -245,60 +260,66 @@
       var pr = c.createProgram(); c.attachShader(pr, vs); c.attachShader(pr, fs); c.linkProgram(pr);
       if (!c.getProgramParameter(pr, c.LINK_STATUS)) return;
       c.useProgram(pr);
-      // Fläche 32 × 32 wie CRL (PlaneGeometry), damit das Biegen rund wird
+      // Fläche 32 × 32, damit das Biegen rund wird
       var N = 32, uv = [], ix = [];
       for (var j = 0; j <= N; j++) for (var i = 0; i <= N; i++) uv.push(i / N, j / N);
       for (j = 0; j < N; j++) for (i = 0; i < N; i++) { var a = j * (N + 1) + i, b = a + 1, d = a + N + 1, e = d + 1; ix.push(a, b, d, b, e, d); }
       var vb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, vb); c.bufferData(c.ARRAY_BUFFER, new Float32Array(uv), c.STATIC_DRAW);
       var ib = c.createBuffer(); c.bindBuffer(c.ELEMENT_ARRAY_BUFFER, ib); c.bufferData(c.ELEMENT_ARRAY_BUFFER, new Uint16Array(ix), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aUv'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uCenter', 'uSize', 'uRot', 'uBend', 'uView', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uOffset'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform1i(U.uTex, 0);
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true);
       wheel.insertBefore(cv, wheel.firstChild);
-      gl = { c: c, cv: cv, U: U, n: ix.length, dpr: 1, w: 0, h: 0, ox: 0, oy: 0, dead: false };
+      gl = { c: c, cv: cv, U: U, n: ix.length, w: 0, h: 0, ox: 0, oy: 0 };
       cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); glOff(); }, false);
     })();
     function glOff() {
       if (!gl) return;
-      gl.dead = true; gl.cv.style.display = 'none';
+      gl.cv.style.display = 'none';
       all.forEach(function (it) { it.el.classList.remove('is-gl'); });
       gl = null;
     }
     function glSize() {
       if (!gl) return;
-      var dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, Hh = window.innerHeight;
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
       var sr = stage.getBoundingClientRect();
       gl.ox = -sr.left; gl.oy = -sr.top;
       gl.cv.style.left = gl.ox + 'px'; gl.cv.style.top = gl.oy + 'px';
-      gl.cv.style.width = W + 'px'; gl.cv.style.height = Hh + 'px';
-      gl.cv.width = Math.round(W * dpr); gl.cv.height = Math.round(Hh * dpr);
-      gl.dpr = dpr; gl.w = W; gl.h = Hh;
+      gl.cv.style.width = W + 'px'; gl.cv.style.height = H + 'px';
+      gl.cv.width = Math.round(W * dpr); gl.cv.height = Math.round(H * dpr);
+      gl.w = W; gl.h = H;
       gl.c.viewport(0, 0, gl.cv.width, gl.cv.height);
     }
-    // Textur laden (Webflow-CDN erlaubt das wie bei CRL). Klappt es nicht, bleibt die normale Karte sichtbar.
+    // Textur laden (Webflow-CDN erlaubt das). Klappt es nicht, bleibt die normale Karte sichtbar.
     function glTex(it) {
-      if (!gl || it.tex || it.texLoading) return;
-      it.texLoading = true;
-      var im = new Image();
-      im.crossOrigin = 'anonymous';
-      im.onload = function () {
-        if (!gl) return;
-        var c = gl.c, t = c.createTexture();
-        c.bindTexture(c.TEXTURE_2D, t);
-        try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, im); } catch (e) { return; }
-        c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
-        c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
-        c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
-        c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
-        it.tex = t; it.ar = im.naturalWidth / im.naturalHeight;
-        it.el.classList.add('is-gl');
-        glMeasure(it);
-        render();
-      };
-      im.onerror = function () { it.texLoading = false; };
-      im.src = it.img.currentSrc || it.img.src;
+      if (!gl) return Promise.resolve();
+      if (it.texP) return it.texP;
+      it.texP = new Promise(function (res) {
+        var im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = function () {
+          var done = function () {
+            if (!gl) return res();
+            var c = gl.c, t = c.createTexture();
+            c.bindTexture(c.TEXTURE_2D, t);
+            try { c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, im); } catch (e) { return res(); }
+            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
+            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
+            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
+            c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
+            it.tex = t; it.ar = im.naturalWidth / im.naturalHeight;
+            it.el.classList.add('is-gl');
+            glMeasure(it);
+            res();
+          };
+          if (im.decode) im.decode().then(done, done); else done();
+        };
+        im.onerror = function () { res(); };
+        im.src = it.img.currentSrc || it.img.src;
+      });
+      return it.texP;
     }
     // Weisser Rand als Anteil der Karte (aus den Abständen im Designer)
     function glMeasure(it) {
@@ -312,19 +333,20 @@
     }
     function glDraw(list) {
       if (!gl) return;
-      var c = gl.c, U = gl.U, K = H / 0.8284;   // CRL: Kamera 45°, Abstand 1 → 1 Welteinheit = H / 0.8284 px
+      var c = gl.c, U = gl.U, sz = Math.min(1, W / 1440);   // Mario rechnet in px für den Desktop: am Handy entsprechend weniger tief
+      var pc = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, prog));
       c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
       c.uniform2f(U.uView, gl.w, gl.h);
-      c.uniform2f(U.uBend, 0.12 * pull * 0.3 * K, 0.06 * pull * 0.1 * K);
-      c.uniform2f(U.uOffset, 0.06 * pull, 0.12 * pull);
-      list.sort(function (a, b) { return a.z - b.z; });
+      c.uniform1f(U.uP, prog);
+      c.uniform1f(U.uPc, pc);
+      c.uniform4f(U.uK, CONFIG.depth * sz, CONFIG.twist * sz, CONFIG.bow * sz, CONFIG.camera);
+      c.uniform1f(U.uZoom, 1 - CONFIG.zoom * prog);
       for (var k = 0; k < list.length; k++) {
         var it = list[k].it;
         if (!it.tex || !it.box || it.el.style.visibility === 'hidden' || !(it.op > 0)) continue;
         c.bindTexture(c.TEXTURE_2D, it.tex);
         c.uniform2f(U.uCenter, list[k].x - gl.ox, gl.h - (list[k].y - gl.oy));
         c.uniform2f(U.uSize, it.cw, it.ch);
-        c.uniform1f(U.uRot, -list[k].r);
         c.uniform1f(U.uOpacity, it.op);
         c.uniform4f(U.uBox, it.box[0], it.box[1], it.box[2], it.box[3]);
         c.uniform1f(U.uImageAspect, it.ar || 1);
@@ -335,26 +357,25 @@
 
     // ---------- Zeichnen ----------
     function render() {
-      var W = window.innerWidth, list = gl ? [] : null;
+      var list = gl ? [] : null, reach = W / 2 + 40;
       for (var i = 0; i < items.length; i++) {
-        var it = items[i], th = rel(i) * step;
-        var x = ringR * Math.sin(th), y = ringR * (1 - Math.cos(th));
-        if (Math.abs(th) > 1.45 || Math.abs(x) - it.w > W / 2 + 40 || y - it.h > H) {
+        var it = items[i], x = rel(i);
+        if (Math.abs(x) - it.w / 2 > reach) {
           if (it.vis) { it.el.classList.remove('is-vis'); it.vis = false; }
           continue;
         }
-        var px = cx + x - it.w / 2, py = cy + y - it.h / 2;
-        it.el.style.transform = 'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0) rotate(' + (CONFIG.tilt * th).toFixed(4) + 'rad)';
-        it.el.style.zIndex = Math.round(100 + 100 * Math.cos(th));
+        var px = cx + x - it.w / 2, py = cy - it.h / 2;
+        it.el.style.transform = 'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0)';
         if (!it.vis) { it.el.classList.add('is-vis'); it.vis = true; }
-        if (list) { if (!it.tex) glTex(it); list.push({ it: it, x: cx + x, y: cy + y, r: CONFIG.tilt * th, z: Math.cos(th) }); }
+        if (list) list.push({ it: it, x: cx + x, y: cy });
       }
       if (list) glDraw(list);
-      idx = nearest(P);
+      idx = nearestTo(P);
       if (idx !== shownIdx && mode !== 'intro' && mode !== 'outro') showMeta(idx);
-      if (fill) {
-        var pos = loop ? ((P % n) + n) % n : Math.max(0, Math.min(n - 1, P));
-        fill.style.width = (n > 1 ? Math.min(1, pos / (n - 1)) * 100 : 100).toFixed(2) + '%';
+      if (fill && items.length) {
+        var span = items[items.length - 1].c, pos = P;
+        if (loop) pos = ((P % L) + L) % L;
+        fill.style.width = (span > 0 ? Math.max(0, Math.min(1, pos / span)) * 100 : 100).toFixed(2) + '%';
       }
     }
 
@@ -385,30 +406,28 @@
     function sineInOut(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
     function setOp(it, o) { it.op = o; it.el.style.opacity = o >= 1 ? '' : o.toFixed(3); }
 
-    // ---------- Bewegung (CRL Nv.update + Rx.update) ----------
+    // ---------- Bewegung (Mario dt.update: lastX = lerp(lastX, currentX, ease); progress = (currentX − lastX) / Breite · velo) ----------
     function frame(now) {
       raf = 0;
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
-      var f60 = dt * 60, busy = false;
+      var busy = false;
       if ((mode === 'intro' || mode === 'outro') && intro) {
         var t = Math.max(0, Math.min(1, (now - intro.t0) / intro.ms));
         var e = mode === 'intro' ? backInOut(t, CONFIG.introBack) : t * t * t;
         P = T = intro.from + (intro.to - intro.from) * e;
+        prog = 0;
         if (intro.tick) intro.tick(now, t);
         busy = true;
         if (t >= 1) { mode = 'idle'; P = T = intro.to; var done = intro.done; intro = null; if (done) done(); }
       } else if (mode !== 'pv') {
-        if (mode !== 'drag') T += (Math.round(T) - T) * (1 - Math.pow(1 - CONFIG.snap, f60));
-        P = T + (P - T) * Math.exp(-dt / CONFIG.lerp);
-        if (mode !== 'drag' && Math.abs(T - P) < 0.0005 && Math.abs(Math.round(T) - T) < 0.0005) { P = T = Math.round(T); }
-        busy = mode === 'drag' || P !== T || Math.abs(pull) > 0.001;
+        P += (T - P) * (1 - Math.pow(1 - CONFIG.ease, dt * 60));
+        if (mode !== 'drag' && Math.abs(T - P) < 0.3) P = T;
+        prog = (P - T) / W * velo;
+        busy = mode === 'drag' || P !== T;
       }
-      var s = Math.max(-CONFIG.pullMax, Math.min(CONFIG.pullMax, T - P));
-      pull += (s - pull) * (1 - Math.pow(1 - CONFIG.pullEase, f60));
-      if (!busy && Math.abs(pull) < 0.001) pull = 0;
       render();
-      if (busy || pull) kick(); else last = 0;
+      if (busy) kick(); else { last = 0; prog = 0; }
     }
     function kick() { if (!raf) raf = requestAnimationFrame(frame); }
     function goTo(i) {
@@ -460,7 +479,7 @@
         last = 0;
         root.classList.add('is-dragging');
       }
-      T = clampT(down.p0 - dx * CONFIG.drag);   // CRL: 0.005 Bilder pro px, ohne Schwung
+      T = clampT(down.p0 - dx * CONFIG.speed);   // Mario: currentX = offX + (x − onX) · 1.5
       kick();
     });
     function release(e, cancelled) {
@@ -468,7 +487,7 @@
       root.classList.remove('is-dragging');
       if (moved || cancelled) {
         mode = 'idle';
-        T = loop ? Math.round(T) : Math.max(0, Math.min(n - 1, Math.round(T)));   // CRL: beim Loslassen aufs nächste Bild
+        snapT();   // Mario: ohne Schwung auf die Karte, die der Mitte am nächsten ist
         kick();
       } else {
         tap(down.x, down.y);
@@ -493,7 +512,7 @@
       e.preventDefault();
       if (e.detail === 0) {   // Tastatur (Enter)
         var i = items.findIndex(function (it) { return it.a === a; });
-        if (i > -1) { P = T = near(i); pull = 0; render(); openPreview(i); }
+        if (i > -1) { P = T = near(i); prog = 0; render(); openPreview(i); }
       }
     });
     function tap(x, y) {
@@ -502,7 +521,7 @@
       if (!item) return;
       var i = items.findIndex(function (it) { return it.el === item; });
       if (i < 0) return;
-      if (i === idx) { P = T = near(i); pull = 0; render(); openPreview(i); }
+      if (i === idx) { P = T = near(i); prog = 0; render(); openPreview(i); }
       else { goTo(i); activity(); }
     }
 
@@ -513,13 +532,14 @@
       e.preventDefault();
       if (mode === 'intro' || mode === 'outro' || root.classList.contains('is-pv')) return;
       if (e.target.closest('.lib-sort-list')) return;
-      // CRL (virtual-scroll, scrollInput): grössere Richtung zählt, 0.5 · 0.001 Bilder pro px, Einrasten zieht laufend
-      var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (e.deltaMode === 1) d *= 30;
+      // Mario: deltaY −= pixelY; deltaY −= pixelX; nach 150 ms Ruhe einrasten, solange Biegen mit 0.4
+      var d = e.deltaX + e.deltaY;
+      if (e.deltaMode === 1) d *= 32;
       if (!d) return;
-      T = clampT(T + d * CONFIG.wheelK);
-      if (!loop) T = Math.max(0, Math.min(n - 1, T));
-      mode = 'idle'; kick();
+      T = clampT(T + d);
+      velo = CONFIG.veloWheel; mode = 'idle'; kick();
+      clearTimeout(wheelT);
+      wheelT = setTimeout(function () { velo = CONFIG.velo; if (mode === 'idle') { snapT(); kick(); } }, CONFIG.wheelIdle);
     }, { passive: false });
 
     // Tastatur
@@ -528,35 +548,41 @@
       if (root.classList.contains('is-pv')) { if (e.key === 'Escape') { e.preventDefault(); closePreview(); } return; }
       if (top && top.classList.contains('is-open') && e.key === 'Escape') { setOpen(false); return; }
       if (mode === 'intro' || mode === 'outro') return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); T = clampT(Math.round(T) + 1); if (!loop) T = Math.min(n - 1, T); mode = 'idle'; kick(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); T = clampT(Math.round(T) - 1); if (!loop) T = Math.max(0, T); mode = 'idle'; kick(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        var k = nearestTo(T) + (e.key === 'ArrowRight' ? 1 : -1);
+        if (loop) k = (k + n) % n; else k = Math.max(0, Math.min(n - 1, k));
+        T = near(k); mode = 'idle'; kick();
+      }
     });
 
     // ---------- Eintritt: Bilder kommen zusammen ----------
     function runIntro(done) {
       measure();
       wheel.style.opacity = '';
-      if (reduce || !items.length) { P = T = 0; pull = 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
-      // CRL _spinIntro: von −n auf 0 (eine ganze Runde), alle Bilder unsichtbar, jedes blendet ein,
-      // sobald es von rechts kommend 0.85 rad unterschreitet; beim Landen der Rest
-      items.forEach(function (it) { setOp(it, 0); it.th = null; it.fade = 0; });
-      P = T = -n; pull = 0; mode = 'intro';
+      velo = CONFIG.velo; prog = 0;
+      if (reduce || !items.length) { P = T = 0; mode = 'idle'; items.forEach(function (it) { setOp(it, 1); }); render(); if (done) done(); return; }
+      // CRL _spinIntro auf der Reihe: einmal die ganze Reihe von rechts nach links durch (3 s, back.inOut(.54)).
+      // Alle Karten starten unsichtbar und blenden in 0.4 s ein, sobald sie rechts ins Bild kommen; beim Landen der Rest.
+      var from = loop ? -L : -Math.max(L, W + 200);
+      items.forEach(function (it) { setOp(it, 0); it.px = null; it.fade = 0; });
+      P = T = from; mode = 'intro';
       render();
       function fades(now) {
         for (var i = 0; i < items.length; i++) {
-          var it = items[i], th = rel(i) * step;
-          if (!it.fade && it.th !== null && it.th > CONFIG.fadeAt && th <= CONFIG.fadeAt && it.th - th < 1) it.fade = now;
-          it.th = th;
+          var it = items[i], x = rel(i), edge = W / 2 + it.w / 2;
+          if (!it.fade && it.px !== null && it.px > edge && x <= edge && it.px - x < L / 2) it.fade = now;
+          it.px = x;
           if (it.fade) setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs))));
         }
       }
-      intro = { from: -n, to: 0, t0: performance.now() + CONFIG.introDelay, ms: CONFIG.introMs, tick: fades,
+      intro = { from: from, to: 0, t0: performance.now() + CONFIG.introDelay, ms: CONFIG.introMs, tick: fades,
         done: function () {
-          // gelandet: noch nicht sichtbare Bilder blenden ein
           var t0 = performance.now(), rest = items.filter(function (it) { return it.op < 1; });
           if (rest.length) (function f() {
             var now = performance.now();
             rest.forEach(function (it) { if (!it.fade) it.fade = t0; setOp(it, Math.min(1, sineInOut(Math.min(1, (now - it.fade) / CONFIG.fadeMs)))); });
+            render();
             if (rest.some(function (it) { return it.op < 1; })) requestAnimationFrame(f);
           })();
           if (done) done();
@@ -613,7 +639,7 @@
     function runOutro(done) {
       if (reduce || !items.length) { done(); return; }
       mode = 'outro';
-      intro = { from: P, to: P + CONFIG.outroSpin, t0: performance.now(), ms: CONFIG.outroMs, done: done,
+      intro = { from: P, to: P + W * 1.3, t0: performance.now(), ms: CONFIG.outroMs, done: done,
         tick: function (now, t) { wheel.style.opacity = (1 - Math.max(0, (t - 0.35) / 0.65)).toFixed(3); } };
       last = 0; kick();
     }
@@ -643,9 +669,10 @@
     if (pv) { pv.setAttribute('role', 'dialog'); pv.setAttribute('aria-modal', 'true'); pv.setAttribute('aria-hidden', 'true'); if ('inert' in pv) pv.inert = true; }
 
     function cloneImg(img) {
+      // Dasselbe Bild wie in der Karte (schon geladen): kein Nachladen, kein Aufblitzen beim Öffnen
       var c = document.createElement('img');
-      if (img.srcset) { c.srcset = img.srcset; c.sizes = img.sizes || '100vw'; }
       c.src = img.currentSrc || img.src;
+      c.decoding = 'sync';
       c.alt = img.alt || '';
       return c;
     }
@@ -655,7 +682,7 @@
       f.className = 'lib-fly';
       f.style.width = b.width + 'px'; f.style.height = b.height + 'px';
       var c = document.createElement('img');
-      c.src = img.currentSrc || img.src; c.alt = '';
+      c.decoding = 'sync'; c.src = img.currentSrc || img.src; c.alt = '';
       f.appendChild(c);
       root.appendChild(f);
       var from = 'translate(' + a.left + 'px,' + a.top + 'px) scale(' + (a.width / b.width) + ',' + (a.height / b.height) + ')';
@@ -851,11 +878,12 @@
         else requestAnimationFrame(wait);
       })();
     }
-    // Erst die ersten Bilder abwarten (höchstens 1.2 s), damit die Breiten stimmen
-    Promise.all(items.slice(0, 6).map(function (it) {
-      return it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
+    // Erst alle Bilder laden und dekodieren (höchstens 2.5 s), damit beim Eintritt nichts nachlädt oder springt
+    Promise.all(all.map(function (it) {
+      var dec = it.img.decode ? it.img.decode().catch(function () {}) : Promise.resolve();
+      return dec.then(function () { return glTex(it); });
     })).then(start);
-    setTimeout(start, 1200);
+    setTimeout(start, 2500);
     // Später geladene Bilder: Breiten neu messen, ohne Sprung
     all.forEach(function (it) {
       it.img.addEventListener('load', function () {
@@ -873,7 +901,7 @@
       rT = setTimeout(function () {
         var keep = items[idx];
         measure();
-        if (mode !== 'intro' && mode !== 'outro' && keep) { P = T = Math.round(near(items.indexOf(keep))); if (mode !== 'pv') mode = 'idle'; }
+        if (mode !== 'intro' && mode !== 'outro' && keep) { P = T = near(items.indexOf(keep)); if (mode !== 'pv') mode = 'idle'; }
         render();
         if (pvState === 'open' && pvFrame) { if (pvAnim) { pvAnim.cancel(); pvAnim = null; } pvFrame.style.transform = box(fitPanel()); }
       }, 80);
@@ -881,7 +909,7 @@
     window.addEventListener('pageshow', function (e) {
       if (!e.persisted) return;
       // Zurück aus der Projektseite: Vorschau bleibt offen, das Bild fliegt dorthin zurück
-      measure(); P = T = Math.round(P); render();
+      measure(); P = T = near(idx); render();
     });
   }
 
