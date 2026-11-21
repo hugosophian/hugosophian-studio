@@ -57,7 +57,7 @@
     // Am Schluss legt sich das Rad in die gerade Reihe (Wischen danach wie Mario).
     introWait:  2000,   // höchstens so lange auf das erste Bild warten
     introAll:   350,    // höchstens so lange warten, bis alle Bilder bereit sind; später geladene blenden einfach dann ein (Hugo 15:16: schneller sichtbar)
-    introSkip:  0.17,   // langsames Ausholen am Anfang der Kurve überspringen: die Galerie ist sofort in Fahrt
+    introSkip:  0,      // nicht mehr nötig: die Kurve beginnt jetzt direkt mit der höchsten Geschwindigkeit
     vtStart:    650,    // nach dem Ausblenden der Homepage (Übergang „fade“ 0.8 s) so früh starten, die ersten Karten kommen ohnehin erst nach ~0.5 s
     introItems: 20,     // so viele Karten drehen vorbei (CRL: Position −Anzahl → 0, CRL hat 20 Projekte)
     radius:     1.8,    // CRL: Radius = 1.8 · Bildschirmhöhe
@@ -65,8 +65,11 @@
     tilt:       1.2,    // CRL: Karte dreht 1.2 × so stark wie ihr Platz auf dem Rad
     fadeAt:     0.85,   // CRL: Einblenden, sobald eine Karte von rechts unter 0.85 rad kommt
     settle:     0.25,   // letzter Anteil des Eintritts, in dem sich das Rad in die gerade Reihe legt
-    introMs:    3000,
-    introBack:  0.54,
+    // Hugo 21.11. 15:24: sofort mit voller Geschwindigkeit sichtbar, dann nur noch abnehmend (wie bei Model).
+    // Kurve = zweite Hälfte von CRLs back.inOut, auf die ganze Dauer gestreckt (back.out): Start mit Höchsttempo,
+    // gleiches leichtes Überschwingen beim Landen wie CRL (s 0.4 ≙ CRLs .54 in der halben Kurve)
+    introMs:    2600,
+    introBack:  0.4,
     fadeMs:     400,    // CRL: Karte blendet in 0.4 s (sine.inOut) ein
     // Auswahl wechseln (Hugo 21.11.): alle Bilder ziehen sich zu einem zusammen, der Stapel blendet aus,
     // dann kommt die neue Auswahl wie beim ersten Laden (erstes Bild blendet auf, dann rollt es wie CRL)
@@ -539,6 +542,8 @@
       function bi(p) { return p * p * ((s + 1) * p - s); }
       return t < 0.5 ? bi(t * 2) / 2 : 1 - bi((1 - t) * 2) / 2;
     }
+    // GSAP back.out(s): beginnt mit der höchsten Geschwindigkeit
+    function backOut(t, s) { var p = 1 - t; return 1 - p * p * ((s + 1) * p - s); }
     function sineInOut(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
     function setOp(it, o) { it.op = o; it.el.style.opacity = o >= 1 ? '' : o.toFixed(3); }
 
@@ -802,7 +807,7 @@
             for (var j = 0; j < items.length; j++) { var tj = ringTh(j); items[j].th = tj; if (tj <= fadeAt && tj > -1.45) items[j].want = true; }
           }
           var t = Math.max(0, Math.min(1, (now - tr) / CONFIG.introMs));
-          ringQ = q0 * (1 - backInOut(t, CONFIG.introBack));
+          ringQ = q0 * (1 - backOut(t, CONFIG.introBack));
           P = T = c0 + ringQ * perItem;
           // am Schluss legt sich das Rad in die gerade Reihe
           var u = Math.max(0, (t - (1 - CONFIG.settle)) / CONFIG.settle);
