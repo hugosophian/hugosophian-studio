@@ -640,9 +640,10 @@
         // Tal: unterhalb des Horizonts (knapp unter dem Titel) ist Boden. Jeder Strahl trifft ihn an einer eigenen Stelle
         // (je nach Strahl näher oder ferner): dort endet er und hinterlässt einen hellen, flachen Lichtfleck, nah gross, fern schmal.
         '  float beam = beamAt(fc);',
-        // Einstrahlen: die Strahlen schiessen von der Sonne her ins Bild (Front wandert von rechts oben nach unten)
-        '  float front = uOn * 2.6;',
-        '  beam *= 1.0 - smoothstep(front - 0.5, front, dist);',
+        // Einstrahlen: jeder Strahl hat seinen eigenen Moment (aus seinem Winkel), erst ein paar, dann alle.
+        // Beim Schliessen läuft es rückwärts: die zuletzt gekommenen gehen zuerst.
+        '  float dly = n1(ang * 7.0 + 3.7) * 0.7;',
+        '  float rf = smoothstep(dly, dly + 0.3, uOn);',
         '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
         '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
         '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
@@ -671,6 +672,7 @@
         '    float da = (ang - pa) / w;',
         '    sh = max(sh, p.z * behind * exp(-da * da));',
         '  }',
+        '  beam *= rf;',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
         '  vec3 causC = caus * beam * (vec3(1.0, 0.88, 0.66) * 0.16 + (rainbow - 0.5) * 0.05);',
@@ -678,13 +680,13 @@
         '  vec3 col;',
         '  if (uMode < 0.5) {',
         '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
-        '    col = mix(vec3(1.0), col, smoothstep(0.0, 0.35, uOn));',
+        '    col = mix(vec3(1.0), col, smoothstep(0.0, 0.45, uOn));',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
         '    float tl = smoothstep(0.25, 0.95, lit);',
         '    vec3 tc = mix(uTextLight, rainbow * 1.15, 0.22);',
-        '    col = (tc * uTextAmt * tl + causC * 0.8) * smoothstep(0.2, 0.6, uOn);',
+        '    col = (tc * uTextAmt * tl + causC * 0.8) * smoothstep(0.0, 0.3, uOn);',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
@@ -826,9 +828,9 @@
         c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
         c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
         // Licht erst, wenn der Titel angekommen ist: in 1.8 s weich einstrahlen; beim Schliessen rasch weg
-        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 1800);
-        else lightOn.v = Math.max(0, lightOn.v - dt * 2.5);
-        var lo = lightOn.v; c.uniform1f(U.uOn, 1 - Math.pow(1 - lo, 3));
+        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 2600);   // 2.6 s, Strahl für Strahl
+        else lightOn.v = Math.max(0, lightOn.v - dt / 1.2);                                   // während die Seite wegfährt
+        var lo = lightOn.v; c.uniform1f(U.uOn, lo * lo * (3 - 2 * lo));
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
