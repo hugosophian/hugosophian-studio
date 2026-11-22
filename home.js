@@ -912,8 +912,13 @@
           // setzt erst nach 0.7 s an und kommt in 1.8 s weich mit den anderen Strahlen (Hugo 22.11.)
           hero = lightOn.want ? (reduce ? 1 : Math.max(0, Math.min(1, (now - lightOn.t0 - 700) / 1800))) : lo;
           hero = hero * hero * hero * (hero * (hero * 6 - 15) + 10);
+          // Hugo 22.11.: wie ein CTA – der Strahl auf dem Button geht in ruhigem Takt weich an und aus (ca. 4.2 s)
+          if (lightOn.want && !reduce) {
+            var since = (now - lightOn.t0) / 1000 - 2.5;
+            if (since > 0) { var ph = 0.5 + 0.5 * Math.cos(since * 6.2832 / 4.2); hero *= ph * ph * (3 - 2 * ph); }
+          }
         }
-        c.uniform3f(U.uHero, ha, hw, hero);
+        c.uniform3f(U.uHero, ha, hw, hero); heroNow = hero;
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
@@ -923,7 +928,7 @@
         lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
       }
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
-      var px = null, btnL = 0, pf = 0;
+      var px = null, btnL = 0, pf = 0, heroNow = 0;
       function probe(rect, sx) {
         if (++pf % 5 || !infoOpen.offsetWidth) return;
         var r = infoOpen.getBoundingClientRect();
@@ -933,8 +938,10 @@
         if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
         c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
         var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
-        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt * 0.55));   // Hugo 22.11.: Schatten öfter, schon bei mittlerem Licht
-        btnL += (v - btnL) * 0.6;
+        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
+        // CTA (Hugo 22.11.): Schatten folgt vor allem dem pulsierenden Strahl auf dem Button, andere Strahlen nur schwach
+        v = Math.max(v * 0.08, heroNow);
+        btnL += (v - btnL) * 0.35;
         infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
         // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
         var Sx = rect.left + SUN.src[0] * rect.width, Sy = rect.top + SUN.src[1] * rect.height;
