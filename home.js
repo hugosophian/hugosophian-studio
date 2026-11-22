@@ -84,6 +84,9 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
+    '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: 1px 2px 1px rgba(70,55,35,.12), 6px 11px 14px rgba(70,55,35,.16); }',
+    '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: 1px 2px 1px rgba(70,55,35,.12), 5px 9px 12px rgba(70,55,35,.15); }',
+    '[data-hp].hp-info-sunlit .hp-info-title { text-shadow: 2px 3px 2px rgba(70,55,35,.12), 12px 20px 26px rgba(70,55,35,.2); }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
@@ -558,12 +561,13 @@
       src: [0.12, -0.2] ,        // Lichtquelle: Anteil Breite, Anteil Höhe über dem oberen Rand
       rays: [7, 19]  ,            // Strahldichte (grobe / feine Strahlen)
       drift: [0.035, -0.055],    // wie schnell die Strahlen wandern
-      edge: [0.3, 0.86] ,        // Schärfe der Strahlen (enger = härter)
+      edge: [0.24, 0.78],        // Schärfe der Strahlen (enger = härter)
       reach: 2.2,                // wie weit die Strahlen nach unten reichen
       strength: 1.25,
-      top: [0.93, 0.915, 0.885], // Himmel oben (warm)
-      bottom: [0.86, 0.855, 0.85], // unten (kühler, etwas dunkler, damit das Licht sichtbar wird)
-      lit: [1.0, 0.972, 0.905],  // Sonnenlicht
+      ambient: 0.22,             // so viel Licht liegt auch im Schatten (Wand bleibt hell)
+      shade: [0.86, 0.865, 0.88],   // Schatten auf der weissen Wand: leicht kühl, wie echter Schatten
+      shadeLow: [0.8, 0.805, 0.825], // unten rechts, weit weg vom Licht, etwas tiefer
+      lit: [1.0, 0.985, 0.95],      // Sonne auf der Wand: warmes Weiss
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
       trailAmt: 0.75,
@@ -579,7 +583,7 @@
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform vec2 uRes; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
-        'uniform float uReach; uniform float uStrength; uniform vec3 uTop; uniform vec3 uBottom; uniform vec3 uLit;',
+        'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
@@ -606,9 +610,9 @@
         '    float da = (ang - pa) / w;',
         '    sh = max(sh, p.z * behind * exp(-da * da));',
         '  }',
-        '  float light = clamp((r * fall + glow * 0.9) * uStrength, 0.0, 1.0) * (1.0 - sh * uTrailAmt);',
-        '  vec3 base = mix(uBottom, uTop, q.y);',
-        '  vec3 col = mix(base, uLit, light);',
+        '  float light = clamp(uAmb + (r * fall + glow * 0.9) * uStrength, 0.0, 1.0) * (1.0 - sh * uTrailAmt);',
+        '  float far = smoothstep(0.4, 1.6, dist);',
+        '  vec3 col = mix(mix(uShade, uShadeLow, far), uLit, light);',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',                 // gegen Farbstufen
         '  gl_FragColor = vec4(col, 1.0);',
         '}'].join('\n');
@@ -620,10 +624,10 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uTop', 'uBottom', 'uLit', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uRes', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
-      c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength);
-      c.uniform3fv(U.uTop, SUN.top); c.uniform3fv(U.uBottom, SUN.bottom); c.uniform3fv(U.uLit, SUN.lit);
+      c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
+      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit);
       c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
       function size() {
@@ -666,6 +670,7 @@
     })();
     if (sun) {
       info.insertBefore(sun.cv, infoPanel);
+      root.classList.add('hp-info-sunlit');
       infoPanel.style.background = 'transparent';
     }
 
