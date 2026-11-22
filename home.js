@@ -94,7 +94,7 @@
     '[data-hp] .hp-info-go { position: relative; }',
     // Schatten von «Galerie öffnen»: Licht von hinten → Schatten fällt nach vorne auf den Boden, gespiegelt, lang
     // gezogen und zum Betrachter hin breiter; nur sichtbar, solange ein Strahl den Button trifft (--hp-lit).
-    '[data-hp] .hp-go-sh { position: absolute; left: 0; right: 0; bottom: .28em; display: inherit; gap: inherit; align-items: inherit; justify-content: inherit; white-space: nowrap; pointer-events: none; color: rgb(70,50,25); opacity: calc(var(--hp-lit,0) * .42); transform-origin: 50% 100%; transform: perspective(70px) rotateX(52deg) scaleY(-2.4); filter: blur(1.2px); -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); }',
+    '[data-hp] .hp-go-sh { position: absolute; left: 0; right: 0; bottom: .28em; display: inherit; gap: inherit; align-items: inherit; justify-content: inherit; white-space: nowrap; pointer-events: none; color: rgb(70,50,25); opacity: calc(var(--hp-lit,0) * .42); transform-origin: 50% 100%; transform: skewX(var(--hp-skew, -40deg)) scaleY(-2.2); filter: blur(1.2px); -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); }',
     '[data-hp] .hp-go-sh * { color: inherit !important; text-shadow: none !important; }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
@@ -573,20 +573,20 @@
     //   schwarze Schrift wird dort goldbraun angestrahlt.
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
-      src: [0.52, -0.42],        // Sonne hinten oben (Licht kommt von hinten, Schatten fallen nach vorne)
+      src: [1.12, -0.16],        // Sonne rechts oben hinter dem Hügel (Titel): Strahlen fallen schräg von rechts ins Tal
       rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
       edge: [0.3, 0.8],          // Schärfe der Strahlen
-      reach: 1.6,                // wie weit die Strahlen nach unten reichen
+      reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
       shade: [0.8, 0.81, 0.835], // Schatten auf der Wand: kühl
-      shadeLow: [0.74, 0.75, 0.78],
+      shadeLow: [0.8, 0.81, 0.835],
       lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
       occLen: 0.9,               // Länge des Glasschattens (Anteil Höhe)
-      occAmt: 0.82,              // der Titel ist die Wolke: Licht kommt nur an den Rändern und durch die Lücken
+      occAmt: 0.75,              // der Titel ist die Wolke: Licht kommt nur an den Rändern und durch die Lücken
       refr: 0.02,                // Lichtbrechung im Glas (Anteil Höhe)
       depth: 0.3,                // Tiefe des Glastitels (Anteil Schrifthöhe)
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
@@ -610,7 +610,7 @@
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
@@ -629,12 +629,28 @@
         '  float fall = exp(-max(dist - 0.45, 0.0) / uReach);',
         '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
         '}',
+        'float rayR(vec2 p) {',
+        '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
+        '  return smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r);',
+        '}',
         'void main() {',
         '  vec2 fc = uOrig + (gl_FragCoord.xy - vec2(uOffX, 0.0)) / uScale;',
         '  S = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
         '  vec2 d = fc - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
         '  float t = uTime;',
+        // Tal: unterhalb des Horizonts (knapp unter dem Titel) ist Boden. Jeder Strahl trifft ihn an einer eigenen Stelle
+        // (je nach Strahl näher oder ferner): dort endet er und hinterlässt einen hellen, flachen Lichtfleck, nah gross, fern schmal.
         '  float beam = beamAt(fc);',
+        '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
+        '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
+        '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
+        '  float dT = 1.0 - hitY / max(uHor, 1.0);',
+        '  float pH = mix(0.014, 0.075, dT) * uRes.y;',
+        '  float pool = exp(-pow((fc.y - hitY) / pH, 2.0));',
+        '  float ray = rayR(fc);',
+        '  beam = beam * mix(1.0, 0.2 + 0.8 * air, grd) + ray * pool * grd * (1.0 + 0.6 * dT);',
         // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
         '  float occ = 0.0, caus = 0.0;',
         '  if (uOccOn > 0.0) {',
@@ -658,44 +674,12 @@
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
         '  vec3 causC = caus * beam * (vec3(1.0, 0.88, 0.66) * 0.16 + (rainbow - 0.5) * 0.05);',
-        '  vec3 shade = mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist));',
+        '  vec3 shade = mix(uShade, uShadeLow, grd * (0.5 + 0.5 * (1.0 - fc.y / max(uHor, 1.0))));',
         '  vec3 col;',
         '  if (uMode < 0.5) {',
-        '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC;',
+        '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
-        // Glaskörper: flache Vorderseite, Seitenwände (Rückseite nach hinten versetzt), leicht gerundete Kanten.
-        // Jede Fläche verschiebt die Strahlen dahinter anders (Brechung), Farben nur fein an Ecken und Kanten.
-        '    if (uOccOn > 0.0) {',
-        '      vec4 g = texture2D(uOcc, (fc - uMB.xy) / uMB.zw);',
-        '      float side = 0.0, sk = 0.0;',
-        '      for (int i = 1; i <= 14; i++) { float k = float(i) / 14.0; float v = texture2D(uOcc, (fc - uExt * k - uMB.xy) / uMB.zw).r; if (v > side) { side = v; sk = k; } }',
-        '      float front = smoothstep(0.1, 0.3, g.r);',
-        '      float sideC = smoothstep(0.1, 0.3, side) * (1.0 - front);',
-        '      float body = max(front, sideC);',
-        '      if (body > 0.001) {',
-        '        vec2 n = (g.ba - 0.5) * 2.0; float sl = clamp(length(n), 0.0, 1.0) * front;',
-        '        vec2 nn = length(n) > 0.001 ? normalize(n) : vec2(0.0); vec2 Ld = normalize(S - fc);',
-        '        vec2 ext = normalize(uExt + vec2(0.0001));',
-        '        vec2 oF = (-n * (0.6 + sl) + vec2(-0.45, -0.25)) * uRefr * uRes.y;',      // Vorderseite: ganze Fläche leicht versetzt
-        '        vec2 oS = (ext * 1.8 + vec2(0.0, -0.4)) * uRefr * uRes.y;',                // Seitenwand: stärker, andere Richtung
-        '        vec2 o = mix(oS, oF, front);',
-        '        vec3 bb = vec3(beamAt(fc + o * 0.94), beamAt(fc + o), beamAt(fc + o * 1.06));',
-        '        vec3 bg = mix(shade, uLit, clamp(vec3(uAmb) + bb * 1.3 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
-        '        vec3 glF = bg * mix(vec3(0.62, 0.66, 0.73), vec3(0.48, 0.52, 0.6), sl);',
-        '        vec3 glS = bg * mix(vec3(0.5, 0.54, 0.62), vec3(0.36, 0.4, 0.48), sk);',   // Seitenwand kühler, nach hinten tiefer
-        '        vec3 gl = mix(glS, glF, front);',
-        '        float spec = pow(max(dot(nn, Ld), 0.0), 5.0) * sl;',                       // Kante zur Sonne leuchtet
-        '        float rim = smoothstep(0.1, 0.16, g.r) * (1.0 - smoothstep(0.16, 0.34, g.r));',
-        '        float back = smoothstep(0.1, 0.3, side) * (1.0 - smoothstep(0.3, 0.6, side)) * (1.0 - front);',   // hintere Kante der Seitenwand
-        '        float sun = exp(-length(fc - S) / uRes.y * 5.0);',                         // nahe der Sonne glüht das Glas
-        '        gl += vec3(1.0, 0.97, 0.9) * (spec * 1.2 + rim * 0.7 + back * 0.45) * (0.45 + 0.7 * beam + 1.5 * sun);',
-        '        vec3 sp = 0.5 + 0.5 * cos(6.2831 * (atan(n.y, n.x) / 6.2831 + ang * 0.6 - t * 0.03 + vec3(0.0, 0.33, 0.67)));',
-        '        gl += (sp - 0.5) * (spec + rim * 0.4) * (0.1 + 0.2 * beam);',            // Farbe nur fein an den Ecken
-        '        gl += vec3(1.0, 0.9, 0.72) * sun * 0.12 * front;',
-        '        col = mix(col, gl, body * uOccOn);',
-        '      }',
-        '    }',
         '  } else {',
         '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8;',
         '  }',
@@ -710,7 +694,7 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
         'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
@@ -737,7 +721,7 @@
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
           if (occ.el) mask(occ.el);
         }
-        var GW = 2 * cw + (G ? G.PW : 0), GH = Math.max(chh, G ? G.PH : 0);
+        var GW = 2 * cw, GH = chh;
         if (gcv.width !== GW || gcv.height !== GH) { gcv.width = GW; gcv.height = GH; }
       }
       // Glastitel in die Maske zeichnen, genau so verzerrt wie die gedrehte Schrift auf dem Bildschirm:
@@ -775,11 +759,9 @@
         upload(mx.getImageData(0, 0, pw, ph).data, mxs, mys, (cs[2][1] - cs[0][1]) * mys);
         c.uniform4f(U.uMB, bx * sx, chh - (by + bh) * sx, bw * sx, bh * sx);
         c.uniform2f(U.uExt, ex * sx, -ey * sx);
-        srcT = [(bx + bw * 0.58) / Math.max(1, rect.width), (by + bh * 0.48) / Math.max(1, rect.height)];   // Sonne hinter dem Titel
         G = { bx: bx, by: by, bw: bw, bh: bh, PW: Math.round(bw * dpr), PH: Math.round(bh * dpr), sx: sx };
         glass.width = G.PW; glass.height = G.PH;
         glass.style.left = bx + 'px'; glass.style.top = by + 'px'; glass.style.width = bw + 'px'; glass.style.height = bh + 'px';
-        glass.style.display = 'block';
       }
       // Kastenfilter mit laufender Summe (schnell, egal wie gross der Radius)
       function box(a, b, w, h, r, horiz) {
@@ -839,15 +821,14 @@
         occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
         var e = G && srcT ? occ.on * occ.on * (3 - 2 * occ.on) : 0;
         c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
+        c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
-        if (G) pass(2 * cw, G.PW, G.PH, 0, G.bx * sx, chh - (G.by + G.bh) * sx, G.PW / (G.bw * sx));
         probe(rect, sx);
         var H = gcv.height;
         wx.drawImage(gcv, 0, H - chh, cw, chh, 0, 0, cw, chh);
         lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
-        if (G) gx2.drawImage(gcv, 2 * cw, H - G.PH, G.PW, G.PH, 0, 0, G.PW, G.PH);
       }
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
       var px = null, btnL = 0, pf = 0;
@@ -863,6 +844,11 @@
         var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
         btnL += (v - btnL) * 0.6;
         infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
+        // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
+        var Sx = rect.left + SUN.src[0] * rect.width, Sy = rect.top + SUN.src[1] * rect.height;
+        var ddx = r.left + r.width * 0.5 - Sx, ddy = Math.max(1, r.top + r.height * 0.5 - Sy);
+        var sk = Math.max(-65, Math.min(65, Math.atan(ddx / ddy) * 180 / Math.PI));
+        infoOpen.style.setProperty('--hp-skew', sk.toFixed(1) + 'deg');
       }
       function loop(now) {
         raf = 0;
@@ -972,22 +958,8 @@
         var sc = Math.min(1, (W - left - right) / Math.max(1, tr.width));
         var ox = tr.left - cr.left, oy = tr.top - cr.top;   // Textanfang innerhalb der Kopie
         var t3 = '', map0 = null, minX = ox, minY = oy, maxY = oy + tr.height;
-        if (sun && !reduce) {
-          // Glastitel wie eine Wolke vor der Sonne, von unten schräg gesehen: rechts ganz nah und gross,
-          // links fern und schmal, unten leicht nach vorne gekippt. Die Schrift fliegt hin und wird dann zu Glas.
-          var P3 = tr.width * 1.5, A3 = -38 * Math.PI / 180, B3 = 10 * Math.PI / 180;
-          var ca = Math.cos(A3), sa = Math.sin(A3), cb = Math.cos(B3), sb = Math.sin(B3);
-          t3 = ' perspective(' + P3.toFixed(0) + 'px) rotateY(-38deg) rotateX(10deg)';
-          map0 = function (lx, ly, lz) {
-            var y1 = ly * cb - lz * sb, z1 = ly * sb + lz * cb;
-            var x2 = lx * ca + z1 * sa, z2 = -lx * sa + z1 * ca, w = 1 - z2 / P3;
-            return [x2 / w, y1 / w];
-          };
-          var cn = [map0(ox, oy, 0), map0(ox + tr.width, oy, 0), map0(ox, oy + tr.height, 0), map0(ox + tr.width, oy + tr.height, 0)];
-          minX = Math.min(cn[0][0], cn[2][0]); minY = Math.min(cn[0][1], cn[1][1]); maxY = Math.max(cn[2][1], cn[3][1]);
-          var maxX = Math.max(cn[1][0], cn[3][0]);
-          sc = Math.min(2.4, (W - left - right * 0.3) / Math.max(1, maxX - minX));   // so gross wie möglich, rechts fast bis an den Rand
-        }
+        // Der Titel bleibt, wie er einfliegt. Für das Licht ist er der Hügel, hinter dem die Sonne steht.
+        if (sun && !reduce) map0 = function (lx, ly) { return [lx, ly]; };
         var dx = left - (cr.left - rr.left) - sc * minX;
         var dy = top - (cr.top - rr.top) - sc * minY;
         tClone.style.transformOrigin = '0 0';
@@ -1000,11 +972,10 @@
           if (csT.textTransform === 'uppercase') txT = txT.toUpperCase();
           glassT = { txt: txT, font: csT.fontStyle + ' ' + csT.fontWeight + ' {s} ' + csT.fontFamily, ox: ox, oy: oy, tw: tr.width, th: tr.height,
             map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
-          tClone.classList.add('hp-3d');
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
         clearTimeout(sunT);
-        sunT = setTimeout(function () { if (sun && glassT && tClone && root.classList.contains('is-info')) { sun.title(glassT); tClone.classList.add('hp-glass'); } }, CONFIG.infoMs * 0.85);
+        sunT = setTimeout(function () { if (sun && glassT && tClone && root.classList.contains('is-info')) { sun.title(glassT); } }, CONFIG.infoMs * 0.85);
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
