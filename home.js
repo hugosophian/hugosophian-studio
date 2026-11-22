@@ -602,9 +602,9 @@
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
       src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
-      rays: [6, 15],             // Strahldichte (grobe / feine Strahlen); Hugo 22.11.: weniger Strahlen
+      rays: [7, 17],             // Strahldichte (grobe / feine Strahlen); Hugo 22.11.: weniger Strahlen
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
-      edge: [0.34, 0.8],          // Schärfe der Strahlen
+      edge: [0.4, 0.82],          // Schärfe der Strahlen
       reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
@@ -656,7 +656,7 @@
         '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
         '  float fall = exp(-max(dist - 0.65, 0.0) / uReach);',
         '  float hd = (ang - uHero.x) / uHero.y; r = max(r, uHero.z * exp(-hd * hd) * (0.82 + 0.18 * n1(t * 0.6)));',
-        '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
+        '  return clamp((r * fall + exp(-dist * 2.2) * 0.35) * uStrength, 0.0, 1.0);',
         '}',
         'float rayR(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
@@ -745,8 +745,8 @@
         '    float b0 = max(beamAt(fc), 0.03);',
         '    vec3 disp = clamp(vec3(beamAt(pR), b0, beamAt(pB)) / b0, 0.0, 1.6);',
         '    lit *= mix(1.0, 0.85 + 0.3 * sv, onG);',
-        '    float tl = smoothstep(0.25, 0.95, lit);',
-        '    vec3 tl3 = smoothstep(vec3(0.25), vec3(0.95), lit * disp);',
+        '    float tl = smoothstep(0.45, 1.0, lit);',
+        '    vec3 tl3 = smoothstep(vec3(0.45), vec3(1.0), lit * disp);',
         '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
         '    vec3 tc = vec3(1.0, 0.8, 0.62) * tm * 1.08 + (tl3 - tm) * vec3(1.0, 0.95, 1.25) * 1.35;',
         '    col = (tc * uTextAmt + causC * 0.8) * max(smoothstep(0.15, 0.5, uOn), uHero.z * exp(-hh * hh * 0.35));',
