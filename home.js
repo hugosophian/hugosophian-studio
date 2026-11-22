@@ -87,7 +87,8 @@
     '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -5px 11px 14px rgba(70,55,35,.16); }',
     '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -4px 9px 12px rgba(70,55,35,.15); }',
     '[data-hp] .hp-sun-light { z-index: 2; mix-blend-mode: screen; }',
-    '[data-hp] .hp-info-title.hp-3d { text-shadow: var(--hp-3d); transition: transform 1.5s cubic-bezier(.6,0,.1,1), text-shadow 1.2s ease .3s; }',
+    '[data-hp] .hp-info-sunlit .hp-tilt { transform: perspective(900px) rotateX(24deg); transform-origin: 50% 100%; }',
+    '[data-hp].hp-info-sunlit .hp-info-go { text-shadow: -2px 4px 2px rgba(60,40,15,calc(var(--hp-lit,0) * .5)), -5px 9px 6px rgba(60,40,15,calc(var(--hp-lit,0) * .2)); }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
@@ -105,7 +106,8 @@
     '[data-hp] .hp-info-go::after { content: ""; position: absolute; inset: -14px -16px; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
-    '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1); will-change: transform; }',
+    '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
+    '[data-hp] .hp-title.hp-info-title.hp-glass { opacity: 0; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .9s ease; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
     /* „Hugo Sophian Studio“ bleibt beim About oben links stehen und wird dunkel, sobald die weisse Seite darunter ist */
@@ -568,18 +570,20 @@
       edge: [0.3, 0.8],          // Schärfe der Strahlen
       reach: 1.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
-      ambient: 0.16,             // so viel Licht liegt auch im Schatten
+      ambient: 0.2,              // so viel Licht liegt auch im Schatten
       shade: [0.8, 0.81, 0.835], // Schatten auf der Wand: kühl
       shadeLow: [0.74, 0.75, 0.78],
       lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
-      occLen: 0.42,              // Länge der Titelschatten (Anteil Höhe)
-      occAmt: 0.8,               // Tiefe der Titelschatten
+      occLen: 0.34,              // Länge des Glasschattens (Anteil Höhe)
+      occAmt: 0.32,              // Glas lässt Licht durch: nur ein heller Schatten
+      refr: 0.03,                // Lichtbrechung im Glas (Anteil Höhe)
+      depth: 0.16,               // Tiefe des Glastitels (Anteil Schrifthöhe)
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
       trailAmt: 0.75,
-      res: 0.55                  // Auflösung (weiches Licht braucht keine volle Schärfe)
+      res: 1                     // Auflösung (1 = CSS-Pixel; scharf genug für die Glaskanten)
     };
     var sun = (function () {
       var gcv = document.createElement('canvas');
@@ -595,53 +599,77 @@
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
-        'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt;',
+        'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
         'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
-        'void main() {',
-        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0); vec2 q = fc / uRes;',
-        '  vec2 s = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
-        '  vec2 d = fc - s; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
-        '  float t = uTime;',
-        // Wolkendecke: Strahlen über den Winkel, wandern und atmen
+        'vec2 S;',
+        'float beamAt(vec2 p) {',
+        '  vec2 d = p - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y; float t = uTime;',
         '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
-        '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',   // Dunst zieht durch die Strahlen
+        '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
         '  float fall = exp(-max(dist - 0.45, 0.0) / uReach);',
-        '  float beam = clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
-        // Titelschatten: Richtung Sonne gehen und schauen, ob der Titel im Weg steht
-        '  float occ = 0.0;',
+        '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
+        '}',
+        'void main() {',
+        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0); vec2 q = fc / uRes;',
+        '  S = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
+        '  vec2 d = fc - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
+        '  float t = uTime;',
+        '  float beam = beamAt(fc);',
+        // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
+        '  float occ = 0.0, caus = 0.0;',
         '  if (uOccOn > 0.0) {',
-        '    vec2 dir = normalize(s - fc); float L = uOccLen * uRes.y; float j = h2(fc * 0.37);',
-        '    for (int i = 0; i < 36; i++) {',
-        '      float k = (float(i) + j) / 36.0; vec2 p = fc + dir * (k * L);',
-        '      float m = texture2D(uOcc, p / uRes).r;',
-        '      occ = max(occ, m * pow(1.0 - k, 0.6));',
+        '    vec2 dir = normalize(S - fc); float L = uOccLen * uRes.y; float j = 0.5;',
+        '    for (int i = 0; i < 30; i++) {',
+        '      float k = (float(i) + j) / 30.0; vec2 p = fc + dir * (k * L);',
+        '      vec4 m = texture2D(uOcc, p / uRes, 1.5 + k * 4.0); float w = pow(1.0 - k, 0.7);',
+        '      occ = max(occ, m.r * w); caus = max(caus, m.g * w * (1.0 - 0.5 * k));',
         '    }',
-        '    occ *= uOccOn * uOccAmt;',
+        '    occ *= uOccOn * uOccAmt; caus *= uOccOn;',
         '  }',
-        // Fingerschatten
         '  float sh = 0.0;',
         '  for (int i = 0; i < ' + NT + '; i++) {',
         '    vec3 p = uTrail[i]; if (p.z <= 0.0) continue;',
-        '    vec2 pd = p.xy - s; float pa = atan(pd.x, -pd.y); float pdist = length(pd) / uRes.y;',
+        '    vec2 pd = p.xy - S; float pa = atan(pd.x, -pd.y); float pdist = length(pd) / uRes.y;',
         '    float w = uShadowW / max(pdist, 0.05);',
         '    float behind = smoothstep(-0.02, 0.04, dist - pdist) * exp(-max(dist - pdist, 0.0) * 1.2);',
         '    float da = (ang - pa) / w;',
         '    sh = max(sh, p.z * behind * exp(-da * da));',
         '  }',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
+        '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 causC = caus * beam * (vec3(1.0, 0.86, 0.6) * 0.35 + rainbow * 0.22);',
+        '  vec3 shade = mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist));',
         '  vec3 col;',
         '  if (uMode < 0.5) {',
-        '    float light = clamp(uAmb + lit, 0.0, 1.0);',
-        '    col = mix(mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist)), uLit, light);',
+        '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC;',
+        // Glaskörper: Vorderseite (Maske) und Seitenwand (Maske nach hinten versetzt)
+        '    if (uOccOn > 0.0) {',
+        '      vec4 g = texture2D(uOcc, q); float side = 0.0;',
+        '      for (int i = 1; i <= 10; i++) { float k = float(i) / 10.0; side = max(side, texture2D(uOcc, (fc - uExt * k) / uRes).r * (1.0 - 0.35 * k)); }',
+        '      float body = max(g.r, side * 0.9);',
+        '      if (body > 0.004) {',
+        '        vec2 n = (g.ba - 0.5) * 2.0; float face = smoothstep(0.15, 0.6, g.r);',
+        '        vec2 off = (n * uRefr + uExt * 0.35 * (1.0 - face)) * uRes.y;',
+        '        vec3 bb = vec3(beamAt(fc + off * 1.06), beamAt(fc + off), beamAt(fc + off * 0.94));',   // Farbzerlegung
+        '        vec3 glass = mix(vec3(shade), vec3(uLit), clamp(uAmb + bb * 1.25 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
+        '        glass *= mix(vec3(0.82, 0.87, 0.9), vec3(0.95, 0.975, 0.99), face);',   // Seitenwand etwas tiefer, leicht kühles Glas
+        '        vec2 tl = normalize(S - fc); float e = g.g;',
+        '        float spec = pow(max(dot(normalize(n + 1e-4), tl), 0.0), 6.0) * e;',
+        '        glass *= 1.0 - e * 0.55 * (1.0 - spec);',                              // dunkle Brechungskanten
+        '        glass += (spec * 1.4 + e * 0.1) * (0.6 + 0.8 * beam) * vec3(1.0, 0.98, 0.93);',   // weisse Lichtkanten
+        '        glass += (rainbow - 0.5) * e * beam * 0.16;',
+        '        col = mix(col, glass, smoothstep(0.0, 0.35, body) * uOccOn);',
+        '      }',
+        '    }',
         '  } else {',
-        '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit);',
+        '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8;',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
@@ -655,12 +683,12 @@
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
       var U = {}; ['uRes', 'uOffX', 'uMode', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
-        'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+        'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
       c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit);
       c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt);
-      c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt);
+      c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt); c.uniform1f(U.uRefr, SUN.refr); c.uniform2f(U.uExt, 0, 0);
       c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
       // Maske des Titels (weiss auf schwarz) als Textur
       var mcv = document.createElement('canvas'), mx = mcv.getContext('2d');
@@ -669,37 +697,71 @@
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
       c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, 1, 1, 0, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
       c.uniform1i(U.uOcc, 0);
-      var occ = { on: 0, t: 0, want: 0, el: null };
+      var occ = { on: 0, t: 0, want: 0, el: null }, pw = 1, ph = 1;
+      function pot(v) { var p = 1; while (p < v) p *= 2; return Math.min(p, 2048); }
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
       function size() {
         var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
         if (w !== cw || h !== chh) {
-          cw = wall.width = glow.width = mcv.width = w; chh = wall.height = glow.height = mcv.height = h;
+          cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
+          mcv.width = pw = pot(w); mcv.height = ph = pot(h);   // Zweierpotenz: erlaubt weiche Stufen (Mipmaps) für die Schatten
           gcv.width = w * 2; gcv.height = h; if (occ.el) mask(occ.el);
         }
       }
-      // Titel in die Maske zeichnen: Schrift wie im Original, gestreckt auf das sichtbare Rechteck
-      function mask(el) {
-        occ.el = el;
-        var rect = wall.getBoundingClientRect(), panelX = rect.left;   // Wand liegt evtl. noch rechts ausserhalb
-        var root0 = root.getBoundingClientRect();
-        var rg = document.createRange(); rg.selectNodeContents(el);
-        var tr = rg.getBoundingClientRect();
-        var cs = getComputedStyle(el), sx = cw / Math.max(1, rect.width);
-        var txt = (el.textContent || '').trim();
-        if (cs.textTransform === 'uppercase') txt = txt.toUpperCase();
-        mx.setTransform(1, 0, 0, 1, 0, 0); mx.fillStyle = '#000'; mx.fillRect(0, 0, cw, chh);
-        if (!txt || tr.width < 2) return upload();
-        var fs = 100;
-        mx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + fs + 'px ' + cs.fontFamily;
-        mx.textBaseline = 'alphabetic';
-        var m = mx.measureText(txt), asc = m.fontBoundingBoxAscent || fs * 0.92, dsc = m.fontBoundingBoxDescent || fs * 0.24;
-        var x0 = (tr.left - root0.left) * sx, y0 = (tr.top - root0.top) * sx, w = tr.width * sx, h = tr.height * sx;
-        mx.setTransform(w / Math.max(1, m.width), 0, 0, h / (asc + dsc), x0, y0);
-        mx.fillStyle = '#fff'; mx.shadowColor = '#fff'; mx.shadowBlur = Math.max(2, h * 0.08); mx.fillText(txt, 0, asc); mx.shadowBlur = 0;
-        upload();
+      // Glastitel in die Maske zeichnen, genau so verzerrt wie die gedrehte Schrift auf dem Bildschirm:
+      // Schrift flach zeichnen, dann in senkrechten Streifen an die perspektivischen Stellen (T.map) setzen.
+      // Daraus pro Bildpunkt: R = Glas, G = Kante, B/A = Neigung der Oberfläche (für Brechung und Glanz).
+      var tcv = document.createElement('canvas'), tx = tcv.getContext('2d');
+      function mask(T) {
+        occ.el = T;
+        var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
+        var mxs = pw / Math.max(1, rect.width), mys = ph / Math.max(1, rect.height);
+        mx.setTransform(1, 0, 0, 1, 0, 0); mx.fillStyle = '#000'; mx.fillRect(0, 0, pw, ph);
+        if (!T.txt || T.tw < 2) return upload(null);
+        var p0 = T.map(T.ox, T.oy), p1 = T.map(T.ox + T.tw, T.oy + T.th);
+        var k = Math.min(4, Math.max(0.2, Math.abs(p1[1] - p0[1]) * mys * 2 / T.th));
+        var tw = Math.max(2, Math.round(T.tw * k)), th = Math.max(2, Math.round(T.th * k));
+        tcv.width = tw; tcv.height = th;
+        var fs = 100; tx.font = T.font.replace('{s}', fs + 'px'); tx.textBaseline = 'alphabetic';
+        var m = tx.measureText(T.txt), asc = m.fontBoundingBoxAscent || fs * 0.92, dsc = m.fontBoundingBoxDescent || fs * 0.24;
+        tx.setTransform(tw / Math.max(1, m.width), 0, 0, th / (asc + dsc), 0, 0);
+        tx.fillStyle = '#fff'; tx.fillText(T.txt, 0, asc);
+        var N = 90;
+        for (var i = 0; i < N; i++) {
+          var a = T.map(T.ox + T.tw * i / N, T.oy), b = T.map(T.ox + T.tw * (i + 1) / N, T.oy), cB = T.map(T.ox + T.tw * i / N, T.oy + T.th);
+          mx.drawImage(tcv, tw * i / N, 0, tw / N + 0.5, th, a[0] * mxs, a[1] * mys, (b[0] - a[0]) * mxs + 0.6, (cB[1] - a[1]) * mys);
+        }
+        var bk = T.map3(T.ox + T.tw * 0.5, T.oy + T.th * 0.5, -SUN.depth * T.th), fr = T.map(T.ox + T.tw * 0.5, T.oy + T.th * 0.5);
+        c.uniform2f(U.uExt, (bk[0] - fr[0]) * sx, -(bk[1] - fr[1]) * sx);
+        upload(mx.getImageData(0, 0, pw, ph).data, mxs / mys);
       }
-      function upload() { c.bindTexture(c.TEXTURE_2D, tex); c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true); c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, mcv); }
+      function upload(src, asp) {
+        var cw = pw, chh = ph, n = cw * chh, out = new Uint8Array(n * 4);
+        if (src) {
+          // weichzeichnen (2x Kasten, Radius 2) → runde Glaskanten
+          var a = new Float32Array(n), b = new Float32Array(n), x, y, i, r = 2;
+          for (i = 0; i < n; i++) a[i] = src[i * 4] / 255;
+          for (var pass = 0; pass < 2; pass++) {
+            for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) { var sm = 0, ct = 0; for (var o = -r; o <= r; o++) { var xx = x + o; if (xx >= 0 && xx < cw) { sm += a[y * cw + xx]; ct++; } } b[y * cw + x] = sm / ct; }
+            for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) { var sm2 = 0, ct2 = 0; for (var o2 = -r; o2 <= r; o2++) { var yy = y + o2; if (yy >= 0 && yy < chh) { sm2 += b[yy * cw + x]; ct2++; } } a[y * cw + x] = sm2 / ct2; }
+          }
+          var gmax = 1e-4, gx = new Float32Array(n), gy = new Float32Array(n);
+          for (y = 1; y < chh - 1; y++) for (x = 1; x < cw - 1; x++) {
+            i = y * cw + x; gx[i] = (a[i + 1] - a[i - 1]) * 0.5 * asp; gy[i] = (a[i - cw] - a[i + cw]) * 0.5;   // y nach oben wie in WebGL; Seitenverhältnis ausgleichen
+            var gm = Math.sqrt(gx[i] * gx[i] + gy[i] * gy[i]); if (gm > gmax) gmax = gm;
+          }
+          for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) {
+            i = y * cw + x; var o4 = ((chh - 1 - y) * cw + x) * 4;     // Zeilen umdrehen (WebGL zählt von unten)
+            var nx = -gx[i] / gmax, ny = -gy[i] / gmax;
+            out[o4] = Math.round(a[i] * 255); out[o4 + 1] = Math.round(Math.min(1, Math.sqrt(nx * nx + ny * ny) * 1.3) * 255);
+            out[o4 + 2] = Math.round((nx * 0.5 + 0.5) * 255); out[o4 + 3] = Math.round((ny * 0.5 + 0.5) * 255);
+          }
+        }
+        c.bindTexture(c.TEXTURE_2D, tex); c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, false); c.pixelStorei(c.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, cw, chh, 0, c.RGBA, c.UNSIGNED_BYTE, out);
+        if (src) { c.generateMipmap(c.TEXTURE_2D); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR_MIPMAP_LINEAR); }
+        else c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
+      }
       function draw(now) {
         size();
         var tm = reduce ? 40.0 : (now - t0) / 1000;
@@ -718,8 +780,24 @@
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, occ.on);
         c.viewport(0, 0, cw, chh); c.uniform1f(U.uOffX, 0); c.uniform1f(U.uMode, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         c.viewport(cw, 0, cw, chh); c.uniform1f(U.uOffX, cw); c.uniform1f(U.uMode, 1); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        probe(rect, sx);
         wx.drawImage(gcv, 0, 0, cw, chh, 0, 0, cw, chh);
         lx.drawImage(gcv, cw, 0, cw, chh, 0, 0, cw, chh);
+      }
+      // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
+      var px = null, btnL = 0, pf = 0;
+      function probe(rect, sx) {
+        if (++pf % 2 || !infoOpen.offsetWidth) return;
+        var r = infoOpen.getBoundingClientRect();
+        var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
+        var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
+        if (w < 1 || y < 0 || y >= chh) return;
+        if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
+        c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
+        var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
+        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
+        btnL += (v - btnL) * 0.35;
+        infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
       }
       function loop(now) {
         raf = 0;
@@ -741,16 +819,17 @@
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
         wall: wall, glow: glow, start: start,
-        title: function (el) { if (el) { size(); mask(el); occ.want = 1; } else occ.want = 0; start(); }
+        title: function (T) { if (T) { size(); mask(T); occ.want = 1; } else occ.want = 0; start(); }
       };
     })();
     if (sun) {
       info.insertBefore(sun.wall, infoPanel); info.appendChild(sun.glow);
       root.classList.add('hp-info-sunlit');
+      if (!reduce) infoText.classList.add('hp-tilt');
       infoPanel.style.background = 'transparent';
     }
 
-    var tClone = null, tOrig = null, infoT = 0, sunT = 0;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0, glassT = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -825,6 +904,7 @@
         var rg = document.createRange(); rg.selectNodeContents(tClone);
         var tr = rg.getBoundingClientRect();
         var sc = Math.min(1, (W - left - right) / Math.max(1, tr.width));
+        if (sun && !reduce) sc *= 0.8;   // die nahe rechte Seite wird grösser, muss trotzdem Platz haben
         var ox = tr.left - cr.left, oy = tr.top - cr.top;   // Textanfang innerhalb der Kopie
         var dx = left - (cr.left - rr.left) - sc * ox;
         var dy = top - (cr.top - rr.top) - sc * oy;
@@ -833,18 +913,21 @@
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
         var t3 = '';
         if (sun && !reduce) {
-          // 3D: Titel leicht seitlich gedreht (rechts weiter weg), Tiefe nach unten links, weg vom Licht oben rechts
-          t3 = ' perspective(' + Math.round(tr.width * 2.4) + 'px) rotateY(20deg)';
-          var cc = (getComputedStyle(tClone).color.match(/[\d.]+/g) || [0, 0, 0]).map(Number);
-          var dk = 'rgb(' + [0, 1, 2].map(function (k) { return Math.round(cc[k] * 0.42); }).join(',') + ')', ly = [];
-          for (var li = 1; li <= 8; li++) ly.push((-0.0035 * li).toFixed(4) + 'em ' + (0.006 * li).toFixed(4) + 'em 0 ' + dk);
-          ly.push('-0.03em 0.07em 0.06em rgba(40,30,15,.28)');
-          tClone.style.setProperty('--hp-3d', ly.join(','));
+          // Glastitel: seitlich gedreht, rechts nah und breit, links fern und schmal. Die Schrift fliegt hin,
+          // dann wird sie zu Glas (gerechnet in der Sonnen-Ebene, genau an derselben Stelle).
+          var P3 = Math.round(tr.width * 2), A3 = -26 * Math.PI / 180, ca = Math.cos(A3), sa = Math.sin(A3);
+          t3 = ' perspective(' + P3 + 'px) rotateY(-26deg)';
+          var bx = cr.left - rr.left + dx, by = cr.top - rr.top + dy, scc = sc;
+          var map3 = function (lx, ly, lz) { var x1 = lx * ca + lz * sa, z1 = -lx * sa + lz * ca, w = 1 - z1 / P3; return [bx + scc * x1 / w, by + scc * ly / w]; };
+          var csT = getComputedStyle(tClone), txT = (tClone.textContent || '').trim();
+          if (csT.textTransform === 'uppercase') txT = txT.toUpperCase();
+          glassT = { txt: txT, font: csT.fontStyle + ' ' + csT.fontWeight + ' {s} ' + csT.fontFamily, ox: ox, oy: oy, tw: tr.width, th: tr.height,
+            map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
           tClone.classList.add('hp-3d');
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
         clearTimeout(sunT);
-        sunT = setTimeout(function () { if (sun && tClone && root.classList.contains('is-info')) sun.title(tClone); }, reduce ? 50 : CONFIG.infoMs * 0.8);
+        sunT = setTimeout(function () { if (sun && glassT && tClone && root.classList.contains('is-info')) { sun.title(glassT); tClone.classList.add('hp-glass'); } }, CONFIG.infoMs * 0.85);
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
@@ -864,7 +947,7 @@
         tween(iz, 0, 1000, easeDock);
       }
       tween(ip, 1, CONFIG.infoMs, easeInfo);
-      if (tClone) { tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d'); }
+      if (tClone) { tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
       clearTimeout(sunT); if (sun) sun.title(null);
       clearTimeout(infoT);
       infoT = setTimeout(function () {
