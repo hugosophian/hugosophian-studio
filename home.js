@@ -84,7 +84,7 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
-    '[data-hp] .hp-sun-light { z-index: 2; mix-blend-mode: screen; }',
+    '[data-hp] .hp-sun-light { z-index: 8; mix-blend-mode: screen; visibility: hidden; }',
     '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
     '[data-hp] .hp-sun-back .hp-sun-wall { left: 0; top: 0; width: 100%; height: 100%; }',
     '[data-hp] .hp-sun-back .hp-sun-glass { display: none; }',
@@ -682,7 +682,9 @@
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
-        '    col = (uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8) * smoothstep(0.2, 0.6, uOn);',
+        '    float tl = smoothstep(0.25, 0.95, lit);',
+        '    vec3 tc = mix(uTextLight, rainbow * 1.15, 0.22);',
+        '    col = (tc * uTextAmt * tl + causC * 0.8) * smoothstep(0.2, 0.6, uOn);',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
@@ -881,7 +883,7 @@
       };
     })();
     if (sun) {
-      info.insertBefore(sun.back, infoPanel); info.appendChild(sun.glow);
+      info.insertBefore(sun.back, infoPanel); root.appendChild(sun.glow);   // Lichtebene über Text UND Titel
       root.classList.add('hp-info-sunlit');
       infoPanel.style.background = 'transparent';
     }
@@ -901,7 +903,7 @@
     var brand = root.querySelector('.hp-brand');
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
-      if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
+      if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
       // Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
     }
