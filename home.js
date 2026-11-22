@@ -44,6 +44,11 @@
     ease:       0.15,   // Mario: 0.15 pro Bild (60 fps), kleiner = träger und mehr Verziehen
     zoom:       0.25,   // Mario: 0.25 (Stärke des Verziehens)
     zoomMax:    0.24,   // Begrenzung, damit beim Herauszoomen nie ein Rand sichtbar wird
+    // Bewegungsunschärfe beim Wischen (Hugo 22.11., wie in der Galerie): Bild verwischt senkrecht, je schneller desto stärker
+    mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
+    mbFrom:     60,     // px/s, darunter scharf
+    mbSpeed:    2200,   // px/s, ab hier volle Verwischung
+    mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
@@ -71,6 +76,8 @@
     '[data-hp] .hp-slide.is-vis { visibility: visible; }',
     '[data-hp] .hp-media { position: absolute; inset: 0; will-change: transform; }',
     '[data-hp] .hp-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }',
+    '[data-hp] .hp-ghost { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform, opacity; }',
+    '[data-hp].is-desk .hp-ghost { display: none; }',
     '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .8s ease .1s; }',
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
     '[data-hp] .hp-data { display: none !important; }',
@@ -186,9 +193,14 @@
       if (title && col) title.style.color = col.replace(/,\s*[\d.]+\s*\)\s*$/, ', 1)');
       var img = q('.hp-img');
       if (img) { img.loading = 'eager'; img.setAttribute('draggable', 'false'); }
+      var ghosts = [];
+      if (img && !reduce) for (var gi = 0; gi < CONFIG.mbGhosts; gi++) {
+        var gh = img.cloneNode(false); gh.removeAttribute('id'); gh.className = 'hp-img hp-ghost'; gh.alt = ''; gh.setAttribute('aria-hidden', 'true');
+        img.parentNode.appendChild(gh); ghosts.push(gh);
+      }
       stage.appendChild(el);
       var s = {
-        el: el, i: i, media: q('.hp-media'), title: title, img: img,
+        el: el, i: i, media: q('.hp-media'), title: title, img: img, ghosts: ghosts, gOn: false,
         name: name, label: title ? title.textContent.trim() : name,
         intro: q('.hp-d-intro') ? q('.hp-d-intro').innerHTML : '',
         btn: q('.hp-d-btn') ? q('.hp-d-btn').textContent.trim() : '',
@@ -315,7 +327,25 @@
     }
 
     // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario)
-    function renderMob() {
+    // Zwischenbilder gleichmässig um das Bild verteilt (oben/unten), zusammen wirken sie wie eine senkrechte Verwischung
+    function ghostBlur(s, L) {
+      var g = s.ghosts; if (!g || !g.length) return;
+      if (L < 0.6) { if (s.gOn) { for (var i = 0; i < g.length; i++) g[i].style.opacity = '0'; s.gOn = false; } return; }
+      s.gOn = true;
+      var N = g.length, a = Math.min(1, L / 8);
+      for (var k = 0; k < N; k++) {
+        var f = (k + 0.5) / N - 0.5;                 // −0.5 … 0.5
+        g[k].style.transform = 'translate3d(0,' + (f * 2 * L).toFixed(2) + 'px,0)';
+        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
+      }
+    }
+    var mbF = 0, mbV = 0;
+    function renderMob(dt) {
+      // Tempo (px/s, geglättet) → Verwischung
+      if (dt > 0) { var v = Math.abs(F - mbF) * H / dt; mbV += (v - mbV) * Math.min(1, dt * 18); } else mbV = 0;
+      mbF = F;
+      var m = Math.pow(clamp((mbV - CONFIG.mbFrom) / (CONFIG.mbSpeed - CONFIG.mbFrom), 0, 1), 0.9);
+      var L = m * CONFIG.mbBlur * H;
       var p = clamp(CONFIG.zoom * (F - C), -CONFIG.zoomMax, CONFIG.zoomMax);
       var z = CONFIG.imgBase / (1 - 0.5 * p);
       for (var j = 0; j < n; j++) {
@@ -327,6 +357,7 @@
         s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
         s.el.style.clipPath = '';
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
+        ghostBlur(s, L / z);
         if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)';
       }
     }
@@ -607,7 +638,7 @@
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform vec3 uHero; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
@@ -624,13 +655,15 @@
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
         '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
         '  float fall = exp(-max(dist - 0.65, 0.0) / uReach);',
+        '  float hd = (ang - uHero.x) / uHero.y; r = max(r, uHero.z * exp(-hd * hd) * (0.82 + 0.18 * n1(t * 0.6)));',
         '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
         '}',
         'float rayR(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
         '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
-        '  return smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r);',
+        '  float hd = (ang - uHero.x) / uHero.y;',
+        '  return max(smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r), uHero.z * exp(-hd * hd));',
         '}',
         'void main() {',
         '  vec2 fc = uOrig + (gl_FragCoord.xy - vec2(uOffX, 0.0)) / uScale;',
@@ -643,7 +676,8 @@
         // Einstrahlen: jeder Strahl hat seinen eigenen Moment (aus seinem Winkel), erst ein paar, dann alle.
         // Beim Schliessen läuft es rückwärts: die zuletzt gekommenen gehen zuerst.
         '  float dly = n1(ang * 7.0 + 3.7) * 0.7;',
-        '  float rf = smoothstep(dly, dly + 0.3, uOn);',
+        '  float hh = (ang - uHero.x) / uHero.y;',
+        '  float rf = max(smoothstep(0.2 + dly * 0.8, 0.5 + dly * 0.8, uOn), uHero.z * exp(-hh * hh * 0.5));',
         '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
         '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
         '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
@@ -693,7 +727,8 @@
         '    L *= mix(1.0, 0.8 + 0.2 * sv - 0.08 * fil, sh2);',
         '    col = mix(shade, uLit, L) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
         '    col += vec3(1.0, 0.85, 0.55) * fil * sh2 * 0.1;',
-        '    col = mix(vec3(1.0), col, smoothstep(0.0, 0.45, uOn));',
+        '    float wf = max(smoothstep(0.25, 0.75, uOn), uHero.z * exp(-hh * hh * 0.35));',
+        '    col = mix(vec3(1.0), col, wf);',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
@@ -709,7 +744,7 @@
         '    vec3 tl3 = smoothstep(vec3(0.25), vec3(0.95), lit * disp);',
         '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
         '    vec3 tc = vec3(1.0, 0.8, 0.62) * tm * 1.08 + (tl3 - tm) * vec3(1.0, 0.95, 1.25) * 1.35;',
-        '    col = (tc * uTextAmt + causC * 0.8) * smoothstep(0.0, 0.3, uOn);',
+        '    col = (tc * uTextAmt + causC * 0.8) * max(smoothstep(0.15, 0.5, uOn), uHero.z * exp(-hh * hh * 0.35));',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
@@ -722,7 +757,7 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uHero', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
         'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
@@ -747,7 +782,7 @@
         var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
-          if (occ.el) mask(occ.el);
+
         }
         var GW = 2 * cw, GH = chh;
         if (gcv.width !== GW || gcv.height !== GH) { gcv.width = GW; gcv.height = GH; }
@@ -852,9 +887,21 @@
         c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
         c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
         // Licht erst, wenn der Titel angekommen ist: in 1.8 s weich einstrahlen; beim Schliessen rasch weg
-        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 2600);   // 2.6 s, Strahl für Strahl
+        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 3200);   // 2.6 s, Strahl für Strahl
         else lightOn.v = Math.max(0, lightOn.v - dt / 1.2);                                   // während die Seite wegfährt
         var lo = lightOn.v; c.uniform1f(U.uOn, lo * lo * (3 - 2 * lo));
+        // Erster Strahl (Hugo 22.11.): kommt zuerst und fällt auf «Galerie öffnen», damit man den Schatten gleich sieht
+        var hero = 0, ha = 0, hw = 0.05;
+        if (infoOpen.offsetWidth) {
+          var br = infoOpen.getBoundingClientRect();
+          var Sx = SUN.src[0] * rect.width, Sy = SUN.src[1] * rect.height;   // Sonne in CSS-Pixeln der Leinwand (y nach unten)
+          var bxx = br.left - rect.left + br.width * 0.45, byy = br.top - rect.top + br.height * 0.5;
+          ha = Math.atan2(bxx - Sx, byy - Sy) + Math.sin(tm * 0.21) * 0.012;
+          hw = Math.max(0.02, br.width * 0.42 / Math.max(1, Math.hypot(bxx - Sx, byy - Sy)));
+          hero = lightOn.want ? (reduce ? 1 : Math.min(1, (now - lightOn.t0) / 700)) : lo;
+          hero = hero * hero * (3 - 2 * hero);
+        }
+        c.uniform3f(U.uHero, ha, hw, hero);
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
@@ -913,7 +960,12 @@
       return {
         back: back, wall: wall, glow: glow, start: start,
         // Titel nur noch für die Lage des Horizonts (knapp darunter beginnt das Tal), er wirft keinen Schatten mehr
-        title: function (T) { if (T) { size(); mask(T); } occ.want = 0; start(); },
+        // Titel nur für den Horizont: Lage aus der Geometrie, ohne Pixelarbeit (die Maske hat beim Andocken
+        // für einige Bilder alles angehalten, Hugos Video 22.11.)
+        title: function (T) {
+          if (T) { var a = T.map(T.ox, T.oy), b = T.map(T.ox + T.tw, T.oy + T.th); G = { bx: a[0], by: a[1], bw: b[0] - a[0], bh: b[1] - a[1] }; }
+          occ.want = 0; start();
+        },
         light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); }
       };
     })();
@@ -1023,7 +1075,7 @@
       if (sun) {
         // Sonne erst, wenn der Titel eingeflogen ist (Hugo 22.11.)
         clearTimeout(sunL); sun.light(false);
-        sunL = setTimeout(function () { if (root.classList.contains('is-info')) sun.light(true); }, reduce ? 0 : CONFIG.infoMs);
+        sunL = setTimeout(function () { if (root.classList.contains('is-info')) sun.light(true); }, reduce ? 0 : CONFIG.infoMs * 0.4);   // erster Strahl kurz nach dem Start
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
