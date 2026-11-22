@@ -585,10 +585,10 @@
       lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
-      occLen: 0.24,              // Länge des Glasschattens (Anteil Höhe)
-      occAmt: 0.32,              // Glas lässt Licht durch: nur ein heller Schatten
-      refr: 0.022,               // Lichtbrechung im Glas (Anteil Höhe)
-      depth: 0.16,               // Tiefe des Glastitels (Anteil Schrifthöhe)
+      occLen: 0.9,               // Länge des Glasschattens (Anteil Höhe)
+      occAmt: 0.82,              // der Titel ist die Wolke: Licht kommt nur an den Rändern und durch die Lücken
+      refr: 0.02,                // Lichtbrechung im Glas (Anteil Höhe)
+      depth: 0.3,                // Tiefe des Glastitels (Anteil Schrifthöhe)
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
       trailAmt: 0.75,
@@ -610,7 +610,7 @@
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
@@ -638,11 +638,11 @@
         // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
         '  float occ = 0.0, caus = 0.0;',
         '  if (uOccOn > 0.0) {',
-        '    vec2 dir = normalize(S - fc); float L = uOccLen * uRes.y; float j = 0.5;',
+        '    vec2 dv = S - fc; float dl = length(dv); vec2 dir = dv / max(dl, 0.001); float L = min(uOccLen * uRes.y, dl); float j = 0.5;',
         '    for (int i = 0; i < 30; i++) {',
         '      float k = (float(i) + j) / 30.0; vec2 p = fc + dir * (k * L);',
-        '      vec4 m = texture2D(uOcc, (p - uMB.xy) / uMB.zw, 3.5 + k * 2.5); float w = pow(1.0 - k, 1.4);',
-        '      occ = max(occ, m.r * w); caus = max(caus, m.g * w * (1.0 - 0.5 * k));',
+        '      vec4 m = texture2D(uOcc, (p - uMB.xy) / uMB.zw, uLodB + 1.5 + k * L / uRes.y * 14.0); float w = pow(1.0 - k, 1.4);',
+        '      occ = max(occ, m.r); caus = max(caus, m.g * w);',
         '    }',
         '    occ *= uOccOn * uOccAmt; caus *= uOccOn;',
         '  }',
@@ -657,35 +657,43 @@
         '  }',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
-        '  vec3 causC = caus * beam * (vec3(1.0, 0.86, 0.6) * 0.22 + (rainbow - 0.4) * 0.16);',
+        '  vec3 causC = caus * beam * (vec3(1.0, 0.88, 0.66) * 0.16 + (rainbow - 0.5) * 0.05);',
         '  vec3 shade = mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist));',
         '  vec3 col;',
         '  if (uMode < 0.5) {',
         '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC;',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
+        // Glaskörper: flache Vorderseite, Seitenwände (Rückseite nach hinten versetzt), leicht gerundete Kanten.
+        // Jede Fläche verschiebt die Strahlen dahinter anders (Brechung), Farben nur fein an Ecken und Kanten.
         '    if (uOccOn > 0.0) {',
         '      vec4 g = texture2D(uOcc, (fc - uMB.xy) / uMB.zw);',
-        '      float cov = smoothstep(0.07, 0.26, g.r);',
-        '      vec4 ga = texture2D(uOcc, (fc + vec2(0.0, uRes.y * 0.012) - uMB.xy) / uMB.zw, 1.5);',   // Glas knapp darüber → weicher Schatten nach vorne
-        '      col *= 1.0 - 0.09 * smoothstep(0.1, 0.5, ga.r) * (1.0 - cov) * uOccOn;',
-        '      if (cov > 0.001) {',
-        '        vec2 n = (g.ba - 0.5) * 2.0; float sl = clamp(length(n), 0.0, 1.0);',
-        '        vec2 nn = sl > 0.001 ? n / sl : vec2(0.0); vec2 Ld = normalize(vec2(-0.2, 1.0));',
-        '        vec2 o = -n * uRefr * uRes.y * (0.5 + sl);',                        // dicker Rand bricht stärker
-        '        vec3 bb = vec3(beamAt(fc + o * 0.7), beamAt(fc + o), beamAt(fc + o * 1.4));',   // jede Farbe anders gebrochen
-        '        vec3 bg = mix(shade, uLit, clamp(vec3(uAmb) + bb * 1.2 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
-        '        vec3 gl = mix(bg, vec3(1.0), 0.1) * mix(vec3(0.985, 0.99, 1.0), vec3(0.6, 0.65, 0.72), smoothstep(0.35, 1.0, sl) * 0.75);',   // Glaskörper zum Rand hin tiefer
-        // farbige Lichtbänder im Glas (wie im Würfel): Farbton folgt der Richtung der Kante, leuchtet, wo Licht hinfällt
-        '        float band = smoothstep(0.45, 0.8, sl) * (1.0 - smoothstep(0.92, 1.0, sl) * 0.5) * smoothstep(0.08, 0.35, g.r);',
-        '        vec3 sp = 0.5 + 0.5 * cos(6.2831 * (atan(n.y, n.x) / 6.2831 + g.r * 0.5 + ang * 0.8 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
-        '        gl = mix(gl, mix(vec3(1.0), sp, 0.7) * (0.8 + 0.4 * beam), band * (0.08 + 0.4 * beam));',
-        '        float rim = smoothstep(0.07, 0.13, g.r) * (1.0 - smoothstep(0.13, 0.3, g.r));',   // feine helle Aussenkante
-        '        float spec = pow(max(dot(nn, Ld), 0.0), 4.0) * sl;',                // Glanz oben (Licht von hinten oben)
-        '        float exit = pow(max(dot(nn, -Ld), 0.0), 2.0) * sl;',                // Licht tritt unten warm aus
-        '        gl += vec3(1.0) * (rim * 0.5 + spec * 0.85) * (0.55 + 0.6 * beam);',
-        '        gl += vec3(1.0, 0.55, 0.2) * exit * beam * 0.45;',
-        '        col = mix(col, gl, cov * uOccOn);',
+        '      float side = 0.0, sk = 0.0;',
+        '      for (int i = 1; i <= 14; i++) { float k = float(i) / 14.0; float v = texture2D(uOcc, (fc - uExt * k - uMB.xy) / uMB.zw).r; if (v > side) { side = v; sk = k; } }',
+        '      float front = smoothstep(0.1, 0.3, g.r);',
+        '      float sideC = smoothstep(0.1, 0.3, side) * (1.0 - front);',
+        '      float body = max(front, sideC);',
+        '      if (body > 0.001) {',
+        '        vec2 n = (g.ba - 0.5) * 2.0; float sl = clamp(length(n), 0.0, 1.0) * front;',
+        '        vec2 nn = length(n) > 0.001 ? normalize(n) : vec2(0.0); vec2 Ld = normalize(S - fc);',
+        '        vec2 ext = normalize(uExt + vec2(0.0001));',
+        '        vec2 oF = (-n * (0.6 + sl) + vec2(-0.45, -0.25)) * uRefr * uRes.y;',      // Vorderseite: ganze Fläche leicht versetzt
+        '        vec2 oS = (ext * 1.8 + vec2(0.0, -0.4)) * uRefr * uRes.y;',                // Seitenwand: stärker, andere Richtung
+        '        vec2 o = mix(oS, oF, front);',
+        '        vec3 bb = vec3(beamAt(fc + o * 0.94), beamAt(fc + o), beamAt(fc + o * 1.06));',
+        '        vec3 bg = mix(shade, uLit, clamp(vec3(uAmb) + bb * 1.3 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
+        '        vec3 glF = bg * mix(vec3(0.62, 0.66, 0.73), vec3(0.48, 0.52, 0.6), sl);',
+        '        vec3 glS = bg * mix(vec3(0.5, 0.54, 0.62), vec3(0.36, 0.4, 0.48), sk);',   // Seitenwand kühler, nach hinten tiefer
+        '        vec3 gl = mix(glS, glF, front);',
+        '        float spec = pow(max(dot(nn, Ld), 0.0), 5.0) * sl;',                       // Kante zur Sonne leuchtet
+        '        float rim = smoothstep(0.1, 0.16, g.r) * (1.0 - smoothstep(0.16, 0.34, g.r));',
+        '        float back = smoothstep(0.1, 0.3, side) * (1.0 - smoothstep(0.3, 0.6, side)) * (1.0 - front);',   // hintere Kante der Seitenwand
+        '        float sun = exp(-length(fc - S) / uRes.y * 5.0);',                         // nahe der Sonne glüht das Glas
+        '        gl += vec3(1.0, 0.97, 0.9) * (spec * 1.2 + rim * 0.7 + back * 0.45) * (0.45 + 0.7 * beam + 1.5 * sun);',
+        '        vec3 sp = 0.5 + 0.5 * cos(6.2831 * (atan(n.y, n.x) / 6.2831 + ang * 0.6 - t * 0.03 + vec3(0.0, 0.33, 0.67)));',
+        '        gl += (sp - 0.5) * (spec + rim * 0.4) * (0.1 + 0.2 * beam);',            // Farbe nur fein an den Ecken
+        '        gl += vec3(1.0, 0.9, 0.72) * sun * 0.12 * front;',
+        '        col = mix(col, gl, body * uOccOn);',
         '      }',
         '    }',
         '  } else {',
@@ -702,7 +710,7 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
         'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
@@ -722,7 +730,7 @@
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
       // Glas-Ausschnitt: der Titelbereich wird extra in voller Retina-Auflösung gerechnet (scharfe Glaskanten),
       // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
-      var G = null;
+      var G = null, srcT = null;
       function size() {
         var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
         if (w !== cw || h !== chh) {
@@ -743,7 +751,9 @@
         if (!T.txt || T.tw < 2) return;
         var cs = [T.map(T.ox, T.oy), T.map(T.ox + T.tw, T.oy), T.map(T.ox, T.oy + T.th), T.map(T.ox + T.tw, T.oy + T.th)];
         var x0 = Math.min(cs[0][0], cs[2][0]), x1 = Math.max(cs[1][0], cs[3][0]), y0 = Math.min(cs[0][1], cs[1][1]), y1 = Math.max(cs[2][1], cs[3][1]);
-        var mg = (y1 - y0) * 0.3;
+        var mc = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, 0), mb = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, -SUN.depth * T.th);
+        var ex = mb[0] - mc[0], ey = mb[1] - mc[1];   // Seitenwände: so weit liegt die Rückseite versetzt
+        var mg = (y1 - y0) * 0.25 + Math.sqrt(ex * ex + ey * ey);
         var bx = Math.floor(x0 - mg), by = Math.floor(y0 - mg), bw = Math.ceil(x1 - x0 + 2 * mg), bh = Math.ceil(y1 - y0 + 2 * mg);
         var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
         pw = Math.min(1024, pot(bw * dpr)); ph = Math.min(512, pot(bh * dpr));
@@ -764,6 +774,8 @@
         }
         upload(mx.getImageData(0, 0, pw, ph).data, mxs, mys, (cs[2][1] - cs[0][1]) * mys);
         c.uniform4f(U.uMB, bx * sx, chh - (by + bh) * sx, bw * sx, bh * sx);
+        c.uniform2f(U.uExt, ex * sx, -ey * sx);
+        srcT = [(bx + bw * 0.58) / Math.max(1, rect.width), (by + bh * 0.48) / Math.max(1, rect.height)];   // Sonne hinter dem Titel
         G = { bx: bx, by: by, bw: bw, bh: bh, PW: Math.round(bw * dpr), PH: Math.round(bh * dpr), sx: sx };
         glass.width = G.PW; glass.height = G.PH;
         glass.style.left = bx + 'px'; glass.style.top = by + 'px'; glass.style.width = bw + 'px'; glass.style.height = bh + 'px';
@@ -788,7 +800,7 @@
         var a = new Float32Array(n), b = new Float32Array(n), x, y, i;
         for (i = 0; i < n; i++) a[i] = src[i * 4] / 255;
         // dicke, runde Glaskanten: Breite etwa 9 % der Schrifthöhe
-        var r = Math.max(1, Math.round(letterH * 0.032));
+        var r = Math.max(1, Math.round(letterH * 0.014));   // kleine Rundung: flache Flächen, weiche Ecken
         for (var pass = 0; pass < 3; pass++) { box(a, b, w, h, r, true); box(b, a, w, h, r, false); }
         var gmax = 1e-6, gx = new Float32Array(n), gy = new Float32Array(n);
         for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
@@ -807,7 +819,7 @@
       }
       function pass(x, w, h, mode, ox, oy, scl) {
         c.viewport(x, 0, w, h); c.uniform1f(U.uOffX, x); c.uniform1f(U.uMode, mode);
-        c.uniform2f(U.uOrig, ox, oy); c.uniform1f(U.uScale, scl);
+        c.uniform2f(U.uOrig, ox, oy); c.uniform1f(U.uScale, scl); c.uniform1f(U.uLodB, Math.log(scl) / Math.LN2);   // gleiche Unschärfe wie die Wand
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
       }
       function draw(now) {
@@ -825,6 +837,8 @@
         // Glas weich ein- und ausblenden
         var dt = Math.min(0.05, (now - (occ.t || now)) / 1000); occ.t = now;
         occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
+        var e = G && srcT ? occ.on * occ.on * (3 - 2 * occ.on) : 0;
+        c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
@@ -956,21 +970,32 @@
         var rg = document.createRange(); rg.selectNodeContents(tClone);
         var tr = rg.getBoundingClientRect();
         var sc = Math.min(1, (W - left - right) / Math.max(1, tr.width));
-        if (sun && !reduce) sc *= 0.8;   // die nahe rechte Seite wird grösser, muss trotzdem Platz haben
         var ox = tr.left - cr.left, oy = tr.top - cr.top;   // Textanfang innerhalb der Kopie
-        var dx = left - (cr.left - rr.left) - sc * ox;
-        var dy = top - (cr.top - rr.top) - sc * oy;
-        tClone.style.transformOrigin = '0 0';
-        root.style.setProperty('--hp-info-top', (top + tr.height * sc + H * 0.035).toFixed(0) + 'px');
-        tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
-        var t3 = '';
+        var t3 = '', map0 = null, minX = ox, minY = oy, maxY = oy + tr.height;
         if (sun && !reduce) {
-          // Glastitel: seitlich gedreht, rechts nah und breit, links fern und schmal. Die Schrift fliegt hin,
-          // dann wird sie zu Glas (gerechnet in der Sonnen-Ebene, genau an derselben Stelle).
-          var P3 = Math.round(tr.width * 2), A3 = -26 * Math.PI / 180, ca = Math.cos(A3), sa = Math.sin(A3);
-          t3 = ' perspective(' + P3 + 'px) rotateY(-26deg)';
+          // Glastitel wie eine Wolke vor der Sonne, von unten schräg gesehen: rechts ganz nah und gross,
+          // links fern und schmal, unten leicht nach vorne gekippt. Die Schrift fliegt hin und wird dann zu Glas.
+          var P3 = tr.width * 1.5, A3 = -38 * Math.PI / 180, B3 = 10 * Math.PI / 180;
+          var ca = Math.cos(A3), sa = Math.sin(A3), cb = Math.cos(B3), sb = Math.sin(B3);
+          t3 = ' perspective(' + P3.toFixed(0) + 'px) rotateY(-38deg) rotateX(10deg)';
+          map0 = function (lx, ly, lz) {
+            var y1 = ly * cb - lz * sb, z1 = ly * sb + lz * cb;
+            var x2 = lx * ca + z1 * sa, z2 = -lx * sa + z1 * ca, w = 1 - z2 / P3;
+            return [x2 / w, y1 / w];
+          };
+          var cn = [map0(ox, oy, 0), map0(ox + tr.width, oy, 0), map0(ox, oy + tr.height, 0), map0(ox + tr.width, oy + tr.height, 0)];
+          minX = Math.min(cn[0][0], cn[2][0]); minY = Math.min(cn[0][1], cn[1][1]); maxY = Math.max(cn[2][1], cn[3][1]);
+          var maxX = Math.max(cn[1][0], cn[3][0]);
+          sc = Math.min(2.4, (W - left - right * 0.3) / Math.max(1, maxX - minX));   // so gross wie möglich, rechts fast bis an den Rand
+        }
+        var dx = left - (cr.left - rr.left) - sc * minX;
+        var dy = top - (cr.top - rr.top) - sc * minY;
+        tClone.style.transformOrigin = '0 0';
+        root.style.setProperty('--hp-info-top', (top + (maxY - minY) * sc + H * 0.035).toFixed(0) + 'px');
+        tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
+        if (map0) {
           var bx = cr.left - rr.left + dx, by = cr.top - rr.top + dy, scc = sc;
-          var map3 = function (lx, ly, lz) { var x1 = lx * ca + lz * sa, z1 = -lx * sa + lz * ca, w = 1 - z1 / P3; return [bx + scc * x1 / w, by + scc * ly / w]; };
+          var map3 = function (lx, ly, lz) { var p = map0(lx, ly, lz); return [bx + scc * p[0], by + scc * p[1]]; };
           var csT = getComputedStyle(tClone), txT = (tClone.textContent || '').trim();
           if (csT.textTransform === 'uppercase') txT = txT.toUpperCase();
           glassT = { txt: txT, font: csT.fontStyle + ' ' + csT.fontWeight + ' {s} ' + csT.fontFamily, ox: ox, oy: oy, tw: tr.width, th: tr.height,
