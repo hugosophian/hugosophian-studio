@@ -602,9 +602,9 @@
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
       src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
-      rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
+      rays: [6, 15],             // Strahldichte (grobe / feine Strahlen); Hugo 22.11.: weniger Strahlen
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
-      edge: [0.3, 0.8],           // Schärfe der Strahlen
+      edge: [0.34, 0.8],          // Schärfe der Strahlen
       reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
