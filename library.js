@@ -48,9 +48,9 @@
     zoom:       0.5,    // Bild zoomt im Rahmen mit (1 − 0.5 · Biegen) (Mario-Fragment-Shader)
     // Bewegungsunschärfe beim Wischen (Hugo 22.11.): Bilder verwischen in Laufrichtung, je schneller desto stärker
     blur:       0.06,   // stärkste Unschärfe als Anteil der Kartenbreite (Foto und weisser Rand verwischen)
-    blurSpeed:  3200,   // ab diesem Tempo (px/s) volle Unschärfe
-    blurFrom:   250,    // darunter keine Unschärfe (ruhiges Ziehen bleibt scharf)
-    blurCurve:  1.4,    // > 1: langsam kaum, schnell deutlich
+    blurSpeed:  1800,   // ab diesem Tempo (px/s) volle Unschärfe (Hugo 22.11.: setzt schon bei schwächeren Wischen an)
+    blurFrom:   60,     // darunter keine Unschärfe (nur ganz langsames Ziehen bleibt scharf)
+    blurCurve:  0.9,    // < 1: schon bei mittlerem Tempo gut sichtbar
     gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
