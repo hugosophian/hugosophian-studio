@@ -874,7 +874,9 @@
         if (trail.length > 30) trail.shift();
         if (!raf) raf = requestAnimationFrame(loop);
       }
-      // (Fingerschatten entfernt, Hugo 22.11.: nur «Galerie öffnen» wirft einen Schatten)
+      // Fingerschatten (Hugo 22.11.: wieder drin)
+      window.addEventListener('pointermove', point, { passive: true });
+      window.addEventListener('pointerdown', point, { passive: true });
       var lightOn = { v: 0, want: false, t0: 0 };
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
