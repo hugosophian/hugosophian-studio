@@ -912,10 +912,10 @@
           // setzt erst nach 0.7 s an und kommt in 1.8 s weich mit den anderen Strahlen (Hugo 22.11.)
           hero = lightOn.want ? (reduce ? 1 : Math.max(0, Math.min(1, (now - lightOn.t0 - 700) / 1800))) : lo;
           hero = hero * hero * hero * (hero * (hero * 6 - 15) + 10);
-          // Hugo 22.11.: wie ein CTA – der Strahl auf dem Button geht in ruhigem Takt weich an und aus (ca. 4.2 s)
+          // Hugo 22.11.: wie ein CTA – der Strahl auf dem Button geht in ruhigem Takt weich an und aus (ca. 6.5 s)
           if (lightOn.want && !reduce) {
             var since = (now - lightOn.t0) / 1000 - 2.5;
-            if (since > 0) { var ph = 0.5 + 0.5 * Math.cos(since * 6.2832 / 4.2); hero *= ph * ph * (3 - 2 * ph); }
+            if (since > 0) { var ph = 0.5 + 0.5 * Math.cos(since * 6.2832 / 6.5); hero *= ph * ph * (3 - 2 * ph); }
           }
         }
         c.uniform3f(U.uHero, ha, hw, hero); heroNow = hero;
