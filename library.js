@@ -46,6 +46,11 @@
     bow:        0.625,  // … plus seitlich sin(v · π) · Biegen · 5 · 0.125 Kartenbreiten
     bendMax:    0.4,    // Biegen in die Tiefe begrenzt (Mario ±0.4)
     zoom:       0.5,    // Bild zoomt im Rahmen mit (1 − 0.5 · Biegen) (Mario-Fragment-Shader)
+    // Bewegungsunschärfe beim Wischen (Hugo 22.11.): Bilder verwischen in Laufrichtung, je schneller desto stärker
+    blur:       0.06,   // stärkste Unschärfe als Anteil der Kartenbreite (Foto und weisser Rand verwischen)
+    blurSpeed:  3200,   // ab diesem Tempo (px/s) volle Unschärfe
+    blurFrom:   250,    // darunter keine Unschärfe (ruhiges Ziehen bleibt scharf)
+    blurCurve:  1.4,    // > 1: langsam kaum, schnell deutlich
     gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
@@ -210,7 +215,7 @@
     var items = all.slice();     // aktuelle Auswahl (Sortierung)
     all.forEach(function (it) { it.el.style.opacity = '0'; });   // auch die normalen Karten bis zum Eintritt unsichtbar
     // Position auf der Reihe in px: P = Anzeige (Mario lastX), T = Ziel (Mario currentX), beide mit umgekehrtem Vorzeichen
-    var P = 0, T = 0, velo = CONFIG.velo, prog = 0;
+    var P = 0, T = 0, velo = CONFIG.velo, prog = 0, blurV = 0, blurAmt = 0;
     var mode = 'idle';           // idle | drag | intro | outro | pv
     var idx = 0, shownIdx = -1;
     var n = 1, L = 1, H = 1, W = 1, cx = 0, cy = 0, loop = true, gapPx = 0;
@@ -285,17 +290,27 @@
         '}'].join('\n');
       var FS = [
         'precision mediump float;',
-        'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform float uZoom;',
+        'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform float uZoom; uniform float uBlur;',
         'varying vec2 vUv;',
-        'void main() {',
+        // Farbe der Karte an einer Stelle: weisser Rahmen oder Foto (Mario-Zoom)
+        'vec3 card(vec2 v) {',
         '  float x0 = uBox.x, x1 = uBox.y, y0 = uBox.z, y1 = uBox.w;',
-        '  if (vUv.x < x0 || vUv.x > x1 || vUv.y < y0 || vUv.y > y1) { gl_FragColor = vec4(uOpacity); return; }',
-        '  vec2 p = vec2((vUv.x - x0) / (x1 - x0), (vUv.y - y0) / (y1 - y0));',
+        '  if (v.x < x0 || v.x > x1 || v.y < y0 || v.y > y1) return vec3(1.0);',
+        '  vec2 p = vec2((v.x - x0) / (x1 - x0), (v.y - y0) / (y1 - y0));',
         '  float ia = uCardAspect * ((x1 - x0) / (y1 - y0));',
         '  vec2 uv = p;',
         '  if (uImageAspect > ia) { uv.x = 0.5 + (p.x - 0.5) * ia / uImageAspect; } else { uv.y = 0.5 + (p.y - 0.5) * uImageAspect / ia; }',
         '  uv = (uv - 0.5) * uZoom + 0.5;',                                        // Mario: (uv − 0.5)·(1 − 0.5·progress) + 0.5
-        '  vec3 col = texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb;',
+        '  return texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb;',
+        '}',
+        'void main() {',
+        '  vec3 col;',
+        '  if (uBlur > 0.0008) {',                                                  // Bewegungsunschärfe in Laufrichtung: 11 Proben, Mitte stärker
+        '    col = vec3(0.0); float ws = 0.0;',
+        '    for (int i = 0; i < 11; i++) { float f = float(i) / 10.0 - 0.5; float w = 1.0 - abs(f) * 1.2;',
+        '      col += card(vUv + vec2(f * uBlur, 0.0)) * w; ws += w; }',
+        '    col /= ws;',
+        '  } else { col = card(vUv); }',
         '  gl_FragColor = vec4(col * uOpacity, uOpacity);',
         '}'].join('\n');
       function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
@@ -311,7 +326,7 @@
       var vb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, vb); c.bufferData(c.ARRAY_BUFFER, new Float32Array(uv), c.STATIC_DRAW);
       var ib = c.createBuffer(); c.bindBuffer(c.ELEMENT_ARRAY_BUFFER, ib); c.bufferData(c.ELEMENT_ARRAY_BUFFER, new Uint16Array(ix), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aUv'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom', 'uBlur'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform1i(U.uTex, 0);
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true);
@@ -369,7 +384,7 @@
           glMeasure(it);
           // Einmal unsichtbar zeichnen: der Grafikchip übernimmt das Bild jetzt, nicht erst mitten im Eintritt
           c.uniform1f(gl.U.uOpacity, 0); c.uniform2f(gl.U.uView, 100, 100); c.uniform2f(gl.U.uSize, 2, 2); c.uniform2f(gl.U.uCenter, 1, 1);
-          c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1);
+          c.uniform4f(gl.U.uBox, 0, 1, 0, 1); c.uniform1f(gl.U.uP, 0); c.uniform1f(gl.U.uPc, 0); c.uniform1f(gl.U.uZoom, 1); c.uniform1f(gl.U.uBlur, 0);
           c.uniform4f(gl.U.uK, 0, 0, 0, 600); c.uniform1f(gl.U.uImageAspect, 1); c.uniform1f(gl.U.uCardAspect, 1); c.uniform1f(gl.U.uRot, 0);
           c.drawElements(c.TRIANGLES, 6, c.UNSIGNED_SHORT, 0);
           it.el.classList.add('is-gl');
@@ -458,6 +473,7 @@
       c.uniform1f(U.uPc, pc);
       c.uniform4f(U.uK, CONFIG.depth * sz, CONFIG.twist * sz, CONFIG.bow * sz, CONFIG.camera);
       c.uniform1f(U.uZoom, 1 - CONFIG.zoom * pe);
+      c.uniform1f(U.uBlur, reduce ? 0 : blurAmt);
       for (var k = 0; k < list.length; k++) {
         var it = list[k].it;
         if (!it.tex || !it.box || it.el.style.visibility === 'hidden' || !(it.op > 0)) continue;
@@ -563,7 +579,7 @@
       if (dirty && mode !== 'intro' && mode !== 'outro') { dirty = false; var keepC = mode === 'idle' && P === T ? items[idx] : null; measure(); if (keepC) P = T = keepC.c; }
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
-      var busy = false;
+      var busy = false, stepV = 0;
       if ((mode === 'outro' || mode === 'intro') && intro && intro.step) {
         busy = true;
         if (intro.step(now, dt)) { var dn = intro.done; intro = null; mode = 'idle'; if (dn) dn(); }
@@ -576,8 +592,10 @@
         busy = true;
         if (t >= 1) { mode = 'idle'; P = T = intro.to; var done = intro.done; intro = null; if (done) done(); }
       } else if (mode !== 'pv') {
+        var p0 = P;
         P += (T - P) * (1 - Math.pow(1 - CONFIG.ease, dt * 60));
         if (mode !== 'drag' && Math.abs(T - P) < 0.3) P = T;
+        stepV = Math.abs(P - p0) / dt;
         // Biegen auf Marios Grenze (±0.4) und weich nachgeführt, damit ein Schwung am Handy nicht springt oder überdreht
         var pt = Math.max(-CONFIG.bendMax, Math.min(CONFIG.bendMax, (P - T) / W * velo));
         // Handy (Hugo 21.11. 15:00): ein normaler Wisch verzerrt wenig, viele schnelle Wische hintereinander immer stärker.
@@ -591,6 +609,12 @@
         if (P === T && Math.abs(prog) < 0.0005) prog = 0;
         busy = mode === 'drag' || P !== T || prog !== 0;
       }
+      // Tempo der Reihe messen (px/s, geglättet) → Bewegungsunschärfe; beim Eintritt und in der Vorschau aus
+      // (nur echte Bewegung zählt, Sprünge beim Einrasten oder Neumessen nicht)
+      blurV += (stepV - blurV) * (1 - Math.pow(1 - 0.25, dt * 60));
+      var bq = Math.max(0, Math.min(1, (blurV - CONFIG.blurFrom) / (CONFIG.blurSpeed - CONFIG.blurFrom)));
+      blurAmt = CONFIG.blur * Math.pow(bq, CONFIG.blurCurve);
+      if (blurAmt < 0.0008) { blurAmt = 0; if (blurV < 5) blurV = 0; } else busy = true;
       render();
       if (busy) kick(); else { last = 0; prog = 0; }
     }
