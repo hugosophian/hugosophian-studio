@@ -67,7 +67,7 @@
     rayColor:   [1, 0.9, 0.74],   // warmes Sonnenlicht wie auf der About-Seite
     sunRays:    0.11,   // Stärke der Sonnenstrahlen im Hintergrund
     sunFrom:    [0.86, -0.3],   // Sonne kommt von hier (wie auf der About-Seite) …
-    sunMorph:   1.8,    // s … und sinkt hinter die Bildreihe
+    sunMorph:   2.6,    // s … und sinkt hinter die Bildreihe, während diese einfliegt
     paper:      [0.93, 0.932, 0.94],     // weisser Rahmen im Schatten: milchiges Papier
     paperLit:   [1.0, 0.975, 0.93],     // im Sonnenlicht
     prism:      0.017,  // Farbzerlegung (Winkel), wie auf der About-Seite
@@ -75,7 +75,7 @@
 
     rayFollowOld: 0.45,  // so weit wandert das Licht Richtung Finger/Maus (Anteil des Abstands)
     rayEase:    0.17,   // Zeitkonstante (s) fürs Nachziehen (madebyigor ≈ 0.17 s)
-    rayFadeIn:  1.6,    // s, das Licht geht an, wenn die Reihe gelandet ist
+    rayFadeIn:  0.9,    // s, das Licht ist schon beim Laden da (Hugo 22.11.: Strahlen durch den Eintritt)
     grain:      0.22,   // Filmkorn in den Strahlen
     gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
@@ -331,7 +331,7 @@
         '  gl_Position = vec4(s.x / uView.x * 2.0 - 1.0, s.y / uView.y * 2.0 - 1.0, -p.z / (uK.w * 4.0), 1.0);',
         '}'].join('\n');
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + RAYF + '\n' + [
-        'uniform float uDpr;',
+        'uniform float uDpr; uniform vec2 uCard;',
         'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform float uZoom; uniform float uBlur; uniform float uMode;',
         'varying vec2 vUv;',
         // Farbe der Karte an einer Stelle: weisser Rahmen oder Foto (Mario-Zoom)
@@ -364,9 +364,14 @@
         '    float sv = rn2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05)); float fil = pow(1.0 - abs(2.0 * sv - 1.0), 7.0);',
         '    vec3 pc = mix(vec3(' + CONFIG.paper.join(', ') + '), vec3(' + CONFIG.paperLit.join(', ') + '), clamp(lg, 0.0, 1.0));',
         '    float mn = min(L.r, min(L.g, L.b));',
-        '    pc += (L - mn) * vec3(1.0, 0.85, 1.35) * 0.8;',
-        '    pc *= mix(1.0, 0.93 + 0.12 * sv, clamp(lg * 2.0, 0.0, 1.0));',
-        '    pc += vec3(1.0, 0.85, 0.55) * fil * lg * 0.16;',
+        '    pc += (L - mn) * vec3(1.0, 0.85, 1.35) * 1.25;',
+        '    pc *= mix(1.0, 0.84 + 0.22 * sv - 0.06 * fil, clamp(lg * 1.6, 0.0, 1.0));',
+        '    pc += vec3(1.0, 0.85, 0.55) * fil * lg * 0.22;',
+        '    vec2 ep = min(vUv, 1.0 - vUv) * uCard; float e = min(ep.x, ep.y);',
+        '    float band = exp(-e * e / 9.0);',
+        '    float per = atan((vUv.y - 0.5) * uCard.y, (vUv.x - 0.5) * uCard.x) / 6.2832;',
+        '    vec3 spec = 0.5 + 0.5 * cos(6.2832 * (per * 2.0 - uT * 0.08 + vec3(0.0, 0.33, 0.67)));',
+        '    pc = mix(pc, spec * 1.04, band * (0.28 + 0.5 * lg));',
         '    col = mix(col, mix(col, pc, uLA), 1.0 - inP);',
         '  }',
         '  gl_FragColor = vec4(col * uOpacity, uOpacity);',
@@ -384,7 +389,7 @@
       var vb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, vb); c.bufferData(c.ARRAY_BUFFER, new Float32Array(uv), c.STATIC_DRAW);
       var ib = c.createBuffer(); c.bindBuffer(c.ELEMENT_ARRAY_BUFFER, ib); c.bufferData(c.ELEMENT_ARRAY_BUFFER, new Uint16Array(ix), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aUv'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom', 'uBlur', 'uMode', 'uDpr', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom', 'uBlur', 'uMode', 'uDpr', 'uCard', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform1i(U.uTex, 0);
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true);
@@ -462,7 +467,7 @@
       })();
       c.useProgram(pr);
       wheel.insertBefore(cv, wheel.firstChild);
-      gl = { c: c, cv: cv, U: U, n: ix.length, w: 0, h: 0, ox: 0, oy: 0, pr: pr, loc: loc, R: R };
+      gl = { c: c, cv: cv, U: U, n: ix.length, w: 0, h: 0, ox: 0, oy: 0, pr: pr, loc: loc, R: R, RAYF: RAYF };
       cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); glOff(); }, false);
     })();
     function glOff() {
@@ -628,11 +633,12 @@
           c.uniform1f(U.uOpacity, it.op);
           c.uniform4f(U.uBox, it.box[0], it.box[1], it.box[2], it.box[3]);
           c.uniform1f(U.uImageAspect, it.ar || 1);
-          c.uniform1f(U.uCardAspect, it.cw / it.ch);
+          c.uniform1f(U.uCardAspect, it.cw / it.ch); c.uniform2f(U.uCard, it.cw, it.ch);
           c.drawElements(c.TRIANGLES, gl.n, c.UNSIGNED_SHORT, 0);
         }
       }
       var R = gl.R, amt = R ? rayAmount(list) : 0;
+      lt.amt = amt;
       if (amt > 0.002) {
         var tm = performance.now() / 1000, lx = lt.x - gl.ox, ly = gl.h - (lt.y - gl.oy);
         // 1) Licht + Karten als schwarze Abdeckung, kleine Auflösung
@@ -708,14 +714,12 @@
       lt.ha += ((lt.down ? 1 : 0) - lt.ha) * (1 - Math.exp(-dt / (lt.down ? 0.25 : 0.6)));
       // Sonne: kommt von oben rechts (wie auf der About-Seite) und sinkt hinter die Reihe, sobald diese gelandet ist
       var sx0 = CONFIG.sunFrom[0] * W + gl.ox * 0, sy0 = CONFIG.sunFrom[1] * H;
-      if (mode === 'intro') { lt.t0 = 0; lt.x = sx0; lt.y = sy0; return 0; }
       if (!lt.t0) { lt.t0 = now; lt.x = sx0; lt.y = sy0; }
       var mf = Math.min(1, (now - lt.t0) / 1000 / CONFIG.sunMorph); mf = mf < 0.5 ? 4 * mf * mf * mf : 1 - Math.pow(-2 * mf + 2, 3) / 2;
       if (mf < 1) { lt.x = sx0 + (tx - sx0) * mf; lt.y = sy0 + (ty - sy0) * mf; }
-      var pvOn = root.classList.contains('is-pv');
-      lt.pvf += ((pvOn ? 0 : 1) - lt.pvf) * (1 - Math.exp(-dt / 0.25));
+      // in der Projekt-Info strahlt es weiter (Hugo 22.11.)
       var f = Math.min(1, (now - lt.t0) / 1000 / CONFIG.rayFadeIn);
-      return f * f * (3 - 2 * f) * lt.pvf;
+      return f * f * (3 - 2 * f);
     }
 
     // ---------- Zeichnen ----------
@@ -1240,6 +1244,85 @@
     // Weisser Rahmen: ein Kästchen von 100 × 100 px, per transform auf jedes Rechteck gezogen
     var pvFrame = null, pvAnim = null, pvTimer2 = 0, pvState = '';
     if (pv) { pvFrame = document.createElement('div'); pvFrame.className = 'lib-pv-frame'; pvFrame.setAttribute('aria-hidden', 'true'); pv.insertBefore(pvFrame, pv.firstChild); }
+    // Licht auf dem weissen Papier der Projekt-Info (Hugo 22.11.): dieselben Sonnenstrahlen wie im Karussell
+    // fallen auf das Blatt. Eine Ebene unter dem Inhalt (multiply): Sonnenmuster, Regenbogensäume,
+    // Regenbogen eng an den Kanten. Eine Ebene über dem Inhalt (screen): angestrahlte Schrift leuchtet golden
+    // mit Prisma, wie auf der About-Seite. Beide aus einem kleinen eigenen WebGL-Bild.
+    var pvLight = (function () {
+      if (!pv || !pvFrame || !gl || !gl.RAYF || reduce) return null;
+      var g = document.createElement('canvas'), c = null;
+      try { c = g.getContext('webgl', { alpha: false, antialias: false, preserveDrawingBuffer: true }); } catch (e) {}
+      if (!c) return null;
+      function mk(cls, z, blend) {
+        var v = document.createElement('canvas'); v.className = cls; v.setAttribute('aria-hidden', 'true');
+        v.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:' + blend + ';z-index:' + z + ';opacity:0;transition:opacity .5s ease;';
+        return v;
+      }
+      var under = mk('lib-pv-sun', 0, 'multiply'), over = mk('lib-pv-glow', 50, 'screen');
+      pvFrame.parentNode.insertBefore(under, pvFrame.nextSibling); pv.appendChild(over);
+      var ux = under.getContext('2d'), ox = over.getContext('2d');
+      var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + gl.RAYF + '\n' + [
+        'uniform vec2 uRes; uniform float uOff; uniform float uMode; uniform vec4 uFr; uniform vec2 uOrg;',
+        'void main() {',
+        '  vec2 fc = gl_FragCoord.xy - vec2(uOff, 0.0); vec2 sp = fc + uOrg;',     // Bühnen-px, y nach oben
+        '  vec3 L = vec3(raysAt(sp, ' + CONFIG.prism.toFixed(3) + '), raysAt(sp, 0.0), raysAt(sp, -' + CONFIG.prism.toFixed(3) + ')) * 0.8 * uLA;',
+        '  float lg = clamp(L.g, 0.0, 1.0); float mn = min(L.r, min(L.g, L.b));',
+        '  vec2 q = sp / uViewH * 5.0;',
+        '  vec2 wq = vec2(rn2(q * 0.9 + vec2(uT * 0.11, -uT * 0.07)), rn2(q + vec2(-uT * 0.09, uT * 0.13) + 5.2));',
+        '  float sv = rn2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05)); float fil = pow(1.0 - abs(2.0 * sv - 1.0), 7.0);',
+        '  vec2 ep = min(fc - uFr.xy, uFr.zw - fc); float e = max(0.0, min(ep.x, ep.y));',
+        '  float band = exp(-e * e / 9.0) * step(0.0, min(ep.x, ep.y));',
+        '  vec2 cc = (uFr.xy + uFr.zw) * 0.5; float per = atan(fc.y - cc.y, fc.x - cc.x) / 6.2832;',
+        '  vec3 spec = 0.5 + 0.5 * cos(6.2832 * (per * 2.0 - uT * 0.08 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 col;',
+        '  if (uMode < 0.5) {',
+        '    vec3 pc = mix(vec3(0.955, 0.956, 0.962), vec3(1.0), clamp(lg, 0.0, 1.0));',
+        '    pc += (L - mn) * vec3(1.0, 0.85, 1.35) * 0.7;',
+        '    pc *= mix(1.0, 0.9 + 0.13 * sv - 0.04 * fil, clamp(lg * 1.6, 0.0, 1.0));',
+        '    pc = mix(pc, spec, band * (0.3 + 0.5 * lg));',
+        '    col = mix(vec3(1.0), pc / max(1.0, max(pc.r, max(pc.g, pc.b))), uLA);',   // multiply: nur abdunkeln und färben
+        '  } else {',
+        '    vec3 tl3 = smoothstep(vec3(0.3), vec3(0.95), L * (0.9 + 0.2 * sv));',
+        '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
+        '    col = vec3(1.0, 0.8, 0.62) * tm * 0.5 + (tl3 - tm) * vec3(1.0, 0.95, 1.25) * 0.7 + vec3(1.0, 0.85, 0.55) * fil * lg * 0.1;',
+        '  }',
+        '  gl_FragColor = vec4(col, 1.0);',
+        '}'].join('\n');
+      var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+      function sh(t, src) { var x = c.createShader(t); c.shaderSource(x, src); c.compileShader(x); return c.getShaderParameter(x, c.COMPILE_STATUS) ? x : null; }
+      var vs = sh(c.VERTEX_SHADER, VS), fs = sh(c.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) return null;
+      var p = c.createProgram(); c.attachShader(p, vs); c.attachShader(p, fs); c.linkProgram(p);
+      if (!c.getProgramParameter(p, c.LINK_STATUS)) return null;
+      c.useProgram(p);
+      var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
+      var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
+      var U = {}; ['uRes', 'uOff', 'uMode', 'uFr', 'uOrg', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var raf = 0, w = 0, h = 0, tail = 0;
+      function draw() {
+        raf = 0;
+        var on = root.classList.contains('is-pv');
+        under.style.opacity = over.style.opacity = on ? '1' : '0';
+        if (on) tail = 45; else if (--tail < 0) return;   // nach dem Schliessen noch kurz weiterzeichnen (Ausblenden)
+        var r = pv.getBoundingClientRect(), fr = pvFrame.getBoundingClientRect();
+        var nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));   // CSS-px: weiches Licht, Kanten bleiben fein genug
+        if (nw !== w || nh !== h) { w = under.width = over.width = nw; h = under.height = over.height = nh; g.width = 2 * w; g.height = h; }
+        // Lage auf der Bühne: Bühnen-x = Bildschirm-x − Bühne links; die Leinwand beginnt bei r.left/r.top
+        var sx = r.left + gl.ox, syTop = r.top + gl.oy;   // Bühnen-px der linken oberen Ecke
+        c.uniform2f(U.uRes, w, h);
+        c.uniform2f(U.uOrg, sx, gl.h - (syTop + h));
+        c.uniform4f(U.uFr, fr.left - r.left, h - (fr.bottom - r.top), fr.right - r.left, h - (fr.top - r.top));
+        sunU(c, U, lt.amt || 0);
+        c.viewport(0, 0, w, h); c.uniform1f(U.uOff, 0); c.uniform1f(U.uMode, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        c.viewport(w, 0, w, h); c.uniform1f(U.uOff, w); c.uniform1f(U.uMode, 1); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        // nur innerhalb des Blatts
+        var clip = 'inset(' + Math.max(0, fr.top - r.top).toFixed(1) + 'px ' + Math.max(0, r.right - fr.right).toFixed(1) + 'px ' + Math.max(0, r.bottom - fr.bottom).toFixed(1) + 'px ' + Math.max(0, fr.left - r.left).toFixed(1) + 'px)';
+        under.style.clipPath = over.style.clipPath = under.style.webkitClipPath = over.style.webkitClipPath = clip;
+        ux.drawImage(g, 0, 0, w, h, 0, 0, w, h); ox.drawImage(g, w, 0, w, h, 0, 0, w, h);
+        raf = requestAnimationFrame(draw);
+      }
+      return { start: function () { if (!raf) raf = requestAnimationFrame(draw); } };
+    })();
     var EASE_OPEN = 'cubic-bezier(.6,0,.1,1)';
     function box(r) { return 'translate(' + r.left + 'px,' + r.top + 'px) scale(' + (r.width / 100) + ',' + (r.height / 100) + ')'; }
     function frameTo(keys, ms, done) {
@@ -1283,6 +1366,7 @@
       if (!it || root.classList.contains('is-pv')) return;
       if (!pv) { location.href = it.href; return; }
       pvItem = it; lastFocus = document.activeElement; pvAt = performance.now();
+      if (pvLight) pvLight.start();
       setOpen(false);
       clearTimeout(pvTimer); clearTimeout(pvTimer2);
       if (pvMedia) { pvMedia.innerHTML = ''; pvMedia.appendChild(cloneImg(it.img)); }

@@ -898,8 +898,9 @@
           var bxx = br.left - rect.left + br.width * 0.45, byy = br.top - rect.top + br.height * 0.5;
           ha = Math.atan2(bxx - Sx, byy - Sy) + Math.sin(tm * 0.21) * 0.012;
           hw = Math.max(0.02, br.width * 0.42 / Math.max(1, Math.hypot(bxx - Sx, byy - Sy)));
-          hero = lightOn.want ? (reduce ? 1 : Math.min(1, (now - lightOn.t0) / 700)) : lo;
-          hero = hero * hero * (3 - 2 * hero);
+          // setzt erst nach 0.7 s an und kommt in 1.8 s weich mit den anderen Strahlen (Hugo 22.11.)
+          hero = lightOn.want ? (reduce ? 1 : Math.max(0, Math.min(1, (now - lightOn.t0 - 700) / 1800))) : lo;
+          hero = hero * hero * hero * (hero * (hero * 6 - 15) + 10);
         }
         c.uniform3f(U.uHero, ha, hw, hero);
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
