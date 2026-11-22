@@ -573,7 +573,7 @@
       src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
       rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
-      edge: [0.3, 0.8],          // Schärfe der Strahlen
+      edge: [0.38, 0.74],         // Schärfe der Strahlen
       reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
@@ -619,7 +619,7 @@
         'vec2 S;',
         'float beamAt(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y; float t = uTime;',
-        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  float r = 0.3 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0) + 0.32 * n1(ang * uRays.y * 2.3 - t * uDrift.x * 1.4 + 2.9);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
         '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
@@ -628,7 +628,7 @@
         '}',
         'float rayR(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
-        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  float r = 0.3 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0) + 0.32 * n1(ang * uRays.y * 2.3 - t * uDrift.x * 1.4 + 2.9);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  return smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r);',
         '}',
@@ -651,7 +651,7 @@
         '  float pH = mix(0.014, 0.075, dT) * uRes.y;',
         '  float pool = exp(-pow((fc.y - hitY) / pH, 2.0));',
         '  float ray = rayR(fc);',
-        '  beam = beam * mix(1.0, 0.2 + 0.8 * air, grd) + ray * pool * grd * (1.0 + 0.6 * dT);',
+        '  beam = beam * mix(1.0, 0.5 + 0.5 * air, grd) + ray * pool * grd * (1.0 + 0.6 * dT);',
         // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
         '  float occ = 0.0, caus = 0.0;',
         '  if (uOccOn > 0.0) {',
