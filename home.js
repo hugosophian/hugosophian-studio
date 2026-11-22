@@ -48,7 +48,7 @@
     mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
     mbFrom:     60,     // px/s, darunter scharf
     mbSpeed:    1800,   // px/s, ab hier volle Verwischung (wie die Galerie)
-    mbRainbow:  3.0,    // Farbstärke der Zwischenbilder (1 = kaum, 4 = kräftig)
+    mbRainbow:  3.6,    // Farbstärke der Zwischenbilder (1 = kaum, 4 = kräftig)
     mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
@@ -334,7 +334,7 @@
 
     // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario)
     // Zwischenbilder gleichmässig um das Bild verteilt (oben/unten), zusammen wirken sie wie eine senkrechte Verwischung
-    function ghostBlur(s, L) {
+    function ghostBlur(s, L, m) {
       var g = s.ghosts; if (!g || !g.length) return;
       if (L < 0.6) { if (s.gOn) { for (var i = 0; i < g.length; i++) g[i].style.opacity = '0'; s.gOn = false; } return; }
       s.gOn = true;
@@ -342,7 +342,10 @@
       for (var k = 0; k < N; k++) {
         var f = (k + 0.5) / N - 0.5;                 // −0.5 … 0.5
         g[k].style.transform = 'translate3d(0,' + (f * 2 * L).toFixed(2) + 'px,0)';
-        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f)) * (g[k].hasAttribute('data-c') ? 0.6 : 1)).toFixed(3);
+        // Regenbogen (Hugo 22.11.): bei langsamem Wischen ein Hauch, bei schnellem kräftig
+        var col = g[k].hasAttribute('data-c');
+        if (col) g[k].style.transform = 'translate3d(0,' + (f * 2 * L * (1 + 0.5 * m)).toFixed(2) + 'px,0)';
+        g[k].style.opacity = (col ? Math.min(0.42, a * (0.08 + 0.36 * m * m)) : a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
       }
     }
     var mbF = 0, mbV = 0;
@@ -363,7 +366,7 @@
         s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
         s.el.style.clipPath = '';
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
-        ghostBlur(s, L / z);
+        ghostBlur(s, L / z, m);
         if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)';
       }
     }
