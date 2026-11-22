@@ -47,7 +47,7 @@
     // Bewegungsunschärfe beim Wischen (Hugo 22.11., wie in der Galerie): Bild verwischt senkrecht, je schneller desto stärker
     mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
     mbFrom:     60,     // px/s, darunter scharf
-    mbSpeed:    2200,   // px/s, ab hier volle Verwischung
+    mbSpeed:    1800,   // px/s, ab hier volle Verwischung (wie die Galerie)
     mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten

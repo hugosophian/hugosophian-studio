@@ -70,7 +70,7 @@
     sunMorph:   1.8,    // s … und sinkt hinter die Bildreihe
     paper:      [0.93, 0.932, 0.94],     // weisser Rahmen im Schatten: milchiges Papier
     paperLit:   [1.0, 0.975, 0.93],     // im Sonnenlicht
-    prism:      0.02,   // Farbzerlegung (Winkel), wie auf der About-Seite
+    prism:      0.017,  // Farbzerlegung (Winkel), wie auf der About-Seite
     rayFollow:  0.15,   // Sonne rückt nur leicht zum Finger, dafür kommt ein Strahl in seine Richtung
 
     rayFollowOld: 0.45,  // so weit wandert das Licht Richtung Finger/Maus (Anteil des Abstands)
