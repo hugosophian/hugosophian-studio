@@ -84,6 +84,7 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
+    '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
     /* Schrift erbt „Alle Projekte“ in der Library vom Eltern-Element lib-top, darum hier dieselben Werte (live gemessen) */
@@ -548,6 +549,112 @@
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
+    // ---------- Sonnenlicht hinter dem About-Text (Hugo 22.11., nachgebaut nach bethebuzz.co, Footer) ----------
+    // Dort: eine three.js-Fläche, deren Höhe ein gestrecktes, gedrehtes Rauschen ist
+    //   pos = drehen(xy, uAngle) · (uFoldFactor 4, 0.5) − (cos(t · 0.75), −t · 2.25); höhe = clamp(noise(pos · 0.5), 0.4, 1)
+    //   Farbe = mix(Bild · (1 − 0.9), Bild · 1.1, höhe), die Mausspur drückt die Fläche ein (dunkler).
+    // Hier dasselbe pro Bildpunkt, warm statt blau: helle, leicht goldene Sonnenbahnen auf gebrochenem Weiss,
+    // von oben links schräg einfallend. Der Finger (bzw. die Maus) wirft einen weichen Schatten in die Bahnen.
+    var SUN = {
+      angle: 0.6,                // Richtung der Bahnen (rad): von oben links nach unten rechts (bethebuzz 0.349)
+      fold: 4,                   // Bahnen schmal quer, lang längs (bethebuzz 4)
+      speed: [0.5, 1.1],         // Wiegen quer, Wandern längs (bethebuzz 0.75 / 2.25, hier ruhiger)
+      scale: 5.2,                // Bildschirmhöhe in Welteinheiten (bethebuzz: Kamera 5, Sichtwinkel 55°)
+      shade: [0.905, 0.89, 0.86] ,   // Schatten: warmes Grauweiss
+      lit:   [1.0, 0.972, 0.90],      // Licht: warmes Sonnenweiss
+      glow:  [1.0, 0.88, 0.62],       // goldener Schein oben links (Sonne)
+      glowAmt: 0.22,
+      trailR: 0.2,               // Fingerschatten: Radius als Anteil der kleineren Seite
+      trailLife: 0.7,            // s, so lange bleibt die Spur
+      trailAmt: 0.85,
+      res: 0.75                  // Auflösung (weiches Licht braucht keine volle Schärfe)
+    };
+    var sun = (function () {
+      var cv = document.createElement('canvas');
+      cv.className = 'hp-info-sun'; cv.setAttribute('aria-hidden', 'true');
+      var c = null;
+      try { c = cv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false }); } catch (e) {}
+      if (!c) return null;
+      var NT = 12;
+      var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+      var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
+        'uniform vec2 uRes; uniform float uTime; uniform float uAngle; uniform float uFold; uniform vec2 uSpeed; uniform float uScale;',
+        'uniform vec3 uShade; uniform vec3 uLit; uniform vec3 uGlow; uniform float uGlowAmt; uniform float uTrailAmt;',
+        'uniform vec4 uTrail[' + NT + '];',
+        'float rand(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float noise(vec2 n) { const vec2 d = vec2(0.0, 1.0); vec2 b = floor(n), f = smoothstep(vec2(0.0), vec2(1.0), fract(n));',
+        '  return mix(mix(rand(b), rand(b + d.yx), f.x), mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y); }',
+        'void main() {',
+        '  vec2 fc = gl_FragCoord.xy;',
+        '  vec2 w = (fc - 0.5 * uRes) / uRes.y * uScale;',
+        '  float a = atan(w.y, w.x) + uAngle; vec2 r = vec2(cos(a), sin(a)) * length(w);',
+        '  vec2 pn = vec2(r.x * uFold - cos(uTime * uSpeed.x), r.y * 0.5 + uTime * uSpeed.y);',
+        '  float e = clamp(noise(pn * 0.5), 0.4, 1.0);',
+        '  float sh = 0.0;',
+        '  for (int i = 0; i < ' + NT + '; i++) { vec4 t = uTrail[i]; vec2 d = (fc - t.xy) / max(t.w, 1.0); sh += t.z * exp(-dot(d, d)); }',
+        '  e = max(0.4, e - min(sh, 1.0) * uTrailAmt);',
+        '  float k = (e - 0.4) / 0.6;',
+        '  vec3 col = mix(uShade, uLit, k);',
+        '  vec2 q = fc / uRes; float g = exp(-length((q - vec2(0.0, 1.0)) * vec2(1.0, uRes.y / uRes.x)) * 2.2);',   // Sonne oben links
+        '  col = mix(col, col * uGlow, g * uGlowAmt * (0.35 + 0.65 * k));',
+        '  col += (uLit - uShade) * g * 0.6 * k;',
+        '  gl_FragColor = vec4(col, 1.0);',
+        '}'].join('\n');
+      function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
+      var vs = sh(c.VERTEX_SHADER, VS), fs = sh(c.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) return null;
+      var pr = c.createProgram(); c.attachShader(pr, vs); c.attachShader(pr, fs); c.linkProgram(pr);
+      if (!c.getProgramParameter(pr, c.LINK_STATUS)) return null;
+      c.useProgram(pr);
+      var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
+      var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
+      var U = {}; ['uRes', 'uTime', 'uAngle', 'uFold', 'uSpeed', 'uScale', 'uShade', 'uLit', 'uGlow', 'uGlowAmt', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      c.uniform1f(U.uAngle, SUN.angle); c.uniform1f(U.uFold, SUN.fold); c.uniform2f(U.uSpeed, SUN.speed[0], SUN.speed[1]); c.uniform1f(U.uScale, SUN.scale);
+      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uGlow, SUN.glow); c.uniform1f(U.uGlowAmt, SUN.glowAmt); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
+      var trail = [], tbuf = new Float32Array(NT * 4), raf = 0, t0 = performance.now(), cw = 0, chh = 0;
+      function size() {
+        var w = Math.max(1, Math.round(cv.clientWidth * SUN.res)), h = Math.max(1, Math.round(cv.clientHeight * SUN.res));
+        if (w !== cw || h !== chh) { cw = cv.width = w; chh = cv.height = h; c.viewport(0, 0, w, h); }
+      }
+      function draw(now) {
+        size();
+        var tm = reduce ? 3.0 : (now - t0) / 1000;
+        var rect = cv.getBoundingClientRect(), sx = cw / Math.max(1, rect.width), r = SUN.trailR * Math.min(cw, chh);
+        trail = trail.filter(function (p) { return now - p.t < SUN.trailLife * 1000; });
+        for (var i = 0; i < NT; i++) {
+          var p = trail[trail.length - 1 - i];
+          if (p) {
+            var life = 1 - (now - p.t) / (SUN.trailLife * 1000);
+            tbuf[i * 4] = (p.x - rect.left) * sx; tbuf[i * 4 + 1] = chh - (p.y - rect.top) * sx;
+            tbuf[i * 4 + 2] = life * life * 0.9; tbuf[i * 4 + 3] = r;
+          } else { tbuf[i * 4 + 2] = 0; tbuf[i * 4 + 3] = 1; }
+        }
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform4fv(U.uTrail, tbuf);
+        c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+      }
+      function loop(now) {
+        raf = 0;
+        if (ip.v >= 1 && !root.classList.contains('is-info')) return;   // Seite zu: nichts zeichnen
+        draw(now);
+        if (!reduce || trail.length) raf = requestAnimationFrame(loop);
+      }
+      function point(e) {
+        if (reduce || !root.classList.contains('is-info')) return;
+        var now = performance.now(), last = trail[trail.length - 1];
+        if (last && Math.abs(last.x - e.clientX) + Math.abs(last.y - e.clientY) < 6 && now - last.t < 40) return;
+        trail.push({ x: e.clientX, y: e.clientY, t: now });
+        if (trail.length > 40) trail.shift();
+        if (!raf) raf = requestAnimationFrame(loop);
+      }
+      window.addEventListener('pointermove', point, { passive: true });
+      window.addEventListener('pointerdown', point, { passive: true });
+      return { cv: cv, start: function () { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } } };
+    })();
+    if (sun) {
+      info.insertBefore(sun.cv, infoPanel);
+      infoPanel.style.background = 'transparent';
+    }
+
     var tClone = null, tOrig = null, infoT = 0;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
@@ -563,6 +670,7 @@
     var brand = root.querySelector('.hp-brand');
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
+      if (sun) { sun.cv.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
       // Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
     }
