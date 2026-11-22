@@ -549,25 +549,25 @@
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
-    // ---------- Sonnenlicht hinter dem About-Text (Hugo 22.11., nachgebaut nach bethebuzz.co, Footer) ----------
-    // Dort: eine three.js-Fläche, deren Höhe ein gestrecktes, gedrehtes Rauschen ist
-    //   pos = drehen(xy, uAngle) · (uFoldFactor 4, 0.5) − (cos(t · 0.75), −t · 2.25); höhe = clamp(noise(pos · 0.5), 0.4, 1)
-    //   Farbe = mix(Bild · (1 − 0.9), Bild · 1.1, höhe), die Mausspur drückt die Fläche ein (dunkler).
-    // Hier dasselbe pro Bildpunkt, warm statt blau: helle, leicht goldene Sonnenbahnen auf gebrochenem Weiss,
-    // von oben links schräg einfallend. Der Finger (bzw. die Maus) wirft einen weichen Schatten in die Bahnen.
+    // ---------- Sonnenstrahlen hinter dem About-Text (Hugo 22.11.) ----------
+    // Licht, das durch eine Wolkenlücke oben links (ausserhalb des Bildes) fächerförmig herabfällt.
+    // Pro Bildpunkt: Winkel zur Lichtquelle → Rauschen über den Winkel = einzelne Strahlen mit Lücken,
+    // die langsam wandern und atmen. Helligkeit nimmt mit der Entfernung zur Quelle ab, entlang der
+    // Strahlen flimmert leichter Dunst. Der Finger steht im Licht und wirft einen Schatten vom Licht weg.
     var SUN = {
-      angle: 0.6,                // Richtung der Bahnen (rad): von oben links nach unten rechts (bethebuzz 0.349)
-      fold: 4,                   // Bahnen schmal quer, lang längs (bethebuzz 4)
-      speed: [0.5, 1.1],         // Wiegen quer, Wandern längs (bethebuzz 0.75 / 2.25, hier ruhiger)
-      scale: 5.2,                // Bildschirmhöhe in Welteinheiten (bethebuzz: Kamera 5, Sichtwinkel 55°)
-      shade: [0.905, 0.89, 0.86] ,   // Schatten: warmes Grauweiss
-      lit:   [1.0, 0.972, 0.90],      // Licht: warmes Sonnenweiss
-      glow:  [1.0, 0.88, 0.62],       // goldener Schein oben links (Sonne)
-      glowAmt: 0.22,
-      trailR: 0.2,               // Fingerschatten: Radius als Anteil der kleineren Seite
-      trailLife: 0.7,            // s, so lange bleibt die Spur
-      trailAmt: 0.85,
-      res: 0.75                  // Auflösung (weiches Licht braucht keine volle Schärfe)
+      src: [0.12, -0.2] ,        // Lichtquelle: Anteil Breite, Anteil Höhe über dem oberen Rand
+      rays: [7, 19]  ,            // Strahldichte (grobe / feine Strahlen)
+      drift: [0.035, -0.055],    // wie schnell die Strahlen wandern
+      edge: [0.3, 0.86] ,        // Schärfe der Strahlen (enger = härter)
+      reach: 2.2,                // wie weit die Strahlen nach unten reichen
+      strength: 1.25,
+      top: [0.93, 0.915, 0.885], // Himmel oben (warm)
+      bottom: [0.86, 0.855, 0.85], // unten (kühler, etwas dunkler, damit das Licht sichtbar wird)
+      lit: [1.0, 0.972, 0.905],  // Sonnenlicht
+      shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
+      trailLife: 0.9,            // s
+      trailAmt: 0.75,
+      res: 0.6                   // Auflösung (weiches Licht braucht keine volle Schärfe)
     };
     var sun = (function () {
       var cv = document.createElement('canvas');
@@ -575,29 +575,41 @@
       var c = null;
       try { c = cv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false }); } catch (e) {}
       if (!c) return null;
-      var NT = 12;
+      var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uTime; uniform float uAngle; uniform float uFold; uniform vec2 uSpeed; uniform float uScale;',
-        'uniform vec3 uShade; uniform vec3 uLit; uniform vec3 uGlow; uniform float uGlowAmt; uniform float uTrailAmt;',
-        'uniform vec4 uTrail[' + NT + '];',
-        'float rand(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
-        'float noise(vec2 n) { const vec2 d = vec2(0.0, 1.0); vec2 b = floor(n), f = smoothstep(vec2(0.0), vec2(1.0), fract(n));',
-        '  return mix(mix(rand(b), rand(b + d.yx), f.x), mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y); }',
+        'uniform vec2 uRes; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform float uReach; uniform float uStrength; uniform vec3 uTop; uniform vec3 uBottom; uniform vec3 uLit;',
+        'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
+        'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
+        'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
+        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+        '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy;',
-        '  vec2 w = (fc - 0.5 * uRes) / uRes.y * uScale;',
-        '  float a = atan(w.y, w.x) + uAngle; vec2 r = vec2(cos(a), sin(a)) * length(w);',
-        '  vec2 pn = vec2(r.x * uFold - cos(uTime * uSpeed.x), r.y * 0.5 + uTime * uSpeed.y);',
-        '  float e = clamp(noise(pn * 0.5), 0.4, 1.0);',
+        '  vec2 fc = gl_FragCoord.xy; vec2 q = fc / uRes;',
+        '  vec2 s = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',   // Quelle über dem oberen Rand
+        '  vec2 d = fc - s; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
+        '  float t = uTime;',
+        '  float r = 0.62 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  r *= 0.8 + 0.4 * n1(t * 0.13 + ang * 3.0);',                // Strahlen atmen
+        '  r = smoothstep(uEdge.x, uEdge.y, r);',
+        '  r *= 0.7 + 0.3 * n2(vec2(ang * 18.0, dist * 2.5 - t * 0.12));',   // Dunst entlang der Strahlen
+        '  float fall = exp(-max(dist - 0.3, 0.0) / uReach);',
+        '  float glow = exp(-dist * 2.6);',
         '  float sh = 0.0;',
-        '  for (int i = 0; i < ' + NT + '; i++) { vec4 t = uTrail[i]; vec2 d = (fc - t.xy) / max(t.w, 1.0); sh += t.z * exp(-dot(d, d)); }',
-        '  e = max(0.4, e - min(sh, 1.0) * uTrailAmt);',
-        '  float k = (e - 0.4) / 0.6;',
-        '  vec3 col = mix(uShade, uLit, k);',
-        '  vec2 q = fc / uRes; float g = exp(-length((q - vec2(0.0, 1.0)) * vec2(1.0, uRes.y / uRes.x)) * 2.2);',   // Sonne oben links
-        '  col = mix(col, col * uGlow, g * uGlowAmt * (0.35 + 0.65 * k));',
-        '  col += (uLit - uShade) * g * 0.6 * k;',
+        '  for (int i = 0; i < ' + NT + '; i++) {',
+        '    vec3 p = uTrail[i]; if (p.z <= 0.0) continue;',
+        '    vec2 pd = p.xy - s; float pa = atan(pd.x, -pd.y); float pdist = length(pd) / uRes.y;',
+        '    float w = uShadowW / max(pdist, 0.05);',
+        '    float behind = smoothstep(-0.02, 0.04, dist - pdist) * exp(-max(dist - pdist, 0.0) * 1.2);',
+        '    float da = (ang - pa) / w;',
+        '    sh = max(sh, p.z * behind * exp(-da * da));',
+        '  }',
+        '  float light = clamp((r * fall + glow * 0.9) * uStrength, 0.0, 1.0) * (1.0 - sh * uTrailAmt);',
+        '  vec3 base = mix(uBottom, uTop, q.y);',
+        '  vec3 col = mix(base, uLit, light);',
+        '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',                 // gegen Farbstufen
         '  gl_FragColor = vec4(col, 1.0);',
         '}'].join('\n');
       function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
@@ -608,28 +620,29 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uTime', 'uAngle', 'uFold', 'uSpeed', 'uScale', 'uShade', 'uLit', 'uGlow', 'uGlowAmt', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
-      c.uniform1f(U.uAngle, SUN.angle); c.uniform1f(U.uFold, SUN.fold); c.uniform2f(U.uSpeed, SUN.speed[0], SUN.speed[1]); c.uniform1f(U.uScale, SUN.scale);
-      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uGlow, SUN.glow); c.uniform1f(U.uGlowAmt, SUN.glowAmt); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
-      var trail = [], tbuf = new Float32Array(NT * 4), raf = 0, t0 = performance.now(), cw = 0, chh = 0;
+      var U = {}; ['uRes', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uTop', 'uBottom', 'uLit', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
+      c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength);
+      c.uniform3fv(U.uTop, SUN.top); c.uniform3fv(U.uBottom, SUN.bottom); c.uniform3fv(U.uLit, SUN.lit);
+      c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
+      var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
       function size() {
         var w = Math.max(1, Math.round(cv.clientWidth * SUN.res)), h = Math.max(1, Math.round(cv.clientHeight * SUN.res));
         if (w !== cw || h !== chh) { cw = cv.width = w; chh = cv.height = h; c.viewport(0, 0, w, h); }
       }
       function draw(now) {
         size();
-        var tm = reduce ? 3.0 : (now - t0) / 1000;
-        var rect = cv.getBoundingClientRect(), sx = cw / Math.max(1, rect.width), r = SUN.trailR * Math.min(cw, chh);
+        var tm = reduce ? 40.0 : (now - t0) / 1000;
+        var rect = cv.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
         trail = trail.filter(function (p) { return now - p.t < SUN.trailLife * 1000; });
         for (var i = 0; i < NT; i++) {
           var p = trail[trail.length - 1 - i];
           if (p) {
             var life = 1 - (now - p.t) / (SUN.trailLife * 1000);
-            tbuf[i * 4] = (p.x - rect.left) * sx; tbuf[i * 4 + 1] = chh - (p.y - rect.top) * sx;
-            tbuf[i * 4 + 2] = life * life * 0.9; tbuf[i * 4 + 3] = r;
-          } else { tbuf[i * 4 + 2] = 0; tbuf[i * 4 + 3] = 1; }
+            tbuf[i * 3] = (p.x - rect.left) * sx; tbuf[i * 3 + 1] = chh - (p.y - rect.top) * sx; tbuf[i * 3 + 2] = life * life;
+          } else tbuf[i * 3 + 2] = 0;
         }
-        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform4fv(U.uTrail, tbuf);
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
       }
       function loop(now) {
@@ -640,10 +653,11 @@
       }
       function point(e) {
         if (reduce || !root.classList.contains('is-info')) return;
+        if (e.pointerType === 'touch' && e.type === 'pointermove' && !e.isPrimary) return;
         var now = performance.now(), last = trail[trail.length - 1];
-        if (last && Math.abs(last.x - e.clientX) + Math.abs(last.y - e.clientY) < 6 && now - last.t < 40) return;
+        if (last && Math.abs(last.x - e.clientX) + Math.abs(last.y - e.clientY) < 8 && now - last.t < 50) { last.t = now; return; }
         trail.push({ x: e.clientX, y: e.clientY, t: now });
-        if (trail.length > 40) trail.shift();
+        if (trail.length > 30) trail.shift();
         if (!raf) raf = requestAnimationFrame(loop);
       }
       window.addEventListener('pointermove', point, { passive: true });
