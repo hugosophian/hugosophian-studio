@@ -56,13 +56,18 @@
     rays:       true,
     rayRes:     0.35,   // Auflösung der Strahlen (Anteil der Bildschirm-Punkte), weich hochgerechnet
     raySamples: 60,     // madebyigor (GodRaysEffect): 60
-    rayExposure: 0.6, rayDecay: 1.0, rayDensity: 1.0, rayWeight: 0.3, rayClamp: 0.45,   // wie madebyigor, nur heller begrenzt (Titel bleibt lesbar)
+    rayExposure: 0.6, rayDecay: 0.97, rayDensity: 1.0, rayWeight: 0.3, rayClamp: 0.45,   // wie madebyigor, nur heller begrenzt (Titel bleibt lesbar)
     sunSize:    1.5,    // Durchmesser der Lichtquelle als Anteil der kleineren Bildschirmseite
     sunGlow:    0.075,  // Helligkeit der Lichtquelle (madebyigor 0.058)
+    // Leuchttisch (Hugo 22.11.): hinter der Bildreihe liegt ein Lichtband wie hinter einem Filmstreifen.
+    // Es scheint zwischen den Bildern und an ihren Rändern hervor, die Strahlen gehen nach oben und unten weg.
+    band:       0.85,   // halbe Höhe des Lichtbands als Anteil der Bildhöhe
+    bandGlow:   0.13,   // Helligkeit des Bands
+    rayFan:     0.45,   // 0 = Strahlen senkrecht vom Band weg, 1 = alle zu einem Punkt (wie vorher)
     rayColor:   [1, 1, 1],
     rayFollow:  0.45,   // so weit wandert das Licht Richtung Finger/Maus (Anteil des Abstands)
     rayEase:    0.17,   // Zeitkonstante (s) fürs Nachziehen (madebyigor ≈ 0.17 s)
-    rayFadeIn:  1.2,    // s, Strahlen blenden mit dem Eintritt ein
+    rayFadeIn:  1.6,    // s, das Licht geht an, wenn die Reihe gelandet ist
     grain:      0.35,   // Filmkorn in den Strahlen
     gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
@@ -354,7 +359,7 @@
         var HP = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
         var QV = 'attribute vec2 aPos; varying vec2 vUv; void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }';
         var SUN = HP + [
-          'uniform vec2 uRes; uniform vec2 uLight; uniform float uRad; uniform float uTime; uniform float uGlow;',
+          'uniform vec2 uRes; uniform vec2 uLight; uniform float uRad; uniform float uTime; uniform float uGlow; uniform vec2 uBand;',
           'varying vec2 vUv;',
           'float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }',
           'float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
@@ -365,14 +370,17 @@
           '  vec2 d = (vUv * uRes - uLight) / uRad;',
           '  float g = smoothstep(0.5, 0.0, length(d)); g = g * g * g;',
           '  float nz = mix(0.5, 1.0, n3(vec3(d * 6.0, uTime * 0.5)));',
-          '  gl_FragColor = vec4(vec3(uGlow * g * nz), 1.0);',
+          '  vec2 px = vUv * uRes; float dy = (px.y - uBand.x) / uBand.y;',
+          '  float band = exp(-dy * dy * 2.0) * (0.6 + 0.4 * exp(-pow((px.x - uLight.x) / (uRes.x * 0.6), 2.0)));',
+          '  float nb = mix(0.75, 1.0, n3(vec3(px.x / uRes.y * 5.0, dy, uTime * 0.4)));',
+          '  gl_FragColor = vec4(vec3(uGlow * g * nz + uBand.y / max(uBand.y, 1.0) * ' + CONFIG.bandGlow.toFixed(3) + ' * band * nb), 1.0);',
           '}'].join('\n');
         var NS = Math.max(8, Math.round(CONFIG.raySamples));
         var RAY = 'precision mediump float;\n' + [
-          'uniform sampler2D uOcc; uniform vec2 uLightUv; uniform vec4 uPar;',    // exposure, decay, density, weight
+          'uniform sampler2D uOcc; uniform vec2 uLightUv; uniform vec4 uPar; uniform float uFan;',    // exposure, decay, density, weight
           'uniform float uClamp; varying vec2 vUv;',
           'void main() {',
-          '  vec2 tc = vUv; vec2 dl = (tc - uLightUv) * (uPar.z / ' + NS + '.0);',
+          '  vec2 tc = vUv; vec2 lu = vec2(mix(tc.x, uLightUv.x, uFan), uLightUv.y); vec2 dl = (tc - lu) * (uPar.z / ' + NS + '.0);',
           '  float il = 1.0; vec3 col = vec3(0.0);',
           '  for (int i = 0; i < ' + NS + '; i++) { tc -= dl; col += texture2D(uOcc, tc).rgb * il * uPar.w; il *= uPar.y; }',
           '  gl_FragColor = vec4(clamp(col * uPar.x, 0.0, uClamp), 1.0);',
@@ -397,8 +405,8 @@
           var u = {}; names.forEach(function (k) { u[k] = c.getUniformLocation(p, k); });
           return { p: p, u: u };
         }
-        var sun = mk(SUN, ['uRes', 'uLight', 'uRad', 'uTime', 'uGlow']);
-        var ray = mk(RAY, ['uOcc', 'uLightUv', 'uPar', 'uClamp']);
+        var sun = mk(SUN, ['uRes', 'uLight', 'uRad', 'uTime', 'uGlow', 'uBand']);
+        var ray = mk(RAY, ['uOcc', 'uLightUv', 'uPar', 'uClamp', 'uFan']);
         var comp = mk(COMP, ['uRays', 'uTexel', 'uTime', 'uGrain', 'uAmt', 'uColor']);
         if (!sun || !ray || !comp) return null;
         var qb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, qb); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
@@ -593,6 +601,7 @@
         c.useProgram(R.sun.p); c.blendFunc(c.ONE, c.ONE);
         c.uniform2f(R.sun.u.uRes, gl.w, gl.h); c.uniform2f(R.sun.u.uLight, lx, ly);
         c.uniform1f(R.sun.u.uRad, CONFIG.sunSize * Math.min(gl.w, gl.h)); c.uniform1f(R.sun.u.uTime, tm); c.uniform1f(R.sun.u.uGlow, CONFIG.sunGlow);
+        c.uniform2f(R.sun.u.uBand, gl.h - (lt.by - gl.oy), Math.max(8, lt.bh * CONFIG.band));
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         c.disableVertexAttribArray(1); c.enableVertexAttribArray(gl.loc);
         c.useProgram(gl.pr); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
@@ -603,7 +612,7 @@
         c.useProgram(R.ray.p); c.disable(c.BLEND);
         c.bindTexture(c.TEXTURE_2D, R.a.t); c.uniform1i(R.ray.u.uOcc, 0);
         c.uniform2f(R.ray.u.uLightUv, lx / gl.w, ly / gl.h);
-        c.uniform4f(R.ray.u.uPar, CONFIG.rayExposure, CONFIG.rayDecay, CONFIG.rayDensity, CONFIG.rayWeight); c.uniform1f(R.ray.u.uClamp, CONFIG.rayClamp);
+        c.uniform4f(R.ray.u.uPar, CONFIG.rayExposure, CONFIG.rayDecay, CONFIG.rayDensity, CONFIG.rayWeight); c.uniform1f(R.ray.u.uClamp, CONFIG.rayClamp); c.uniform1f(R.ray.u.uFan, CONFIG.rayFan);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         // 3) auf den Bildschirm, mit Filmkorn, dann die Karten darüber
         c.bindFramebuffer(c.FRAMEBUFFER, null); c.viewport(0, 0, gl.cv.width, gl.cv.height);
@@ -623,15 +632,16 @@
       cards(0);
     }
     // Licht: Ruhelage hinter der Reihenmitte, zieht weich zum Finger (solange er liegt) bzw. zur Maus
-    var lt = { x: 0, y: 0, fx: 0, fy: 0, on: false, down: false, init: false, t: 0, amt: 0, t0: 0 };
+    var lt = { x: 0, y: 0, fx: 0, fy: 0, on: false, down: false, init: false, t: 0, amt: 0, t0: 0, by: 0, bh: 0, pvf: 1 };
     window.addEventListener('pointermove', function (e) { if ((e.pointerType === 'mouse' && (e.clientX || e.clientY)) || lt.down) { lt.fx = e.clientX; lt.fy = e.clientY; lt.on = true; } }, { passive: true });
     window.addEventListener('pointerdown', function (e) { lt.down = true; lt.fx = e.clientX; lt.fy = e.clientY; lt.on = true; }, { passive: true });
     ['pointerup', 'pointercancel'].forEach(function (ev) { window.addEventListener(ev, function (e) { lt.down = false; if (e.pointerType !== 'mouse') lt.on = false; }, { passive: true }); });
     document.documentElement.addEventListener('mouseleave', function () { lt.on = false; });
     function rayAmount(list) {
       var now = performance.now(), dt = lt.t ? Math.min(0.05, (now - lt.t) / 1000) : 1 / 60; lt.t = now;
-      var ry = 0, n = 0;
-      for (var k = 0; k < list.length; k++) { ry += list[k].y; n++; }
+      var ry = 0, n = 0, ch = 0;
+      for (var k = 0; k < list.length; k++) { ry += list[k].y; ch += list[k].ch || 0; n++; }
+      if (n) { lt.by = ry / n; lt.bh = ch / n || H * 0.3; }   // Lichtband: Mitte und Höhe der Reihe
       var rx = W / 2; ry = n ? ry / n : H * 0.45;
       var tx = rx, ty = ry;
       if (lt.on) { var fx = lt.fx + gl.ox, fy = lt.fy + gl.oy; tx = rx + (fx - rx) * CONFIG.rayFollow; ty = ry + (fy - ry) * CONFIG.rayFollow; }   // Finger in Bühnen-Koordinaten
@@ -639,8 +649,13 @@
       if (!lt.init) { lt.x = tx; lt.y = ty; lt.init = true; }
       var k2 = 1 - Math.exp(-dt / CONFIG.rayEase);
       lt.x += (tx - lt.x) * k2; lt.y += (ty - lt.y) * k2;
+      // erst an, wenn die Reihe gelandet ist (beim Drehen kein grauer Dunst); in der Vorschau weich aus (kein Aufblitzen)
+      if (mode === 'intro') { lt.t0 = 0; return 0; }
       if (!lt.t0) lt.t0 = now;
-      return Math.min(1, (now - lt.t0) / 1000 / CONFIG.rayFadeIn);
+      var pvOn = root.classList.contains('is-pv');
+      lt.pvf += ((pvOn ? 0 : 1) - lt.pvf) * (1 - Math.exp(-dt / 0.25));
+      var f = Math.min(1, (now - lt.t0) / 1000 / CONFIG.rayFadeIn);
+      return f * f * (3 - 2 * f) * lt.pvf;
     }
 
     // ---------- Zeichnen ----------
