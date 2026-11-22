@@ -84,13 +84,10 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
-    '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -5px 11px 14px rgba(70,55,35,.16); }',
-    '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -4px 9px 12px rgba(70,55,35,.15); }',
     '[data-hp] .hp-sun-light { z-index: 2; mix-blend-mode: screen; }',
     '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
     '[data-hp] .hp-sun-back .hp-sun-wall { left: 0; top: 0; width: 100%; height: 100%; }',
     '[data-hp] .hp-sun-back .hp-sun-glass { display: none; }',
-    '[data-hp] .hp-info-sunlit .hp-tilt { transform: perspective(900px) rotateX(24deg); transform-origin: 50% 100%; }',
     '[data-hp] .hp-info-go { position: relative; }',
     // Schatten von «Galerie öffnen»: Licht von hinten → Schatten fällt nach vorne auf den Boden, gespiegelt, lang
     // gezogen und zum Betrachter hin breiter; nur sichtbar, solange ein Strahl den Button trifft (--hp-lit).
@@ -564,40 +561,36 @@
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
-    // ---------- Sonnenlicht im Tal hinter dem About-Text (Hugo 22.11.) ----------
-    // Eine kleine echte 3D-Szene, pro Bildpunkt gerechnet:
-    //   Kamera schaut leicht von oben in ein Tal. Ganz hinten steht eine Wand (der Hügel), auf ihr der Titel.
-    //   Die Sonne steht tief rechts hinter dem Hügel. Über dem Tal zieht eine Wolkenschicht mit Lücken.
-    //   Für jeden Punkt im Dunst und am Boden wird zur Sonne geschaut: liegt eine Wolke oder ein Buchstabe
-    //   dazwischen? So entstehen Lichtstrahlen im Dunst UND die passenden Lichtflecken am Boden, ganz von selbst.
-    //   Der Text liegt im Tal am Boden: wo die Sonne ihn trifft, leuchtet er golden (zweite Ebene, screen).
-    //   Finger und «Galerie öffnen» werfen ihre Schatten richtig über den Boden, weg von der Sonne.
+    // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
+    // Wie Morgensonne durch Dunst (Hugos Bild): Licht fällt von oben durch eine Wolkendecke in Strahlen auf
+    // die weisse Wand. Der Titel steht leicht gedreht im Raum, hat Tiefe und wirft lange Schattenstreifen,
+    // zwischen den Buchstaben strahlt das Licht durch. Wo ein Strahl über den Text läuft, leuchtet er warm auf.
+    //   Ebene 1 (unter dem Text): Wand mit Strahlen, Wolkenschatten und Titelschatten
+    //   Ebene 2 (über dem Text, mix-blend-mode: screen): nur das Licht. Auf Weiss ändert es nichts,
+    //   schwarze Schrift wird dort goldbraun angestrahlt.
+    // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
-      sun: [0.5, 0.115, -1.0],   // Richtung zur Sonne (rechts, tief, hinten). Höher = kürzere Schatten
-      camH: 1.5,                 // Augenhöhe über dem Boden
-      far: 8,                    // Abstand zur Hügelwand
-      fov: 1.35,                 // Brennweite (grösser = enger)
-      cloudH: 4.2,               // Höhe der Wolkenschicht
-      cloudScale: 1.1,           // Grösse der Wolkenlücken (grösser = kleinere Lücken)
-      cloudCover: 0.5,           // Bedeckung 0 … 1 (mehr = weniger, dafür schärfere Strahlen)
-      cloudSoft: 0.14,
-      wind: [0.05, 0.11],        // Wolkenzug
-      fog: 0.075,                // Dichte des Dunsts (sichtbare Strahlen)
-      fogH: 2.2,                 // Dunst nimmt nach oben ab
-      steps: 16,
-      titleAmt: 0.85,            // wie stark der Titel die Sonne verdeckt
-      // Farben (Morgendunst auf Weiss). Für Abendlicht z. B. ground [0.42,0.38,0.36], lit [1,0.86,0.62], sky [0.55,0.5,0.5]
-      ground: [0.83, 0.84, 0.865],  // Boden im Schatten: kühl
-      lit: [1.0, 0.985, 0.95],      // Boden in der Sonne: warmes Weiss
-      sky: [0.9, 0.905, 0.92],      // Hügel/Hintergrund
-      glowC: [1.0, 0.93, 0.78],     // Schein um die Sonne
-      fogC: [1.0, 0.95, 0.84],      // Farbe des Lichts im Dunst
+      src: [1.12, -0.16],        // Sonne rechts oben hinter dem Hügel (Titel): Strahlen fallen schräg von rechts ins Tal
+      rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
+      drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
+      edge: [0.3, 0.8],          // Schärfe der Strahlen
+      reach: 2.6,                // wie weit die Strahlen nach unten reichen
+      strength: 1.2,
+      ambient: 0.2,              // so viel Licht liegt auch im Schatten
+      shade: [0.8, 0.81, 0.835], // Schatten auf der Wand: kühl
+      shadeLow: [0.8, 0.81, 0.835],
+      lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
-      trailLife: 0.9,               // s, Fingerschatten
-      res: 0.5                      // Auflösung (Licht und Dunst sind weich, halbe Auflösung reicht)
+      occLen: 0.9,               // Länge des Glasschattens (Anteil Höhe)
+      occAmt: 0.75,              // der Titel ist die Wolke: Licht kommt nur an den Rändern und durch die Lücken
+      refr: 0.02,                // Lichtbrechung im Glas (Anteil Höhe)
+      depth: 0.3,                // Tiefe des Glastitels (Anteil Schrifthöhe)
+      shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
+      trailLife: 0.9,            // s
+      trailAmt: 0.75,
+      res: 1                     // Auflösung (1 = CSS-Pixel; scharf genug für die Glaskanten)
     };
-    function v3n(v) { var l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
     var sun = (function () {
       var gcv = document.createElement('canvas');
       var c = null;
@@ -606,92 +599,91 @@
       function mk(cls) { var v = document.createElement('canvas'); v.className = 'hp-info-sun ' + cls; v.setAttribute('aria-hidden', 'true'); return v; }
       var back = document.createElement('div'); back.className = 'hp-info-sun hp-sun-back'; back.setAttribute('aria-hidden', 'true');
       var wall = document.createElement('canvas'); wall.className = 'hp-sun-wall';
-      back.appendChild(wall);
+      var glass = document.createElement('canvas'); glass.className = 'hp-sun-glass';
+      back.appendChild(wall); back.appendChild(glass);
       var glow = mk('hp-sun-light');
-      var wx = wall.getContext('2d'), lx = glow.getContext('2d');
-      if (!wx || !lx) return null;
-      var NT = 10, LS = v3n(SUN.sun);
+      var wx = wall.getContext('2d'), lx = glow.getContext('2d'), gx2 = glass.getContext('2d');
+      if (!wx || !lx || !gx2) return null;
+      var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform float uTime; uniform float uLodB;',
-        'uniform float uPitch; uniform float uF; uniform float uCamH; uniform float uFar; uniform vec3 uLs;',
-        'uniform float uCH; uniform float uCS; uniform float uCC; uniform float uCSoft; uniform vec2 uWind;',
-        'uniform float uFog; uniform float uFogH; uniform float uTA;',
-        'uniform vec3 uGround; uniform vec3 uLit; uniform vec3 uSky; uniform vec3 uGlowC; uniform vec3 uFogC;',
-        'uniform vec3 uTextLight; uniform float uTextAmt;',
-        'uniform sampler2D uOcc; uniform float uOccOn; uniform vec4 uMB;',
-        'uniform vec4 uTrail[' + NT + ']; uniform vec3 uSh;',     // Finger: Boden x, z, Stärke · Schattenrichtung x, z, Länge
-        'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
+        'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
+        'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
+        'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
+        'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
+        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
-        'float fbm(vec2 p) { return 0.55 * n2(p) + 0.3 * n2(p * 2.07 + 3.1) + 0.15 * n2(p * 4.3 - 1.7); }',
-        'float fbm2(vec2 p) { return 0.62 * n2(p) + 0.38 * n2(p * 2.07 + 3.1); }',
-        'vec3 toWorld(vec3 v) { float c = cos(uPitch), s = sin(uPitch); return vec3(v.x, v.y * c + v.z * s, -v.y * s + v.z * c); }',
-        'vec3 toCam(vec3 v) { float c = cos(uPitch), s = sin(uPitch); return vec3(v.x, v.y * c - v.z * s, v.y * s + v.z * c); }',
-        'vec2 toScreen(vec3 P) { vec3 q = toCam(P - vec3(0.0, uCamH, 0.0)); return q.xy * uF / max(-q.z, 0.001) * uRes.y + 0.5 * uRes; }',
-        // Wie viel Sonne kommt am Punkt P an? Wolken (Lücken) und Titel (an der Hügelwand)
-        'float sunAt(vec3 P, float blur) {',
-        '  float tc = (uCH - P.y) / uLs.y; vec2 cq = (P.xz + uLs.xz * tc) * uCS + uWind * uTime;',
-        '  float T = smoothstep(uCC - uCSoft, uCC + uCSoft, blur > 1.0 ? fbm2(cq) : fbm(cq));',
-        '  if (uOccOn > 0.0 && P.z > -uFar) {',
-        '    float tt = (-uFar - P.z) / uLs.z; vec3 Q = P + uLs * tt;',
-        '    vec2 uv = (toScreen(Q) - uMB.xy) / uMB.zw;',
-        '    vec2 ins = step(vec2(0.0), uv) * step(uv, vec2(1.0));',
-        '    float m = texture2D(uOcc, uv, uLodB + blur + log2(1.0 + tt * 0.1)).r * ins.x * ins.y;',
-        '    T *= 1.0 - m * uTA * uOccOn;',
-        '  }',
-        '  return T;',
+        'vec2 S;',
+        'float beamAt(vec2 p) {',
+        '  vec2 d = p - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y; float t = uTime;',
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
+        '  r = smoothstep(uEdge.x, uEdge.y, r);',
+        '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
+        '  float fall = exp(-max(dist - 0.45, 0.0) / uReach);',
+        '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
+        '}',
+        'float rayR(vec2 p) {',
+        '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
+        '  return smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r);',
         '}',
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0);',
-        '  vec2 sc = (fc - 0.5 * uRes) / uRes.y;',
-        '  vec3 rd = normalize(toWorld(vec3(sc, -uF))); vec3 ro = vec3(0.0, uCamH, 0.0);',
-        '  float tg = rd.y < -0.0001 ? -uCamH / rd.y : 1e5;',               // Boden
-        '  float tw = rd.z < -0.0001 ? -uFar / rd.z : 1e5;',               // Hügelwand
-        '  bool hitG = tg < tw; float tE = min(min(tg, tw), uFar * 3.0);',
-        '  float mu = dot(rd, uLs);',
-        '  vec3 col; float lit = 0.0;',
-        '  if (hitG) {',
-        '    vec3 Pg = ro + rd * tg;',
-        '    lit = sunAt(Pg, 0.0);',
-        // Fingerschatten auf dem Boden: ein kleiner Stab, sein Schatten läuft weg von der Sonne
-        '    float fs = 0.0;',
-        '    for (int i = 0; i < ' + NT + '; i++) {',
-        '      vec4 f = uTrail[i]; if (f.z <= 0.0) continue;',
-        '      vec2 v = Pg.xz - f.xy; float al = dot(v, uSh.xy); float pe = length(v - uSh.xy * al);',
-        '      float w = 0.035 * f.w;',
-        '      fs = max(fs, f.z * exp(-pe * pe / (w * w)) * smoothstep(-0.01, 0.03, al) * (1.0 - smoothstep(0.0, uSh.z * f.w, al)));',
+        '  vec2 fc = uOrig + (gl_FragCoord.xy - vec2(uOffX, 0.0)) / uScale;',
+        '  S = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
+        '  vec2 d = fc - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
+        '  float t = uTime;',
+        // Tal: unterhalb des Horizonts (knapp unter dem Titel) ist Boden. Jeder Strahl trifft ihn an einer eigenen Stelle
+        // (je nach Strahl näher oder ferner): dort endet er und hinterlässt einen hellen, flachen Lichtfleck, nah gross, fern schmal.
+        '  float beam = beamAt(fc);',
+        '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
+        '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
+        '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
+        '  float dT = 1.0 - hitY / max(uHor, 1.0);',
+        '  float pH = mix(0.014, 0.075, dT) * uRes.y;',
+        '  float pool = exp(-pow((fc.y - hitY) / pH, 2.0));',
+        '  float ray = rayR(fc);',
+        '  beam = beam * mix(1.0, 0.2 + 0.8 * air, grd) + ray * pool * grd * (1.0 + 0.6 * dT);',
+        // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
+        '  float occ = 0.0, caus = 0.0;',
+        '  if (uOccOn > 0.0) {',
+        '    vec2 dv = S - fc; float dl = length(dv); vec2 dir = dv / max(dl, 0.001); float L = min(uOccLen * uRes.y, dl); float j = 0.5;',
+        '    for (int i = 0; i < 30; i++) {',
+        '      float k = (float(i) + j) / 30.0; vec2 p = fc + dir * (k * L);',
+        '      vec4 m = texture2D(uOcc, (p - uMB.xy) / uMB.zw, uLodB + 1.5 + k * L / uRes.y * 14.0); float w = pow(1.0 - k, 1.4);',
+        '      occ = max(occ, m.r); caus = max(caus, m.g * w);',
         '    }',
-        '    lit *= 1.0 - 0.8 * fs;',
-        '    float near = clamp(1.0 - tg / uFar, 0.0, 1.0);',
-        '    col = mix(uGround * mix(1.0, 0.96, near), uLit, lit);',
+        '    occ *= uOccOn * uOccAmt; caus *= uOccOn;',
+        '  }',
+        '  float sh = 0.0;',
+        '  for (int i = 0; i < ' + NT + '; i++) {',
+        '    vec3 p = uTrail[i]; if (p.z <= 0.0) continue;',
+        '    vec2 pd = p.xy - S; float pa = atan(pd.x, -pd.y); float pdist = length(pd) / uRes.y;',
+        '    float w = uShadowW / max(pdist, 0.05);',
+        '    float behind = smoothstep(-0.02, 0.04, dist - pdist) * exp(-max(dist - pdist, 0.0) * 1.2);',
+        '    float da = (ang - pa) / w;',
+        '    sh = max(sh, p.z * behind * exp(-da * da));',
+        '  }',
+        '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
+        '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 causC = caus * beam * (vec3(1.0, 0.88, 0.66) * 0.16 + (rainbow - 0.5) * 0.05);',
+        '  vec3 shade = mix(uShade, uShadeLow, grd * (0.5 + 0.5 * (1.0 - fc.y / max(uHor, 1.0))));',
+        '  vec3 col;',
+        '  if (uMode < 0.5) {',
+        '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
+        // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
+        // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
-        '    float g = pow(max(mu, 0.0), 6.0);',
-        '    col = mix(uSky, uGlowC, g * 0.8);',
-        '    lit = 0.0;',
+        '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8;',
         '  }',
-        '  if (uMode > 0.5) {',
-        '    gl_FragColor = vec4(uTextLight * uTextAmt * smoothstep(0.3, 0.95, lit) * (hitG ? 1.0 : 0.0), 1.0);',
-        '    return;',
-        '  }',
-        // Dunst: entlang des Blicks Licht einsammeln, wo die Sonne hinkommt (Strahlen)
-        '  float j = fract(52.9829 * fract(dot(fc, vec2(0.06711, 0.00584))));',   // feines Muster gegen Stufen
-        '  float aL = 0.0, aD = 0.0, dt = tE / float(' + SUN.steps + ');',
-        '  for (int i = 0; i < ' + SUN.steps + '; i++) {',
-        '    float t = (float(i) + j) * dt; vec3 P = ro + rd * t;',
-        '    float d = exp(-max(P.y, 0.0) / uFogH);',
-        '    aL += sunAt(P, 1.5) * d * dt; aD += d * dt;',
-        '  }',
-        // auf Weiss: Dunst im Schatten ist leicht grau, Dunst im Licht warm weiss → die Strahlen
-        '  float amt = 1.0 - exp(-aD * uFog);',
-        '  float ph = 0.55 + 1.2 * pow(max(mu, 0.0), 3.0);',
-        '  float lr = clamp(aL / max(aD, 0.0001) * ph, 0.0, 1.0);',
-        '  vec3 fogCol = mix(uGround * 1.01, uFogC, lr);',
-        '  col = mix(col, fogCol, amt);',
-        '  col += (h2(fc + fract(uTime)) - 0.5) / 255.0;',
+        '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
         '}'].join('\n');
-      function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); if (!c.getShaderParameter(s, c.COMPILE_STATUS)) { if (window.console) console.warn(c.getShaderInfoLog(s)); return null; } return s; }
+      function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
       var vs = sh(c.VERTEX_SHADER, VS), fs = sh(c.FRAGMENT_SHADER, FS);
       if (!vs || !fs) return null;
       var pr = c.createProgram(); c.attachShader(pr, vs); c.attachShader(pr, fs); c.linkProgram(pr);
@@ -699,17 +691,15 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uTime', 'uLodB', 'uPitch', 'uF', 'uCamH', 'uFar', 'uLs', 'uCH', 'uCS', 'uCC', 'uCSoft', 'uWind', 'uFog', 'uFogH', 'uTA',
-        'uGround', 'uLit', 'uSky', 'uGlowC', 'uFogC', 'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uMB', 'uTrail', 'uSh'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
-      c.uniform1f(U.uF, SUN.fov); c.uniform1f(U.uCamH, SUN.camH); c.uniform1f(U.uFar, SUN.far); c.uniform3fv(U.uLs, LS);
-      c.uniform1f(U.uCH, SUN.cloudH); c.uniform1f(U.uCS, SUN.cloudScale); c.uniform1f(U.uCC, SUN.cloudCover); c.uniform1f(U.uCSoft, SUN.cloudSoft); c.uniform2fv(U.uWind, SUN.wind);
-      c.uniform1f(U.uFog, SUN.fog); c.uniform1f(U.uFogH, SUN.fogH); c.uniform1f(U.uTA, SUN.titleAmt);
-      c.uniform3fv(U.uGround, SUN.ground); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uSky, SUN.sky); c.uniform3fv(U.uGlowC, SUN.glowC); c.uniform3fv(U.uFogC, SUN.fogC);
-      c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt); c.uniform1f(U.uLodB, 0);
-      // Schatten am Boden: weg von der Sonne; Länge für einen Stab der Höhe 1
-      var shd = [-LS[0], -LS[2]], shl = Math.sqrt(shd[0] * shd[0] + shd[1] * shd[1]) || 1;
-      c.uniform3f(U.uSh, shd[0] / shl, shd[1] / shl, shl / Math.max(0.05, LS[1]));
-      // Maske des Titels als Textur (für seinen Schatten)
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+        'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
+      c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
+      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit);
+      c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt);
+      c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt); c.uniform1f(U.uRefr, SUN.refr); c.uniform2f(U.uExt, 0, 0);
+      c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
+      // Maske des Titels (weiss auf schwarz) als Textur
       var mcv = document.createElement('canvas'), mx = mcv.getContext('2d');
       var tex = c.createTexture(); c.activeTexture(c.TEXTURE0); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -718,31 +708,20 @@
       c.uniform1i(U.uOcc, 0);
       var occ = { on: 0, t: 0, want: 0, el: null }, pw = 1, ph = 1;
       function pot(v) { var p = 1; while (p < v) p *= 2; return p; }
-      var trail = [], tbuf = new Float32Array(NT * 4), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
-      var G = null, cam = { pitch: 0.3 };
+      var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
+      // Glas-Ausschnitt: der Titelbereich wird extra in voller Retina-Auflösung gerechnet (scharfe Glaskanten),
+      // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
+      var G = null, srcT = null;
       function size() {
         var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
           if (occ.el) mask(occ.el);
         }
-        if (gcv.width !== 2 * cw || gcv.height !== chh) { gcv.width = 2 * cw; gcv.height = chh; }
+        var GW = 2 * cw, GH = chh;
+        if (gcv.width !== GW || gcv.height !== GH) { gcv.width = GW; gcv.height = GH; }
       }
-      // Kamera so neigen, dass der Fuss der Hügelwand (Horizont) knapp unter dem Titel liegt
-      function aim(horFromTop) {
-        var ys = 0.5 - horFromTop;   // Bildschirm-y des Horizonts, Mitte = 0, oben = +0.5
-        cam.pitch = Math.atan(ys / SUN.fov) + Math.atan(SUN.camH / SUN.far);
-        c.uniform1f(U.uPitch, cam.pitch);
-      }
-      // Bildschirmpunkt (CSS) → Punkt am Boden (x, z) und Entfernung
-      function ground(px, py, rect) {
-        var sx = (px - rect.left - rect.width / 2) / rect.height, sy = -(py - rect.top - rect.height / 2) / rect.height;
-        var cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), l = Math.sqrt(sx * sx + sy * sy + SUN.fov * SUN.fov);
-        var dx = sx / l, dy = (sy * cp - SUN.fov * sp) / l, dz = (-sy * sp - SUN.fov * cp) / l;
-        if (dy > -0.0001) return null;
-        var t = -SUN.camH / dy; return [dx * t, dz * t, t];
-      }
-      // Titel in die Maske zeichnen (für seinen Schatten), genau an seiner Stelle auf dem Bildschirm:
+      // Glastitel in die Maske zeichnen, genau so verzerrt wie die gedrehte Schrift auf dem Bildschirm:
       // Schrift flach zeichnen, dann in senkrechten Streifen an die perspektivischen Stellen (T.map) setzen.
       // Die Maske deckt nur den Titelbereich ab, dafür fein. Daraus pro Bildpunkt:
       // R = Glasdicke (gerundet), G = Kante, B/A = Neigung der Oberfläche (für Brechung, Farben, Glanz).
@@ -753,9 +732,11 @@
         if (!T.txt || T.tw < 2) return;
         var cs = [T.map(T.ox, T.oy), T.map(T.ox + T.tw, T.oy), T.map(T.ox, T.oy + T.th), T.map(T.ox + T.tw, T.oy + T.th)];
         var x0 = Math.min(cs[0][0], cs[2][0]), x1 = Math.max(cs[1][0], cs[3][0]), y0 = Math.min(cs[0][1], cs[1][1]), y1 = Math.max(cs[2][1], cs[3][1]);
-        var mg = (y1 - y0) * 0.25;
+        var mc = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, 0), mb = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, -SUN.depth * T.th);
+        var ex = mb[0] - mc[0], ey = mb[1] - mc[1];   // Seitenwände: so weit liegt die Rückseite versetzt
+        var mg = (y1 - y0) * 0.25 + Math.sqrt(ex * ex + ey * ey);
         var bx = Math.floor(x0 - mg), by = Math.floor(y0 - mg), bw = Math.ceil(x1 - x0 + 2 * mg), bh = Math.ceil(y1 - y0 + 2 * mg);
-        var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
         pw = Math.min(1024, pot(bw * dpr)); ph = Math.min(512, pot(bh * dpr));
         mcv.width = pw; mcv.height = ph;
         var mxs = pw / bw, mys = ph / bh;
@@ -774,7 +755,10 @@
         }
         upload(mx.getImageData(0, 0, pw, ph).data, mxs, mys, (cs[2][1] - cs[0][1]) * mys);
         c.uniform4f(U.uMB, bx * sx, chh - (by + bh) * sx, bw * sx, bh * sx);
+        c.uniform2f(U.uExt, ex * sx, -ey * sx);
         G = { bx: bx, by: by, bw: bw, bh: bh, PW: Math.round(bw * dpr), PH: Math.round(bh * dpr), sx: sx };
+        glass.width = G.PW; glass.height = G.PH;
+        glass.style.left = bx + 'px'; glass.style.top = by + 'px'; glass.style.width = bw + 'px'; glass.style.height = bh + 'px';
       }
       // Kastenfilter mit laufender Summe (schnell, egal wie gross der Radius)
       function box(a, b, w, h, r, horiz) {
@@ -812,40 +796,39 @@
         c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, w, h, 0, c.RGBA, c.UNSIGNED_BYTE, out);
         c.generateMipmap(c.TEXTURE_2D); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR_MIPMAP_LINEAR);
       }
-      function pass(x, w, h, mode) {
+      function pass(x, w, h, mode, ox, oy, scl) {
         c.viewport(x, 0, w, h); c.uniform1f(U.uOffX, x); c.uniform1f(U.uMode, mode);
+        c.uniform2f(U.uOrig, ox, oy); c.uniform1f(U.uScale, scl); c.uniform1f(U.uLodB, Math.log(scl) / Math.LN2);   // gleiche Unschärfe wie die Wand
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
       }
       function draw(now) {
         size();
         var tm = reduce ? 40.0 : (now - t0) / 1000;
         var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
-        aim(G ? (G.by + G.bh * 0.68) / Math.max(1, rect.height) : 0.2);
         trail = trail.filter(function (p) { return now - p.t < SUN.trailLife * 1000; });
         for (var i = 0; i < NT; i++) {
-          var p = trail[trail.length - 1 - i], g = p ? ground(p.x, p.y, rect) : null;
-          if (g) {
+          var p = trail[trail.length - 1 - i];
+          if (p) {
             var life = 1 - (now - p.t) / (SUN.trailLife * 1000);
-            tbuf[i * 4] = g[0]; tbuf[i * 4 + 1] = g[1]; tbuf[i * 4 + 2] = life * life; tbuf[i * 4 + 3] = 0.12 + g[2] * 0.06;   // Stabgrösse wächst mit der Entfernung (bleibt am Bildschirm gleich)
-          } else tbuf[i * 4 + 2] = 0;
+            tbuf[i * 3] = (p.x - rect.left) * sx; tbuf[i * 3 + 1] = chh - (p.y - rect.top) * sx; tbuf[i * 3 + 2] = life * life;
+          } else tbuf[i * 3 + 2] = 0;
         }
+        // Glas weich ein- und ausblenden
         var dt = Math.min(0.05, (now - (occ.t || now)) / 1000); occ.t = now;
         occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
-        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform4fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
-        pass(0, cw, chh, 0);
-        pass(cw, cw, chh, 1);
+        var e = G && srcT ? occ.on * occ.on * (3 - 2 * occ.on) : 0;
+        c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
+        c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
+        pass(0, cw, chh, 0, 0, 0, 1);
+        pass(cw, cw, chh, 1, 0, 0, 1);
         probe(rect, sx);
-        wx.drawImage(gcv, 0, 0, cw, chh, 0, 0, cw, chh);
-        lx.drawImage(gcv, cw, 0, cw, chh, 0, 0, cw, chh);
+        var H = gcv.height;
+        wx.drawImage(gcv, 0, H - chh, cw, chh, 0, 0, cw, chh);
+        lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
       }
-      // «Galerie öffnen»: Licht an seiner Stelle messen (Schatten nur in der Sonne) und Schattenrichtung
-      // auf dem Boden aus der 3D-Szene: Fusspunkt und ein Punkt weiter weg von der Sonne → am Bildschirm
+      // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
       var px = null, btnL = 0, pf = 0;
-      function scr(x, z, rect) {
-        var cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), y = -SUN.camH;
-        var qy = y * cp - z * sp, qz = y * sp + z * cp;
-        return [rect.left + rect.width / 2 + x * SUN.fov / -qz * rect.height, rect.top + rect.height / 2 - qy * SUN.fov / -qz * rect.height];
-      }
       function probe(rect, sx) {
         if (++pf % 5 || !infoOpen.offsetWidth) return;
         var r = infoOpen.getBoundingClientRect();
@@ -858,12 +841,11 @@
         var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
         btnL += (v - btnL) * 0.6;
         infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
-        var g = ground(r.left + r.width * 0.5, r.bottom, rect);
-        if (g) {
-          var a = scr(g[0], g[1], rect), bb = scr(g[0] - LS[0] * 0.3, g[1] - LS[2] * 0.3, rect);
-          var ddx = bb[0] - a[0], ddy = Math.max(0.5, bb[1] - a[1]);
-          infoOpen.style.setProperty('--hp-skew', Math.max(-70, Math.min(70, Math.atan(ddx / ddy) * 180 / Math.PI)).toFixed(1) + 'deg');
-        }
+        // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
+        var Sx = rect.left + SUN.src[0] * rect.width, Sy = rect.top + SUN.src[1] * rect.height;
+        var ddx = r.left + r.width * 0.5 - Sx, ddy = Math.max(1, r.top + r.height * 0.5 - Sy);
+        var sk = Math.max(-65, Math.min(65, Math.atan(ddx / ddy) * 180 / Math.PI));
+        infoOpen.style.setProperty('--hp-skew', sk.toFixed(1) + 'deg');
       }
       function loop(now) {
         raf = 0;
@@ -880,18 +862,17 @@
         if (trail.length > 30) trail.shift();
         if (!raf) raf = requestAnimationFrame(loop);
       }
-      window.addEventListener('pointermove', point, { passive: true });
-      window.addEventListener('pointerdown', point, { passive: true });
+      // (Fingerschatten entfernt, Hugo 22.11.: nur «Galerie öffnen» wirft einen Schatten)
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
         back: back, wall: wall, glow: glow, start: start,
-        title: function (T) { if (T) { size(); mask(T); occ.want = 1; } else occ.want = 0; start(); }
+        // Titel nur noch für die Lage des Horizonts (knapp darunter beginnt das Tal), er wirft keinen Schatten mehr
+        title: function (T) { if (T) { size(); mask(T); } occ.want = 0; start(); }
       };
     })();
     if (sun) {
       info.insertBefore(sun.back, infoPanel); info.appendChild(sun.glow);
       root.classList.add('hp-info-sunlit');
-      if (!reduce) infoText.classList.add('hp-tilt');
       infoPanel.style.background = 'transparent';
     }
 
