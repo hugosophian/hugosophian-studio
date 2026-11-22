@@ -48,7 +48,6 @@
     mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
     mbFrom:     60,     // px/s, darunter scharf
     mbSpeed:    1800,   // px/s, ab hier volle Verwischung (wie die Galerie)
-    mbRainbow:  3.6,    // Farbstärke der Zwischenbilder (1 = kaum, 4 = kräftig)
     mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
@@ -197,12 +196,7 @@
       var ghosts = [];
       if (img && !reduce) for (var gi = 0; gi < CONFIG.mbGhosts; gi++) {
         var gh = img.cloneNode(false); gh.removeAttribute('id'); gh.className = 'hp-img hp-ghost'; gh.alt = ''; gh.setAttribute('aria-hidden', 'true');
-        // Hugo 22.11.: ein Hauch Regenbogen in der Unschärfe, wie Licht durch ein Prisma (oben rot … unten violett)
-        // Gegenfarben paarweise (rot ↔ cyan, gelb ↔ blau): in der Mitte heben sie sich auf, nur an den Kanten bleibt Farbe
-        var hue = [-35, 15, null, null, 190, 145][Math.round(gi * 5 / Math.max(1, CONFIG.mbGhosts - 1))];
-        if (hue !== null) { gh.style.filter = 'sepia(.6) saturate(' + CONFIG.mbRainbow + ') hue-rotate(' + hue + 'deg)'; gh.setAttribute('data-c', '1'); }
-        if (hue !== null) img.parentNode.insertBefore(gh, img.nextSibling); else img.parentNode.appendChild(gh);   // farbige unter die neutralen
-        ghosts.push(gh);
+        img.parentNode.appendChild(gh); ghosts.push(gh);
       }
       stage.appendChild(el);
       var s = {
@@ -289,6 +283,81 @@
       });
     }
 
+    // ---------- Berührungswellen (Hugo 22.11.) ----------
+    // Wo der Finger das Bild berührt oder entlangwischt, laufen weiche Wellen aus, die den Kontrast heben
+    // (soft-light: heller und dunkler im Wechsel) und zum Rand hin ausklingen. Erreicht eine Welle den Rand,
+    // fliesst dort, und nur dort, weich ein Regenbogen entlang der Kante.
+    var ripple = (function () {
+      if (reduce) return null;
+      var cv = document.createElement('canvas'), c = null;
+      cv.className = 'hp-ripple'; cv.setAttribute('aria-hidden', 'true');
+      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;mix-blend-mode:soft-light;';
+      try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false }); } catch (e) {}
+      if (!c) return null;
+      var NP = 12;
+      var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
+        'uniform vec2 uRes; uniform vec4 uP[' + NP + '];',   // x, y (px), Alter (s), Stärke
+        'void main() {',
+        '  vec2 fc = gl_FragCoord.xy; float W = 0.0, E = 0.0;',
+        '  vec2 ed = min(fc, uRes - fc); float e = min(ed.x, ed.y);',
+        '  float per = (fc.x < ed.y + 0.5 && fc.x < uRes.x - fc.x) || (uRes.x - fc.x < ed.y) ? fc.y / uRes.y : fc.x / uRes.x;',
+        '  float mx = max(uRes.x, uRes.y);',
+        '  for (int i = 0; i < ' + NP + '; i++) {',
+        '    vec4 p = uP[i]; if (p.w <= 0.0) continue;',
+        '    float d = length(fc - p.xy); float R = p.z * mx * 0.38;',
+        '    float env = exp(-pow((d - R) / (mx * 0.16), 2.0));',                       // Wellenpaket um die Front
+        '    float fade = exp(-p.z * 0.75) * (1.0 - smoothstep(0.0, 1.3, d / mx)) * 0.85;',      // klingt zum Rand hin aus
+        '    W += sin((d - R) * 0.09) * env * fade * p.w;',
+        '    float reach = exp(-pow((d - R) / (mx * 0.12), 2.0)) * exp(-p.z * 0.8);',   // Front erreicht den Rand
+        '    E = max(E, reach * p.w);',
+        '  }',
+        '  vec3 spec = 0.5 + 0.5 * cos(6.2832 * (per * 2.5 + vec3(0.0, 0.33, 0.67)));',
+        '  float band = exp(-e * e / 160.0) * E;',
+        '  vec3 col = vec3(0.5 + 0.5 * clamp(W * 1.4, -1.0, 1.0));',
+        '  col = mix(col, spec, clamp(band * 1.3, 0.0, 0.9));',
+        '  float a = clamp(abs(W) * 2.2 + band * 1.4, 0.0, 1.0);',
+        '  gl_FragColor = vec4(col, a);',
+        '}'].join('\n');
+      var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+      function sh(t, src) { var x = c.createShader(t); c.shaderSource(x, src); c.compileShader(x); return c.getShaderParameter(x, c.COMPILE_STATUS) ? x : null; }
+      var vs = sh(c.VERTEX_SHADER, VS), fs = sh(c.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) return null;
+      var p = c.createProgram(); c.attachShader(p, vs); c.attachShader(p, fs); c.linkProgram(p);
+      if (!c.getProgramParameter(p, c.LINK_STATUS)) return null;
+      c.useProgram(p);
+      var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
+      var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
+      var uRes = c.getUniformLocation(p, 'uRes'), uP = c.getUniformLocation(p, 'uP');
+      var pts = [], buf = new Float32Array(NP * 4), raf = 0, RS = 0.5, LIFE = 2.8;
+      function add(x, y, s) {
+        var r = stage.getBoundingClientRect(), now = performance.now(), last = pts[pts.length - 1];
+        if (last && Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 40 && now - last.t < 120) return;
+        pts.push({ x: x - r.left, y: y - r.top, t: now, s: s });
+        if (pts.length > NP) pts.shift();
+        if (!raf) raf = requestAnimationFrame(draw);
+      }
+      function draw(now) {
+        raf = 0;
+        pts = pts.filter(function (q) { return now - q.t < LIFE * 1000; });
+        var w = Math.max(1, Math.round(stage.clientWidth * RS)), h = Math.max(1, Math.round(stage.clientHeight * RS));
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; c.viewport(0, 0, w, h); }
+        for (var i = 0; i < NP; i++) {
+          var q = pts[i];
+          if (q) { buf[i * 4] = q.x * RS; buf[i * 4 + 1] = h - q.y * RS; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.s; }
+          else buf[i * 4 + 3] = 0;
+        }
+        c.uniform2f(uRes, w, h); c.uniform4fv(uP, buf);
+        c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
+        c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        if (pts.length) raf = requestAnimationFrame(draw);
+      }
+      stage.appendChild(cv);
+      function ok() { return !desk && !root.classList.contains('is-info'); }
+      stage.addEventListener('touchstart', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 1); }, { passive: true });
+      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 0.7); }, { passive: true });
+      return cv;
+    })();
+
     // ---------- Zeichnen ----------
     function render(dt) {
       W = stage.clientWidth || window.innerWidth;
@@ -342,10 +411,7 @@
       for (var k = 0; k < N; k++) {
         var f = (k + 0.5) / N - 0.5;                 // −0.5 … 0.5
         g[k].style.transform = 'translate3d(0,' + (f * 2 * L).toFixed(2) + 'px,0)';
-        // Regenbogen (Hugo 22.11.): bei langsamem Wischen ein Hauch, bei schnellem kräftig
-        var col = g[k].hasAttribute('data-c');
-        if (col) g[k].style.transform = 'translate3d(0,' + (f * 2 * L * (1 + 0.5 * m)).toFixed(2) + 'px,0)';
-        g[k].style.opacity = (col ? Math.min(0.42, a * (0.08 + 0.36 * m * m)) : a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
+        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
       }
     }
     var mbF = 0, mbV = 0;
