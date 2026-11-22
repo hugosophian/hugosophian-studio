@@ -87,8 +87,15 @@
     '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -5px 11px 14px rgba(70,55,35,.16); }',
     '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -4px 9px 12px rgba(70,55,35,.15); }',
     '[data-hp] .hp-sun-light { z-index: 2; mix-blend-mode: screen; }',
+    '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
+    '[data-hp] .hp-sun-back .hp-sun-wall { left: 0; top: 0; width: 100%; height: 100%; }',
+    '[data-hp] .hp-sun-back .hp-sun-glass { display: none; }',
     '[data-hp] .hp-info-sunlit .hp-tilt { transform: perspective(900px) rotateX(24deg); transform-origin: 50% 100%; }',
-    '[data-hp].hp-info-sunlit .hp-info-go { text-shadow: -2px 4px 2px rgba(60,40,15,calc(var(--hp-lit,0) * .5)), -5px 9px 6px rgba(60,40,15,calc(var(--hp-lit,0) * .2)); }',
+    '[data-hp] .hp-info-go { position: relative; }',
+    // Schatten von «Galerie öffnen»: Licht von hinten → Schatten fällt nach vorne auf den Boden, gespiegelt, lang
+    // gezogen und zum Betrachter hin breiter; nur sichtbar, solange ein Strahl den Button trifft (--hp-lit).
+    '[data-hp] .hp-go-sh { position: absolute; left: 0; right: 0; bottom: .28em; display: inherit; gap: inherit; align-items: inherit; justify-content: inherit; white-space: nowrap; pointer-events: none; color: rgb(70,50,25); opacity: calc(var(--hp-lit,0) * .42); transform-origin: 50% 100%; transform: perspective(70px) rotateX(52deg) scaleY(-2.4); filter: blur(1.2px); -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); }',
+    '[data-hp] .hp-go-sh * { color: inherit !important; text-shadow: none !important; }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
@@ -543,6 +550,8 @@
     var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Galerie öffnen';
     var infoGoArrow = document.createElement('span'); infoGoArrow.className = 'lib-sort-arrow'; infoGoArrow.setAttribute('aria-hidden', 'true'); infoGoArrow.textContent = '\u2192';
     infoOpen.appendChild(infoGoLabel); infoOpen.appendChild(infoGoArrow);
+    var infoGoSh = document.createElement('span'); infoGoSh.className = 'hp-go-sh'; infoGoSh.setAttribute('aria-hidden', 'true');
+    function goShadow() { infoGoSh.innerHTML = ''; infoGoSh.appendChild(infoGoLabel.cloneNode(true)); infoGoSh.appendChild(infoGoArrow.cloneNode(true)); }
     // gleich ein echtes Ziel, damit Suchmaschinen dem Link folgen können (später je nach Bild gesetzt)
     var firstHref = slides.filter(function (x) { return x.href; })[0]; infoOpen.setAttribute('href', firstHref ? firstHref.href : '/creator');
     var infoClose = inClose ? inClose.cloneNode(true) : document.createElement('div');
@@ -564,7 +573,7 @@
     //   schwarze Schrift wird dort goldbraun angestrahlt.
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
-      src: [0.68, -0.5],         // Sonne: Anteil Breite, Anteil Höhe über dem oberen Rand
+      src: [0.52, -0.42],        // Sonne hinten oben (Licht kommt von hinten, Schatten fallen nach vorne)
       rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
       edge: [0.3, 0.8],          // Schärfe der Strahlen
@@ -576,9 +585,9 @@
       lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
-      occLen: 0.34,              // Länge des Glasschattens (Anteil Höhe)
+      occLen: 0.24,              // Länge des Glasschattens (Anteil Höhe)
       occAmt: 0.32,              // Glas lässt Licht durch: nur ein heller Schatten
-      refr: 0.03,                // Lichtbrechung im Glas (Anteil Höhe)
+      refr: 0.022,               // Lichtbrechung im Glas (Anteil Höhe)
       depth: 0.16,               // Tiefe des Glastitels (Anteil Schrifthöhe)
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
@@ -591,13 +600,17 @@
       try { c = gcv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true }); } catch (e) {}
       if (!c) return null;
       function mk(cls) { var v = document.createElement('canvas'); v.className = 'hp-info-sun ' + cls; v.setAttribute('aria-hidden', 'true'); return v; }
-      var wall = mk('hp-sun-wall'), glow = mk('hp-sun-light');
-      var wx = wall.getContext('2d'), lx = glow.getContext('2d');
-      if (!wx || !lx) return null;
+      var back = document.createElement('div'); back.className = 'hp-info-sun hp-sun-back'; back.setAttribute('aria-hidden', 'true');
+      var wall = document.createElement('canvas'); wall.className = 'hp-sun-wall';
+      var glass = document.createElement('canvas'); glass.className = 'hp-sun-glass';
+      back.appendChild(wall); back.appendChild(glass);
+      var glow = mk('hp-sun-light');
+      var wx = wall.getContext('2d'), lx = glow.getContext('2d'), gx2 = glass.getContext('2d');
+      if (!wx || !lx || !gx2) return null;
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
@@ -617,7 +630,7 @@
         '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
         '}',
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0); vec2 q = fc / uRes;',
+        '  vec2 fc = uOrig + (gl_FragCoord.xy - vec2(uOffX, 0.0)) / uScale;',
         '  S = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
         '  vec2 d = fc - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
         '  float t = uTime;',
@@ -628,7 +641,7 @@
         '    vec2 dir = normalize(S - fc); float L = uOccLen * uRes.y; float j = 0.5;',
         '    for (int i = 0; i < 30; i++) {',
         '      float k = (float(i) + j) / 30.0; vec2 p = fc + dir * (k * L);',
-        '      vec4 m = texture2D(uOcc, p / uRes, 1.5 + k * 4.0); float w = pow(1.0 - k, 0.7);',
+        '      vec4 m = texture2D(uOcc, (p - uMB.xy) / uMB.zw, 3.5 + k * 2.5); float w = pow(1.0 - k, 1.4);',
         '      occ = max(occ, m.r * w); caus = max(caus, m.g * w * (1.0 - 0.5 * k));',
         '    }',
         '    occ *= uOccOn * uOccAmt; caus *= uOccOn;',
@@ -644,28 +657,35 @@
         '  }',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
-        '  vec3 causC = caus * beam * (vec3(1.0, 0.86, 0.6) * 0.35 + rainbow * 0.22);',
+        '  vec3 causC = caus * beam * (vec3(1.0, 0.86, 0.6) * 0.22 + (rainbow - 0.4) * 0.16);',
         '  vec3 shade = mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist));',
         '  vec3 col;',
         '  if (uMode < 0.5) {',
         '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC;',
-        // Glaskörper: Vorderseite (Maske) und Seitenwand (Maske nach hinten versetzt)
+        // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
+        // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '    if (uOccOn > 0.0) {',
-        '      vec4 g = texture2D(uOcc, q); float side = 0.0;',
-        '      for (int i = 1; i <= 10; i++) { float k = float(i) / 10.0; side = max(side, texture2D(uOcc, (fc - uExt * k) / uRes).r * (1.0 - 0.35 * k)); }',
-        '      float body = max(g.r, side * 0.9);',
-        '      if (body > 0.004) {',
-        '        vec2 n = (g.ba - 0.5) * 2.0; float face = smoothstep(0.15, 0.6, g.r);',
-        '        vec2 off = (n * uRefr + uExt * 0.35 * (1.0 - face)) * uRes.y;',
-        '        vec3 bb = vec3(beamAt(fc + off * 1.06), beamAt(fc + off), beamAt(fc + off * 0.94));',   // Farbzerlegung
-        '        vec3 glass = mix(vec3(shade), vec3(uLit), clamp(uAmb + bb * 1.25 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
-        '        glass *= mix(vec3(0.82, 0.87, 0.9), vec3(0.95, 0.975, 0.99), face);',   // Seitenwand etwas tiefer, leicht kühles Glas
-        '        vec2 tl = normalize(S - fc); float e = g.g;',
-        '        float spec = pow(max(dot(normalize(n + 1e-4), tl), 0.0), 6.0) * e;',
-        '        glass *= 1.0 - e * 0.55 * (1.0 - spec);',                              // dunkle Brechungskanten
-        '        glass += (spec * 1.4 + e * 0.1) * (0.6 + 0.8 * beam) * vec3(1.0, 0.98, 0.93);',   // weisse Lichtkanten
-        '        glass += (rainbow - 0.5) * e * beam * 0.16;',
-        '        col = mix(col, glass, smoothstep(0.0, 0.35, body) * uOccOn);',
+        '      vec4 g = texture2D(uOcc, (fc - uMB.xy) / uMB.zw);',
+        '      float cov = smoothstep(0.07, 0.26, g.r);',
+        '      vec4 ga = texture2D(uOcc, (fc + vec2(0.0, uRes.y * 0.012) - uMB.xy) / uMB.zw, 1.5);',   // Glas knapp darüber → weicher Schatten nach vorne
+        '      col *= 1.0 - 0.09 * smoothstep(0.1, 0.5, ga.r) * (1.0 - cov) * uOccOn;',
+        '      if (cov > 0.001) {',
+        '        vec2 n = (g.ba - 0.5) * 2.0; float sl = clamp(length(n), 0.0, 1.0);',
+        '        vec2 nn = sl > 0.001 ? n / sl : vec2(0.0); vec2 Ld = normalize(vec2(-0.2, 1.0));',
+        '        vec2 o = -n * uRefr * uRes.y * (0.5 + sl);',                        // dicker Rand bricht stärker
+        '        vec3 bb = vec3(beamAt(fc + o * 0.7), beamAt(fc + o), beamAt(fc + o * 1.4));',   // jede Farbe anders gebrochen
+        '        vec3 bg = mix(shade, uLit, clamp(vec3(uAmb) + bb * 1.2 * (1.0 - sh * uTrailAmt), 0.0, 1.0));',
+        '        vec3 gl = mix(bg, vec3(1.0), 0.1) * mix(vec3(0.985, 0.99, 1.0), vec3(0.6, 0.65, 0.72), smoothstep(0.35, 1.0, sl) * 0.75);',   // Glaskörper zum Rand hin tiefer
+        // farbige Lichtbänder im Glas (wie im Würfel): Farbton folgt der Richtung der Kante, leuchtet, wo Licht hinfällt
+        '        float band = smoothstep(0.45, 0.8, sl) * (1.0 - smoothstep(0.92, 1.0, sl) * 0.5) * smoothstep(0.08, 0.35, g.r);',
+        '        vec3 sp = 0.5 + 0.5 * cos(6.2831 * (atan(n.y, n.x) / 6.2831 + g.r * 0.5 + ang * 0.8 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
+        '        gl = mix(gl, mix(vec3(1.0), sp, 0.7) * (0.8 + 0.4 * beam), band * (0.08 + 0.4 * beam));',
+        '        float rim = smoothstep(0.07, 0.13, g.r) * (1.0 - smoothstep(0.13, 0.3, g.r));',   // feine helle Aussenkante
+        '        float spec = pow(max(dot(nn, Ld), 0.0), 4.0) * sl;',                // Glanz oben (Licht von hinten oben)
+        '        float exit = pow(max(dot(nn, -Ld), 0.0), 2.0) * sl;',                // Licht tritt unten warm aus
+        '        gl += vec3(1.0) * (rim * 0.5 + spec * 0.85) * (0.55 + 0.6 * beam);',
+        '        gl += vec3(1.0, 0.55, 0.2) * exit * beam * 0.45;',
+        '        col = mix(col, gl, cov * uOccOn);',
         '      }',
         '    }',
         '  } else {',
@@ -682,7 +702,7 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
         'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
@@ -698,69 +718,97 @@
       c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, 1, 1, 0, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
       c.uniform1i(U.uOcc, 0);
       var occ = { on: 0, t: 0, want: 0, el: null }, pw = 1, ph = 1;
-      function pot(v) { var p = 1; while (p < v) p *= 2; return Math.min(p, 2048); }
+      function pot(v) { var p = 1; while (p < v) p *= 2; return p; }
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
+      // Glas-Ausschnitt: der Titelbereich wird extra in voller Retina-Auflösung gerechnet (scharfe Glaskanten),
+      // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
+      var G = null;
       function size() {
         var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
-          mcv.width = pw = pot(w); mcv.height = ph = pot(h);   // Zweierpotenz: erlaubt weiche Stufen (Mipmaps) für die Schatten
-          gcv.width = w * 2; gcv.height = h; if (occ.el) mask(occ.el);
+          if (occ.el) mask(occ.el);
         }
+        var GW = 2 * cw + (G ? G.PW : 0), GH = Math.max(chh, G ? G.PH : 0);
+        if (gcv.width !== GW || gcv.height !== GH) { gcv.width = GW; gcv.height = GH; }
       }
       // Glastitel in die Maske zeichnen, genau so verzerrt wie die gedrehte Schrift auf dem Bildschirm:
       // Schrift flach zeichnen, dann in senkrechten Streifen an die perspektivischen Stellen (T.map) setzen.
-      // Daraus pro Bildpunkt: R = Glas, G = Kante, B/A = Neigung der Oberfläche (für Brechung und Glanz).
+      // Die Maske deckt nur den Titelbereich ab, dafür fein. Daraus pro Bildpunkt:
+      // R = Glasdicke (gerundet), G = Kante, B/A = Neigung der Oberfläche (für Brechung, Farben, Glanz).
       var tcv = document.createElement('canvas'), tx = tcv.getContext('2d');
       function mask(T) {
         occ.el = T;
         var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
-        var mxs = pw / Math.max(1, rect.width), mys = ph / Math.max(1, rect.height);
+        if (!T.txt || T.tw < 2) return;
+        var cs = [T.map(T.ox, T.oy), T.map(T.ox + T.tw, T.oy), T.map(T.ox, T.oy + T.th), T.map(T.ox + T.tw, T.oy + T.th)];
+        var x0 = Math.min(cs[0][0], cs[2][0]), x1 = Math.max(cs[1][0], cs[3][0]), y0 = Math.min(cs[0][1], cs[1][1]), y1 = Math.max(cs[2][1], cs[3][1]);
+        var mg = (y1 - y0) * 0.3;
+        var bx = Math.floor(x0 - mg), by = Math.floor(y0 - mg), bw = Math.ceil(x1 - x0 + 2 * mg), bh = Math.ceil(y1 - y0 + 2 * mg);
+        var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        pw = Math.min(1024, pot(bw * dpr)); ph = Math.min(512, pot(bh * dpr));
+        mcv.width = pw; mcv.height = ph;
+        var mxs = pw / bw, mys = ph / bh;
         mx.setTransform(1, 0, 0, 1, 0, 0); mx.fillStyle = '#000'; mx.fillRect(0, 0, pw, ph);
-        if (!T.txt || T.tw < 2) return upload(null);
-        var p0 = T.map(T.ox, T.oy), p1 = T.map(T.ox + T.tw, T.oy + T.th);
-        var k = Math.min(4, Math.max(0.2, Math.abs(p1[1] - p0[1]) * mys * 2 / T.th));
+        var k = Math.min(4, Math.max(0.2, (y1 - y0) * mys * 1.5 / T.th));
         var tw = Math.max(2, Math.round(T.tw * k)), th = Math.max(2, Math.round(T.th * k));
         tcv.width = tw; tcv.height = th;
         var fs = 100; tx.font = T.font.replace('{s}', fs + 'px'); tx.textBaseline = 'alphabetic';
         var m = tx.measureText(T.txt), asc = m.fontBoundingBoxAscent || fs * 0.92, dsc = m.fontBoundingBoxDescent || fs * 0.24;
         tx.setTransform(tw / Math.max(1, m.width), 0, 0, th / (asc + dsc), 0, 0);
         tx.fillStyle = '#fff'; tx.fillText(T.txt, 0, asc);
-        var N = 90;
+        var N = 120;
         for (var i = 0; i < N; i++) {
           var a = T.map(T.ox + T.tw * i / N, T.oy), b = T.map(T.ox + T.tw * (i + 1) / N, T.oy), cB = T.map(T.ox + T.tw * i / N, T.oy + T.th);
-          mx.drawImage(tcv, tw * i / N, 0, tw / N + 0.5, th, a[0] * mxs, a[1] * mys, (b[0] - a[0]) * mxs + 0.6, (cB[1] - a[1]) * mys);
+          mx.drawImage(tcv, tw * i / N, 0, tw / N + 0.5, th, (a[0] - bx) * mxs, (a[1] - by) * mys, (b[0] - a[0]) * mxs + 0.6, (cB[1] - a[1]) * mys);
         }
-        var bk = T.map3(T.ox + T.tw * 0.5, T.oy + T.th * 0.5, -SUN.depth * T.th), fr = T.map(T.ox + T.tw * 0.5, T.oy + T.th * 0.5);
-        c.uniform2f(U.uExt, (bk[0] - fr[0]) * sx, -(bk[1] - fr[1]) * sx);
-        upload(mx.getImageData(0, 0, pw, ph).data, mxs / mys);
+        upload(mx.getImageData(0, 0, pw, ph).data, mxs, mys, (cs[2][1] - cs[0][1]) * mys);
+        c.uniform4f(U.uMB, bx * sx, chh - (by + bh) * sx, bw * sx, bh * sx);
+        G = { bx: bx, by: by, bw: bw, bh: bh, PW: Math.round(bw * dpr), PH: Math.round(bh * dpr), sx: sx };
+        glass.width = G.PW; glass.height = G.PH;
+        glass.style.left = bx + 'px'; glass.style.top = by + 'px'; glass.style.width = bw + 'px'; glass.style.height = bh + 'px';
+        glass.style.display = 'block';
       }
-      function upload(src, asp) {
-        var cw = pw, chh = ph, n = cw * chh, out = new Uint8Array(n * 4);
-        if (src) {
-          // weichzeichnen (2x Kasten, Radius 2) → runde Glaskanten
-          var a = new Float32Array(n), b = new Float32Array(n), x, y, i, r = 2;
-          for (i = 0; i < n; i++) a[i] = src[i * 4] / 255;
-          for (var pass = 0; pass < 2; pass++) {
-            for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) { var sm = 0, ct = 0; for (var o = -r; o <= r; o++) { var xx = x + o; if (xx >= 0 && xx < cw) { sm += a[y * cw + xx]; ct++; } } b[y * cw + x] = sm / ct; }
-            for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) { var sm2 = 0, ct2 = 0; for (var o2 = -r; o2 <= r; o2++) { var yy = y + o2; if (yy >= 0 && yy < chh) { sm2 += b[yy * cw + x]; ct2++; } } a[y * cw + x] = sm2 / ct2; }
+      // Kastenfilter mit laufender Summe (schnell, egal wie gross der Radius)
+      function box(a, b, w, h, r, horiz) {
+        var len = horiz ? w : h, lines = horiz ? h : w, st = horiz ? 1 : w, ls = horiz ? w : 1;
+        for (var L = 0; L < lines; L++) {
+          var base = L * ls, sum = 0, cnt = 0, i;
+          for (i = 0; i <= r && i < len; i++) { sum += a[base + i * st]; cnt++; }
+          for (i = 0; i < len; i++) {
+            b[base + i * st] = sum / cnt;
+            var add = i + r + 1, rem = i - r;
+            if (add < len) { sum += a[base + add * st]; cnt++; }
+            if (rem >= 0) { sum -= a[base + rem * st]; cnt--; }
           }
-          var gmax = 1e-4, gx = new Float32Array(n), gy = new Float32Array(n);
-          for (y = 1; y < chh - 1; y++) for (x = 1; x < cw - 1; x++) {
-            i = y * cw + x; gx[i] = (a[i + 1] - a[i - 1]) * 0.5 * asp; gy[i] = (a[i - cw] - a[i + cw]) * 0.5;   // y nach oben wie in WebGL; Seitenverhältnis ausgleichen
-            var gm = Math.sqrt(gx[i] * gx[i] + gy[i] * gy[i]); if (gm > gmax) gmax = gm;
-          }
-          for (y = 0; y < chh; y++) for (x = 0; x < cw; x++) {
-            i = y * cw + x; var o4 = ((chh - 1 - y) * cw + x) * 4;     // Zeilen umdrehen (WebGL zählt von unten)
-            var nx = -gx[i] / gmax, ny = -gy[i] / gmax;
-            out[o4] = Math.round(a[i] * 255); out[o4 + 1] = Math.round(Math.min(1, Math.sqrt(nx * nx + ny * ny) * 1.3) * 255);
-            out[o4 + 2] = Math.round((nx * 0.5 + 0.5) * 255); out[o4 + 3] = Math.round((ny * 0.5 + 0.5) * 255);
-          }
+        }
+      }
+      function upload(src, mxs, mys, letterH) {
+        var w = pw, h = ph, n = w * h, out = new Uint8Array(n * 4);
+        var a = new Float32Array(n), b = new Float32Array(n), x, y, i;
+        for (i = 0; i < n; i++) a[i] = src[i * 4] / 255;
+        // dicke, runde Glaskanten: Breite etwa 9 % der Schrifthöhe
+        var r = Math.max(1, Math.round(letterH * 0.032));
+        for (var pass = 0; pass < 3; pass++) { box(a, b, w, h, r, true); box(b, a, w, h, r, false); }
+        var gmax = 1e-6, gx = new Float32Array(n), gy = new Float32Array(n);
+        for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
+          i = y * w + x; gx[i] = (a[i + 1] - a[i - 1]) * 0.5 * mxs; gy[i] = (a[i - w] - a[i + w]) * 0.5 * mys;   // je CSS-Pixel, y nach oben
+          var gm = Math.sqrt(gx[i] * gx[i] + gy[i] * gy[i]); if (gm > gmax) gmax = gm;
+        }
+        for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+          i = y * w + x; var o4 = ((h - 1 - y) * w + x) * 4;     // Zeilen umdrehen (WebGL zählt von unten)
+          var nx = -gx[i] / gmax, ny = -gy[i] / gmax;
+          out[o4] = Math.round(a[i] * 255); out[o4 + 1] = Math.round(Math.min(1, Math.sqrt(nx * nx + ny * ny) * 1.3) * 255);
+          out[o4 + 2] = Math.round((nx * 0.5 + 0.5) * 255); out[o4 + 3] = Math.round((ny * 0.5 + 0.5) * 255);
         }
         c.bindTexture(c.TEXTURE_2D, tex); c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, false); c.pixelStorei(c.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, cw, chh, 0, c.RGBA, c.UNSIGNED_BYTE, out);
-        if (src) { c.generateMipmap(c.TEXTURE_2D); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR_MIPMAP_LINEAR); }
-        else c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR);
+        c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, w, h, 0, c.RGBA, c.UNSIGNED_BYTE, out);
+        c.generateMipmap(c.TEXTURE_2D); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR_MIPMAP_LINEAR);
+      }
+      function pass(x, w, h, mode, ox, oy, scl) {
+        c.viewport(x, 0, w, h); c.uniform1f(U.uOffX, x); c.uniform1f(U.uMode, mode);
+        c.uniform2f(U.uOrig, ox, oy); c.uniform1f(U.uScale, scl);
+        c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
       }
       function draw(now) {
         size();
@@ -774,20 +822,23 @@
             tbuf[i * 3] = (p.x - rect.left) * sx; tbuf[i * 3 + 1] = chh - (p.y - rect.top) * sx; tbuf[i * 3 + 2] = life * life;
           } else tbuf[i * 3 + 2] = 0;
         }
-        // Titelschatten weich ein- und ausblenden
+        // Glas weich ein- und ausblenden
         var dt = Math.min(0.05, (now - (occ.t || now)) / 1000); occ.t = now;
         occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
-        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, occ.on);
-        c.viewport(0, 0, cw, chh); c.uniform1f(U.uOffX, 0); c.uniform1f(U.uMode, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
-        c.viewport(cw, 0, cw, chh); c.uniform1f(U.uOffX, cw); c.uniform1f(U.uMode, 1); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
+        pass(0, cw, chh, 0, 0, 0, 1);
+        pass(cw, cw, chh, 1, 0, 0, 1);
+        if (G) pass(2 * cw, G.PW, G.PH, 0, G.bx * sx, chh - (G.by + G.bh) * sx, G.PW / (G.bw * sx));
         probe(rect, sx);
-        wx.drawImage(gcv, 0, 0, cw, chh, 0, 0, cw, chh);
-        lx.drawImage(gcv, cw, 0, cw, chh, 0, 0, cw, chh);
+        var H = gcv.height;
+        wx.drawImage(gcv, 0, H - chh, cw, chh, 0, 0, cw, chh);
+        lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
+        if (G) gx2.drawImage(gcv, 2 * cw, H - G.PH, G.PW, G.PH, 0, 0, G.PW, G.PH);
       }
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
       var px = null, btnL = 0, pf = 0;
       function probe(rect, sx) {
-        if (++pf % 2 || !infoOpen.offsetWidth) return;
+        if (++pf % 5 || !infoOpen.offsetWidth) return;
         var r = infoOpen.getBoundingClientRect();
         var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
@@ -796,7 +847,7 @@
         c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
         var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
         var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
-        btnL += (v - btnL) * 0.35;
+        btnL += (v - btnL) * 0.6;
         infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
       }
       function loop(now) {
@@ -818,12 +869,12 @@
       window.addEventListener('pointerdown', point, { passive: true });
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
-        wall: wall, glow: glow, start: start,
+        back: back, wall: wall, glow: glow, start: start,
         title: function (T) { if (T) { size(); mask(T); occ.want = 1; } else occ.want = 0; start(); }
       };
     })();
     if (sun) {
-      info.insertBefore(sun.wall, infoPanel); info.appendChild(sun.glow);
+      info.insertBefore(sun.back, infoPanel); info.appendChild(sun.glow);
       root.classList.add('hp-info-sunlit');
       if (!reduce) infoText.classList.add('hp-tilt');
       infoPanel.style.background = 'transparent';
@@ -844,7 +895,7 @@
     var brand = root.querySelector('.hp-brand');
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
-      if (sun) { sun.wall.style.transform = sun.glow.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
+      if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
       // Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
     }
@@ -881,6 +932,7 @@
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
       infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
+      if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
       // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben rechts neben
