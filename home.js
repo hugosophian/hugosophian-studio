@@ -84,9 +84,10 @@
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
     '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
-    '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: 1px 2px 1px rgba(70,55,35,.12), 6px 11px 14px rgba(70,55,35,.16); }',
-    '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: 1px 2px 1px rgba(70,55,35,.12), 5px 9px 12px rgba(70,55,35,.15); }',
-    '[data-hp].hp-info-sunlit .hp-info-title { text-shadow: 2px 3px 2px rgba(70,55,35,.12), 12px 20px 26px rgba(70,55,35,.2); }',
+    '[data-hp].hp-info-sunlit .hp-info-panel { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -5px 11px 14px rgba(70,55,35,.16); }',
+    '[data-hp].hp-info-sunlit.is-info .hp-on-white { text-shadow: -1px 2px 1px rgba(70,55,35,.12), -4px 9px 12px rgba(70,55,35,.15); }',
+    '[data-hp] .hp-sun-light { z-index: 2; mix-blend-mode: screen; }',
+    '[data-hp] .hp-info-title.hp-3d { text-shadow: var(--hp-3d); transition: transform 1.5s cubic-bezier(.6,0,.1,1), text-shadow 1.2s ease .3s; }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
@@ -552,38 +553,49 @@
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
-    // ---------- Sonnenstrahlen hinter dem About-Text (Hugo 22.11.) ----------
-    // Licht, das durch eine Wolkenlücke oben links (ausserhalb des Bildes) fächerförmig herabfällt.
-    // Pro Bildpunkt: Winkel zur Lichtquelle → Rauschen über den Winkel = einzelne Strahlen mit Lücken,
-    // die langsam wandern und atmen. Helligkeit nimmt mit der Entfernung zur Quelle ab, entlang der
-    // Strahlen flimmert leichter Dunst. Der Finger steht im Licht und wirft einen Schatten vom Licht weg.
+    // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
+    // Wie Morgensonne durch Dunst (Hugos Bild): Licht fällt von oben durch eine Wolkendecke in Strahlen auf
+    // die weisse Wand. Der Titel steht leicht gedreht im Raum, hat Tiefe und wirft lange Schattenstreifen,
+    // zwischen den Buchstaben strahlt das Licht durch. Wo ein Strahl über den Text läuft, leuchtet er warm auf.
+    //   Ebene 1 (unter dem Text): Wand mit Strahlen, Wolkenschatten und Titelschatten
+    //   Ebene 2 (über dem Text, mix-blend-mode: screen): nur das Licht. Auf Weiss ändert es nichts,
+    //   schwarze Schrift wird dort goldbraun angestrahlt.
+    // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
-      src: [0.12, -0.2] ,        // Lichtquelle: Anteil Breite, Anteil Höhe über dem oberen Rand
-      rays: [7, 19]  ,            // Strahldichte (grobe / feine Strahlen)
-      drift: [0.035, -0.055],    // wie schnell die Strahlen wandern
-      edge: [0.24, 0.78],        // Schärfe der Strahlen (enger = härter)
-      reach: 2.2,                // wie weit die Strahlen nach unten reichen
-      strength: 1.25,
-      ambient: 0.22,             // so viel Licht liegt auch im Schatten (Wand bleibt hell)
-      shade: [0.86, 0.865, 0.88],   // Schatten auf der weissen Wand: leicht kühl, wie echter Schatten
-      shadeLow: [0.8, 0.805, 0.825], // unten rechts, weit weg vom Licht, etwas tiefer
-      lit: [1.0, 0.985, 0.95],      // Sonne auf der Wand: warmes Weiss
+      src: [0.68, -0.5],         // Sonne: Anteil Breite, Anteil Höhe über dem oberen Rand
+      rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
+      drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
+      edge: [0.3, 0.8],          // Schärfe der Strahlen
+      reach: 1.6,                // wie weit die Strahlen nach unten reichen
+      strength: 1.2,
+      ambient: 0.16,             // so viel Licht liegt auch im Schatten
+      shade: [0.8, 0.81, 0.835], // Schatten auf der Wand: kühl
+      shadeLow: [0.74, 0.75, 0.78],
+      lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
+      textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
+      textAmt: 0.62,
+      occLen: 0.42,              // Länge der Titelschatten (Anteil Höhe)
+      occAmt: 0.8,               // Tiefe der Titelschatten
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
       trailAmt: 0.75,
-      res: 0.6                   // Auflösung (weiches Licht braucht keine volle Schärfe)
+      res: 0.55                  // Auflösung (weiches Licht braucht keine volle Schärfe)
     };
     var sun = (function () {
-      var cv = document.createElement('canvas');
-      cv.className = 'hp-info-sun'; cv.setAttribute('aria-hidden', 'true');
+      var gcv = document.createElement('canvas');
       var c = null;
-      try { c = cv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false }); } catch (e) {}
+      try { c = gcv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true }); } catch (e) {}
       if (!c) return null;
+      function mk(cls) { var v = document.createElement('canvas'); v.className = 'hp-info-sun ' + cls; v.setAttribute('aria-hidden', 'true'); return v; }
+      var wall = mk('hp-sun-wall'), glow = mk('hp-sun-light');
+      var wx = wall.getContext('2d'), lx = glow.getContext('2d');
+      if (!wx || !lx) return null;
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
+        'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
@@ -591,16 +603,29 @@
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy; vec2 q = fc / uRes;',
-        '  vec2 s = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',   // Quelle über dem oberen Rand
+        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0); vec2 q = fc / uRes;',
+        '  vec2 s = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
         '  vec2 d = fc - s; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
         '  float t = uTime;',
-        '  float r = 0.62 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
-        '  r *= 0.8 + 0.4 * n1(t * 0.13 + ang * 3.0);',                // Strahlen atmen
+        // Wolkendecke: Strahlen über den Winkel, wandern und atmen
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
+        '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
-        '  r *= 0.7 + 0.3 * n2(vec2(ang * 18.0, dist * 2.5 - t * 0.12));',   // Dunst entlang der Strahlen
-        '  float fall = exp(-max(dist - 0.3, 0.0) / uReach);',
-        '  float glow = exp(-dist * 2.6);',
+        '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',   // Dunst zieht durch die Strahlen
+        '  float fall = exp(-max(dist - 0.45, 0.0) / uReach);',
+        '  float beam = clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
+        // Titelschatten: Richtung Sonne gehen und schauen, ob der Titel im Weg steht
+        '  float occ = 0.0;',
+        '  if (uOccOn > 0.0) {',
+        '    vec2 dir = normalize(s - fc); float L = uOccLen * uRes.y; float j = h2(fc * 0.37);',
+        '    for (int i = 0; i < 36; i++) {',
+        '      float k = (float(i) + j) / 36.0; vec2 p = fc + dir * (k * L);',
+        '      float m = texture2D(uOcc, p / uRes).r;',
+        '      occ = max(occ, m * pow(1.0 - k, 0.6));',
+        '    }',
+        '    occ *= uOccOn * uOccAmt;',
+        '  }',
+        // Fingerschatten
         '  float sh = 0.0;',
         '  for (int i = 0; i < ' + NT + '; i++) {',
         '    vec3 p = uTrail[i]; if (p.z <= 0.0) continue;',
@@ -610,10 +635,15 @@
         '    float da = (ang - pa) / w;',
         '    sh = max(sh, p.z * behind * exp(-da * da));',
         '  }',
-        '  float light = clamp(uAmb + (r * fall + glow * 0.9) * uStrength, 0.0, 1.0) * (1.0 - sh * uTrailAmt);',
-        '  float far = smoothstep(0.4, 1.6, dist);',
-        '  vec3 col = mix(mix(uShade, uShadeLow, far), uLit, light);',
-        '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',                 // gegen Farbstufen
+        '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
+        '  vec3 col;',
+        '  if (uMode < 0.5) {',
+        '    float light = clamp(uAmb + lit, 0.0, 1.0);',
+        '    col = mix(mix(uShade, uShadeLow, smoothstep(0.5, 1.7, dist)), uLit, light);',
+        '  } else {',
+        '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit);',
+        '  }',
+        '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
         '}'].join('\n');
       function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
@@ -624,20 +654,56 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+        'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
       c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit);
+      c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt);
+      c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt);
       c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
+      // Maske des Titels (weiss auf schwarz) als Textur
+      var mcv = document.createElement('canvas'), mx = mcv.getContext('2d');
+      var tex = c.createTexture(); c.activeTexture(c.TEXTURE0); c.bindTexture(c.TEXTURE_2D, tex);
+      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
+      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
+      c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, 1, 1, 0, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      c.uniform1i(U.uOcc, 0);
+      var occ = { on: 0, t: 0, want: 0, el: null };
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
       function size() {
-        var w = Math.max(1, Math.round(cv.clientWidth * SUN.res)), h = Math.max(1, Math.round(cv.clientHeight * SUN.res));
-        if (w !== cw || h !== chh) { cw = cv.width = w; chh = cv.height = h; c.viewport(0, 0, w, h); }
+        var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
+        if (w !== cw || h !== chh) {
+          cw = wall.width = glow.width = mcv.width = w; chh = wall.height = glow.height = mcv.height = h;
+          gcv.width = w * 2; gcv.height = h; if (occ.el) mask(occ.el);
+        }
       }
+      // Titel in die Maske zeichnen: Schrift wie im Original, gestreckt auf das sichtbare Rechteck
+      function mask(el) {
+        occ.el = el;
+        var rect = wall.getBoundingClientRect(), panelX = rect.left;   // Wand liegt evtl. noch rechts ausserhalb
+        var root0 = root.getBoundingClientRect();
+        var rg = document.createRange(); rg.selectNodeContents(el);
+        var tr = rg.getBoundingClientRect();
+        var cs = getComputedStyle(el), sx = cw / Math.max(1, rect.width);
+        var txt = (el.textContent || '').trim();
+        if (cs.textTransform === 'uppercase') txt = txt.toUpperCase();
+        mx.setTransform(1, 0, 0, 1, 0, 0); mx.fillStyle = '#000'; mx.fillRect(0, 0, cw, chh);
+        if (!txt || tr.width < 2) return upload();
+        var fs = 100;
+        mx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + fs + 'px ' + cs.fontFamily;
+        mx.textBaseline = 'alphabetic';
+        var m = mx.measureText(txt), asc = m.fontBoundingBoxAscent || fs * 0.92, dsc = m.fontBoundingBoxDescent || fs * 0.24;
+        var x0 = (tr.left - root0.left) * sx, y0 = (tr.top - root0.top) * sx, w = tr.width * sx, h = tr.height * sx;
+        mx.setTransform(w / Math.max(1, m.width), 0, 0, h / (asc + dsc), x0, y0);
+        mx.fillStyle = '#fff'; mx.shadowColor = '#fff'; mx.shadowBlur = Math.max(2, h * 0.08); mx.fillText(txt, 0, asc); mx.shadowBlur = 0;
+        upload();
+      }
+      function upload() { c.bindTexture(c.TEXTURE_2D, tex); c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true); c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, c.RGBA, c.UNSIGNED_BYTE, mcv); }
       function draw(now) {
         size();
         var tm = reduce ? 40.0 : (now - t0) / 1000;
-        var rect = cv.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
+        var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
         trail = trail.filter(function (p) { return now - p.t < SUN.trailLife * 1000; });
         for (var i = 0; i < NT; i++) {
           var p = trail[trail.length - 1 - i];
@@ -646,14 +712,20 @@
             tbuf[i * 3] = (p.x - rect.left) * sx; tbuf[i * 3 + 1] = chh - (p.y - rect.top) * sx; tbuf[i * 3 + 2] = life * life;
           } else tbuf[i * 3 + 2] = 0;
         }
-        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf);
-        c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        // Titelschatten weich ein- und ausblenden
+        var dt = Math.min(0.05, (now - (occ.t || now)) / 1000); occ.t = now;
+        occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, occ.on);
+        c.viewport(0, 0, cw, chh); c.uniform1f(U.uOffX, 0); c.uniform1f(U.uMode, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        c.viewport(cw, 0, cw, chh); c.uniform1f(U.uOffX, cw); c.uniform1f(U.uMode, 1); c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        wx.drawImage(gcv, 0, 0, cw, chh, 0, 0, cw, chh);
+        lx.drawImage(gcv, cw, 0, cw, chh, 0, 0, cw, chh);
       }
       function loop(now) {
         raf = 0;
-        if (ip.v >= 1 && !root.classList.contains('is-info')) return;   // Seite zu: nichts zeichnen
+        if (ip.v >= 1 && !root.classList.contains('is-info')) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
         draw(now);
-        if (!reduce || trail.length) raf = requestAnimationFrame(loop);
+        if (!reduce || trail.length || Math.abs(occ.want - occ.on) > 0.01) raf = requestAnimationFrame(loop);
       }
       function point(e) {
         if (reduce || !root.classList.contains('is-info')) return;
@@ -666,15 +738,19 @@
       }
       window.addEventListener('pointermove', point, { passive: true });
       window.addEventListener('pointerdown', point, { passive: true });
-      return { cv: cv, start: function () { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } } };
+      function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
+      return {
+        wall: wall, glow: glow, start: start,
+        title: function (el) { if (el) { size(); mask(el); occ.want = 1; } else occ.want = 0; start(); }
+      };
     })();
     if (sun) {
-      info.insertBefore(sun.cv, infoPanel);
+      info.insertBefore(sun.wall, infoPanel); info.appendChild(sun.glow);
       root.classList.add('hp-info-sunlit');
       infoPanel.style.background = 'transparent';
     }
 
-    var tClone = null, tOrig = null, infoT = 0;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -689,7 +765,7 @@
     var brand = root.querySelector('.hp-brand');
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
-      if (sun) { sun.cv.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
+      if (sun) { sun.wall.style.transform = sun.glow.style.transform = infoPanel.style.transform; if (ip.v < 1) sun.start(); }
       // Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
     }
@@ -755,7 +831,20 @@
         tClone.style.transformOrigin = '0 0';
         root.style.setProperty('--hp-info-top', (top + tr.height * sc + H * 0.035).toFixed(0) + 'px');
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
-        tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')';
+        var t3 = '';
+        if (sun && !reduce) {
+          // 3D: Titel leicht seitlich gedreht (rechts weiter weg), Tiefe nach unten links, weg vom Licht oben rechts
+          t3 = ' perspective(' + Math.round(tr.width * 2.4) + 'px) rotateY(20deg)';
+          var cc = (getComputedStyle(tClone).color.match(/[\d.]+/g) || [0, 0, 0]).map(Number);
+          var dk = 'rgb(' + [0, 1, 2].map(function (k) { return Math.round(cc[k] * 0.42); }).join(',') + ')', ly = [];
+          for (var li = 1; li <= 8; li++) ly.push((-0.0035 * li).toFixed(4) + 'em ' + (0.006 * li).toFixed(4) + 'em 0 ' + dk);
+          ly.push('-0.03em 0.07em 0.06em rgba(40,30,15,.28)');
+          tClone.style.setProperty('--hp-3d', ly.join(','));
+          tClone.classList.add('hp-3d');
+        }
+        tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
+        clearTimeout(sunT);
+        sunT = setTimeout(function () { if (sun && tClone && root.classList.contains('is-info')) sun.title(tClone); }, reduce ? 50 : CONFIG.infoMs * 0.8);
       }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
@@ -775,7 +864,8 @@
         tween(iz, 0, 1000, easeDock);
       }
       tween(ip, 1, CONFIG.infoMs, easeInfo);
-      if (tClone) tClone.style.transform = 'translate3d(0,0,0)';
+      if (tClone) { tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d'); }
+      clearTimeout(sunT); if (sun) sun.title(null);
       clearTimeout(infoT);
       infoT = setTimeout(function () {
         if (root.classList.contains('is-info')) return;
