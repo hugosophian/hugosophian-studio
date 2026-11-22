@@ -573,7 +573,7 @@
       src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
       rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
-      edge: [0.38, 0.74],         // Schärfe der Strahlen
+      edge: [0.3, 0.8],           // Schärfe der Strahlen
       reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
@@ -619,7 +619,7 @@
         'vec2 S;',
         'float beamAt(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y; float t = uTime;',
-        '  float r = 0.3 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0) + 0.32 * n1(ang * uRays.y * 2.3 - t * uDrift.x * 1.4 + 2.9);',
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
         '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
@@ -628,7 +628,7 @@
         '}',
         'float rayR(vec2 p) {',
         '  vec2 d = p - S; float ang = atan(d.x, -d.y); float t = uTime;',
-        '  float r = 0.3 * n1(ang * uRays.x + t * uDrift.x) + 0.38 * n1(ang * uRays.y + t * uDrift.y + 7.0) + 0.32 * n1(ang * uRays.y * 2.3 - t * uDrift.x * 1.4 + 2.9);',
+        '  float r = 0.6 * n1(ang * uRays.x + t * uDrift.x) + 0.4 * n1(ang * uRays.y + t * uDrift.y + 7.0);',
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  return smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r);',
         '}',
@@ -672,6 +672,14 @@
         '    float da = (ang - pa) / w;',
         '    sh = max(sh, p.z * behind * exp(-da * da));',
         '  }',
+        // Bewegung am Boden wie auf der Sonnenoberfläche: im Licht wabert ein fliessendes, verwirbeltes Muster,
+        // perspektivisch auf den Boden gelegt (hinten klein, vorne gross), mit feinen hellen Fäden dazwischen.
+        '  float yh = max(uHor - fc.y, 2.0) / uRes.y;',
+        '  vec2 gp = vec2((fc.x - 0.5 * uRes.x) / uRes.y / yh, 1.0 / yh) * 0.55;',
+        '  vec2 wq = vec2(n2(gp * 1.7 + vec2(t * 0.11, -t * 0.07)), n2(gp * 1.9 + vec2(-t * 0.09, t * 0.13) + 5.2));',
+        '  float sv = n2(gp * 2.6 + wq * 2.2 + vec2(0.0, t * 0.05));',
+        '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 7.0);',
+        '  float onG = grd * smoothstep(0.05, 0.45, beam);',
         '  beam *= rf;',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
@@ -679,7 +687,11 @@
         '  vec3 shade = mix(uShade, uShadeLow, grd * (0.5 + 0.5 * (1.0 - fc.y / max(uHor, 1.0))));',
         '  vec3 col;',
         '  if (uMode < 0.5) {',
-        '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
+        '    float L = clamp(uAmb + lit, 0.0, 1.0);',
+        '    float sh2 = onG * smoothstep(0.0, 0.6, uOn);',
+        '    L *= mix(1.0, 0.8 + 0.2 * sv - 0.08 * fil, sh2);',
+        '    col = mix(shade, uLit, L) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
+        '    col += vec3(1.0, 0.85, 0.55) * fil * sh2 * 0.1;',
         '    col = mix(vec3(1.0), col, smoothstep(0.0, 0.45, uOn));',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
@@ -691,6 +703,7 @@
         '    vec2 pB = S + vec2(dd.x * cs + dd.y * sn, -dd.x * sn + dd.y * cs);',
         '    float b0 = max(beamAt(fc), 0.03);',
         '    vec3 disp = clamp(vec3(beamAt(pR), b0, beamAt(pB)) / b0, 0.0, 1.6);',
+        '    lit *= mix(1.0, 0.85 + 0.3 * sv, onG);',
         '    float tl = smoothstep(0.25, 0.95, lit);',
         '    vec3 tl3 = smoothstep(vec3(0.25), vec3(0.95), lit * disp);',
         '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
