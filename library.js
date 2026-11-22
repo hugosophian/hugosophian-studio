@@ -337,8 +337,8 @@
         '  vec3 sp2 = mix(spec, vec3(1.0), 0.25);',
         '  float mz = exp(-e / 22.0) * hit;',
         '  pc += (sp2 - 0.5) * mz * (0.12 + cw * 0.38 + fil * 0.3);',
-        '  float band = exp(-e * e / 14.0) * (0.65 + 0.35 * smoothstep(0.2, 0.8, sv + 0.25 * exp(-e / 6.0))) * hit;',
-        '  return mix(pc, mix(spec, vec3(1.0), 0.1) * 1.03, clamp(band, 0.0, 1.0) * 0.75);',
+        '  float band = exp(-e * e / 26.0) * (0.6 + 0.4 * smoothstep(0.2, 0.8, sv + 0.25 * exp(-e / 6.0))) * hit;',
+        '  return mix(pc, mix(spec, vec3(1.0), 0.1) * 1.03, clamp(band, 0.0, 1.0) * 0.62);',
         '}'].join('\n');
       var VS = [
         'attribute vec2 aUv;',
@@ -454,7 +454,7 @@
           'void main() {',
           '  float l = (texture2D(uRays, vUv + uTexel * vec2(0.5, 0.5)).r + texture2D(uRays, vUv - uTexel * vec2(0.5, 0.5)).r',
           '           + texture2D(uRays, vUv + uTexel * vec2(0.5, -0.5)).r + texture2D(uRays, vUv + uTexel * vec2(-0.5, 0.5)).r) * 0.25 * uAmt;',
-          '  l *= mix(0.12, 1.0, smoothstep(uRow.y * 0.75, uRow.y * 1.35, abs(vUv.y - uRow.x)));',
+          '  l *= mix(0.5, 1.0, smoothstep(uRow.y * 0.6, uRow.y * 1.4, abs(vUv.y - uRow.x)));',
           '  float g = h(floor(gl_FragCoord.xy) + fract(uTime * 7.31) * 137.0);',
           '  l *= 1.0 - uGrain + uGrain * 2.0 * g;',
           '  vec3 col = uColor * l;',
