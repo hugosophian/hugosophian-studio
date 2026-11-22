@@ -332,11 +332,13 @@
         '  vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 4.0 + uT * 0.02 + vec3(0.0, 0.33, 0.67)));',
         '  pc += (cr - 0.5) * cw * lg * 0.18;',
         '  vec3 spec = 0.5 + 0.5 * cos(6.2832 * (per * 2.0 - uT * 0.08 + vec3(0.0, 0.33, 0.67)));',
-        '  float hit = smoothstep(0.15, 0.8, raysAt(sp, 0.0) * 1.4);',
-        '  float mz = exp(-e / 12.0) * hit;',
-        '  pc += (spec - 0.5) * mz * (cw * 0.4 + fil * 0.35);',
-        '  float band = exp(-e * e / 9.0) * (0.75 + 0.5 * sv) * hit;',
-        '  return mix(pc, spec * 1.04, clamp(band, 0.0, 1.0) * 0.65);',
+        // Hugo 22.11.: Randfarbe weicher, breiter auslaufend und mit dem Muster verwoben
+        '  float hit = smoothstep(0.1, 0.9, raysAt(sp, 0.0) * 1.4);',
+        '  vec3 sp2 = mix(spec, vec3(1.0), 0.25);',
+        '  float mz = exp(-e / 22.0) * hit;',
+        '  pc += (sp2 - 0.5) * mz * (0.12 + cw * 0.38 + fil * 0.3);',
+        '  float band = exp(-e * e / 45.0) * (0.55 + 0.45 * smoothstep(0.2, 0.8, sv + 0.25 * exp(-e / 6.0))) * hit;',
+        '  return mix(pc, sp2 * 1.03, clamp(band, 0.0, 1.0) * 0.5);',
         '}'].join('\n');
       var VS = [
         'attribute vec2 aUv;',
