@@ -48,6 +48,7 @@
     mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
     mbFrom:     60,     // px/s, darunter scharf
     mbSpeed:    1800,   // px/s, ab hier volle Verwischung (wie die Galerie)
+    mbRainbow:  3.0,    // Farbstärke der Zwischenbilder (1 = kaum, 4 = kräftig)
     mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
@@ -196,7 +197,12 @@
       var ghosts = [];
       if (img && !reduce) for (var gi = 0; gi < CONFIG.mbGhosts; gi++) {
         var gh = img.cloneNode(false); gh.removeAttribute('id'); gh.className = 'hp-img hp-ghost'; gh.alt = ''; gh.setAttribute('aria-hidden', 'true');
-        img.parentNode.appendChild(gh); ghosts.push(gh);
+        // Hugo 22.11.: ein Hauch Regenbogen in der Unschärfe, wie Licht durch ein Prisma (oben rot … unten violett)
+        // Gegenfarben paarweise (rot ↔ cyan, gelb ↔ blau): in der Mitte heben sie sich auf, nur an den Kanten bleibt Farbe
+        var hue = [-35, 15, null, null, 190, 145][Math.round(gi * 5 / Math.max(1, CONFIG.mbGhosts - 1))];
+        if (hue !== null) { gh.style.filter = 'sepia(.6) saturate(' + CONFIG.mbRainbow + ') hue-rotate(' + hue + 'deg)'; gh.setAttribute('data-c', '1'); }
+        if (hue !== null) img.parentNode.insertBefore(gh, img.nextSibling); else img.parentNode.appendChild(gh);   // farbige unter die neutralen
+        ghosts.push(gh);
       }
       stage.appendChild(el);
       var s = {
@@ -336,7 +342,7 @@
       for (var k = 0; k < N; k++) {
         var f = (k + 0.5) / N - 0.5;                 // −0.5 … 0.5
         g[k].style.transform = 'translate3d(0,' + (f * 2 * L).toFixed(2) + 'px,0)';
-        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
+        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f)) * (g[k].hasAttribute('data-c') ? 0.6 : 1)).toFixed(3);
       }
     }
     var mbF = 0, mbV = 0;

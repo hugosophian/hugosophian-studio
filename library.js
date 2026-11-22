@@ -699,6 +699,7 @@
       c.uniform1f(U.uDpr, gl.cv.width / Math.max(1, gl.w));
       sunU(c, U, amt);
       cards(0);
+      if (typeof titleLight !== 'undefined' && titleLight) titleLight.draw(root.classList.contains('is-pv-dim') ? 0 : amt);
     }
     // Licht: Ruhelage hinter der Reihenmitte, zieht weich zum Finger (solange er liegt) bzw. zur Maus
     var lt = { x: 0, y: 0, fx: 0, fy: 0, on: false, down: false, init: false, t: 0, amt: 0, t0: 0, by: 0, bh: 0, pvf: 1, hx: 0, hy: 0, ha: 0 };
@@ -1317,14 +1318,16 @@
       var raf = 0, w = 0, h = 0, tail = 0;
       function draw() {
         raf = 0;
-        var on = root.classList.contains('is-pv');
+        var on = root.classList.contains('is-pv') && pvState !== 'closing';
+        // Schliessen: Licht während des Rückflugs ausblenden, damit nach der Landung nichts aufblitzt
+        under.style.transition = over.style.transition = on ? 'opacity .5s ease' : 'opacity ' + Math.round(CONFIG.pvCloseMs * 0.45) + 'ms ease';
         under.style.opacity = over.style.opacity = on ? '1' : '0';
         if (on) tail = 45; else if (--tail < 0) return;   // nach dem Schliessen noch kurz weiterzeichnen (Ausblenden)
         var r = pv.getBoundingClientRect(), fr = pvFrame.getBoundingClientRect();
         var nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));   // CSS-px: weiches Licht, Kanten bleiben fein genug
         if (nw !== w || nh !== h) { w = under.width = over.width = nw; h = under.height = over.height = nh; g.width = 2 * w; g.height = h; }
         // Lage auf der Bühne: Bühnen-x = Bildschirm-x − Bühne links; die Leinwand beginnt bei r.left/r.top
-        var sx = r.left + gl.ox, syTop = r.top + gl.oy;   // Bühnen-px der linken oberen Ecke
+        var sx = r.left, syTop = r.top;   // die Karten-Leinwand beginnt bei Bildschirm 0/0
         c.uniform2f(U.uRes, w, h);
         c.uniform2f(U.uOrg, sx, gl.h - (syTop + h));
         c.uniform4f(U.uFr, fr.left - r.left, h - (fr.bottom - r.top), fr.right - r.left, h - (fr.top - r.top));
@@ -1338,6 +1341,53 @@
         raf = requestAnimationFrame(draw);
       }
       return { start: function () { if (!raf) raf = requestAnimationFrame(draw); } };
+    })();
+    // Überschrift im Karussell (Name und Jahr) wird wie der Titel auf der About-Seite angestrahlt (Hugo 22.11.):
+    // eine Ebene genau über dem Titel (multiply). Ohne Licht weiss (keine Änderung), im Strahl golden mit Prisma-Säumen.
+    var titleLight = (function () {
+      if (!meta || !gl || !gl.RAYF || reduce) return null;
+      var g = document.createElement('canvas'), c = null;
+      try { c = g.getContext('webgl', { alpha: false, antialias: false, preserveDrawingBuffer: true }); } catch (e) {}
+      if (!c) return null;
+      var v = document.createElement('canvas'); v.className = 'lib-title-sun'; v.setAttribute('aria-hidden', 'true');
+      v.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;mix-blend-mode:multiply;z-index:25;';
+      root.appendChild(v);
+      var vx = v.getContext('2d');
+      var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + gl.RAYF + '\n' + [
+        'uniform vec2 uOrg;',
+        'void main() {',
+        '  vec2 sp = gl_FragCoord.xy + uOrg;',
+        '  vec3 L = vec3(raysAt(sp, ' + CONFIG.prism.toFixed(3) + '), raysAt(sp, 0.0), raysAt(sp, -' + CONFIG.prism.toFixed(3) + ')) * 1.5 * uLA;',
+        '  vec3 tl3 = smoothstep(vec3(0.3), vec3(0.95), L);',
+        '  float tm = min(tl3.r, min(tl3.g, tl3.b));',
+        '  vec3 tint = mix(vec3(1.0), vec3(1.0, 0.78, 0.52), tm * 0.85);',          // golden
+        '  vec3 fr = tl3 - tm;',                                                      // Prisma-Säume
+        '  tint *= 1.0 - (vec3(fr.g + fr.b, fr.r + fr.b, fr.r + fr.g)) * 0.55;',      // Gegenfarben abziehen → reine Farbe bleibt
+        '  gl_FragColor = vec4(clamp(tint, 0.0, 1.0), 1.0);',
+        '}'].join('\n');
+      var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+      function sh(t, src) { var x = c.createShader(t); c.shaderSource(x, src); c.compileShader(x); return c.getShaderParameter(x, c.COMPILE_STATUS) ? x : null; }
+      var vs = sh(c.VERTEX_SHADER, VS), fs = sh(c.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) return null;
+      var p = c.createProgram(); c.attachShader(p, vs); c.attachShader(p, fs); c.linkProgram(p);
+      if (!c.getProgramParameter(p, c.LINK_STATUS)) return null;
+      c.useProgram(p);
+      var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
+      var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
+      var U = {}; ['uOrg', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var w = 0, h = 0;
+      return { draw: function (amt) {
+        var r = meta.getBoundingClientRect();
+        if (amt < 0.002 || r.width < 2 || r.height < 2) { v.style.visibility = 'hidden'; return; }
+        v.style.visibility = '';
+        var nw = Math.round(r.width), nh = Math.round(r.height);
+        if (nw !== w || nh !== h) { w = v.width = g.width = nw; h = v.height = g.height = nh; v.style.width = nw + 'px'; v.style.height = nh + 'px'; c.viewport(0, 0, w, h); }
+        v.style.transform = 'translate(' + r.left.toFixed(1) + 'px,' + r.top.toFixed(1) + 'px)';
+        c.uniform2f(U.uOrg, r.left, gl.h - (r.top + h));   // Leinwand der Karten liegt bei Bildschirm 0/0
+        sunU(c, U, amt);
+        c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        vx.drawImage(g, 0, 0);
+      } };
     })();
     var EASE_OPEN = 'cubic-bezier(.6,0,.1,1)';
     function box(r) { return 'translate(' + r.left + 'px,' + r.top + 'px) scale(' + (r.width / 100) + ',' + (r.height / 100) + ')'; }
