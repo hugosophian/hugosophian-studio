@@ -58,7 +58,7 @@
     raySamples: 60,     // madebyigor (GodRaysEffect): 60
     rayExposure: 0.6, rayDecay: 0.97, rayDensity: 1.0, rayWeight: 0.3, rayClamp: 0.45,   // wie madebyigor, nur heller begrenzt (Titel bleibt lesbar)
     sunSize:    1.5,    // Durchmesser der Lichtquelle als Anteil der kleineren Bildschirmseite
-    sunGlow:    0.075,  // Helligkeit der Lichtquelle (madebyigor 0.058)
+    sunGlow:    0.022,  // Helligkeit der Lichtquelle (madebyigor 0.058)
     // Leuchttisch (Hugo 22.11.): hinter der Bildreihe liegt ein Lichtband wie hinter einem Filmstreifen.
     // Es scheint zwischen den Bildern und an ihren Rändern hervor, die Strahlen gehen nach oben und unten weg.
     band:       0.85,   // halbe Höhe des Lichtbands als Anteil der Bildhöhe
@@ -67,7 +67,7 @@
     rayColor:   [1, 0.9, 0.74],   // warmes Sonnenlicht wie auf der About-Seite
     sunRays:    0.11,   // Stärke der Sonnenstrahlen im Hintergrund
     sunFrom:    [0.86, -0.3],   // Sonne kommt von hier (wie auf der About-Seite) …
-    sunMorph:   2.6,    // s … und sinkt hinter die Bildreihe, während diese einfliegt
+    sunMorph:   0,      // Hugo 22.11.: Sonne steht schon beim Laden hinter der Reihe
     paper:      [0.93, 0.932, 0.94],     // weisser Rahmen im Schatten: milchiges Papier
     paperLit:   [1.0, 0.975, 0.93],     // im Sonnenlicht
     prism:      0.017,  // Farbzerlegung (Winkel), wie auf der About-Seite
@@ -418,7 +418,7 @@
           '  float band = exp(-dy * dy * 2.0) * (0.6 + 0.4 * exp(-pow((px.x - uLight.x) / (uRes.x * 0.6), 2.0)));',
           '  float nb = mix(0.75, 1.0, n3(vec3(px.x / uRes.y * 5.0, dy, uTime * 0.4)));',
           '  float sdist = length(px - uSunP) / uViewH;',
-          '  float sr = raysAt(px, 0.0) * smoothstep(0.02, 0.12, sdist) * exp(-sdist * 1.6) * ' + CONFIG.sunRays.toFixed(3) + ';',
+          '  float sr = raysAt(px, 0.0) * smoothstep(0.05, 0.3, sdist) * exp(-sdist * 1.6) * ' + CONFIG.sunRays.toFixed(3) + ';',
           '  gl_FragColor = vec4(vec3(sr + uGlow * g * nz + uBand.y / max(uBand.y, 1.0) * ' + CONFIG.bandGlow.toFixed(3) + ' * band * nb), 1.0);',
           '}'].join('\n');
         var NS = Math.max(8, Math.round(CONFIG.raySamples));
@@ -714,8 +714,8 @@
       lt.ha += ((lt.down ? 1 : 0) - lt.ha) * (1 - Math.exp(-dt / (lt.down ? 0.25 : 0.6)));
       // Sonne: kommt von oben rechts (wie auf der About-Seite) und sinkt hinter die Reihe, sobald diese gelandet ist
       var sx0 = CONFIG.sunFrom[0] * W + gl.ox * 0, sy0 = CONFIG.sunFrom[1] * H;
-      if (!lt.t0) { lt.t0 = now; lt.x = sx0; lt.y = sy0; }
-      var mf = Math.min(1, (now - lt.t0) / 1000 / CONFIG.sunMorph); mf = mf < 0.5 ? 4 * mf * mf * mf : 1 - Math.pow(-2 * mf + 2, 3) / 2;
+      if (!lt.t0) { lt.t0 = now; lt.x = CONFIG.sunMorph > 0 ? sx0 : tx; lt.y = CONFIG.sunMorph > 0 ? sy0 : ty; }
+      var mf = CONFIG.sunMorph > 0 ? Math.min(1, (now - lt.t0) / 1000 / CONFIG.sunMorph) : 1; mf = mf < 0.5 ? 4 * mf * mf * mf : 1 - Math.pow(-2 * mf + 2, 3) / 2;
       if (mf < 1) { lt.x = sx0 + (tx - sx0) * mf; lt.y = sy0 + (ty - sy0) * mf; }
       // in der Projekt-Info strahlt es weiter (Hugo 22.11.)
       var f = Math.min(1, (now - lt.t0) / 1000 / CONFIG.rayFadeIn);
