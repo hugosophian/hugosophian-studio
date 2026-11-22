@@ -62,13 +62,21 @@
     // Leuchttisch (Hugo 22.11.): hinter der Bildreihe liegt ein Lichtband wie hinter einem Filmstreifen.
     // Es scheint zwischen den Bildern und an ihren Rändern hervor, die Strahlen gehen nach oben und unten weg.
     band:       0.85,   // halbe Höhe des Lichtbands als Anteil der Bildhöhe
-    bandGlow:   0.13,   // Helligkeit des Bands
-    rayFan:     0.45,   // 0 = Strahlen senkrecht vom Band weg, 1 = alle zu einem Punkt (wie vorher)
-    rayColor:   [1, 1, 1],
-    rayFollow:  0.45,   // so weit wandert das Licht Richtung Finger/Maus (Anteil des Abstands)
+    bandGlow:   0.04,   // Helligkeit des Bands (jetzt nur noch ein Hauch, die Sonne macht das Licht)
+    rayFan:     1.0,    // 0 = Strahlen senkrecht vom Band weg, 1 = alle zu einem Punkt (wie vorher)
+    rayColor:   [1, 0.9, 0.74],   // warmes Sonnenlicht wie auf der About-Seite
+    sunRays:    0.11,   // Stärke der Sonnenstrahlen im Hintergrund
+    sunFrom:    [0.86, -0.3],   // Sonne kommt von hier (wie auf der About-Seite) …
+    sunMorph:   1.8,    // s … und sinkt hinter die Bildreihe
+    paper:      [0.93, 0.932, 0.94],     // weisser Rahmen im Schatten: milchiges Papier
+    paperLit:   [1.0, 0.975, 0.93],     // im Sonnenlicht
+    prism:      0.02,   // Farbzerlegung (Winkel), wie auf der About-Seite
+    rayFollow:  0.15,   // Sonne rückt nur leicht zum Finger, dafür kommt ein Strahl in seine Richtung
+
+    rayFollowOld: 0.45,  // so weit wandert das Licht Richtung Finger/Maus (Anteil des Abstands)
     rayEase:    0.17,   // Zeitkonstante (s) fürs Nachziehen (madebyigor ≈ 0.17 s)
     rayFadeIn:  1.6,    // s, das Licht geht an, wenn die Reihe gelandet ist
-    grain:      0.35,   // Filmkorn in den Strahlen
+    grain:      0.22,   // Filmkorn in den Strahlen
     gl:         true,   // Bilder per WebGL wie Mario; ohne WebGL normale Karten ohne Biegen
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
     // Eintritt wie CRL (_spinIntro): die ganze Reihe zieht einmal durch (3 s, back.inOut(.54)),
@@ -288,6 +296,22 @@
       var c = null;
       try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: true }); } catch (e) {}
       if (!c) return;
+      // Sonnenstrahlen wie auf der About-Seite (Hugo 22.11.): Strahlenmuster über den Winkel zur Sonne,
+      // langsam wandernd; dazu ein Strahl in Richtung des Fingers (uHero: Winkel, Breite, Stärke)
+      var RAYF = [
+        'uniform vec2 uSunP; uniform float uT; uniform float uLA; uniform vec3 uHero; uniform float uViewH;',
+        'float rh2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float rn2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+        '  return mix(mix(rh2(i), rh2(i + vec2(1.0, 0.0)), f.x), mix(rh2(i + vec2(0.0, 1.0)), rh2(i + vec2(1.0, 1.0)), f.x), f.y); }',
+        'float raysAt(vec2 p, float da) {',
+        '  vec2 d = p - uSunP; float a = atan(d.y, d.x) + da; float dist = length(d) / uViewH;',
+        '  vec2 cs = vec2(cos(a), sin(a));',                                       // auf dem Kreis: keine Naht
+        '  float r = 0.6 * rn2(cs * 2.4 + vec2(uT * 0.05, -uT * 0.03)) + 0.4 * rn2(cs * 6.0 + vec2(-uT * 0.07, uT * 0.04) + 3.0);',
+        '  r = smoothstep(0.4, 0.78, r) * (0.75 + 0.25 * rn2(vec2(a * 9.0, dist * 3.0 - uT * 0.3)));',
+        '  float hd = a - uHero.x; hd = atan(sin(hd), cos(hd)) / uHero.y;',
+        '  r = max(r, uHero.z * exp(-hd * hd));',
+        '  return r * exp(-dist * 0.9);',
+        '}'].join('\n');
       var VS = [
         'attribute vec2 aUv;',
         'uniform vec2 uCenter; uniform vec2 uSize; uniform vec2 uView; uniform float uP; uniform float uPc; uniform vec4 uK; uniform float uRot;',
@@ -306,8 +330,8 @@
         '  vec2 s = c + (w - c) * (uK.w / (uK.w - p.z));',                        // Kamera uK.w px vor der Ebene
         '  gl_Position = vec4(s.x / uView.x * 2.0 - 1.0, s.y / uView.y * 2.0 - 1.0, -p.z / (uK.w * 4.0), 1.0);',
         '}'].join('\n');
-      var FS = [
-        'precision mediump float;',
+      var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + RAYF + '\n' + [
+        'uniform float uDpr;',
         'uniform sampler2D uTex; uniform float uOpacity; uniform vec4 uBox; uniform float uImageAspect; uniform float uCardAspect; uniform float uZoom; uniform float uBlur; uniform float uMode;',
         'varying vec2 vUv;',
         // Farbe der Karte an einer Stelle: weisser Rahmen oder Foto (Mario-Zoom)
@@ -330,6 +354,21 @@
         '      col += card(vUv + vec2(f * uBlur, 0.0)) * w; ws += w; }',
         '    col /= ws;',
         '  } else { col = card(vUv); }',
+        '  if (uLA > 0.002) {',
+        '    float inP = step(uBox.x, vUv.x) * step(vUv.x, uBox.y) * step(uBox.z, vUv.y) * step(vUv.y, uBox.w);',
+        '    vec2 sp = gl_FragCoord.xy / uDpr;',
+        '    vec3 L = vec3(raysAt(sp, ' + CONFIG.prism.toFixed(3) + '), raysAt(sp, 0.0), raysAt(sp, -' + CONFIG.prism.toFixed(3) + ')) * 0.9;',
+        '    float lg = clamp(L.g, 0.0, 1.0);',
+        '    vec2 q = sp / uViewH * 5.0;',
+        '    vec2 wq = vec2(rn2(q * 0.9 + vec2(uT * 0.11, -uT * 0.07)), rn2(q + vec2(-uT * 0.09, uT * 0.13) + 5.2));',
+        '    float sv = rn2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05)); float fil = pow(1.0 - abs(2.0 * sv - 1.0), 7.0);',
+        '    vec3 pc = mix(vec3(' + CONFIG.paper.join(', ') + '), vec3(' + CONFIG.paperLit.join(', ') + '), clamp(lg, 0.0, 1.0));',
+        '    float mn = min(L.r, min(L.g, L.b));',
+        '    pc += (L - mn) * vec3(1.0, 0.85, 1.35) * 0.8;',
+        '    pc *= mix(1.0, 0.93 + 0.12 * sv, clamp(lg * 2.0, 0.0, 1.0));',
+        '    pc += vec3(1.0, 0.85, 0.55) * fil * lg * 0.16;',
+        '    col = mix(col, mix(col, pc, uLA), 1.0 - inP);',
+        '  }',
         '  gl_FragColor = vec4(col * uOpacity, uOpacity);',
         '}'].join('\n');
       function sh(type, src) { var s = c.createShader(type); c.shaderSource(s, src); c.compileShader(s); return c.getShaderParameter(s, c.COMPILE_STATUS) ? s : null; }
@@ -345,7 +384,7 @@
       var vb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, vb); c.bufferData(c.ARRAY_BUFFER, new Float32Array(uv), c.STATIC_DRAW);
       var ib = c.createBuffer(); c.bindBuffer(c.ELEMENT_ARRAY_BUFFER, ib); c.bufferData(c.ELEMENT_ARRAY_BUFFER, new Uint16Array(ix), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aUv'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom', 'uBlur', 'uMode'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uCenter', 'uSize', 'uView', 'uP', 'uPc', 'uK', 'uRot', 'uTex', 'uOpacity', 'uBox', 'uImageAspect', 'uCardAspect', 'uZoom', 'uBlur', 'uMode', 'uDpr', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform1i(U.uTex, 0);
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, true);
@@ -358,7 +397,7 @@
       if (CONFIG.rays && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) R = (function () {
         var HP = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
         var QV = 'attribute vec2 aPos; varying vec2 vUv; void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }';
-        var SUN = HP + [
+        var SUN = HP + RAYF + '\n' + [
           'uniform vec2 uRes; uniform vec2 uLight; uniform float uRad; uniform float uTime; uniform float uGlow; uniform vec2 uBand;',
           'varying vec2 vUv;',
           'float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }',
@@ -373,7 +412,9 @@
           '  vec2 px = vUv * uRes; float dy = (px.y - uBand.x) / uBand.y;',
           '  float band = exp(-dy * dy * 2.0) * (0.6 + 0.4 * exp(-pow((px.x - uLight.x) / (uRes.x * 0.6), 2.0)));',
           '  float nb = mix(0.75, 1.0, n3(vec3(px.x / uRes.y * 5.0, dy, uTime * 0.4)));',
-          '  gl_FragColor = vec4(vec3(uGlow * g * nz + uBand.y / max(uBand.y, 1.0) * ' + CONFIG.bandGlow.toFixed(3) + ' * band * nb), 1.0);',
+          '  float sdist = length(px - uSunP) / uViewH;',
+          '  float sr = raysAt(px, 0.0) * smoothstep(0.02, 0.12, sdist) * exp(-sdist * 1.6) * ' + CONFIG.sunRays.toFixed(3) + ';',
+          '  gl_FragColor = vec4(vec3(sr + uGlow * g * nz + uBand.y / max(uBand.y, 1.0) * ' + CONFIG.bandGlow.toFixed(3) + ' * band * nb), 1.0);',
           '}'].join('\n');
         var NS = Math.max(8, Math.round(CONFIG.raySamples));
         var RAY = 'precision mediump float;\n' + [
@@ -405,7 +446,7 @@
           var u = {}; names.forEach(function (k) { u[k] = c.getUniformLocation(p, k); });
           return { p: p, u: u };
         }
-        var sun = mk(SUN, ['uRes', 'uLight', 'uRad', 'uTime', 'uGlow', 'uBand']);
+        var sun = mk(SUN, ['uRes', 'uLight', 'uRad', 'uTime', 'uGlow', 'uBand', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH']);
         var ray = mk(RAY, ['uOcc', 'uLightUv', 'uPar', 'uClamp', 'uFan']);
         var comp = mk(COMP, ['uRays', 'uTexel', 'uTime', 'uGrain', 'uAmt', 'uColor']);
         if (!sun || !ray || !comp) return null;
@@ -600,6 +641,7 @@
         c.disableVertexAttribArray(gl.loc); c.enableVertexAttribArray(1);
         c.useProgram(R.sun.p); c.blendFunc(c.ONE, c.ONE);
         c.uniform2f(R.sun.u.uRes, gl.w, gl.h); c.uniform2f(R.sun.u.uLight, lx, ly);
+        sunU(c, R.sun.u, amt);
         c.uniform1f(R.sun.u.uRad, CONFIG.sunSize * Math.min(gl.w, gl.h)); c.uniform1f(R.sun.u.uTime, tm); c.uniform1f(R.sun.u.uGlow, CONFIG.sunGlow);
         c.uniform2f(R.sun.u.uBand, gl.h - (lt.by - gl.oy), Math.max(8, lt.bh * CONFIG.band));
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
@@ -629,14 +671,26 @@
       } else {
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
       }
+      // Licht auf dem weissen Rahmen (milchiges Papier mit Regenbogen und Bewegung)
+      c.uniform1f(U.uDpr, gl.cv.width / Math.max(1, gl.w));
+      sunU(c, U, amt);
       cards(0);
     }
     // Licht: Ruhelage hinter der Reihenmitte, zieht weich zum Finger (solange er liegt) bzw. zur Maus
-    var lt = { x: 0, y: 0, fx: 0, fy: 0, on: false, down: false, init: false, t: 0, amt: 0, t0: 0, by: 0, bh: 0, pvf: 1 };
+    var lt = { x: 0, y: 0, fx: 0, fy: 0, on: false, down: false, init: false, t: 0, amt: 0, t0: 0, by: 0, bh: 0, pvf: 1, hx: 0, hy: 0, ha: 0 };
     window.addEventListener('pointermove', function (e) { if ((e.pointerType === 'mouse' && (e.clientX || e.clientY)) || lt.down) { lt.fx = e.clientX; lt.fy = e.clientY; lt.on = true; } }, { passive: true });
     window.addEventListener('pointerdown', function (e) { lt.down = true; lt.fx = e.clientX; lt.fy = e.clientY; lt.on = true; }, { passive: true });
     ['pointerup', 'pointercancel'].forEach(function (ev) { window.addEventListener(ev, function (e) { lt.down = false; if (e.pointerType !== 'mouse') lt.on = false; }, { passive: true }); });
     document.documentElement.addEventListener('mouseleave', function () { lt.on = false; });
+    // gemeinsame Werte für Hintergrund und Rahmen: Sonne (Bühnen-px, y nach oben), Zeit, Stärke, Fingerstrahl
+    function sunU(c, u, amt) {
+      c.uniform2f(u.uSunP, lt.x - gl.ox, gl.h - (lt.y - gl.oy));
+      c.uniform1f(u.uT, (performance.now() / 1000) % 1000);
+      c.uniform1f(u.uLA, amt);
+      c.uniform1f(u.uViewH, gl.h);
+      var hx = lt.hx - gl.ox - (lt.x - gl.ox), hy = (gl.h - (lt.hy - gl.oy)) - (gl.h - (lt.y - gl.oy));
+      c.uniform3f(u.uHero, Math.atan2(hy, hx), Math.max(0.035, 70 / Math.max(60, Math.hypot(hx, hy))), lt.ha);
+    }
     function rayAmount(list) {
       var now = performance.now(), dt = lt.t ? Math.min(0.05, (now - lt.t) / 1000) : 1 / 60; lt.t = now;
       var ry = 0, n = 0, ch = 0;
@@ -649,9 +703,15 @@
       if (!lt.init) { lt.x = tx; lt.y = ty; lt.init = true; }
       var k2 = 1 - Math.exp(-dt / CONFIG.rayEase);
       lt.x += (tx - lt.x) * k2; lt.y += (ty - lt.y) * k2;
-      // erst an, wenn die Reihe gelandet ist (beim Drehen kein grauer Dunst); in der Vorschau weich aus (kein Aufblitzen)
-      if (mode === 'intro') { lt.t0 = 0; return 0; }
-      if (!lt.t0) lt.t0 = now;
+      // Fingerstrahl: blendet ein, solange der Finger liegt, danach weich aus
+      if (lt.down) { lt.hx = lt.fx + gl.ox; lt.hy = lt.fy + gl.oy; }
+      lt.ha += ((lt.down ? 1 : 0) - lt.ha) * (1 - Math.exp(-dt / (lt.down ? 0.25 : 0.6)));
+      // Sonne: kommt von oben rechts (wie auf der About-Seite) und sinkt hinter die Reihe, sobald diese gelandet ist
+      var sx0 = CONFIG.sunFrom[0] * W + gl.ox * 0, sy0 = CONFIG.sunFrom[1] * H;
+      if (mode === 'intro') { lt.t0 = 0; lt.x = sx0; lt.y = sy0; return 0; }
+      if (!lt.t0) { lt.t0 = now; lt.x = sx0; lt.y = sy0; }
+      var mf = Math.min(1, (now - lt.t0) / 1000 / CONFIG.sunMorph); mf = mf < 0.5 ? 4 * mf * mf * mf : 1 - Math.pow(-2 * mf + 2, 3) / 2;
+      if (mf < 1) { lt.x = sx0 + (tx - sx0) * mf; lt.y = sy0 + (ty - sy0) * mf; }
       var pvOn = root.classList.contains('is-pv');
       lt.pvf += ((pvOn ? 0 : 1) - lt.pvf) * (1 - Math.exp(-dt / 0.25));
       var f = Math.min(1, (now - lt.t0) / 1000 / CONFIG.rayFadeIn);
