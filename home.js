@@ -684,9 +684,18 @@
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
+        // Prisma: jede Farbe kommt aus einem minimal anderen Winkel. In der Strahlmitte goldweiss,
+        // an den Strahlrändern fächert es sich in klare Spektralfarben auf (eine Seite rot-orange, andere blau-violett).
+        '    vec2 dd = fc - S; float cs = cos(0.017), sn = sin(0.017);',
+        '    vec2 pR = S + vec2(dd.x * cs - dd.y * sn, dd.x * sn + dd.y * cs);',
+        '    vec2 pB = S + vec2(dd.x * cs + dd.y * sn, -dd.x * sn + dd.y * cs);',
+        '    float b0 = max(beamAt(fc), 0.03);',
+        '    vec3 disp = clamp(vec3(beamAt(pR), b0, beamAt(pB)) / b0, 0.0, 1.6);',
         '    float tl = smoothstep(0.25, 0.95, lit);',
-        '    vec3 tc = mix(uTextLight, rainbow * 1.15, 0.22);',
-        '    col = (tc * uTextAmt * tl + causC * 0.8) * smoothstep(0.0, 0.3, uOn);',
+        '    vec3 tl3 = smoothstep(vec3(0.25), vec3(0.95), lit * disp);',
+        '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
+        '    vec3 tc = vec3(1.0, 0.8, 0.62) * tm * 1.08 + (tl3 - tm) * vec3(1.0, 0.95, 1.25) * 1.35;',
+        '    col = (tc * uTextAmt + causC * 0.8) * smoothstep(0.0, 0.3, uOn);',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
