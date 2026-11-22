@@ -337,8 +337,8 @@
         '  vec3 sp2 = mix(spec, vec3(1.0), 0.25);',
         '  float mz = exp(-e / 22.0) * hit;',
         '  pc += (sp2 - 0.5) * mz * (0.12 + cw * 0.38 + fil * 0.3);',
-        '  float band = exp(-e * e / 45.0) * (0.55 + 0.45 * smoothstep(0.2, 0.8, sv + 0.25 * exp(-e / 6.0))) * hit;',
-        '  return mix(pc, sp2 * 1.03, clamp(band, 0.0, 1.0) * 0.5);',
+        '  float band = exp(-e * e / 14.0) * (0.65 + 0.35 * smoothstep(0.2, 0.8, sv + 0.25 * exp(-e / 6.0))) * hit;',
+        '  return mix(pc, mix(spec, vec3(1.0), 0.1) * 1.03, clamp(band, 0.0, 1.0) * 0.75);',
         '}'].join('\n');
       var VS = [
         'attribute vec2 aUv;',
@@ -448,12 +448,13 @@
           '  gl_FragColor = vec4(clamp(col * uPar.x, 0.0, uClamp), 1.0);',
           '}'].join('\n');
         var COMP = HP + [
-          'uniform sampler2D uRays; uniform vec2 uTexel; uniform float uTime; uniform float uGrain; uniform float uAmt; uniform vec3 uColor;',
+          'uniform sampler2D uRays; uniform vec2 uTexel; uniform float uTime; uniform float uGrain; uniform float uAmt; uniform vec3 uColor; uniform vec2 uRow;',
           'varying vec2 vUv;',
           'float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }',
           'void main() {',
           '  float l = (texture2D(uRays, vUv + uTexel * vec2(0.5, 0.5)).r + texture2D(uRays, vUv - uTexel * vec2(0.5, 0.5)).r',
           '           + texture2D(uRays, vUv + uTexel * vec2(0.5, -0.5)).r + texture2D(uRays, vUv + uTexel * vec2(-0.5, 0.5)).r) * 0.25 * uAmt;',
+          '  l *= mix(0.12, 1.0, smoothstep(uRow.y * 0.75, uRow.y * 1.35, abs(vUv.y - uRow.x)));',
           '  float g = h(floor(gl_FragCoord.xy) + fract(uTime * 7.31) * 137.0);',
           '  l *= 1.0 - uGrain + uGrain * 2.0 * g;',
           '  vec3 col = uColor * l;',
@@ -469,7 +470,7 @@
         }
         var sun = mk(SUN, ['uRes', 'uLight', 'uRad', 'uTime', 'uGlow', 'uBand', 'uSunP', 'uT', 'uLA', 'uHero', 'uViewH']);
         var ray = mk(RAY, ['uOcc', 'uLightUv', 'uPar', 'uClamp', 'uFan']);
-        var comp = mk(COMP, ['uRays', 'uTexel', 'uTime', 'uGrain', 'uAmt', 'uColor']);
+        var comp = mk(COMP, ['uRays', 'uTexel', 'uTime', 'uGrain', 'uAmt', 'uColor', 'uRow']);
         if (!sun || !ray || !comp) return null;
         var qb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, qb); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
         c.vertexAttribPointer(1, 2, c.FLOAT, false, 0, 0);
@@ -686,6 +687,7 @@
         c.bindTexture(c.TEXTURE_2D, R.b.t); c.uniform1i(R.comp.u.uRays, 0);
         c.uniform2f(R.comp.u.uTexel, 1 / R.w, 1 / R.h); c.uniform1f(R.comp.u.uTime, tm);
         c.uniform1f(R.comp.u.uGrain, CONFIG.grain); c.uniform1f(R.comp.u.uAmt, amt);
+        c.uniform2f(R.comp.u.uRow, (gl.h - (lt.by - gl.oy)) / gl.h, (lt.bh || gl.h * 0.3) * 0.5 / gl.h);
         c.uniform3f(R.comp.u.uColor, CONFIG.rayColor[0], CONFIG.rayColor[1], CONFIG.rayColor[2]);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         c.disableVertexAttribArray(1); c.enableVertexAttribArray(gl.loc);
