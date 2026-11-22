@@ -822,6 +822,7 @@
         size();
         var tm = reduce ? 40.0 : (now - t0) / 1000;
         var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
+        if (held && trail.length) trail[trail.length - 1].t = now;   // Finger liegt noch: Schatten bleibt
         trail = trail.filter(function (p) { return now - p.t < SUN.trailLife * 1000; });
         for (var i = 0; i < NT; i++) {
           var p = trail[trail.length - 1 - i];
@@ -874,18 +875,25 @@
         draw(now);
         if (!reduce || trail.length || Math.abs(occ.want - occ.on) > 0.01) raf = requestAnimationFrame(loop);
       }
-      function point(e) {
+      // Fingerschatten: bleibt, solange der Finger auf dem Display liegt, und folgt ihm (auch beim Scrollen);
+      // erst beim Loslassen verblasst er. Touch-Ereignisse statt Pointer, weil Pointer beim Scrollen abbrechen.
+      var held = false;
+      function addPt(x, y) {
         if (reduce || !root.classList.contains('is-info')) return;
-        if (e.pointerType === 'touch' && e.type === 'pointermove' && !e.isPrimary) return;
         var now = performance.now(), last = trail[trail.length - 1];
-        if (last && Math.abs(last.x - e.clientX) + Math.abs(last.y - e.clientY) < 8 && now - last.t < 50) { last.t = now; return; }
-        trail.push({ x: e.clientX, y: e.clientY, t: now });
+        if (last && Math.abs(last.x - x) + Math.abs(last.y - y) < 8 && now - last.t < 50) { last.t = now; return; }
+        trail.push({ x: x, y: y, t: now });
         if (trail.length > 30) trail.shift();
         if (!raf) raf = requestAnimationFrame(loop);
       }
-      // Fingerschatten (Hugo 22.11.: wieder drin)
-      window.addEventListener('pointermove', point, { passive: true });
-      window.addEventListener('pointerdown', point, { passive: true });
+      function tStart(e) { if (!e.touches || !e.touches[0]) return; held = true; addPt(e.touches[0].clientX, e.touches[0].clientY); }
+      function tMove(e) { if (!e.touches || !e.touches[0]) return; held = true; addPt(e.touches[0].clientX, e.touches[0].clientY); }
+      function tEnd(e) { if (e.touches && e.touches.length) return; held = false; var l = trail[trail.length - 1]; if (l) l.t = performance.now(); }
+      window.addEventListener('touchstart', tStart, { passive: true });
+      window.addEventListener('touchmove', tMove, { passive: true });
+      window.addEventListener('touchend', tEnd, { passive: true });
+      window.addEventListener('touchcancel', tEnd, { passive: true });
+      window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') addPt(e.clientX, e.clientY); }, { passive: true });
       var lightOn = { v: 0, want: false, t0: 0 };
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
