@@ -607,7 +607,7 @@
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
@@ -640,6 +640,9 @@
         // Tal: unterhalb des Horizonts (knapp unter dem Titel) ist Boden. Jeder Strahl trifft ihn an einer eigenen Stelle
         // (je nach Strahl näher oder ferner): dort endet er und hinterlässt einen hellen, flachen Lichtfleck, nah gross, fern schmal.
         '  float beam = beamAt(fc);',
+        // Einstrahlen: die Strahlen schiessen von der Sonne her ins Bild (Front wandert von rechts oben nach unten)
+        '  float front = uOn * 2.6;',
+        '  beam *= 1.0 - smoothstep(front - 0.5, front, dist);',
         '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
         '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
         '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
@@ -675,10 +678,11 @@
         '  vec3 col;',
         '  if (uMode < 0.5) {',
         '    col = mix(shade, uLit, clamp(uAmb + lit, 0.0, 1.0)) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
+        '    col = mix(vec3(1.0), col, smoothstep(0.0, 0.35, uOn));',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
-        '    col = uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8;',
+        '    col = (uTextLight * uTextAmt * smoothstep(0.25, 0.95, lit) + causC * 0.8) * smoothstep(0.2, 0.6, uOn);',
         '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
@@ -691,7 +695,7 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
         'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
@@ -819,6 +823,10 @@
         var e = G && srcT ? occ.on * occ.on * (3 - 2 * occ.on) : 0;
         c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
         c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
+        // Licht erst, wenn der Titel angekommen ist: in 1.8 s weich einstrahlen; beim Schliessen rasch weg
+        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 1800);
+        else lightOn.v = Math.max(0, lightOn.v - dt * 2.5);
+        var lo = lightOn.v; c.uniform1f(U.uOn, 1 - Math.pow(1 - lo, 3));
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
         pass(0, cw, chh, 0, 0, 0, 1);
         pass(cw, cw, chh, 1, 0, 0, 1);
@@ -863,11 +871,13 @@
         if (!raf) raf = requestAnimationFrame(loop);
       }
       // (Fingerschatten entfernt, Hugo 22.11.: nur «Galerie öffnen» wirft einen Schatten)
+      var lightOn = { v: 0, want: false, t0: 0 };
       function start() { if (!raf) { draw(performance.now()); raf = requestAnimationFrame(loop); } }
       return {
         back: back, wall: wall, glow: glow, start: start,
         // Titel nur noch für die Lage des Horizonts (knapp darunter beginnt das Tal), er wirft keinen Schatten mehr
-        title: function (T) { if (T) { size(); mask(T); } occ.want = 0; start(); }
+        title: function (T) { if (T) { size(); mask(T); } occ.want = 0; start(); },
+        light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); }
       };
     })();
     if (sun) {
@@ -876,7 +886,7 @@
       infoPanel.style.background = 'transparent';
     }
 
-    var tClone = null, tOrig = null, infoT = 0, sunT = 0, glassT = null;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -973,6 +983,11 @@
         clearTimeout(sunT);
         sunT = setTimeout(function () { if (sun && glassT && tClone && root.classList.contains('is-info')) { sun.title(glassT); } }, CONFIG.infoMs * 0.85);
       }
+      if (sun) {
+        // Sonne erst, wenn der Titel eingeflogen ist (Hugo 22.11.)
+        clearTimeout(sunL); sun.light(false);
+        sunL = setTimeout(function () { if (root.classList.contains('is-info')) sun.light(true); }, reduce ? 0 : CONFIG.infoMs);
+      }
       if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
       infoSlide = s; infoClosing = false;
       ix.a = null; ix.v = 0;
@@ -992,7 +1007,7 @@
       }
       tween(ip, 1, CONFIG.infoMs, easeInfo);
       if (tClone) { tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
-      clearTimeout(sunT); if (sun) sun.title(null);
+      clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); }
       clearTimeout(infoT);
       infoT = setTimeout(function () {
         if (root.classList.contains('is-info')) return;
