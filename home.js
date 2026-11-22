@@ -602,9 +602,9 @@
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
       src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
-      rays: [7, 17],             // Strahldichte (grobe / feine Strahlen); Hugo 22.11.: weniger Strahlen
+      rays: [8, 19],             // Strahldichte (grobe / feine Strahlen); Hugo 22.11.: weniger Strahlen
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
-      edge: [0.4, 0.82],          // Schärfe der Strahlen
+      edge: [0.37, 0.82],         // Schärfe der Strahlen
       reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
@@ -715,7 +715,7 @@
         '  float sv = n2(gp * 2.6 + wq * 2.2 + vec2(0.0, t * 0.05));',
         '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 7.0);',
         '  float dw = smoothstep(0.04, 0.55, yh);',
-        '  float onG = grd * smoothstep(0.05, 0.45, beam) * smoothstep(0.02, 0.1, yh) * mix(0.35, 1.0, dw);',
+        '  float onG = grd * smoothstep(0.03, 0.35, beam) * smoothstep(0.02, 0.1, yh) * mix(0.35, 1.0, dw);',
         '  beam *= rf;',
         '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
         '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
@@ -725,7 +725,7 @@
         '  if (uMode < 0.5) {',
         '    float L = clamp(uAmb + lit, 0.0, 1.0);',
         '    float sh2 = onG * smoothstep(0.0, 0.6, uOn);',
-        '    float amp = mix(0.6, 1.35, dw);',
+        '    float amp = mix(0.8, 1.6, dw);',
         '    L *= mix(1.0, 1.0 - amp * (0.2 - 0.2 * sv + 0.08 * fil), sh2);',
         '    col = mix(shade, uLit, L) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
         '    col += vec3(1.0, 0.85, 0.55) * fil * sh2 * 0.1 * amp;',
@@ -927,7 +927,7 @@
         if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
         c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
         var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
-        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
+        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt * 0.55));   // Hugo 22.11.: Schatten öfter, schon bei mittlerem Licht
         btnL += (v - btnL) * 0.6;
         infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
         // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
