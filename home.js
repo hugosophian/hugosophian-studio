@@ -570,11 +570,11 @@
     //   schwarze Schrift wird dort goldbraun angestrahlt.
     // Gerechnet wird beides in einem WebGL-Bild (links Wand, rechts Licht) und auf zwei Leinwände kopiert.
     var SUN = {
-      src: [0.86, -0.42],        // Sonne oben rechts (Hugo 22.11.: etwas weiter links und höher, Strahlen steiler von oben)
+      src: [0.86, -0.3],         // Sonne oben rechts (Hugo 22.11.: weiter links, etwas höher als ursprünglich)
       rays: [9, 23],             // Strahldichte (grobe / feine Strahlen)
       drift: [0.16, -0.24],      // wie schnell die Strahlen wandern
       edge: [0.3, 0.8],          // Schärfe der Strahlen
-      reach: 4.5,                // wie weit die Strahlen nach unten reichen
+      reach: 2.6,                // wie weit die Strahlen nach unten reichen
       strength: 1.2,
       ambient: 0.2,              // so viel Licht liegt auch im Schatten
       shade: [0.8, 0.81, 0.835], // Schatten auf der Wand: kühl
@@ -623,7 +623,7 @@
         '  r *= 0.75 + 0.5 * n1(t * 0.35 + ang * 4.0);',
         '  r = smoothstep(uEdge.x, uEdge.y, r);',
         '  r *= 0.72 + 0.28 * n2(vec2(ang * 22.0, dist * 3.0 - t * 0.35));',
-        '  float fall = exp(-max(dist - 0.95, 0.0) / uReach);',
+        '  float fall = exp(-max(dist - 0.65, 0.0) / uReach);',
         '  return clamp((r * fall + exp(-dist * 2.2) * 0.7) * uStrength, 0.0, 1.0);',
         '}',
         'float rayR(vec2 p) {',
@@ -644,7 +644,7 @@
         // Beim Schliessen läuft es rückwärts: die zuletzt gekommenen gehen zuerst.
         '  float dly = n1(ang * 7.0 + 3.7) * 0.7;',
         '  float rf = smoothstep(dly, dly + 0.3, uOn);',
-        '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 2.6));',
+        '  float hitY = uHor * (0.03 + 0.85 * pow(n1(ang * 6.5 + 11.0 + t * 0.015), 1.7));',
         '  float grd = 1.0 - smoothstep(uHor - 0.02 * uRes.y, uHor + 0.02 * uRes.y, fc.y);',
         '  float air = smoothstep(hitY - 0.01 * uRes.y, hitY + 0.05 * uRes.y, fc.y);',
         '  float dT = 1.0 - hitY / max(uHor, 1.0);',
