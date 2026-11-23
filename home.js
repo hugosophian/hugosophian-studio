@@ -296,7 +296,7 @@
         '  vec2 ab = b.xy - a.xy; float l2 = dot(ab, ab);',
         '  float t = l2 > 0.01 ? clamp(dot(fc - a.xy, ab) / l2, 0.0, 1.0) : 0.0;',
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
-        '  return d - z * mx * 0.15 + (1.0 - smoothstep(0.0, 0.45, z)) * mx * 0.12; }',
+        '  return d - z * mx * 0.15 + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
@@ -451,10 +451,24 @@
       var dprCap = weak ? 1 : 2;
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
-        var now = performance.now(), last = wv.pts[wv.pts.length - 1];
-        if (last && Math.hypot(last.x - x, last.y - y) < 22) return;
-        if (wv.pts.length >= PW) return;                                // Bahn voll: die Welle hat ihre Form
-        wv.pts.push({ x: x, y: y, t: now });
+        // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
+        // dem Finger und wird erst festgelegt, wenn der Finger ein Stück weiter ist; ist die Bahn voll, wird sie
+        // ausgedünnt statt angehalten, so geht auch ein langer Zug bis zum Schluss mit
+        var now = performance.now(), pts = wv.pts, last = pts[pts.length - 1];
+        if (!last) { pts.push({ x: x, y: y, t: now }); wv.sp = 14; }
+        else {
+          var fixed = last.tip ? pts[pts.length - 2] : last;
+          if (last.tip && Math.hypot(fixed.x - x, fixed.y - y) < wv.sp) { last.x = x; last.y = y; last.t = now; }
+          else {
+            if (last.tip) last.tip = false;
+            if (pts.length >= PW) {
+              var keep = [pts[0]];
+              for (var m = 1; m < pts.length - 1; m++) if (m % 2 === 0) keep.push(pts[m]);
+              keep.push(pts[pts.length - 1]); wv.pts = pts = keep; wv.sp *= 2;
+            }
+            pts.push({ x: x, y: y, t: now, tip: true });
+          }
+        }
         if (!raf) raf = requestAnimationFrame(draw);
       }
       function draw(now) {
