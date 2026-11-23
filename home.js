@@ -372,7 +372,11 @@
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
         '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
         '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.25 + 0.4 * egm);',
-        '    eacc = ecol * band * flash * 1.1;',
+        // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
+        '    float patch = 0.2 + 1.0 * smoothstep(0.3, 0.75, n2(ca * 2.6 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',
+        '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
+        '    band = exp(-max(e, 0.0) * max(e, 0.0) / (560.0 * bw * bw));',
+        '    eacc = ecol * band * flash * 1.1 * patch;',
         '    for (int i = 0; i < ' + NF + '; i++) {',
         '      vec4 f1 = uFl[i]; vec4 f2 = uFl2[i]; if (f2.y <= 0.001) continue;',
         '      vec2 uv;',                                                                     // Randseite: u entlang, v nach innen
@@ -380,16 +384,18 @@
         '      else if (f1.x < 1.5) uv = vec2(fc.y, uRes.x - fc.x);',
         '      else if (f1.x < 2.5) uv = vec2(uRes.x - fc.x, uRes.y - fc.y);',
         '      else uv = vec2(uRes.y - fc.y, fc.x);',
-        '      float sv2 = max(uv.y, 0.0) / max(f1.z, 1.0);',
-        '      if (sv2 > 2.2) continue;',
-        // organisch (Hugo 23.11.): die Flare windet sich wie eine Flamme, die Windung läuft langsam nach oben
-        '      float cen = f1.y + f1.w * sv2 * sv2 + f2.x * sv2 * (1.3 * sin(sv2 * 5.0 - uT * 1.4 + f2.w) + 0.8 * sin(sv2 * 2.3 + uT * 0.8 + f2.w * 1.7));',
-        '      float wd = f2.x * (1.0 + 0.5 * sv2) * (1.0 - 0.45 * smoothstep(0.5, 1.4, sv2));',   // weich, zur Spitze hin schlanker
-        '      float dd = (uv.x - cen) / wd;',
-        '      float wob = 0.75 + 0.25 * n2(vec2(sv2 * 3.0 - uT * 0.4, float(i) * 3.7));',       // lebendig, nicht glatt
-        '      float I = exp(-dd * dd) * exp(-pow(sv2, 1.5)) * wob * f2.y;',
+        // Hugo 23.11.: schmale Bögen wie auf der Sonne – steigen aus dem Rand, biegen sich und landen wieder im Rand;
+        // kleine Spannweite = schlanke Zunge, grosse = Bogen. Die Linie windet sich lebendig.
+        '      float aa = abs(f1.w) * 0.5 + f2.x * 0.8, hh = max(f1.z, 1.0);',
+        '      vec2 qq = vec2((uv.x - f1.y - f1.w * 0.5) / aa, max(uv.y, 0.0) / hh);',
+        '      float rr = length(qq); if (rr > 2.4) continue;',
+        '      float th = atan(qq.y, qq.x);',
+        '      rr += 0.04 * sin(th * 3.0 - uT * 1.1 + f2.w) + 0.02 * sin(th * 5.0 + uT * 0.7 + f2.w * 1.7);',   // sanft gewunden, nicht zackig
+        '      float dpx = (rr - 1.0) * length(vec2(aa * qq.x, hh * qq.y)) / max(rr, 0.001);',
+        '      float I = (exp(-dpx * dpx / (f2.x * f2.x)) + 0.35 * (1.0 - smoothstep(0.6, 1.0, rr))) * mix(1.0, 0.45, smoothstep(0.2, 1.0, qq.y)) * f2.y;',   // weich gefüllt, Rand heller
+        '      float sv2 = qq.y;',
         '      vec3 fcol = mix(vec3(1.0, 0.86, 0.62), 0.5 + 0.5 * cos(6.2832 * (f2.z + sv2 * 0.25 + vec3(0.0, 0.33, 0.67))), 0.12);',   // Gold wie bei der Fingerwelle
-        '      eacc += fcol * I * 0.7; fI += I;',
+        '      eacc += fcol * I * 0.8; fI += I;',
         '    }',
         '    eacc *= fade;',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
@@ -582,42 +588,50 @@
       function flInit(w, h) {
         FL = [];
         var mx = Math.max(w, h);
-        // ein bis zwei kräftige, die weit ins Bild reichen (auf verschiedenen Seiten), der Rest schwächer und kürzer
+        // ein bis zwei grössere, der Rest klein; alle schmal (Hugo 23.11.)
         var strong = Math.random() < 0.5 ? 1 : 2, s0 = Math.floor(Math.random() * 4);
         for (var i = 0; i < NF; i++) {
           var big = i < strong;
           var side = big ? (s0 + i * 2) % 4 : Math.floor(Math.random() * 4), len = side % 2 ? h : w;
-          FL.push({ side: side, u: len * (0.1 + 0.8 * Math.random()), du: 0, vu: 0, vt: 0, len: len,
-            L: mx * (big ? 0.13 + 0.07 * Math.random() : 0.035 + 0.06 * Math.pow(Math.random(), 1.5)),   // Hugo 23.11.: kleiner
-            amp: big ? 0.8 + 0.2 * Math.random() : 0.3 + 0.35 * Math.random(),
-            wd: mx * (big ? 0.016 + 0.008 * Math.random() : 0.009 + 0.008 * Math.random()),
+          var L = mx * (big ? 0.1 + 0.06 * Math.random() : 0.03 + 0.045 * Math.random());
+          FL.push({ side: side, u: len * (0.1 + 0.8 * Math.random()), vu: 0, len: len, L: L,
+            sg: Math.random() < 0.5 ? -1 : 1, span: 0, vs: 0,
+            amp: big ? 0.8 + 0.2 * Math.random() : 0.4 + 0.35 * Math.random(),
+            wd: mx * (big ? 0.009 + 0.004 * Math.random() : 0.005 + 0.004 * Math.random()),
             hue: Math.random(), dl: Math.random() * 0.5, ph: Math.random() * 100 });
         }
         flLast = 0;
       }
+      // Bögen: der erste Fuss wandert langsam, der zweite Fuss (Spannweite) atmet organisch. Kommt das Ende eines Bogens
+      // in die Nähe eines anderen Fusses, wird es magnetisch dorthin gezogen – die Bögen fliessen ineinander – und löst
+      // sich später wieder. Füsse, die sich zu nahe kommen, stossen sich ab.
       function flStep(et, w, h) {
         if (!FL.length) flInit(w, h);
         var dt = flLast ? Math.min(0.05, et - flLast) : 0.016; flLast = et;
         var mx = Math.max(w, h);
         FL.forEach(function (f, i) {
-          // langsam, organisch: Wanderung aus weichem Rauschen
-          var drift = Math.sin(et * 0.35 + f.ph) * 0.6 + Math.sin(et * 0.21 + f.ph * 1.7) * 0.4;
-          var fu = drift * mx * 0.02, ft = drift * mx * 0.06;
-          // magnetisch: Füsse und Spitzen auf derselben Seite stossen sich ab
+          var drift = Math.sin(et * 0.3 + f.ph) * 0.6 + Math.sin(et * 0.19 + f.ph * 1.7) * 0.4;
+          var fu = drift * mx * 0.018;
+          var rest = f.sg * f.L * (0.08 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(et * 0.42 + f.ph * 0.7), 2.0));   // meist schlanke Zunge, ab und zu ein Bogen
+          var fs = (rest - f.span) * 1.6;
+          var tip = f.u + f.span;
           FL.forEach(function (g, j) {
             if (i === j || g.side !== f.side) return;
-            var d = f.u - g.u, ad = Math.abs(d) + 1, R = mx * 0.09;
-            fu += Math.sign(d) * mx * 0.25 * Math.exp(-ad / R);
-            var dtp = (f.u + f.du) - (g.u + g.du), adt = Math.abs(dtp) + 1;
-            ft += Math.sign(dtp) * mx * 0.9 * Math.exp(-adt / (R * 1.4));
+            var d = f.u - g.u, ad = Math.abs(d) + 1;
+            fu += Math.sign(d) * mx * 0.16 * Math.exp(-ad / (mx * 0.05));
+            [g.u, g.u + g.span].forEach(function (t) {
+              var dd = t - tip, a2 = Math.abs(dd);
+              if (a2 < mx * 0.16) fs += dd * 2.6 * Math.exp(-a2 / (mx * 0.06));   // magnetisch angezogen
+            });
           });
           f.vu += (fu - f.vu * 1.6) * dt; f.u += f.vu * dt;
           f.u = Math.max(f.len * 0.03, Math.min(f.len * 0.97, f.u));
-          f.vt += (ft - f.du * 2.2 - f.vt * 2.0) * dt; f.du += f.vt * dt;   // Spitze federt zurück, weich gedämpft
-          f.du = Math.max(-mx * 0.3, Math.min(mx * 0.3, f.du));
-          var grow = Math.max(0, Math.min(1, (et - f.dl * 0.6) / 1.2)); grow = grow * grow * (3 - 2 * grow);
+          f.vs += (fs - f.vs * 1.8) * dt; f.span += f.vs * dt;
+          f.span = Math.max(-f.L * 2.2, Math.min(f.L * 2.2, f.span));
+          var grow = Math.max(0, Math.min(1, (et - f.dl * 0.6) / 1.0)); grow = grow * grow * (3 - 2 * grow);
           var life = 1 - Math.max(0, Math.min(1, (et - 4.4 - f.dl) / 2.0));
-          fl1[i * 4] = f.side; fl1[i * 4 + 1] = f.u; fl1[i * 4 + 2] = f.L * (0.15 + 0.85 * grow); fl1[i * 4 + 3] = f.du;
+          var Lb = f.L * (0.85 + 0.15 * Math.sin(et * 0.8 + f.ph * 2.3));
+          fl1[i * 4] = f.side; fl1[i * 4 + 1] = f.u; fl1[i * 4 + 2] = Lb * (0.1 + 0.9 * grow); fl1[i * 4 + 3] = f.span;
           fl2[i * 4] = f.wd; fl2[i * 4 + 1] = f.amp * grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = f.ph;
         });
       }
