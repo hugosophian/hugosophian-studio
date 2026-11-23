@@ -321,7 +321,8 @@
         '    float best = 1e9;',
         '    for (int j = 0; j < ' + PW + '; j++) {',
         '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
-        '      best = min(best, length(fc - p.xy) - max(p.z, 0.0) * mx * 0.15);',
+        '      float pen = (1.0 - smoothstep(0.0, 0.45, p.z)) * mx * 0.12;',
+        '      best = min(best, length(fc - p.xy) - max(p.z, 0.0) * mx * 0.15 + pen);',
         '    }',
         '    if (best > 1e8) continue;',
         '    float w = mx * min(0.016 + 0.028 * age, 0.085);',   // schmal beim Auslösen, beim Auslaufen breiter
@@ -329,7 +330,7 @@
         '    for (int j = 0; j < ' + PW + '; j++) {',
         '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
         '      vec2 dv = fc - p.xy; float d = length(dv);',
-        '      float f = d - max(p.z, 0.0) * mx * 0.15;',
+        '      float f = d - max(p.z, 0.0) * mx * 0.15 + (1.0 - smoothstep(0.0, 0.45, p.z)) * mx * 0.12;',
         '      float q = exp(-(f - best) / (w * 0.35));',
         '      ws += q; sf += q * f; dir += q * (d > 0.5 ? dv / d : vec2(0.0));',
         '    }',
@@ -349,7 +350,7 @@
         '    vec2 cs = vec2(cos(an), sin(an)) * 2.2;',
         '    float fl = pow(n2(cs + vec2(sd, uT * 0.3)), 3.5);',
         '    float ln = 0.5 + fl * (5.0 + 3.0 * n2(cs * 1.7 + vec2(uT * 0.8, sd)));',
-        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on);',
+        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.35, 1.1, age));',   // kein Stern am Startpunkt
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  float a = smoothstep(0.0, 0.35, ring);',
