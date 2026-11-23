@@ -53,6 +53,8 @@
     vtDelay:    0,      // nach „zum Studio“: Animation so viel später (ms); 0 = sofort, die alte Seite ist dann schon weg (Hugo 17:12)
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
+    ldStripW:   0.038,  // Ladeanimation (Hugo 23.11.): Karten starten weiter weg, also kleiner
+    ldStripH:   0.046,
     // Desktop
     desk:       992,    // ab dieser Breite (px) und mit Maus: Bilder nebeneinander
     deskOpen:   0.52,   // Breite des geöffneten Bildes samt Text (Anteil)
@@ -628,12 +630,12 @@
           E = easeDock(clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1));
         } else {
           var r = rel(j);
-          aw = W * CONFIG.stripW; ah = H * CONFIG.stripH;
+          aw = W * (LD ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LD ? CONFIG.ldStripH : CONFIG.stripH);
           k = r + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
           E = LD ? easeMagnet(clamp((P - 0.25) / 0.75, 0, 1)) : easeDock(clamp((P - 0.25) / 0.75, 0, 1));
-          ay = H / 2 + r * (ah + 4);
+          ay = H / 2 + r * (ah + (LD ? 2.5 : 4));
         }
         var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
