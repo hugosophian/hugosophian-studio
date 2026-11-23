@@ -362,7 +362,7 @@
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
-        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0));',
+        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.15));',   // Andock-Welle: kein Rahmen-Leuchten,
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
@@ -395,7 +395,7 @@
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.8 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // von Anfang an ungleich
+        '    eacc = ecol * band * flash * 0.55 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -601,15 +601,15 @@
         // Eine Welle; die Bahn läuft einmal um den Rand, unregelmässig (organisch).
         var r = stage.getBoundingClientRect();
         function ring(delay, inset, reach) {
-          var now = performance.now() + delay, per = 2 * (r.width + r.height), N = PW - 1, pts = [];
-          var off = Math.random() * per;
+          var now = performance.now() + delay, N = PW - 1, pts = [];
+          // Hugo 23.11.: keine viereckige Form – die Bahn ist eine weich gerundete, unregelmässige Form (Superellipse
+          // mit Rauschen), die sich nur an den Seiten an den Rand schmiegt und die Ecken weit abrundet
+          var off = Math.random() * 6.2832, w2 = r.width, h2 = r.height, ph1 = Math.random() * 6.28, ph2 = Math.random() * 6.28;
           for (var i = 0; i < N; i++) {
-            var d = (off + per * i / N) % per, x, y, w2 = r.width, h2 = r.height;
-            if (d < w2) { x = d; y = 0; } else if (d < w2 + h2) { x = w2; y = d - w2; }
-            else if (d < 2 * w2 + h2) { x = w2 - (d - w2 - h2); y = h2; } else { x = 0; y = h2 - (d - 2 * w2 - h2); }
-            // knapp innerhalb des Rands, nicht überall gleich weit
-            var ins = inset + Math.pow(Math.random(), 2) * Math.min(w2, h2) * 0.12;   // Hugo 23.11.: unregelmässig, kein Rahmen
-            x = Math.min(w2 - ins, Math.max(ins, x)); y = Math.min(h2 - ins, Math.max(ins, y));
+            var th = off + 6.2832 * i / N, c = Math.cos(th), sn = Math.sin(th), n = 2.6;
+            var ex = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), ey = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
+            var k = 1 - 0.05 * (1 + Math.sin(th * 3 + ph1)) - 0.035 * (1 + Math.sin(th * 5 + ph2)) - Math.pow(Math.random(), 2) * 0.05;
+            var x = w2 / 2 + ex * (w2 / 2 + inset) * k, y = h2 / 2 + ey * (h2 / 2 + inset) * k;
             pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 220, m: 0.12 + 1.9 * Math.pow(Math.random(), 1.6) });
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
