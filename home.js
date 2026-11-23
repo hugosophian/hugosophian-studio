@@ -362,7 +362,7 @@
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
-        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.15));',   // Andock-Welle: kein Rahmen-Leuchten,
+        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35));',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
@@ -395,7 +395,7 @@
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.55 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // von Anfang an ungleich
+        '    eacc = ecol * band * flash * 0.85 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // Hugo 23.11.: am Rand wieder etwas mehr   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
