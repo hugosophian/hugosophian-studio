@@ -137,24 +137,8 @@
     /* Klein (55 %) nur im versteckten Zustand vor dem Hochbouncen; beim Wegfallen bleibt er gross */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.hp-mb-small { scale: .55; }',
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); will-change: translate, scale; }',
-    /* Ladeanimation (Hugo 23.11., erst Handy): weiss, «Hugo Sophian Studio» gross in der Mitte von der Sonne angestrahlt,
-       gleitet dann in die Ecke; die Bilder kommen als leuchtende Vierecke im goldenen Licht, beim Andocken wird es schwarz */
+    /* Ladeanimation (Hugo 23.11., erst Handy): die Bilder kommen als weisse Karten mit leuchtendem Rand */
     'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
-    'html.hp-preload [data-hp], html.hp-preload [data-hp] * { visibility: hidden !important; }',
-    '[data-hp].hp-ld, [data-hp].hp-ld .hp-stage { background: transparent !important; }',
-    '[data-hp].hp-ld-a .hp-stage { visibility: hidden; }',
-    '[data-hp].hp-ld-nb .hp-brand:not(.hp-ld-brand) { opacity: 0; }',
-    '[data-hp].hp-ld-nab .hp-about-btn { opacity: 0; visibility: hidden; pointer-events: none; }',
-    '[data-hp]:not(.hp-ld-nab) .hp-about-btn { transition: opacity .6s ease; }',
-    '[data-hp] .hp-info-sun.hp-ldx { transform: none !important; }',
-    '[data-hp] .hp-sun-light.hp-ldx { visibility: visible !important; transition: opacity 1.8s ease; }',
-    '[data-hp] .hp-sun-back.hp-ldx { z-index: 0; transition: opacity 1.8s ease; }',
-    '[data-hp] .hp-ldx.hp-out { opacity: 0; }',
-    '[data-hp] .hp-ld-brand { position: fixed !important; margin: 0 !important; z-index: 7 !important; color: #8e8a84; mix-blend-mode: normal !important; pointer-events: none; visibility: visible !important; transform: none; }',
-    '[data-hp] .hp-ld-brand .hp-ld-l { display: inline-block; }',
-    '[data-hp] .hp-ld-brand { color: transparent !important; }',
-    '[data-hp] .hp-ld-txt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; pointer-events: none; mix-blend-mode: screen; }',
-    '[data-hp]:not(.hp-ld-nb) .hp-brand { transition: color .25s ease, opacity .7s ease; }',
     '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(130% 100% at 50% 50%, #fff 0%, #fffdf7 55%, #fff1d6 100%); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
@@ -398,13 +382,14 @@
         '      else uv = vec2(uRes.y - fc.y, fc.x);',
         '      float sv2 = max(uv.y, 0.0) / max(f1.z, 1.0);',
         '      if (sv2 > 2.2) continue;',
-        '      float cen = f1.y + f1.w * sv2 * sv2;',                                          // gebogen: die Spitze weicht aus
-        '      float wd = f2.x * (1.0 + 0.9 * sv2);',                                            // weich, oben breiter
+        // organisch (Hugo 23.11.): die Flare windet sich wie eine Flamme, die Windung läuft langsam nach oben
+        '      float cen = f1.y + f1.w * sv2 * sv2 + f2.x * sv2 * (1.3 * sin(sv2 * 5.0 - uT * 1.4 + f2.w) + 0.8 * sin(sv2 * 2.3 + uT * 0.8 + f2.w * 1.7));',
+        '      float wd = f2.x * (1.0 + 0.5 * sv2) * (1.0 - 0.45 * smoothstep(0.5, 1.4, sv2));',   // weich, zur Spitze hin schlanker
         '      float dd = (uv.x - cen) / wd;',
         '      float wob = 0.75 + 0.25 * n2(vec2(sv2 * 3.0 - uT * 0.4, float(i) * 3.7));',       // lebendig, nicht glatt
         '      float I = exp(-dd * dd) * exp(-pow(sv2, 1.5)) * wob * f2.y;',
-        '      vec3 fcol = mix(vec3(1.0, 0.84, 0.56), 0.5 + 0.5 * cos(6.2832 * (f2.z + sv2 * 0.25 + vec3(0.0, 0.33, 0.67))), 0.35);',
-        '      eacc += fcol * I * 1.0; fI += I;',
+        '      vec3 fcol = mix(vec3(1.0, 0.86, 0.62), 0.5 + 0.5 * cos(6.2832 * (f2.z + sv2 * 0.25 + vec3(0.0, 0.33, 0.67))), 0.12);',   // Gold wie bei der Fingerwelle
+        '      eacc += fcol * I * 0.7; fI += I;',
         '    }',
         '    eacc *= fade;',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
@@ -603,9 +588,9 @@
           var big = i < strong;
           var side = big ? (s0 + i * 2) % 4 : Math.floor(Math.random() * 4), len = side % 2 ? h : w;
           FL.push({ side: side, u: len * (0.1 + 0.8 * Math.random()), du: 0, vu: 0, vt: 0, len: len,
-            L: mx * (big ? 0.26 + 0.14 * Math.random() : 0.05 + 0.11 * Math.pow(Math.random(), 1.5)),
-            amp: big ? 0.9 + 0.1 * Math.random() : 0.25 + 0.4 * Math.random(),
-            wd: mx * (big ? 0.03 + 0.012 * Math.random() : 0.015 + 0.015 * Math.random()),
+            L: mx * (big ? 0.13 + 0.07 * Math.random() : 0.035 + 0.06 * Math.pow(Math.random(), 1.5)),   // Hugo 23.11.: kleiner
+            amp: big ? 0.8 + 0.2 * Math.random() : 0.3 + 0.35 * Math.random(),
+            wd: mx * (big ? 0.016 + 0.008 * Math.random() : 0.009 + 0.008 * Math.random()),
             hue: Math.random(), dl: Math.random() * 0.5, ph: Math.random() * 100 });
         }
         flLast = 0;
@@ -633,7 +618,7 @@
           var grow = Math.max(0, Math.min(1, (et - f.dl * 0.6) / 1.2)); grow = grow * grow * (3 - 2 * grow);
           var life = 1 - Math.max(0, Math.min(1, (et - 4.4 - f.dl) / 2.0));
           fl1[i * 4] = f.side; fl1[i * 4 + 1] = f.u; fl1[i * 4 + 2] = f.L * (0.15 + 0.85 * grow); fl1[i * 4 + 3] = f.du;
-          fl2[i * 4] = f.wd; fl2[i * 4 + 1] = f.amp * grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = 0;
+          fl2[i * 4] = f.wd; fl2[i * 4 + 1] = f.amp * grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = f.ph;
         });
       }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
@@ -993,14 +978,6 @@
       trailLife: 0.9,            // s
       trailAmt: 0.75,
       res: 1                     // Auflösung (1 = CSS-Pixel; scharf genug für die Glaskanten)
-    };
-    // Eigene Sonne der Ladeanimation (Hugo 23.11.: getrennt vom About – hier ändern wirkt nur beim Laden)
-    var SUN_LD = {
-      // Hugo 23.11.: auf Schwarz – Grund schwarz, die Strahlen warm golden
-      src: [0.86, -0.3], rays: [8, 19], drift: [0.16, -0.24], edge: [0.37, 0.82], reach: 2.6, strength: 1.2, ambient: 0.0,
-      base: [0, 0, 0], shade: [0, 0, 0], shadeLow: [0, 0, 0], lit: [0.5, 0.4, 0.26],
-      textLight: [1.0, 0.74, 0.36], textAmt: 1.0,   // Schrift erscheint nur im Licht, darum kräftiger
-      occLen: 0.9, occAmt: 0.75, refr: 0.02, depth: 0.3, shadowW: 0.05, trailLife: 0.9, trailAmt: 0.75, res: 1
     };
     // Hugo 23.11.: About und Ladeanimation haben je ihre eigene Sonne (eigene Werte, eigene Leinwand), gleiche Bauart
     function makeSun(SUN, mode) {
@@ -1630,152 +1607,26 @@
 
 
     // ---------- Ladeanimation (Hugo 23.11., vorerst nur Handy) ----------
-    //   1. Weiss, auch Safaris Ränder. «Hugo Sophian Studio» steht gross in der Mitte, die eigene Lade-Sonne (SUN_LD)
-    //      strahlt Strahl für Strahl ein und lässt die Schrift golden aufleuchten – gleichmässig, nicht nach Ladefortschritt;
-    //      am Boden die Sonnenoberfläche.
-    //   2. Sind die Bilder bereit (frühestens nach LD.min): der Schriftzug fliesst wie ein Stoffband in die Ecke, die Bilder
-    //      kommen als stark leuchtende goldene Vierecke, je näher sie kommen, desto mehr erkennt man sie.
-    //   3. Andocken: der Hintergrund wird schwarz, eine schnelle Welle aus der Mitte lässt den Rand im Regenbogen leuchten.
-    //   Nur beim ersten Besuch pro Sitzung; Tippen verkürzt das Warten; mit «Bewegung reduzieren» ohne.
+    //   Alles schwarz, die Bilder kommen wie immer, aber als weisse Karten mit leuchtendem Rand – wie Türen, die aufgehen,
+    //   und dahinter kommt das Bild zum Vorschein. Sobald das Bild angedockt ist, leuchtet der Rand bunt auf, das Bild
+    //   wabbert kurz und kleine goldene Solar Flares züngeln aus dem Rand.
+    //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
-      var LDC = { min: 3000, swoosh: 1600, stagger: 45, size: 0.42 };
       var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
-      // Safaris Leistenfarbe: im Kopf der Seite schon auf Weiss gesetzt, danach wieder Schwarz
-      var meta = document.querySelector('meta[name="theme-color"]');
-      function bare() { html.classList.remove('hp-preload'); if (meta) meta.setAttribute('content', '#000000'); return null; }
-      if (desk || reduce || seen || !brand || html.classList.contains('hs-vt-studio')) return bare();
-      var ls = makeSun(SUN_LD, 'load');
-      if (!ls) return bare();
+      if (desk || reduce || seen) return null;
       try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
-      var t0 = performance.now(), W0 = window.innerWidth, H0 = window.innerHeight;
-      html.classList.add('hp-ld'); root.classList.add('hp-ld', 'hp-ld-a', 'hp-ld-nb', 'hp-ld-nab');
-      ls.back.classList.add('hp-ldx');
-      root.insertBefore(ls.back, root.firstChild);   // nur die Wand mit den Strahlen; die Schrift wird direkt beleuchtet
-
-      // Schriftzug: Kopie mit einzelnen Buchstaben, gross in der Mitte (in echter Schriftgrösse, nicht hochskaliert → scharf)
-      var B = brand.getBoundingClientRect(), bcs = getComputedStyle(brand);
-      var cl = brand.cloneNode(false); cl.classList.add('hp-ld-brand'); cl.setAttribute('aria-hidden', 'true'); cl.removeAttribute('id');
-      var letters = [];
-      [].forEach.call(brand.childNodes, function (nd) {
-        if (nd.nodeType !== 3) { cl.appendChild(nd.cloneNode(true)); return; }
-        nd.textContent.split('').forEach(function (ch) {
-          if (!ch.trim()) { cl.appendChild(document.createTextNode(ch)); return; }
-          var sp = document.createElement('span'); sp.className = 'hp-ld-l'; sp.textContent = ch; cl.appendChild(sp); letters.push(sp);
-        });
+      slides.forEach(function (s) {
+        var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
+        if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
+        s.gold = g;
       });
-      var S = Math.max(1, Math.min(LDC.size * H0 / Math.max(1, B.height), 0.8 * W0 / Math.max(1, B.width)));
-      cl.style.fontSize = (parseFloat(bcs.fontSize) * S).toFixed(2) + 'px';
-      if (/px$/.test(bcs.letterSpacing)) cl.style.letterSpacing = (parseFloat(bcs.letterSpacing) * S).toFixed(2) + 'px';
-      cl.style.left = '0px'; cl.style.top = '0px';
-      root.appendChild(cl);
-      var R = cl.getBoundingClientRect();
-      var cx = (W0 - R.width) / 2, cy = (H0 - R.height) / 2 - H0 * 0.04;
-      cl.style.left = cx.toFixed(1) + 'px'; cl.style.top = cy.toFixed(1) + 'px';
-      ls.horizon(cy, cy + R.height + H0 * 0.03);   // Boden knapp unter dem Schriftzug
-      html.classList.remove('hp-preload');
-      setTimeout(function () { ls.light(true); }, 200);
-      // Hugo 23.11.: die Schrift ist durchsichtig und zeichnet sich nur dort, wo die Sonne sie trifft – mit den
-      // Prismafarben des Lichts. Jeder Buchstabe wird auf eine Leinwand gezeichnet und mit dem Lichtbild gefüllt
-      // (auch unterwegs in die Ecke); ganz schwach ist die Form auch im Schatten zu ahnen.
-      var tcv = document.createElement('canvas'); tcv.className = 'hp-ld-txt'; tcv.setAttribute('aria-hidden', 'true');
-      var tx2 = tcv.getContext('2d'); root.appendChild(tcv);
-      var dprT = Math.min(window.devicePixelRatio || 1, 2);
-      tcv.width = Math.round(W0 * dprT); tcv.height = Math.round(H0 * dprT);
-      var ccs = getComputedStyle(cl), font = ccs.fontStyle + ' ' + ccs.fontWeight + ' ' + ccs.fontSize + ' ' + ccs.fontFamily;
-      var LS = letters.map(function (sp) {
-        var r = sp.getBoundingClientRect();
-        return { ch: /upper/.test(ccs.textTransform) ? sp.textContent.toUpperCase() : sp.textContent, x: r.left + r.width / 2, y: r.top + r.height / 2, tx: 0, ty: 0, ang: 0, st: 1, sc: 1 };
-      });
-      var litOn = !!tx2;
-      function letterPaths(style) {
-        tx2.fillStyle = style;
-        LS.forEach(function (o) {
-          tx2.setTransform(dprT, 0, 0, dprT, 0, 0);
-          tx2.translate(o.x + o.tx, o.y + o.ty);
-          if (o.st !== 1) { var a = o.ang * Math.PI / 180; tx2.rotate(a); tx2.scale(o.st, 1 / Math.sqrt(o.st)); tx2.rotate(-a); }
-          tx2.scale(o.sc, o.sc);
-          tx2.fillText(o.ch, 0, 0);
-        });
-        tx2.setTransform(1, 0, 0, 1, 0, 0);
-      }
-      function litFrame() {
-        if (!litOn) return;
-        var src = ls.lightSrc();
-        tx2.globalCompositeOperation = 'source-over'; tx2.setTransform(1, 0, 0, 1, 0, 0);
-        tx2.clearRect(0, 0, tcv.width, tcv.height);
-        tx2.font = font; tx2.textAlign = 'center'; tx2.textBaseline = 'middle';
-        letterPaths('#fff');
-        tx2.globalCompositeOperation = 'source-in';
-        tx2.drawImage(src[0], src[1], src[2], src[3], src[4], 0, 0, tcv.width, tcv.height);
-        tx2.globalCompositeOperation = 'lighter';
-        var bk = clamp((performance.now() - t0 - 900) / 2200, 0, 1); bk = bk * bk;   // Form taucht langsam aus dem Schwarz auf
-        if (bk > 0.01) letterPaths('rgb(' + Math.round(22 * bk) + ',' + Math.round(20 * bk) + ',' + Math.round(18 * bk) + ')');
-        tx2.globalCompositeOperation = 'source-over';
-        requestAnimationFrame(litFrame);
-      }
-      if (litOn) requestAnimationFrame(litFrame);
-      var pending = null, phase = 'a';
-      root.addEventListener('touchstart', function () { if (phase === 'a' && pending) go(); }, { passive: true });
-      function go() {
-        if (phase !== 'a' || !pending) return;
-        phase = 'b';
-        root.classList.remove('hp-ld-a');
-        slides.forEach(function (s) {
-          var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
-          if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
-          s.gold = g;
-        });
-        var cb = pending; pending = null; cb();
-        swoosh();
-      }
-      // Wie ein Stoff, den man nach hinten wegzieht (Hugo 23.11.): die Buchstaben gleiten nacheinander weich los,
-      // das Band biegt sich in einem sanften Bogen, wird in Zugrichtung leicht gedehnt und schrumpft in die Tiefe.
-      // Die Sonne leuchtet unterwegs weiter auf die Buchstaben; erst angekommen werden sie weiss wie das Logo.
-      function swoosh() {
-        var C = cl.getBoundingClientRect(), Cc = [C.left + C.width / 2, C.top + C.height / 2], Bc = [B.left + B.width / 2, B.top + B.height / 2];
-        var L = letters.map(function (sp, i) {
-          var r = sp.getBoundingClientRect(), p = [r.left + r.width / 2, r.top + r.height / 2];
-          var t = [Bc[0] + (p[0] - Cc[0]) / S, Bc[1] + (p[1] - Cc[1]) / S];
-          return { sp: sp, i: i, dx: t[0] - p[0], dy: t[1] - p[1], o2: LS[i] };
-        });
-        var dir = [Bc[0] - Cc[0], Bc[1] - Cc[1]], dl = Math.hypot(dir[0], dir[1]) || 1, nx = -dir[1] / dl, ny = dir[0] / dl;
-        var ang = Math.atan2(dir[1], dir[0]) * 180 / Math.PI;
-        var A = Math.min(W0, H0) * 0.12, ts = performance.now(), N = letters.length;
-        function ease(u) { return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; }
-        function vel(u) { return u < 0.5 ? 12 * u * u : 3 * Math.pow(-2 * u + 2, 2) / 2; }   // Ableitung, max. 3
-        function fr(now) {
-          var all = true;
-          L.forEach(function (o) {
-            var u = clamp((now - ts - o.i * LDC.stagger) / LDC.swoosh, 0, 1); if (u < 1) all = false;
-            var e = ease(u), bell = Math.sin(Math.PI * u), k = o.i / Math.max(1, N - 1);
-            var off = bell * A * (0.35 + 0.65 * k);              // hintere Buchstaben schwingen weiter aus: das Band biegt sich
-            var st = 1 + 0.55 * vel(u) / 3;                       // Dehnung in Zugrichtung, je schneller desto mehr
-            var sc = Math.exp(Math.log(1 / S) * e);
-            var q = o.o2; q.tx = o.dx * e + nx * off; q.ty = o.dy * e + ny * off; q.ang = ang; q.st = st; q.sc = sc;
-          });
-          if (!all) requestAnimationFrame(fr);
-          else {
-            // angekommen: das echte Logo blendet weich ein, die Lichtschrift weich aus
-            root.classList.remove('hp-ld-nb'); tcv.style.transition = 'opacity .7s ease'; tcv.style.opacity = '0';
-            setTimeout(function () { litOn = false; tcv.remove(); if (cl.parentNode) cl.parentNode.removeChild(cl); }, 750);
-          }
-        }
-        requestAnimationFrame(fr);
-      }
       var docked = false;
       return {
-        // Bilder bereit: weiter, sobald der Schriftzug lange genug geleuchtet hat
-        ready: function (cb) { pending = cb; setTimeout(go, Math.max(0, LDC.min - (performance.now() - t0))); },
-        // Bilder angedockt: schwarz werden, Regenbogen am Rand
+        ready: function (cb) { cb(); },
         dock: function () {
           if (docked) return; docked = true;
-          html.classList.remove('hp-ld'); root.classList.remove('hp-ld', 'hp-ld-nab', 'hp-ld-nb');
-          // Strahlen bleiben bis hierher und verblassen jetzt sanft
-          ls.light(false); ls.back.classList.add('hp-out');
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
-          if (cl.parentNode) cl.parentNode.removeChild(cl);
           if (ripple && ripple.dock) ripple.dock();
-          setTimeout(function () { litOn = false; tcv.remove(); ls.destroy(); ls.back.remove(); }, 2000);
         }
       };
     })();
