@@ -309,7 +309,7 @@
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
         // Hugo 23.11.: mehrere Wellen gleichzeitig (schnell hintereinander verschwindet die erste nicht)
-        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0;',
+        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0;',
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         '    float best = 1e9;',
@@ -332,21 +332,24 @@
         '    float env = exp(-x * x) * smoothstep(0.0, 0.35, age);',
         '    float amp = exp(-age * 0.45);',
         '    off += dir * (-x * 1.6 * env * amp) * mx * 0.032;',
-        '    float r = env * amp; if (r > ring) { ring = r; ph = x; }',
+        '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
         '  }',
-        '  float a = clamp(ring * 3.0, 0.0, 1.0);',
+        '  ph = rs > 0.0001 ? ph / rs : 0.0;',
+        '  float a = smoothstep(0.0, 0.35, ring);',
         '  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (ph * 0.18 + vec3(0.0, 0.33, 0.67)));',
         '  vec3 col = vec3(0.0); float al = 0.0;',
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
         '    vec2 u = (sp - uRect.xy) / uRect.zw;',
-        '    float inside = step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0);',
+        '    vec2 bu = min(u, 1.0 - u) * uRect.zw;',
+        '    float inside = smoothstep(0.0, 6.0, min(bu.x, bu.y));',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
         '    vec2 ca = off * 0.25 / uRect.zw * uCrop.zw;',                                 // leichte Farbtrennung in der Welle
         '    vec3 img = vec3(texture2D(uImg, iu + ca).r, texture2D(uImg, iu).g, texture2D(uImg, iu - ca).b);',
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
-        '    float here = step(0.0, u0) * step(u0, 1.0) * step(0.0, v0) * step(v0, 1.0);',
+        '    vec2 bh = min(vec2(u0, v0), 1.0 - vec2(u0, v0)) * uRect.zw;',
+        '    float here = smoothstep(0.0, 6.0, min(bh.x, bh.y));',
         '    al = a * inside * here; col = img * al;',
         '  }',
         '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
@@ -413,6 +416,10 @@
       function draw(now) {
         raf = 0;
         waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
+        // immer im gerade gezeigten Bild (auch nach dem Wischen): Leinwand dorthin, dessen Foto als Textur
+        var cs = slides[current()];
+        if (cs) { if (cs.img !== gImg) { gImg = cs.img; } var md0 = cs.media; if (md0 && cv.previousSibling !== md0) md0.parentNode.insertBefore(cv, md0.nextSibling); }
+        if (!cv.parentNode) stage.appendChild(cv);
         var sr = cv.getBoundingClientRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
         if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; c.viewport(0, 0, w, h); }
@@ -444,10 +451,11 @@
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
-        var t = e.touches[0], im = imgAt(t.clientX, t.clientY);
-        if (im !== gImg) { waves = []; gImg = im; texFor(gImg); }     // anderes Bild: dort neu beginnen
-        var md = gImg && gImg.closest('.hp-media');
+        var t = e.touches[0], cs = slides[current()], im = (cs && cs.img) || imgAt(t.clientX, t.clientY);
+        if (im !== gImg) { gImg = im; texFor(gImg); }
+        var md = cs ? cs.media : (gImg && gImg.closest('.hp-media'));
         if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
+        if (!cv.parentNode) stage.appendChild(cv);
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) waves.shift();
         add(t.clientX, t.clientY);
       }, { passive: true });
@@ -695,7 +703,7 @@
       var wasMoved = moved;
       down = null;
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
-      else openInfo();
+      else setTimeout(openInfo, reduce ? 0 : 200);   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist
     }
     window.addEventListener('pointerup', function (e) { release(e, false); });
     window.addEventListener('pointercancel', function (e) { release(e, true); });
