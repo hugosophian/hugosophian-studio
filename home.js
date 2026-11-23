@@ -664,7 +664,9 @@
         if (s.gold) {
           var gv = 1 - smoothstep(0.02, 0.45, E), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 23.11.: Bild blendet früher ein
           s.gold.style.opacity = gv.toFixed(3);
-          s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (6 + 16 * rim).toFixed(1) + 'px ' + (1 + 3 * rim).toFixed(1) + 'px rgba(255,250,238,' + (0.75 * rim).toFixed(3) + '), 0 0 2px 1px rgba(255,255,255,' + rim.toFixed(3) + ')' : '';
+          // Hugo 23.11.: kein Blenden an den Ecken – das Leuchten ohne Ausdehnung (spread) und schwächer, so addieren
+          // sich die Lichthöfe benachbarter Karten in den Ecken nicht zu hellen Punkten
+          s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (5 + 12 * rim).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rim).toFixed(3) + ')' : '';
         }
       }
     }
