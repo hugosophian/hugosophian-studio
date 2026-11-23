@@ -358,7 +358,7 @@
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
         '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
         '    float ln = 0.3 + fl * (2.2 + 1.4 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
-        '    fa = max(fa, 0.7 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.35, 1.1, age));',   // kein Stern am Startpunkt
+        '    fa = max(fa, 0.7 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.06, 0.3, age) * smoothstep(w * 0.6, w * 1.8, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
@@ -396,7 +396,10 @@
         // statt halbdurchsichtig darüber zu liegen
         '  if (uHas > 0.5 && here > 0.0) {',
         '    float L = dot(gc, vec3(0.333)), lum = dot(base, vec3(0.3, 0.59, 0.11));',
-        '    vec3 lit = base * (1.0 + L * 1.2) + (gc - L) * (0.2 + 0.4 * lum) + gc * 0.14;',
+        // Hugo 23.11.: auf Weiss kein heller Rand mehr (Helles wird nur leicht eingefärbt, nicht aufgehellt);
+        // auf Dunklem leuchten Licht und Flares dafür stärker, damit man sie überall sieht
+        '    float dk = 1.0 - lum;',
+        '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.25 + 0.35 * lum) + gc * 0.2 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.3 * dk;',
         '    float cov = clamp(max(al, L * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
