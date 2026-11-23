@@ -337,8 +337,8 @@
         '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.55;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
-        // Hugo 23.11.: am Bildschirmrand stärker und länger: hat die Welle den Rand erreicht, bleibt er leuchten und verblasst langsam
-        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.07) * smoothstep(0.0, 0.35, age) * exp(-age * 0.2) * (1.0 - smoothstep(4.6, 6.9, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0));',
+        // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 3 s
+        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.4) * (1.0 - smoothstep(2.6, 4.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0));',
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
@@ -349,7 +349,7 @@
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
         '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
         '    float ln = 0.4 + fl * (3.2 + 2.0 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
-        '    fa = max(fa, 1.05 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.06, 0.3, age) * smoothstep(w * 0.6, w * 1.8, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
+        '    fa = max(fa, 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.05, 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
@@ -445,7 +445,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 7, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : 2;
