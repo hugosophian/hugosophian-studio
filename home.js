@@ -392,7 +392,7 @@
         '    float patch = 0.2 + 1.0 * smoothstep(0.3, 0.75, n2(ca * 2.6 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 1.25 * mix(1.0, patch, smoothstep(0.2, 1.2, et));',   // erst rundherum, dann ungleich
+        '    eacc = ecol * band * flash * 0.8 * mix(1.0, patch, smoothstep(0.2, 1.2, et));',   // erst rundherum, dann ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -403,13 +403,13 @@
         '    float egr = smoothstep(0.05, 0.7, et) * (1.0 - smoothstep(4.0, 6.2, et));',
         '    float efa = efl * exp(-exo * exo / eln) * egr;',
         '    float efm = smoothstep(0.35, 0.85, n2(fc / mx * 2.6 + vec2(uT * 0.05, 3.0)));',
-        '    eacc += vec3(1.0, 0.86, 0.62) * efa * (0.6 + 0.5 * efm) * 1.1; fI = efa;',
+        '    eacc += vec3(1.0, 0.86, 0.62) * efa * (0.6 + 0.5 * efm) * 0.35; fI = efa * 0.3;',   // die Flares kommen jetzt v. a. von den Wellen
         '    eacc *= fade;',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
-        '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) + min(fI, 1.2) * 0.9) * fade;',
+        '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 + min(fI, 1.2) * 0.9) * fade;',
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
         '    off += (nin * sin(wph) + vec2(-nin.y, nin.x) * 0.5 * cos(wph * 0.7 + 1.3)) * wa * mx * 0.009 * smoothstep(0.0, 0.25, et);',
         '  }',
@@ -593,6 +593,27 @@
         gImg = cs.img; texFor(gImg);
         var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
         edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
+        // Hugo 23.11. (wie die Fingerwelle im Video): das Andocken löst echte Wellen aus, die rundherum am Rand beginnen
+        // und nach innen durchs Bild laufen – mit Prisma-Regenbogen, Verzerrung und Solar Flares, die darauf surfen.
+        // Zwei Wellen kurz nacheinander; die Bahn läuft einmal um den Rand, leicht unregelmässig (organisch).
+        var r = stage.getBoundingClientRect();
+        function ring(delay, inset) {
+          var now = performance.now() + delay, per = 2 * (r.width + r.height), N = PW - 1, pts = [];
+          var off = Math.random() * per;
+          for (var i = 0; i < N; i++) {
+            var d = (off + per * i / N) % per, x, y, w2 = r.width, h2 = r.height;
+            if (d < w2) { x = d; y = 0; } else if (d < w2 + h2) { x = w2; y = d - w2; }
+            else if (d < 2 * w2 + h2) { x = w2 - (d - w2 - h2); y = h2; } else { x = 0; y = h2 - (d - 2 * w2 - h2); }
+            // knapp innerhalb des Rands, nicht überall gleich weit
+            var ins = inset * (0.6 + 0.8 * Math.random());
+            x = Math.min(w2 - ins, Math.max(ins, x)); y = Math.min(h2 - ins, Math.max(ins, y));
+            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 140 });
+          }
+          pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t });   // Bahn schliessen
+          waves.push({ t0: now, pts: pts }); if (waves.length > NW) waves.shift();
+        }
+        ring(0, 12);
+        setTimeout(function () { ring(0, 22); if (!raf) raf = requestAnimationFrame(draw); }, 650);
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
