@@ -149,9 +149,11 @@
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   // Andocken wie ein Magnet (Hugo 23.11.): das Bild wird langsamer, fast bis zum Stillstand, und wird dann zum Rand
   // hin angezogen – zuletzt immer schneller, bis es einrastet
+  // Hugo 23.11.: bis kurz vor dem Ziel genau die ursprüngliche Bewegung (Kurve wie Mario), nur endet sie knapp vor
+  // dem Rand; von dort zieht der Magnet das Bild immer schneller heran, bis es einrastet
   function easeMagnet(x) {
-    var a = 0.78, k = 0.94;
-    if (x < a) { var t = x / a; return k * (1 - Math.pow(1 - t, 3)); }
+    var a = 0.8, k = 0.95;
+    if (x < a) return k * easeDock(x / a);
     var u = (x - a) / (1 - a); return k + (1 - k) * u * u * u;
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
