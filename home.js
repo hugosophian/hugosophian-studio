@@ -1531,13 +1531,14 @@
     LD = (function () {
       var LDC = { min: 1900, swoosh: 1350, stagger: 32, lightOff: 2100, size: 0.42 };
       var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
-      function bare() { html.classList.remove('hp-preload'); return null; }
+      // Safaris Leistenfarbe: im Kopf der Seite schon auf Weiss gesetzt, danach wieder Schwarz
+      var meta = document.querySelector('meta[name="theme-color"]');
+      function bare() { html.classList.remove('hp-preload'); if (meta) meta.setAttribute('content', '#000000'); return null; }
       if (desk || reduce || seen || !brand || html.classList.contains('hs-vt-studio')) return bare();
       var ls = makeSun(SUN_LD, 'load');
       if (!ls) return bare();
       try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
       var t0 = performance.now(), W0 = window.innerWidth, H0 = window.innerHeight;
-      var meta = document.querySelector('meta[name="theme-color"]'), metaOld = meta && meta.getAttribute('content');
       if (meta) meta.setAttribute('content', '#ffffff');
       html.classList.add('hp-ld'); root.classList.add('hp-ld', 'hp-ld-a', 'hp-ld-nb', 'hp-ld-nab');
       ls.back.classList.add('hp-ldx'); ls.glow.classList.add('hp-ldx');
@@ -1617,7 +1618,7 @@
         dock: function () {
           if (docked) return; docked = true;
           html.classList.remove('hp-ld'); root.classList.remove('hp-ld', 'hp-ld-nab', 'hp-ld-nb');
-          if (meta) meta.setAttribute('content', metaOld || '#000000');
+          if (meta) meta.setAttribute('content', '#000000');
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (cl.parentNode) cl.parentNode.removeChild(cl);
           if (ripple && ripple.dock) ripple.dock();
