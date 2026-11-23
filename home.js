@@ -153,9 +153,9 @@
   // hin angezogen – zuletzt immer schneller, bis es einrastet
   // Hugo 23.11.: Heranzoomen kubisch (langsam an, schnell, langsam aus), knapp vor dem Ziel übernimmt weich ein Magnet:
   // das Bild wird langsamer, ohne anzuhalten, und dann immer schneller zum Rand gezogen, bis es einrastet
-  function magnetPull(x) { var x0 = 0.63; return x > x0 ? Math.pow((x - x0) / (1 - x0), 4.5) : 0; }   // Hugo 23.11.: Magnet etwas schwächer als zuletzt
+  function magnetPull(x) { var x0 = 0.62; return x > x0 ? Math.pow((x - x0) / (1 - x0), 5) : 0; }   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
   function easeMagnet(x) {
-    var k = 0.85, a = 0.85, t = Math.min(1, x / a);
+    var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 23.11.: der schnelle Teil schneller, das Abdämpfen etwas stärker: Anlauf und Bremsung mit Potenz 4
     // (stetig angesetzt, Spitzentempo ein Drittel höher als kubisch, bremst kräftiger und läuft länger sanft aus)
     var c = t < 0.5 ? 0.5 * Math.pow(2 * t, 4) : 1 - 0.5 * Math.pow(2 - 2 * t, 4);
