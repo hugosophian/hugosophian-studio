@@ -312,10 +312,10 @@
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
         // Hugo 23.11.: mehrere Wellen gleichzeitig (schnell hintereinander verschwindet die erste nicht)
-        '  vec2 q = fc / mx * 4.0;',
+        '  vec2 q = fc / mx * 2.6;',   // gröber: breitere, ruhigere Sonnenbewegung
         '  vec2 wq = vec2(n2(q * 0.9 + vec2(uT * 0.11, -uT * 0.07)), n2(q + vec2(-uT * 0.09, uT * 0.13) + 5.2));',
         '  float sv = n2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05));',
-        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0; vec3 rbA = vec3(0.0);',
+        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0, halo = 0.0, fa = 0.0; vec3 rbA = vec3(0.0);',
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         '    float best = 1e9;',
@@ -341,11 +341,17 @@
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
+        '    float on = smoothstep(0.0, 0.35, age) * amp;',
+        '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 6.0) * on);',
+        '    float an = atan(dir.y, dir.x);',
+        '    float fl = pow(n2(vec2(an * 7.0 + float(k) * 3.1, uT * 0.35 + float(k))), 4.0);',
+        '    float xo = max(x, 0.0);',
+        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / (0.6 + fl * 6.0)) * on);',
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  float a = smoothstep(0.0, 0.35, ring);',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
-        '  rb = clamp((rb - 0.5) * 1.6 + 0.5, 0.0, 1.0);',
+        '  rb = mix(vec3(dot(rb, vec3(0.333))), rb, 0.7);',   // etwas weniger bunt
         '  vec3 col = vec3(0.0); float al = 0.0;',
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
@@ -360,8 +366,11 @@
         '    float here = smoothstep(0.0, 6.0, min(bh.x, bh.y));',
         '    al = a * inside * here; col = img * al;',
         '  }',
+        '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
         '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
-        '  vec3 gc = mix(rb, vec3(1.0), 0.06) * glow;',
+        '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
+        '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
+        '  vec3 gc = mix(rb, vec3(1.0), 0.15) * glow + fc2 * halo * fm * 0.16 + vec3(1.0, 0.86, 0.62) * fa * (0.45 + 0.45 * fm);',
         '  col = col + gc * (1.0 - al * 0.4);',                                       // Regenbogen um die Welle (aufhellend)
         '  al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.9);',
         '  gl_FragColor = vec4(col, al);',
