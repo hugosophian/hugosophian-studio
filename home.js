@@ -152,7 +152,7 @@
   // Hugo 23.11.: die ursprüngliche Bewegung (Kurve wie Mario), aber knapp vor dem Ziel übernimmt weich ein Magnet:
   // das Bild wird langsamer, ohne anzuhalten, und dann immer schneller zum Rand gezogen, bis es einrastet
   function easeMagnet(x) {
-    var k = 0.88, x0 = 0.62, m = x > x0 ? Math.pow((x - x0) / (1 - x0), 3.2) : 0;
+    var k = 0.9, x0 = 0.7, m = x > x0 ? Math.pow((x - x0) / (1 - x0), 4.5) : 0;   // Hugo 23.11.: etwas weniger weich
     return k * easeDock(x) + (1 - k) * m;
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
