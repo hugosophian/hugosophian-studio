@@ -342,7 +342,9 @@
         '    float x = best / w;',
         '    float env = exp(-x * x) * smoothstep(0.0, 0.35, age);',
         '    float amp = exp(-age * 0.45);',
-        '    off += dir * (-x * 1.6 * env * amp * smoothstep(0.0, w, sd)) * mx * 0.032;',
+        // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
+        // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
+        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.55;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
@@ -355,8 +357,8 @@
         '    float ra = xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
         '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
-        '    float ln = 0.5 + fl * (5.0 + 3.0 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',
-        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.35, 1.1, age));',   // kein Stern am Startpunkt
+        '    float ln = 0.3 + fl * (2.2 + 1.4 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
+        '    fa = max(fa, 0.7 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.35, 1.1, age));',   // kein Stern am Startpunkt
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
@@ -377,7 +379,7 @@
         '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al;',
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
-        '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
+        '  float glow = clamp(ring * 0.8 + edge * 1.2, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
         '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 6.0), cw = pow(1.0 - abs(2.0 * sv - 1.0), 3.0);',
@@ -385,7 +387,10 @@
         '  float mixr = clamp(0.25 * smoothstep(0.45, 0.8, n2(q * 0.5 + vec2(uT * 0.06, 3.0))) + 0.75 * org, 0.0, 1.0);',
         '  vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 1.8 + uT * 0.03 + vec3(0.0, 0.33, 0.67)));',
         '  sun = mix(sun, cr * (0.5 * fm + 0.6 * cw), mixr * cw);',
-        '  vec3 gc = mix(rb, vec3(1.0), 0.15) * glow + sun * halo * 0.42 + vec3(1.0, 0.86, 0.62) * fa * (0.45 + 0.45 * fm);',
+        // Hugo 23.11.: am Rand goldenes Licht wie die Sonnenstrahlen, das sich weich mit dem Regenbogen mischt
+        '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
+        '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
+        '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.42 + vec3(1.0, 0.86, 0.62) * fa * (0.45 + 0.45 * fm);',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
         // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
         // statt halbdurchsichtig darüber zu liegen
