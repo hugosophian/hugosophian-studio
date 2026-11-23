@@ -300,7 +300,7 @@
       // langsam wandernd; dazu ein Strahl in Richtung des Fingers (uHero: Winkel, Breite, Stärke)
       var RAYF = [
         'uniform vec2 uSunP; uniform float uT; uniform float uLA; uniform vec3 uHero; uniform float uViewH;',
-        'float rh2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float rh2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float rn2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(rh2(i), rh2(i + vec2(1.0, 0.0)), f.x), mix(rh2(i + vec2(0.0, 1.0)), rh2(i + vec2(1.0, 1.0)), f.x), f.y); }',
         'float raysAt(vec2 p, float da) {',
@@ -421,7 +421,7 @@
         var SUN = HP + RAYF + '\n' + [
           'uniform vec2 uRes; uniform vec2 uLight; uniform float uRad; uniform float uTime; uniform float uGlow; uniform vec2 uBand;',
           'varying vec2 vUv;',
-          'float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }',
+          'float h(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }',
           'float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
           '  float a = mix(mix(h(i), h(i + vec3(1, 0, 0)), f.x), mix(h(i + vec3(0, 1, 0)), h(i + vec3(1, 1, 0)), f.x), f.y);',
           '  float b = mix(mix(h(i + vec3(0, 0, 1)), h(i + vec3(1, 0, 1)), f.x), mix(h(i + vec3(0, 1, 1)), h(i + vec3(1, 1, 1)), f.x), f.y);',
@@ -450,7 +450,7 @@
         var COMP = HP + [
           'uniform sampler2D uRays; uniform vec2 uTexel; uniform float uTime; uniform float uGrain; uniform float uAmt; uniform vec3 uColor; uniform vec2 uRow;',
           'varying vec2 vUv;',
-          'float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }',
+          'float h(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
           'void main() {',
           '  float l = (texture2D(uRays, vUv + uTexel * vec2(0.5, 0.5)).r + texture2D(uRays, vUv - uTexel * vec2(0.5, 0.5)).r',
           '           + texture2D(uRays, vUv + uTexel * vec2(0.5, -0.5)).r + texture2D(uRays, vUv + uTexel * vec2(-0.5, 0.5)).r) * 0.25 * uAmt;',

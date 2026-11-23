@@ -300,7 +300,7 @@
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform float uT;',
-        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
@@ -343,10 +343,13 @@
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 6.0) * on);',
-        '    float an = atan(dir.y, dir.x);',
-        '    float fl = pow(n2(vec2(an * 7.0 + float(k) * 3.1, uT * 0.35 + float(k))), 4.0);',
+        '    float sd = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
-        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / (0.6 + fl * 6.0)) * on);',
+        '    float an = atan(dir.y, dir.x) + xo * 0.22 * sin(uT * 0.6 + sd);',
+        '    vec2 cs = vec2(cos(an), sin(an)) * 2.2;',
+        '    float fl = pow(n2(cs + vec2(sd, uT * 0.3)), 3.5);',
+        '    float ln = 0.5 + fl * (5.0 + 3.0 * n2(cs * 1.7 + vec2(uT * 0.8, sd)));',
+        '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on);',
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  float a = smoothstep(0.0, 0.35, ring);',
@@ -845,9 +848,9 @@
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
-        'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
+        'float h1(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
-        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
         'vec2 S;',
