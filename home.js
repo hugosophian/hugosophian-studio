@@ -317,7 +317,7 @@
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
-        '    float w = mx * min(0.016 + 0.028 * age, 0.085), sw = 1.0 / (w * 0.5);',   // schmal beim Auslösen, beim Auslaufen breiter
+        '    float w = mx * min(0.012 + 0.017 * age, 0.052), sw = 1.0 / (w * 0.5);',   // Hugo 23.11. nachmittags: kompakter (vorher 0.016 + 0.028 · Alter, max. 0.085)
         '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
@@ -334,7 +334,7 @@
         '    float amp = exp(-age * 0.45);',
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.55;',
+        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
@@ -346,9 +346,9 @@
         '    float xo = max(x, 0.0);',
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
         '    float ra = xo * 0.22 * sin(uT * 0.6 + fs);',
-        '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
-        '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
-        '    float ln = 0.4 + fl * (3.2 + 2.0 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
+        '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
+        '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',
+        '    float ln = 0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
         '    fa = max(fa, 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.05, 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
