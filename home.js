@@ -140,19 +140,22 @@
     /* Ladeanimation (Hugo 23.11., erst Handy): weiss, «Hugo Sophian Studio» gross in der Mitte von der Sonne angestrahlt,
        gleitet dann in die Ecke; die Bilder kommen als leuchtende Vierecke im goldenen Licht, beim Andocken wird es schwarz */
     'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
-    'html.hp-preload, html.hp-preload body, html.hp-ld, html.hp-ld body { background: #fff !important; }',
-    'html.hp-preload [data-hp] { visibility: hidden; }',
+    'html.hp-preload [data-hp], html.hp-preload [data-hp] * { visibility: hidden !important; }',
     '[data-hp].hp-ld, [data-hp].hp-ld .hp-stage { background: transparent !important; }',
-    '[data-hp].hp-ld-a .hp-stage, [data-hp].hp-ld-nb .hp-brand:not(.hp-ld-brand) { visibility: hidden; }',
-    '[data-hp].hp-ld-nab .hp-about-btn { opacity: 0; pointer-events: none; }',
+    '[data-hp].hp-ld-a .hp-stage { visibility: hidden; }',
+    '[data-hp].hp-ld-nb .hp-brand:not(.hp-ld-brand) { opacity: 0; }',
+    '[data-hp].hp-ld-nab .hp-about-btn { opacity: 0; visibility: hidden; pointer-events: none; }',
     '[data-hp]:not(.hp-ld-nab) .hp-about-btn { transition: opacity .6s ease; }',
     '[data-hp] .hp-info-sun.hp-ldx { transform: none !important; }',
-    '[data-hp] .hp-sun-light.hp-ldx { visibility: visible !important; transition: opacity 1.2s ease; }',
-    '[data-hp] .hp-sun-back.hp-ldx { z-index: 0; transition: opacity 1s ease; }',
+    '[data-hp] .hp-sun-light.hp-ldx { visibility: visible !important; transition: opacity 1.8s ease; }',
+    '[data-hp] .hp-sun-back.hp-ldx { z-index: 0; transition: opacity 1.8s ease; }',
     '[data-hp] .hp-ldx.hp-out { opacity: 0; }',
-    '[data-hp] .hp-ld-brand { position: fixed !important; margin: 0 !important; z-index: 7 !important; color: #141414 !important; mix-blend-mode: normal !important; pointer-events: none; visibility: visible !important; transform: none; }',
-    '[data-hp] .hp-ld-brand .hp-ld-l { display: inline-block; will-change: transform; }',
-    '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, #fffaf0 0%, #ffe2a0 45%, #f6bd5c 100%); }',
+    '[data-hp] .hp-ld-brand { position: fixed !important; margin: 0 !important; z-index: 7 !important; color: #8e8a84; mix-blend-mode: normal !important; pointer-events: none; visibility: visible !important; transform: none; }',
+    '[data-hp] .hp-ld-brand .hp-ld-l { display: inline-block; }',
+    '[data-hp] .hp-ld-brand { color: transparent !important; }',
+    '[data-hp] .hp-ld-txt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; pointer-events: none; mix-blend-mode: screen; }',
+    '[data-hp] .hp-brand { transition: opacity .7s ease; }',
+    '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(130% 100% at 50% 50%, #fff 0%, #fffdf7 55%, #fff1d6 100%); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -304,7 +307,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT;',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -399,6 +402,25 @@
         '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
         '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm);',
+        // Andocken nach dem Laden (Hugo 23.11.): Licht läuft von den vier Ecken den Rand entlang, mit grossen Solar Flares,
+        // die vom Rand ins Bild züngeln; Regenbogen und Gold mischen sich, dann verglüht es
+        '  if (uEdgeT >= 0.0) {',
+        '    float et = uEdgeT;',
+        '    float dc = ed.x < ed.y ? min(fc.y, uRes.y - fc.y) : min(fc.x, uRes.x - fc.x);',   // Weg entlang des Rands ab der nächsten Ecke
+        '    float fr = et * mx * 0.85;',
+        '    float run = (1.0 - smoothstep(fr - mx * 0.08, fr, dc)) * 0.75 + exp(-pow((dc - fr) / (mx * 0.05), 2.0)) * 0.9;',
+        '    float fade = exp(-et * 0.3) * (1.0 - smoothstep(3.2, 4.8, et));',
+        '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001));',
+        '    float fl = pow(n2(ca * 4.0 + vec2(uT * 0.22, -uT * 0.17) + 3.0), 2.0);',
+        '    float fln = mx * (0.04 + 0.42 * fl * (0.5 + 0.5 * n2(ca * 9.0 - vec2(uT * 0.5, 0.0))));',   // grosse Flares
+        '    float fx = max(e, 0.0) / max(fln, 1.0); float flare = fl * exp(-fx * fx * 1.6) * smoothstep(0.0, 0.35, et);',
+        '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 700.0);',
+        '    float ang = atan(ca.y, ca.x) / 6.2832;',
+        '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
+        '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
+        '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.3 + 0.45 * egm);',
+        '    gc += (ecol * band * 1.1 + mix(vec3(1.0, 0.86, 0.62), ecol, 0.35) * flare * 1.2) * run * fade;',
+        '  }',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
         // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
         // statt halbdurchsichtig darüber zu liegen
@@ -425,7 +447,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -462,7 +484,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : 2;
@@ -538,17 +560,17 @@
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
+        var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 5) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
-        if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
+        if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
       function ok() { return !desk && !root.classList.contains('is-info'); }
-      // Andocken nach dem Laden (Hugo 23.11.): eine schnelle Welle aus der Bildmitte, die am Rand den Regenbogen auslöst
+      // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       function dock() {
         var cs = slides[current()]; if (!cs) return;
         gImg = cs.img; texFor(gImg);
         var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
-        var r = (md || stage).getBoundingClientRect(), now = performance.now();
-        waves.push({ t0: now, pts: [{ x: r.left + r.width / 2, y: r.top + r.height / 2, t: now }], sp2: 3.2 }); if (waves.length > NW) waves.shift();
+        edgeT0 = performance.now();
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
@@ -607,11 +629,12 @@
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
-        // Ladeanimation: stark leuchtende Vierecke im goldenen Licht; je näher sie kommen, desto mehr erkennt man das Bild
+        // Ladeanimation (Hugo 23.11.): weisse Vierecke mit leuchtendem Rand, wie Türen, durch die Licht fällt;
+        // beim Aufgehen kommt das Bild zum Vorschein
         if (s.gold) {
-          var gv = 1 - smoothstep(0.08, 0.85, E);
+          var gv = 1 - smoothstep(0.1, 0.8, E), rim = 1 - smoothstep(0.6, 1, E);
           s.gold.style.opacity = gv.toFixed(3);
-          s.el.style.boxShadow = gv > 0.01 ? '0 0 ' + (34 * gv).toFixed(1) + 'px ' + (8 * gv).toFixed(1) + 'px rgba(255,200,110,' + (0.85 * gv).toFixed(3) + ')' : '';
+          s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (10 + 30 * rim).toFixed(1) + 'px ' + (2 + 6 * rim).toFixed(1) + 'px rgba(255,226,170,' + (0.9 * rim).toFixed(3) + '), 0 0 3px 1px rgba(255,255,255,' + rim.toFixed(3) + ')' : '';
         }
       }
     }
@@ -670,6 +693,7 @@
       if (introOn) {
         if (!introT0) introT0 = now;
         introP = clamp((now - introT0) / CONFIG.introMs, 0, 1);
+        if (LD && introP >= 0.84) LD.dock();   // sichtbar angedockt (die Kurve legt sich ganz am Schluss nur noch an)
         if (introP >= 1) endIntro(); else more = true;
       } else if (desk) {
         deskMoving = false;
@@ -899,9 +923,10 @@
     };
     // Eigene Sonne der Ladeanimation (Hugo 23.11.: getrennt vom About – hier ändern wirkt nur beim Laden)
     var SUN_LD = {
-      src: [0.86, -0.3], rays: [8, 19], drift: [0.16, -0.24], edge: [0.37, 0.82], reach: 2.6, strength: 1.2, ambient: 0.2,
-      shade: [0.8, 0.81, 0.835], shadeLow: [0.8, 0.81, 0.835], lit: [1.0, 0.985, 0.95],
-      textLight: [1.0, 0.74, 0.36], textAmt: 0.62,
+      // Hugo 23.11.: auf Schwarz – Grund schwarz, die Strahlen warm golden
+      src: [0.86, -0.3], rays: [8, 19], drift: [0.16, -0.24], edge: [0.37, 0.82], reach: 2.6, strength: 1.2, ambient: 0.0,
+      base: [0, 0, 0], shade: [0, 0, 0], shadeLow: [0, 0, 0], lit: [0.5, 0.4, 0.26],
+      textLight: [1.0, 0.74, 0.36], textAmt: 1.0,   // Schrift erscheint nur im Licht, darum kräftiger
       occLen: 0.9, occAmt: 0.75, refr: 0.02, depth: 0.3, shadowW: 0.05, trailLife: 0.9, trailAmt: 0.75, res: 1
     };
     // Hugo 23.11.: About und Ladeanimation haben je ihre eigene Sonne (eigene Werte, eigene Leinwand), gleiche Bauart
@@ -922,7 +947,7 @@
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform vec3 uHero; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
-        'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit;',
+        'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit; uniform vec3 uBase;',
         'uniform vec3 uTextLight; uniform float uTextAmt; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }',
@@ -1016,7 +1041,7 @@
         '    vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 4.0 + t * 0.02 + vec3(0.0, 0.33, 0.67)));',
         '    col += (cr - 0.5) * cw * sh2 * 0.13 * amp;',
         '    float wf = max(smoothstep(0.25, 0.75, uOn), uHero.z * exp(-hh * hh * 0.35));',
-        '    col = mix(vec3(1.0), col, wf);',
+        '    col = mix(uBase, col, wf);',
         // Liquid Glass: dicke, runde Glasschrift. Innen leicht milchig und vergrössernd, an den Rändern bricht
         // das Licht weich in Regenbogenfarben (jede Farbe etwas anders versetzt), oben ein weisser Glanz.
         '  } else {',
@@ -1046,10 +1071,10 @@
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
       var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uHero', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
-        'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+        'uBase', 'uTextLight', 'uTextAmt', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
-      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit);
+      c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uBase, SUN.base || [1, 1, 1]);
       c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt);
       c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt); c.uniform1f(U.uRefr, SUN.refr); c.uniform2f(U.uExt, 0, 0);
       c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
@@ -1267,6 +1292,17 @@
         light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); },
         // Laden: Boden (Sonnenoberfläche) beginnt knapp unter dem Schriftzug
         horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); },
+        // Lichtbild der Schrift (zweite Hälfte der Rechenleinwand): Quelle und Ausschnitt für drawImage
+        lightSrc: function () { return [gcv, cw, gcv.height - chh, cw, chh]; },
+        // Licht an einer Stelle (CSS-Pixel): 0 … 1, so stark wie angestrahlte Schrift dort leuchten würde
+        lightAt: function (x, y) {
+          var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
+          var px0 = Math.round((x - rect.left) * sx), py0 = Math.round(chh - (y - rect.top) * sx);
+          if (px0 < 0 || px0 >= cw || py0 < 0 || py0 >= chh) return 0;
+          if (!px) px = new Uint8Array(4);
+          c.readPixels(cw + px0, py0, 1, 1, c.RGBA, c.UNSIGNED_BYTE, px);
+          return Math.min(1, px[0] / 255 / (SUN.textLight[0] * SUN.textAmt));
+        },
         // Ladeanimation fertig: Leinwand und Speicher freigeben
         destroy: function () { lightOn.want = false; lightOn.v = 0; if (raf) cancelAnimationFrame(raf); raf = 0; var lx2 = c.getExtension('WEBGL_lose_context'); if (lx2) lx2.loseContext(); }
       };
@@ -1529,7 +1565,7 @@
     //   3. Andocken: der Hintergrund wird schwarz, eine schnelle Welle aus der Mitte lässt den Rand im Regenbogen leuchten.
     //   Nur beim ersten Besuch pro Sitzung; Tippen verkürzt das Warten; mit «Bewegung reduzieren» ohne.
     LD = (function () {
-      var LDC = { min: 1900, swoosh: 1350, stagger: 32, lightOff: 2100, size: 0.42 };
+      var LDC = { min: 3000, swoosh: 1600, stagger: 45, size: 0.42 };
       var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
       // Safaris Leistenfarbe: im Kopf der Seite schon auf Weiss gesetzt, danach wieder Schwarz
       var meta = document.querySelector('meta[name="theme-color"]');
@@ -1539,10 +1575,9 @@
       if (!ls) return bare();
       try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
       var t0 = performance.now(), W0 = window.innerWidth, H0 = window.innerHeight;
-      if (meta) meta.setAttribute('content', '#ffffff');
       html.classList.add('hp-ld'); root.classList.add('hp-ld', 'hp-ld-a', 'hp-ld-nb', 'hp-ld-nab');
-      ls.back.classList.add('hp-ldx'); ls.glow.classList.add('hp-ldx');
-      root.insertBefore(ls.back, root.firstChild); root.appendChild(ls.glow);
+      ls.back.classList.add('hp-ldx');
+      root.insertBefore(ls.back, root.firstChild);   // nur die Wand mit den Strahlen; die Schrift wird direkt beleuchtet
 
       // Schriftzug: Kopie mit einzelnen Buchstaben, gross in der Mitte (in echter Schriftgrösse, nicht hochskaliert → scharf)
       var B = brand.getBoundingClientRect(), bcs = getComputedStyle(brand);
@@ -1566,7 +1601,45 @@
       ls.horizon(cy, cy + R.height + H0 * 0.03);   // Boden knapp unter dem Schriftzug
       html.classList.remove('hp-preload');
       setTimeout(function () { ls.light(true); }, 200);
-
+      // Hugo 23.11.: die Schrift ist durchsichtig und zeichnet sich nur dort, wo die Sonne sie trifft – mit den
+      // Prismafarben des Lichts. Jeder Buchstabe wird auf eine Leinwand gezeichnet und mit dem Lichtbild gefüllt
+      // (auch unterwegs in die Ecke); ganz schwach ist die Form auch im Schatten zu ahnen.
+      var tcv = document.createElement('canvas'); tcv.className = 'hp-ld-txt'; tcv.setAttribute('aria-hidden', 'true');
+      var tx2 = tcv.getContext('2d'); root.appendChild(tcv);
+      var dprT = Math.min(window.devicePixelRatio || 1, 2);
+      tcv.width = Math.round(W0 * dprT); tcv.height = Math.round(H0 * dprT);
+      var ccs = getComputedStyle(cl), font = ccs.fontStyle + ' ' + ccs.fontWeight + ' ' + ccs.fontSize + ' ' + ccs.fontFamily;
+      var LS = letters.map(function (sp) {
+        var r = sp.getBoundingClientRect();
+        return { ch: /upper/.test(ccs.textTransform) ? sp.textContent.toUpperCase() : sp.textContent, x: r.left + r.width / 2, y: r.top + r.height / 2, tx: 0, ty: 0, ang: 0, st: 1, sc: 1 };
+      });
+      var litOn = !!tx2;
+      function letterPaths(style) {
+        tx2.fillStyle = style;
+        LS.forEach(function (o) {
+          tx2.setTransform(dprT, 0, 0, dprT, 0, 0);
+          tx2.translate(o.x + o.tx, o.y + o.ty);
+          if (o.st !== 1) { var a = o.ang * Math.PI / 180; tx2.rotate(a); tx2.scale(o.st, 1 / Math.sqrt(o.st)); tx2.rotate(-a); }
+          tx2.scale(o.sc, o.sc);
+          tx2.fillText(o.ch, 0, 0);
+        });
+        tx2.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      function litFrame() {
+        if (!litOn) return;
+        var src = ls.lightSrc();
+        tx2.globalCompositeOperation = 'source-over'; tx2.setTransform(1, 0, 0, 1, 0, 0);
+        tx2.clearRect(0, 0, tcv.width, tcv.height);
+        tx2.font = font; tx2.textAlign = 'center'; tx2.textBaseline = 'middle';
+        letterPaths('#fff');
+        tx2.globalCompositeOperation = 'source-in';
+        tx2.drawImage(src[0], src[1], src[2], src[3], src[4], 0, 0, tcv.width, tcv.height);
+        tx2.globalCompositeOperation = 'lighter';
+        letterPaths('rgb(22,20,18)');   // die Form im Schatten nur zu ahnen
+        tx2.globalCompositeOperation = 'source-over';
+        requestAnimationFrame(litFrame);
+      }
+      if (litOn) requestAnimationFrame(litFrame);
       var pending = null, phase = 'a';
       root.addEventListener('touchstart', function () { if (phase === 'a' && pending) go(); }, { passive: true });
       function go() {
@@ -1580,33 +1653,38 @@
         });
         var cb = pending; pending = null; cb();
         swoosh();
-        ls.glow.style.opacity = '0.6';   // auf den Bildern eher goldenes Licht als bunte Prismenränder
-        setTimeout(function () { ls.light(false); ls.back.classList.add('hp-out'); ls.glow.classList.add('hp-out'); }, LDC.lightOff);
       }
-      // Wie ein Stoffband: die Buchstaben ziehen nacheinander los, eine Welle läuft quer durch das Band,
-      // jeder Buchstabe schwingt und dreht sich leicht, bis alles genau an seiner Stelle oben links liegt
+      // Wie ein Stoff, den man nach hinten wegzieht (Hugo 23.11.): die Buchstaben gleiten nacheinander weich los,
+      // das Band biegt sich in einem sanften Bogen, wird in Zugrichtung leicht gedehnt und schrumpft in die Tiefe.
+      // Die Sonne leuchtet unterwegs weiter auf die Buchstaben; erst angekommen werden sie weiss wie das Logo.
       function swoosh() {
         var C = cl.getBoundingClientRect(), Cc = [C.left + C.width / 2, C.top + C.height / 2], Bc = [B.left + B.width / 2, B.top + B.height / 2];
         var L = letters.map(function (sp, i) {
           var r = sp.getBoundingClientRect(), p = [r.left + r.width / 2, r.top + r.height / 2];
           var t = [Bc[0] + (p[0] - Cc[0]) / S, Bc[1] + (p[1] - Cc[1]) / S];
-          return { sp: sp, i: i, dx: t[0] - p[0], dy: t[1] - p[1] };
+          return { sp: sp, i: i, dx: t[0] - p[0], dy: t[1] - p[1], o2: LS[i] };
         });
         var dir = [Bc[0] - Cc[0], Bc[1] - Cc[1]], dl = Math.hypot(dir[0], dir[1]) || 1, nx = -dir[1] / dl, ny = dir[0] / dl;
-        var A = Math.min(W0, H0) * 0.07, ts = performance.now();
+        var ang = Math.atan2(dir[1], dir[0]) * 180 / Math.PI;
+        var A = Math.min(W0, H0) * 0.12, ts = performance.now(), N = letters.length;
         function ease(u) { return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; }
+        function vel(u) { return u < 0.5 ? 12 * u * u : 3 * Math.pow(-2 * u + 2, 2) / 2; }   // Ableitung, max. 3
         function fr(now) {
           var all = true;
           L.forEach(function (o) {
             var u = clamp((now - ts - o.i * LDC.stagger) / LDC.swoosh, 0, 1); if (u < 1) all = false;
-            var e = ease(u), bell = Math.sin(Math.PI * u);
-            var wv = Math.sin(6.2832 * (u * 1.15) + o.i * 0.55);
-            var off = bell * A * wv, rot = bell * 16 * Math.cos(6.2832 * (u * 1.15) + o.i * 0.55);
+            var e = ease(u), bell = Math.sin(Math.PI * u), k = o.i / Math.max(1, N - 1);
+            var off = bell * A * (0.35 + 0.65 * k);              // hintere Buchstaben schwingen weiter aus: das Band biegt sich
+            var st = 1 + 0.55 * vel(u) / 3;                       // Dehnung in Zugrichtung, je schneller desto mehr
             var sc = Math.exp(Math.log(1 / S) * e);
-            o.sp.style.transform = 'translate3d(' + (o.dx * e + nx * off).toFixed(2) + 'px,' + (o.dy * e + ny * off).toFixed(2) + 'px,0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
+            var q = o.o2; q.tx = o.dx * e + nx * off; q.ty = o.dy * e + ny * off; q.ang = ang; q.st = st; q.sc = sc;
           });
           if (!all) requestAnimationFrame(fr);
-          else { root.classList.remove('hp-ld-nb'); requestAnimationFrame(function () { if (cl.parentNode) cl.parentNode.removeChild(cl); }); }
+          else {
+            // angekommen: das echte Logo blendet weich ein, die Lichtschrift weich aus
+            root.classList.remove('hp-ld-nb'); tcv.style.transition = 'opacity .7s ease'; tcv.style.opacity = '0';
+            setTimeout(function () { litOn = false; tcv.remove(); if (cl.parentNode) cl.parentNode.removeChild(cl); }, 750);
+          }
         }
         requestAnimationFrame(fr);
       }
@@ -1618,11 +1696,12 @@
         dock: function () {
           if (docked) return; docked = true;
           html.classList.remove('hp-ld'); root.classList.remove('hp-ld', 'hp-ld-nab', 'hp-ld-nb');
-          if (meta) meta.setAttribute('content', '#000000');
+          // Strahlen bleiben bis hierher und verblassen jetzt sanft
+          ls.light(false); ls.back.classList.add('hp-out');
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (cl.parentNode) cl.parentNode.removeChild(cl);
           if (ripple && ripple.dock) ripple.dock();
-          setTimeout(function () { ls.destroy(); ls.back.remove(); ls.glow.remove(); }, 1400);
+          setTimeout(function () { litOn = false; tcv.remove(); ls.destroy(); ls.back.remove(); }, 2000);
         }
       };
     })();
