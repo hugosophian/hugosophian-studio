@@ -44,11 +44,6 @@
     ease:       0.15,   // Mario: 0.15 pro Bild (60 fps), kleiner = träger und mehr Verziehen
     zoom:       0.25,   // Mario: 0.25 (Stärke des Verziehens)
     zoomMax:    0.24,   // Begrenzung, damit beim Herauszoomen nie ein Rand sichtbar wird
-    // Bewegungsunschärfe beim Wischen (Hugo 22.11., wie in der Galerie): Bild verwischt senkrecht, je schneller desto stärker
-    mbBlur:     0.035,  // stärkste Verwischung als Anteil der Bildschirmhöhe
-    mbFrom:     60,     // px/s, darunter scharf
-    mbSpeed:    1800,   // px/s, ab hier volle Verwischung (wie die Galerie)
-    mbGhosts:   6,      // Zwischenbilder (Kopien desselben Bilds, kosten fast nichts)
     imgBase:    1.12,   // Bild im Rahmen leicht grösser, als Reserve fürs Herauszoomen (= 1 / (1 − zoomMax / 2))
     wheelIdle:  160,    // ms nach Mausrad/Trackpad, dann einrasten
     edgeGuard:  40,     // px am Rand, in denen Safaris Zurück-Wischen gesperrt ist
@@ -76,8 +71,6 @@
     '[data-hp] .hp-slide.is-vis { visibility: visible; }',
     '[data-hp] .hp-media { position: absolute; inset: 0; will-change: transform; }',
     '[data-hp] .hp-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }',
-    '[data-hp] .hp-ghost { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform, opacity; }',
-    '[data-hp].is-desk .hp-ghost { display: none; }',
     '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .8s ease .1s; }',
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
     '[data-hp] .hp-data { display: none !important; }',
@@ -193,14 +186,9 @@
       if (title && col) title.style.color = col.replace(/,\s*[\d.]+\s*\)\s*$/, ', 1)');
       var img = q('.hp-img');
       if (img) { img.loading = 'eager'; img.setAttribute('draggable', 'false'); }
-      var ghosts = [];
-      if (img && !reduce) for (var gi = 0; gi < CONFIG.mbGhosts; gi++) {
-        var gh = img.cloneNode(false); gh.removeAttribute('id'); gh.className = 'hp-img hp-ghost'; gh.alt = ''; gh.setAttribute('aria-hidden', 'true');
-        img.parentNode.appendChild(gh); ghosts.push(gh);
-      }
       stage.appendChild(el);
       var s = {
-        el: el, i: i, media: q('.hp-media'), title: title, img: img, ghosts: ghosts, gOn: false,
+        el: el, i: i, media: q('.hp-media'), title: title, img: img,
         name: name, label: title ? title.textContent.trim() : name,
         intro: q('.hp-d-intro') ? q('.hp-d-intro').innerHTML : '',
         btn: q('.hp-d-btn') ? q('.hp-d-btn').textContent.trim() : '',
@@ -299,7 +287,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform float uT;',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -313,7 +301,7 @@
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
-        '  vec2 ed = min(fc, uRes - fc); float e = min(ed.x, ed.y);',
+        '  vec2 ed = min(fc, uRes - fc); float e = -18.0 * log(exp(-ed.x / 18.0) + exp(-ed.y / 18.0));',   // weich gerundet: keine Diagonalen in den Ecken
         // Hugo 23.11.: EINE Welle in der Form der Fingerbewegung. Jeder Punkt der Bahn startet zu seiner Zeit;
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
@@ -324,6 +312,8 @@
         '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0, halo = 0.0, fa = 0.0, org = 0.0; vec3 rbA = vec3(0.0);',
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
+        // schwache Handys: Pixel weit weg von dieser Welle rechnen die Bahn gar nicht erst durch
+        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 > mx * 0.62) continue;',
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
@@ -347,7 +337,8 @@
         '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.55;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
-        '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
+        // Hugo 23.11.: am Bildschirmrand stärker und länger: hat die Welle den Rand erreicht, bleibt er leuchten und verblasst langsam
+        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.07) * smoothstep(0.0, 0.35, age) * exp(-age * 0.2) * (1.0 - smoothstep(4.6, 6.9, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0));',
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
@@ -357,12 +348,12 @@
         '    float ra = xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
         '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
-        '    float ln = 0.3 + fl * (2.2 + 1.4 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
-        '    fa = max(fa, 0.7 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.06, 0.3, age) * smoothstep(w * 0.6, w * 1.8, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
+        '    float ln = 0.4 + fl * (3.2 + 2.0 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
+        '    fa = max(fa, 1.05 * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.06, 0.3, age) * smoothstep(w * 0.6, w * 1.8, sd));',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
-        '  rb = mix(vec3(dot(rb, vec3(0.333))), rb, 0.7);',   // etwas weniger bunt
+        '  rb = mix(vec3(dot(rb, vec3(0.333))), rb, 0.85);',   // Hugo 23.11.: wieder etwas kräftiger
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0;',
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
@@ -379,7 +370,7 @@
         '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al;',
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
-        '  float glow = clamp(ring * 0.8 + edge * 1.2, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
+        '  float glow = clamp(ring * 1.0 + edge * 1.6, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
         '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 6.0), cw = pow(1.0 - abs(2.0 * sv - 1.0), 3.0);',
@@ -390,7 +381,7 @@
         // Hugo 23.11.: am Rand goldenes Licht wie die Sonnenstrahlen, das sich weich mit dem Regenbogen mischt
         '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
-        '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.42 + vec3(1.0, 0.86, 0.62) * fa * (0.45 + 0.45 * fm);',
+        '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm);',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
         // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
         // statt halbdurchsichtig darüber zu liegen
@@ -399,7 +390,7 @@
         // Hugo 23.11.: auf Weiss kein heller Rand mehr (Helles wird nur leicht eingefärbt, nicht aufgehellt);
         // auf Dunklem leuchten Licht und Flares dafür stärker, damit man sie überall sieht
         '    float dk = 1.0 - lum;',
-        '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.25 + 0.35 * lum) + gc * 0.2 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.3 * dk;',
+        '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
         '    float cov = clamp(max(al, L * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
@@ -417,7 +408,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -454,11 +445,14 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null, dprCap = 2, slowEma = 16, lastT = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 7, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
+      var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
+      var dprCap = weak ? 1 : 2;
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         var now = performance.now(), last = wv.pts[wv.pts.length - 1];
-        if (last && Math.hypot(last.x - x, last.y - y) < 18) return;
+        if (last && Math.hypot(last.x - x, last.y - y) < 22) return;
         if (wv.pts.length >= PW) return;                                // Bahn voll: die Welle hat ihre Form
         wv.pts.push({ x: x, y: y, t: now });
         if (!raf) raf = requestAnimationFrame(draw);
@@ -474,7 +468,10 @@
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
         // volle Bildschirmschärfe (Hugo 23.11.: vorher halbe Auflösung → das verschobene Foto wirkte unscharf und durchsichtig)
         // passt sich an: wird ein Gerät zu langsam, rechnet die Welle etwas gröber (flüssig geht vor)
-        if (lastT && now - lastT < 200) { slowEma = slowEma * 0.9 + (now - lastT) * 0.1; if (slowEma > 24 && dprCap > 1) { dprCap = Math.max(1, dprCap - 0.5); slowEma = 16; } }
+        if (lastT && now - lastT < 200) {
+          slowEma = slowEma * 0.85 + (now - lastT) * 0.15;
+          if (slowEma > 21 && dprCap > 0.6) { dprCap = Math.max(0.6, dprCap - (dprCap > 1 ? 0.5 : 0.2)); slowEma = 16; slowN++; }
+        }
         lastT = now;
         var dpr = Math.min(window.devicePixelRatio || 1, dprCap), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
         if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; c.viewport(0, 0, pw, ph); }
@@ -487,6 +484,11 @@
             hues[k] = dl < 20 ? (a0.x / Math.max(1, sr.width) * 0.6 + a0.y / Math.max(1, sr.height) * 0.4)
                               : (Math.atan2(a1.y - a0.y, a1.x - a0.x) / 6.2832 + dl / Math.max(1, sr.height) * 0.5);
           }
+          // Umkreis der Fingerbahn (für das Überspringen ferner Pixel)
+          var cx = 0, cy = 0, rr = 0, np = wv ? wv.pts.length : 0;
+          for (var j0 = 0; j0 < np; j0++) { cx += wv.pts[j0].x; cy += wv.pts[j0].y; }
+          if (np) { cx /= np; cy /= np; for (j0 = 0; j0 < np; j0++) rr = Math.max(rr, Math.hypot(wv.pts[j0].x - cx, wv.pts[j0].y - cy)); }
+          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = 0;
           for (var j = 0; j < PW; j++) {
             var i = k * PW + j, q = wv && wv.pts[j];
             if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
@@ -504,7 +506,7 @@
           c.uniform4f(U.uCrop, (1 - cw) * op[0], (1 - chh) * op[1], cw, chh);
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
-        c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform1f(U.uT, (now / 1000) % 1000);
+        c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
@@ -567,26 +569,8 @@
       }
     }
 
-    // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario)
-    // Zwischenbilder gleichmässig um das Bild verteilt (oben/unten), zusammen wirken sie wie eine senkrechte Verwischung
-    function ghostBlur(s, L, m) {
-      var g = s.ghosts; if (!g || !g.length) return;
-      if (L < 0.6) { if (s.gOn) { for (var i = 0; i < g.length; i++) g[i].style.opacity = '0'; s.gOn = false; } return; }
-      s.gOn = true;
-      var N = g.length, a = Math.min(1, L / 8);
-      for (var k = 0; k < N; k++) {
-        var f = (k + 0.5) / N - 0.5;                 // −0.5 … 0.5
-        g[k].style.transform = 'translate3d(0,' + (f * 2 * L).toFixed(2) + 'px,0)';
-        g[k].style.opacity = (a * (0.42 - 0.3 * Math.abs(f))).toFixed(3);
-      }
-    }
-    var mbF = 0, mbV = 0;
+    // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario). Ohne Bewegungsunschärfe (Hugo 23.11.)
     function renderMob(dt) {
-      // Tempo (px/s, geglättet) → Verwischung
-      if (dt > 0) { var v = Math.abs(F - mbF) * H / dt; mbV += (v - mbV) * Math.min(1, dt * 18); } else mbV = 0;
-      mbF = F;
-      var m = Math.pow(clamp((mbV - CONFIG.mbFrom) / (CONFIG.mbSpeed - CONFIG.mbFrom), 0, 1), 0.9);
-      var L = m * CONFIG.mbBlur * H;
       var p = clamp(CONFIG.zoom * (F - C), -CONFIG.zoomMax, CONFIG.zoomMax);
       var z = CONFIG.imgBase / (1 - 0.5 * p);
       for (var j = 0; j < n; j++) {
@@ -598,7 +582,6 @@
         s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
         s.el.style.clipPath = '';
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
-        ghostBlur(s, L / z, m);
         if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)';
       }
     }
