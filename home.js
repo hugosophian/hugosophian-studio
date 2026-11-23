@@ -283,49 +283,60 @@
       });
     }
 
-    // ---------- Berührungswellen (Hugo 22.11.) ----------
-    // Wo der Finger das Bild berührt oder entlangwischt, laufen weiche Wellen aus, die den Kontrast heben
-    // (soft-light: heller und dunkler im Wechsel) und zum Rand hin ausklingen. Erreicht eine Welle den Rand,
-    // fliesst dort, und nur dort, weich ein Regenbogen entlang der Kante.
+    // ---------- Wasserwellen bei Berührung (Hugo 23.11.) ----------
+    // Wie ein Stein im Wasser: wo der Finger aufsetzt, beginnt eine kleine Ringwelle, entlang der Fingerbahn
+    // folgen weitere (zuerst berührt = zuerst los). Die Welle verzerrt das Bild darunter wirklich (es wird in
+    // WebGL nachgezeichnet und an der Welle verschoben), um die Welle schimmert ein feiner Regenbogen.
+    // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
+    // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
       cv.className = 'hp-ripple'; cv.setAttribute('aria-hidden', 'true');
-      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;mix-blend-mode:soft-light;';
-      try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false }); } catch (e) {}
+      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;';
+      try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) {}
       if (!c) return null;
-      var NP = 6;
-      // Eine einzige, ruhige Welle pro Berührung: ein breites Lichtband, darin das fliessende Sonnenmuster
-      // der About-Seite mit schillerndem Regenbogen (Iridescence). Es wandert zum Bildschirmrand, dort leuchten
-      // die Farben noch einmal weich auf, dann verblasst es.
+      var NP = 10;
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uT; uniform vec4 uP[' + NP + '];',   // x, y (px), Alter (s), Stärke
-        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
-        'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
-        '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
+        'uniform vec2 uRes; uniform vec4 uP[' + NP + '];',      // x, y (px, y oben), Alter (s), Stärke
+        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy; float mx = max(uRes.x, uRes.y);',
+        '  vec2 fc = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
+        '  float mx = max(uRes.x, uRes.y);',
         '  vec2 ed = min(fc, uRes - fc); float e = min(ed.x, ed.y);',
-        '  vec2 q = fc / uRes.y * 5.0;',
-        '  vec2 wq = vec2(n2(q * 0.9 + vec2(uT * 0.11, -uT * 0.07)), n2(q + vec2(-uT * 0.09, uT * 0.13) + 5.2));',
-        '  float sv = n2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05));',
-        '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 5.0);',
-        '  float A = 0.0, G = 0.0, ph = 0.0;',
+        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0;',
         '  for (int i = 0; i < ' + NP + '; i++) {',
         '    vec4 p = uP[i]; if (p.w <= 0.0) continue;',
-        '    float d = length(fc - p.xy); float R = p.z * mx * 0.26;',
-        '    float wd = mx * (0.07 + 0.05 * p.z);',                                    // Band wird beim Wandern breiter
-        '    float env = exp(-pow((d - R) / wd, 2.0)) * smoothstep(0.0, 0.5, p.z);',  // weich einblenden
-        '    float out_ = 1.0 - smoothstep(0.75, 1.25, d / mx);',
-        '    float life = 1.0 - smoothstep(2.2, 3.4, p.z);',
-        '    float a = env * out_ * life * p.w;',
-        '    A = max(A, a); ph += a * d / mx;',
-        '    G = max(G, a * exp(-e * e / 260.0));',                                    // am Rand: noch einmal aufleuchten
+        '    vec2 dv = fc - p.xy; float d = length(dv);',
+        '    float R = p.z * mx * 0.27;',                                          // Tempo der Welle
+        '    float w = mx * 0.035 * (1.0 + p.z * 0.6);',                          // Breite, wird nach aussen flacher
+        '    float x = (d - R) / w;',
+        '    float env = exp(-x * x) * smoothstep(0.0, 0.12, p.z);',
+        '    float amp = p.w * exp(-p.z * 0.9);',
+        '    float h = sin(x * 2.6) * env * amp;',                                // Wellenprofil: Berg und Tal
+        '    off += (d > 0.5 ? dv / d : vec2(0.0)) * h * mx * 0.012;',
+        '    float r = env * amp; if (r > ring) { ring = r; ph = x; }',
+        '    edge = max(edge, env * p.w * exp(-p.z * 0.55) * exp(-e * e / 380.0));',   // am Rand aufleuchten
         '  }',
-        '  vec3 ir = 0.5 + 0.5 * cos(6.2832 * (sv * 1.4 + ph * 1.5 + fil * 0.3 - uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
-        '  vec3 col = mix(vec3(0.5 + 0.18 * (sv - 0.5) + 0.12 * fil), ir, 0.55 + 0.45 * G);',
-        '  float alpha = clamp(A * (0.24 + 0.2 * fil) + G * 0.7, 0.0, 0.75);',
-        '  gl_FragColor = vec4(col, alpha);',
+        '  float a = clamp(ring * 3.0, 0.0, 1.0);',
+        '  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (ph * 0.18 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 col = vec3(0.0); float al = 0.0;',
+        '  if (uHas > 0.5) {',
+        '    vec2 sp = fc + off;',
+        '    vec2 u = (sp - uRect.xy) / uRect.zw;',
+        '    float inside = step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0);',
+        '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
+        '    vec2 ca = off * 0.25 / uRect.zw * uCrop.zw;',                                 // leichte Farbtrennung in der Welle
+        '    vec3 img = vec3(texture2D(uImg, iu + ca).r, texture2D(uImg, iu).g, texture2D(uImg, iu - ca).b);',
+        '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
+        '    float here = step(0.0, u0) * step(u0, 1.0) * step(0.0, v0) * step(v0, 1.0);',
+        '    al = a * inside * here; col = img * al;',
+        '  }',
+        '  float glow = clamp(ring * (0.22 + 0.3 * abs(sin(ph * 2.6))) + edge * 1.1, 0.0, 1.0);',
+        '  vec3 gc = mix(rb, vec3(1.0), 0.2) * glow;',
+        '  col = col + gc * (1.0 - al * 0.4);',                                       // Regenbogen um die Welle (aufhellend)
+        '  al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.9);',
+        '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       function sh(t, src) { var x = c.createShader(t); c.shaderSource(x, src); c.compileShader(x); return c.getShaderParameter(x, c.COMPILE_STATUS) ? x : null; }
@@ -336,12 +347,43 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var uRes = c.getUniformLocation(p, 'uRes'), uP = c.getUniformLocation(p, 'uP'), uT = c.getUniformLocation(p, 'uT');
-      var pts = [], buf = new Float32Array(NP * 4), raf = 0, RS = 0.5, LIFE = 3.5;
+      var U = {}; ['uRes', 'uP', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
+      var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
+      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
+      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
+      c.uniform1i(U.uImg, 0);
+      // Bild der aktuellen Seite als Textur (eigene Kopie mit CORS; klappt das nicht, gibt es nur den Regenbogen)
+      var cache = {}, texSrc = '', texOk = false;
+      function texFor(img) {
+        var src = img && (img.currentSrc || img.src);
+        if (!src) { texOk = false; return; }
+        if (src === texSrc) return;
+        var e = cache[src];
+        if (!e) {
+          e = cache[src] = { im: new Image(), ok: false };
+          e.im.crossOrigin = 'anonymous';
+          e.im.onload = function () { e.ok = true; };
+          e.im.src = src;
+        }
+        if (!e.ok) { texOk = false; return; }
+        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, e.im); texSrc = src; texOk = true; }
+        catch (er) { texOk = false; texSrc = src; }
+      }
+      function nearest(sr) {
+        var best = null, bd = 1e9, cy = sr.top + sr.height / 2;
+        for (var j = 0; j < slides.length; j++) {
+          var im = slides[j].img; if (!im) continue;
+          var r = im.getBoundingClientRect(); if (r.height < 2) continue;
+          var dd = Math.abs(r.top + r.height / 2 - cy); if (dd < bd) { bd = dd; best = im; }
+        }
+        return best;
+      }
+      var pts = [], buf = new Float32Array(NP * 4), raf = 0, LIFE = 3.6;
       function add(x, y, s) {
         var r = stage.getBoundingClientRect(), now = performance.now(), last = pts[pts.length - 1];
-        // seltener (Hugo 23.11.): beim Ziehen höchstens alle 0.9 s und erst nach einem Stück Weg eine neue Welle
-        if (last && (now - last.t < 900 || Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 90)) return;
+        if (last && !last.first && Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 70) return;
+        if (last && last.first && Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 70) return;
         pts.push({ x: x - r.left, y: y - r.top, t: now, s: s });
         if (pts.length > NP) pts.shift();
         if (!raf) raf = requestAnimationFrame(draw);
@@ -349,22 +391,34 @@
       function draw(now) {
         raf = 0;
         pts = pts.filter(function (q) { return now - q.t < LIFE * 1000; });
-        var w = Math.max(1, Math.round(stage.clientWidth * RS)), h = Math.max(1, Math.round(stage.clientHeight * RS));
+        var sr = stage.getBoundingClientRect();
+        var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
         if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; c.viewport(0, 0, w, h); }
         for (var i = 0; i < NP; i++) {
           var q = pts[i];
-          if (q) { buf[i * 4] = q.x * RS; buf[i * 4 + 1] = h - q.y * RS; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.s; }
+          if (q) { buf[i * 4] = q.x; buf[i * 4 + 1] = q.y; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.s; }
           else buf[i * 4 + 3] = 0;
         }
-        c.uniform2f(uRes, w, h); c.uniform4fv(uP, buf); c.uniform1f(uT, (now / 1000) % 1000);
+        var im = nearest(sr); texFor(im);
+        if (texOk && im) {
+          var r = im.getBoundingClientRect();
+          // object-fit: cover → sichtbarer Ausschnitt des Bilds
+          var iw = im.naturalWidth || 1, ih = im.naturalHeight || 1, ra = r.width / r.height, ia = iw / ih;
+          var cw = 1, chh = 1; if (ia > ra) cw = ra / ia; else chh = ia / ra;
+          c.uniform4f(U.uRect, r.left - sr.left, r.top - sr.top, r.width, r.height);
+          c.uniform4f(U.uCrop, (1 - cw) / 2, (1 - chh) / 2, cw, chh);
+          c.uniform1f(U.uHas, 1);
+        } else c.uniform1f(U.uHas, 0);
+        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         if (pts.length) raf = requestAnimationFrame(draw);
+        else { c.clear(c.COLOR_BUFFER_BIT); }
       }
       stage.appendChild(cv);
       function ok() { return !desk && !root.classList.contains('is-info'); }
-      stage.addEventListener('touchstart', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 1); }, { passive: true });
-      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 0.8); }, { passive: true });
+      stage.addEventListener('touchstart', function (e) { if (ok() && e.touches[0]) { var im = nearest(stage.getBoundingClientRect()); texFor(im); add(e.touches[0].clientX, e.touches[0].clientY, 1); } }, { passive: true });
+      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 0.75); }, { passive: true });
       return cv;
     })();
 
