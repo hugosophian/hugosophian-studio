@@ -154,7 +154,7 @@
     '[data-hp] .hp-ld-brand .hp-ld-l { display: inline-block; }',
     '[data-hp] .hp-ld-brand { color: transparent !important; }',
     '[data-hp] .hp-ld-txt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; pointer-events: none; mix-blend-mode: screen; }',
-    '[data-hp] .hp-brand { transition: opacity .7s ease; }',
+    '[data-hp]:not(.hp-ld-nb) .hp-brand { transition: color .25s ease, opacity .7s ease; }',
     '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(130% 100% at 50% 50%, #fff 0%, #fffdf7 55%, #fff1d6 100%); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
@@ -307,7 +307,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT;',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -402,24 +402,50 @@
         '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
         '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm);',
-        // Andocken nach dem Laden (Hugo 23.11.): Licht läuft von den vier Ecken den Rand entlang, mit grossen Solar Flares,
-        // die vom Rand ins Bild züngeln; Regenbogen und Gold mischen sich, dann verglüht es
+        // Andocken nach dem Laden (Hugo 23.11.): in dem Moment, in dem das Bild andockt, leuchtet der ganze Rand auf einmal auf,
+        // und aus ihm steigen Sonnenbögen wie auf Hugos Bild der Sonnenoberfläche: helle Fusspunkte am Rand, feine
+        // faserige Bögen, ungleich hoch (manche reichen weit ins Bild), nach hinten gebogen und oben verblassend (Tiefe),
+        // das Licht fliesst die Fasern entlang; Gold mit mitgezogenen Regenbogenfarben
+        '  vec3 eacc = vec3(0.0);',
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
-        '    float dc = ed.x < ed.y ? min(fc.y, uRes.y - fc.y) : min(fc.x, uRes.x - fc.x);',   // Weg entlang des Rands ab der nächsten Ecke
-        '    float fr = et * mx * 0.85;',
-        '    float run = (1.0 - smoothstep(fr - mx * 0.08, fr, dc)) * 0.75 + exp(-pow((dc - fr) / (mx * 0.05), 2.0)) * 0.9;',
-        '    float fade = exp(-et * 0.3) * (1.0 - smoothstep(3.2, 4.8, et));',
-        '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001));',
-        '    float fl = pow(n2(ca * 4.0 + vec2(uT * 0.22, -uT * 0.17) + 3.0), 2.0);',
-        '    float fln = mx * (0.04 + 0.42 * fl * (0.5 + 0.5 * n2(ca * 9.0 - vec2(uT * 0.5, 0.0))));',   // grosse Flares
-        '    float fx = max(e, 0.0) / max(fln, 1.0); float flare = fl * exp(-fx * fx * 1.6) * smoothstep(0.0, 0.35, et);',
-        '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 700.0);',
-        '    float ang = atan(ca.y, ca.x) / 6.2832;',
+        '    float fade = 1.0 - smoothstep(3.2, 5.0, et);',
+        '    float flash = 1.6 * exp(-et * 3.2) + 0.5 * exp(-et * 0.5);',                  // alles gleichzeitig: kräftiger Schlag, dann Nachglühen
+        '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 650.0) + 0.35 * exp(-max(e, 0.0) / (mx * 0.06)) * exp(-et * 2.0);',
+        '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
         '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
-        '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.3 + 0.45 * egm);',
-        '    gc += (ecol * band * 1.1 + mix(vec3(1.0, 0.86, 0.62), ecol, 0.35) * flare * 1.2) * run * fade;',
+        '    eacc = mix(erb, vec3(1.0, 0.8, 0.48), 0.35 + 0.4 * egm) * band * flash;',
+        '    for (int i = 0; i < 12; i++) {',
+        '      float fi = float(i), side = floor(fi / 3.0);',
+        '      vec2 uv; float len;',                                                        // Koordinaten der Randseite: u entlang, v nach innen
+        '      if (side < 0.5) { uv = fc; len = uRes.x; }',
+        '      else if (side < 1.5) { uv = vec2(fc.y, uRes.x - fc.x); len = uRes.y; }',
+        '      else if (side < 2.5) { uv = vec2(uRes.x - fc.x, uRes.y - fc.y); len = uRes.x; }',
+        '      else { uv = vec2(uRes.y - fc.y, fc.x); len = uRes.y; }',
+        '      float r1 = h2(vec2(fi, uSeed)), r2 = h2(vec2(fi + 17.0, uSeed)), r3 = h2(vec2(fi + 31.0, uSeed)), r4 = h2(vec2(fi + 47.0, uSeed));',
+        '      float uc = len * (0.1 + 0.8 * (mod(fi, 3.0) + r1) / 3.0);',
+        '      float dl = r4 * 0.35, grow = smoothstep(dl, dl + 1.1, et);',
+        '      float hh = mx * (0.05 + 0.55 * pow(r3, 3.0)) * (0.12 + 0.88 * grow);',          // ungleich hoch, einige bis weit hinüber
+        '      float aa = mx * 0.03 + hh * (0.35 + 0.4 * r2);',                                // halbe Spannweite: hohe Bögen sind auch breit
+        '      float vv = max(uv.y, 0.0);',
+        '      float lean = (r1 - 0.5) * 1.0 + sin(et * 0.9 + fi) * 0.18;',                      // nach hinten / zur Seite gebogen
+        '      float uu = uv.x - uc - lean * vv * vv / max(hh, 1.0);',
+        '      float qx = uu / aa, qy = vv / max(hh, 1.0), rr = sqrt(qx * qx + qy * qy);',
+        '      if (rr > 1.7) continue;',
+        '      float th = atan(qy, qx);',
+        '      float fib = n2(vec2(th * 7.0 - et * 2.2 + fi * 3.1, rr * 16.0 + fi * 1.7));',     // feine Fasern, Licht fliesst entlang
+        '      float fib2 = n2(vec2(th * 15.0 + et * 1.3, rr * 34.0 - fi));',
+        '      float strands = pow(fib, 5.0) * 2.4 + pow(fib2, 7.0) * 1.4;',   // nur feine Fasern, dunkle Lücken dazwischen
+        '      float shell = exp(-pow((rr - 1.0) / 0.14, 2.0)) + 0.5 * exp(-pow((rr - 0.8) / 0.1, 2.0));',
+        '      float depth = mix(1.0, 0.3, smoothstep(0.0, 1.0, qy));',                        // oben weiter weg: schwächer
+        '      float foot = exp(-vv / (hh * 0.14 + 5.0)) * exp(-pow((abs(qx) - 1.0) / 0.3, 2.0));',   // helle Fusspunkte am Rand
+        '      float life = grow * (1.0 - smoothstep(1.8 + r4, 4.2 + r4 * 0.6, et));',
+        '      vec3 lrb = 0.5 + 0.5 * cos(6.2832 * (th * 0.32 + fi * 0.13 + uT * 0.1 + vec3(0.0, 0.33, 0.67)));',
+        '      vec3 lc = mix(vec3(1.0, 0.78, 0.38), lrb, 0.3 + 0.2 * fib);',                     // Gold, das Farben mitzieht
+        '      eacc += (lc * shell * strands * depth * 0.9 + vec3(1.0, 0.9, 0.7) * foot * 2.0) * life;',
+        '    }',
+        '    eacc *= fade;',
         '  }',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
         // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
@@ -430,11 +456,13 @@
         // auf Dunklem leuchten Licht und Flares dafür stärker, damit man sie überall sieht
         '    float dk = 1.0 - lum;',
         '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
-        '    float cov = clamp(max(al, L * 6.0), 0.0, 1.0) * here;',
+        '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
+        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.85) + eacc * 0.35;',      // Andock-Licht: färbt auch Weiss golden
+        '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
-        '    col = col + gc * (1.0 - al * 0.4);',
-        '    al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.55);',
+        '    col = col + gc * (1.0 - al * 0.4) + eacc;',
+        '    al = max(al, max(max(gc.r, max(gc.g, gc.b)) * 0.55, max(eacc.r, max(eacc.g, eacc.b))));',
         '  }',
         '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
@@ -447,7 +475,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -484,7 +512,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : 2;
@@ -560,7 +588,7 @@
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
-        var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 5) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et);
+        var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 5.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
@@ -570,7 +598,7 @@
         var cs = slides[current()]; if (!cs) return;
         gImg = cs.img; texFor(gImg);
         var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
-        edgeT0 = performance.now();
+        edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
@@ -631,6 +659,8 @@
         setVis(s, ap > 0);
         // Ladeanimation (Hugo 23.11.): weisse Vierecke mit leuchtendem Rand, wie Türen, durch die Licht fällt;
         // beim Aufgehen kommt das Bild zum Vorschein
+        // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
+        if (LD && !desk && rel(j) === 0 && E > 0.993) LD.dock();
         if (s.gold) {
           var gv = 1 - smoothstep(0.1, 0.8, E), rim = 1 - smoothstep(0.6, 1, E);
           s.gold.style.opacity = gv.toFixed(3);
@@ -693,7 +723,7 @@
       if (introOn) {
         if (!introT0) introT0 = now;
         introP = clamp((now - introT0) / CONFIG.introMs, 0, 1);
-        if (LD && introP >= 0.84) LD.dock();   // sichtbar angedockt (die Kurve legt sich ganz am Schluss nur noch an)
+
         if (introP >= 1) endIntro(); else more = true;
       } else if (desk) {
         deskMoving = false;
@@ -1635,7 +1665,8 @@
         tx2.globalCompositeOperation = 'source-in';
         tx2.drawImage(src[0], src[1], src[2], src[3], src[4], 0, 0, tcv.width, tcv.height);
         tx2.globalCompositeOperation = 'lighter';
-        letterPaths('rgb(22,20,18)');   // die Form im Schatten nur zu ahnen
+        var bk = clamp((performance.now() - t0 - 900) / 2200, 0, 1); bk = bk * bk;   // Form taucht langsam aus dem Schwarz auf
+        if (bk > 0.01) letterPaths('rgb(' + Math.round(22 * bk) + ',' + Math.round(20 * bk) + ',' + Math.round(18 * bk) + ')');
         tx2.globalCompositeOperation = 'source-over';
         requestAnimationFrame(litFrame);
       }
