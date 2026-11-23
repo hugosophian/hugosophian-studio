@@ -143,7 +143,7 @@
     'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
     '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #fff; }',
     /* Hugo 23.11.: wuchtiges Andocken – das Bild schlägt ein: kurzer Stoss nach vorn, federt zurück */
-    '@keyframes hp-dock-hit { 0% { transform: scale(1); } 18% { transform: scale(1.035); } 45% { transform: scale(0.992); } 70% { transform: scale(1.006); } 100% { transform: scale(1); } }',
+    '@keyframes hp-dock-hit { 0% { transform: scale(1); } 12% { transform: scale(1.04); } 38% { transform: scale(0.99); } 65% { transform: scale(1.005); } 100% { transform: scale(1); } }',
     '[data-hp].hp-dock-hit .hp-stage { animation: hp-dock-hit .75s cubic-bezier(.2,.7,.3,1) both; }',
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
@@ -156,7 +156,7 @@
   // hin angezogen – zuletzt immer schneller, bis es einrastet
   // Hugo 23.11.: Heranzoomen kubisch (langsam an, schnell, langsam aus), knapp vor dem Ziel übernimmt weich ein Magnet:
   // das Bild wird langsamer, ohne anzuhalten, und dann immer schneller zum Rand gezogen, bis es einrastet
-  function magnetPull(x) { var x0 = 0.62; return x > x0 ? Math.pow((x - x0) / (1 - x0), 5) : 0; }   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
+  function magnetPull(x) { var x0 = 0.62; return x > x0 ? Math.pow((x - x0) / (1 - x0), 6.5) : 0; }   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 23.11.: der schnelle Teil schneller, das Abdämpfen etwas stärker: Anlauf und Bremsung mit Potenz 4
@@ -322,7 +322,7 @@
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
         // sp > 0: Fingerwelle (gleichmässig); sp < 0: Andock-Welle – schiesst schnell aus dem Rand und wird rasch langsamer,
         // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
-        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp : mx * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',
+        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
         '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
@@ -357,8 +357,10 @@
         '    if (ws <= 0.0) continue;',
         '    best = sf / ws; dir /= ws; sd /= ws;',
         '    float x = best / w;',
-        '    float env = exp(-x * x) * smoothstep(0.0, 0.35, age);',
-        '    float amp = exp(-age * 0.45);',
+        // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
+        '    bool dockW = uB[k].w < 0.0;',
+        '    float env = exp(-x * x) * smoothstep(0.0, dockW ? 0.03 : 0.35, age);',
+        '    float amp = exp(-age * (dockW ? 0.95 : 0.45));',
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
         '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 1.7);',   // Andocken: kräftiger
@@ -366,7 +368,7 @@
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
         '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35));',   // Andock-Welle: Rand leuchtet nur leicht mit,
-        '    float on = smoothstep(0.0, 0.35, age) * amp;',
+        '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) : amp);',   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
         '    float fs = uHue[k] * 17.0;',
@@ -387,8 +389,8 @@
         '  vec3 eacc = vec3(0.0); float fI = 0.0;',
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
-        '    float fade = 1.0 - smoothstep(5.0, 7.0, et);',   // Hugo 23.11.: Farbe hält länger
-        '    float flash = 2.3 * exp(-et * 2.6) + 0.6 * exp(-et * 0.18);',   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float fade = 1.0 - smoothstep(2.6, 4.4, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
+        '    float flash = 2.3 * exp(-et * 3.2) + 0.5 * exp(-et * 0.45);',   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
@@ -458,7 +460,10 @@
         '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
         '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.6) + eacc * (0.45 + 0.7 * dk);',   // auf Dunklem deutlicher      // Andock-Licht: färbt auch Weiss golden
-        '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
+        // Belichtungsblitz beim Aufprall (Hugo 23.11.): das ganze Bild blitzt für einen Augenblick hell auf
+        '    float xf = uEdgeT >= 0.0 ? exp(-uEdgeT * 11.0) * 0.6 : 0.0;',
+        '    lit += (1.0 - lit) * xf;',
+        '    float cov = clamp(max(max(max(al, L * 6.0), ea * 6.0), xf * 8.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
         '    col = col + gc * (1.0 - al * 0.4) + eacc;',
@@ -618,7 +623,7 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        ring(0, 6, 0.15);   // Hugo 23.11.: nur eine Explosion nach innen
+        ring(0, 6, 0.24);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
@@ -666,11 +671,12 @@
           bx = 0; by = r * H; bw = W; bh = H;
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
-          var xin = clamp((P - 0.25) / 0.75, 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
+          var x0i = LD ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
+          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
           E = LD ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
-        var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
+        var ap = LD ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
@@ -686,7 +692,7 @@
         // Ladeanimation (Hugo 23.11.): weisse Vierecke mit leuchtendem Rand, wie Türen, durch die Licht fällt;
         // beim Aufgehen kommt das Bild zum Vorschein
         // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
-        if (LD && !desk && rel(j) === 0 && E > 0.993) LD.dock();
+        if (LD && !desk && rel(j) === 0 && E > 0.978) LD.dock();   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
         if (s.gold) {
           var gv = 1 - smoothstep(0.02, 0.45, E), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 23.11.: Bild blendet früher ein
           s.gold.style.opacity = gv.toFixed(3);
