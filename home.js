@@ -317,7 +317,10 @@
         '  vec2 ab = b.xy - a.xy; float l2 = dot(ab, ab);',
         '  float t = l2 > 0.01 ? clamp(dot(fc - a.xy, ab) / l2, 0.0, 1.0) : 0.0;',
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
-        '  return d - z * mx * 0.15 * sp + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
+        // sp > 0: Fingerwelle (gleichmässig); sp < 0: Andock-Welle – schiesst schnell aus dem Rand und wird rasch langsamer,
+        // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
+        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp : mx * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',
+        '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
@@ -334,7 +337,7 @@
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         // schwache Handys: Pixel weit weg von dieser Welle rechnen die Bahn gar nicht erst durch
-        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * uB[k].w > mx * 0.62) continue;',
+        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * abs(uB[k].w) > mx * 0.62) continue;',
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
@@ -563,10 +566,10 @@
           var cx = 0, cy = 0, rr = 0, np = wv ? wv.pts.length : 0;
           for (var j0 = 0; j0 < np; j0++) { cx += wv.pts[j0].x; cy += wv.pts[j0].y; }
           if (np) { cx /= np; cy /= np; for (j0 = 0; j0 < np; j0++) rr = Math.max(rr, Math.hypot(wv.pts[j0].x - cx, wv.pts[j0].y - cy)); }
-          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = (wv && wv.sp2) || 1;   // Tempo der Welle (Andocken: schneller)
+          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = (wv && wv.sp2) || 1;   // < 0: Andock-Welle (Reichweite)   // Tempo der Welle (Andocken: schneller)
           for (var j = 0; j < PW; j++) {
             var i = k * PW + j, q = wv && wv.pts[j];
-            if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
+            if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.m || 1; }
             else buf[i * 4 + 3] = 0;
           }
         }
@@ -597,7 +600,7 @@
         // und nach innen durchs Bild laufen – mit Prisma-Regenbogen, Verzerrung und Solar Flares, die darauf surfen.
         // Zwei Wellen kurz nacheinander; die Bahn läuft einmal um den Rand, leicht unregelmässig (organisch).
         var r = stage.getBoundingClientRect();
-        function ring(delay, inset) {
+        function ring(delay, inset, reach) {
           var now = performance.now() + delay, per = 2 * (r.width + r.height), N = PW - 1, pts = [];
           var off = Math.random() * per;
           for (var i = 0; i < N; i++) {
@@ -607,13 +610,13 @@
             // knapp innerhalb des Rands, nicht überall gleich weit
             var ins = inset * (0.6 + 0.8 * Math.random());
             x = Math.min(w2 - ins, Math.max(ins, x)); y = Math.min(h2 - ins, Math.max(ins, y));
-            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 140 });
+            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 140, m: 0.35 + 1.3 * Math.random() });
           }
-          pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t });   // Bahn schliessen
-          waves.push({ t0: now, pts: pts }); if (waves.length > NW) waves.shift();
+          pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
+          waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        ring(0, 12);
-        setTimeout(function () { ring(0, 22); if (!raf) raf = requestAnimationFrame(draw); }, 650);
+        ring(0, 6, 0.13);
+        setTimeout(function () { ring(0, 10, 0.08); if (!raf) raf = requestAnimationFrame(draw); }, 450);
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
