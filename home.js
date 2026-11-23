@@ -598,7 +598,7 @@
         edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
         // Hugo 23.11. (wie die Fingerwelle im Video): das Andocken löst echte Wellen aus, die rundherum am Rand beginnen
         // und nach innen durchs Bild laufen – mit Prisma-Regenbogen, Verzerrung und Solar Flares, die darauf surfen.
-        // Zwei Wellen kurz nacheinander; die Bahn läuft einmal um den Rand, leicht unregelmässig (organisch).
+        // Eine Welle; die Bahn läuft einmal um den Rand, unregelmässig (organisch).
         var r = stage.getBoundingClientRect();
         function ring(delay, inset, reach) {
           var now = performance.now() + delay, per = 2 * (r.width + r.height), N = PW - 1, pts = [];
@@ -615,8 +615,7 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        ring(0, 6, 0.13);
-        setTimeout(function () { ring(0, 10, 0.08); if (!raf) raf = requestAnimationFrame(draw); }, 450);
+        ring(0, 6, 0.13);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
