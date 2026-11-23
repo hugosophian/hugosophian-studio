@@ -156,9 +156,9 @@
   function magnetPull(x) { var x0 = 0.66; return x > x0 ? Math.pow((x - x0) / (1 - x0), 4) : 0; }
   function easeMagnet(x) {
     var k = 0.88, a = 0.86, t = Math.min(1, x / a);
-    // Hugo 23.11.: der schnelle Teil schneller, das Abdämpfen gleich: Anlauf steiler (Potenz 4), danach dieselbe
-    // kubische Bremsung über die zweite Hälfte (stetig angesetzt: D = 3/7, Spitzentempo knapp 15 % höher)
-    var D = 3 / 7, c = t < 0.5 ? D * Math.pow(2 * t, 4) : D + (1 - D) * (1 - Math.pow(2 - 2 * t, 3));
+    // Hugo 23.11.: der schnelle Teil schneller, das Abdämpfen etwas stärker: Anlauf und Bremsung mit Potenz 4
+    // (stetig angesetzt, Spitzentempo ein Drittel höher als kubisch, bremst kräftiger und läuft länger sanft aus)
+    var c = t < 0.5 ? 0.5 * Math.pow(2 * t, 4) : 1 - 0.5 * Math.pow(2 - 2 * t, 4);
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
