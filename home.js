@@ -299,7 +299,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + '];',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
+        'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + '];',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
@@ -309,7 +309,7 @@
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
         // Hugo 23.11.: mehrere Wellen gleichzeitig (schnell hintereinander verschwindet die erste nicht)
-        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0;',
+        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0; vec3 rbA = vec3(0.0);',
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         '    float best = 1e9;',
@@ -318,7 +318,7 @@
         '      best = min(best, length(fc - p.xy) - max(p.z, 0.0) * mx * 0.15);',
         '    }',
         '    if (best > 1e8) continue;',
-        '    float w = mx * (0.05 + 0.025 * age);',
+        '    float w = mx * min(0.018 + 0.04 * age, 0.16);',   // schmal beim Auslösen, beim Auslaufen breiter
         '    float ws = 0.0, sf = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + PW + '; j++) {',
         '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
@@ -333,11 +333,13 @@
         '    float amp = exp(-age * 0.45);',
         '    off += dir * (-x * 1.6 * env * amp) * mx * 0.032;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
+        '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (x * 0.16 + uHue[k] + vec3(0.0, 0.33, 0.67))));',
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  float a = smoothstep(0.0, 0.35, ring);',
-        '  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (ph * 0.18 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
+        '  rb = clamp((rb - 0.5) * 1.6 + 0.5, 0.0, 1.0);',
         '  vec3 col = vec3(0.0); float al = 0.0;',
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
@@ -353,7 +355,7 @@
         '    al = a * inside * here; col = img * al;',
         '  }',
         '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
-        '  vec3 gc = mix(rb, vec3(1.0), 0.2) * glow;',
+        '  vec3 gc = mix(rb, vec3(1.0), 0.06) * glow;',
         '  col = col + gc * (1.0 - al * 0.4);',                                       // Regenbogen um die Welle (aufhellend)
         '  al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.9);',
         '  gl_FragColor = vec4(col, al);',
@@ -367,7 +369,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uP', 'uAge', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uP', 'uAge', 'uHue', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -404,7 +406,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null;
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         var now = performance.now(), last = wv.pts[wv.pts.length - 1];
@@ -426,6 +428,12 @@
         for (var k = 0; k < NW; k++) {
           var wv = waves[k];
           ages[k] = wv ? (now - wv.t0) / 1000 : -1;
+          // Farbe je nach Auslösung (Hugo 23.11.): Tippen → Ort, Ziehen → Richtung und Länge der Bahn
+          if (wv && wv.pts.length) {
+            var a0 = wv.pts[0], a1 = wv.pts[wv.pts.length - 1], dl = Math.hypot(a1.x - a0.x, a1.y - a0.y);
+            hues[k] = dl < 20 ? (a0.x / Math.max(1, sr.width) * 0.6 + a0.y / Math.max(1, sr.height) * 0.4)
+                              : (Math.atan2(a1.y - a0.y, a1.x - a0.x) / 6.2832 + dl / Math.max(1, sr.height) * 0.5);
+          }
           for (var j = 0; j < PW; j++) {
             var i = k * PW + j, q = wv && wv.pts[j];
             if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
@@ -443,7 +451,7 @@
           c.uniform4f(U.uCrop, (1 - cw) * op[0], (1 - chh) * op[1], cw, chh);
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
-        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages);
+        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
