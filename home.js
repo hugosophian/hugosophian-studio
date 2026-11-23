@@ -662,7 +662,7 @@
         // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
         if (LD && !desk && rel(j) === 0 && E > 0.993) LD.dock();
         if (s.gold) {
-          var gv = 1 - smoothstep(0.1, 0.8, E), rim = 1 - smoothstep(0.6, 1, E);
+          var gv = 1 - smoothstep(0.02, 0.45, E), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 23.11.: Bild blendet früher ein
           s.gold.style.opacity = gv.toFixed(3);
           s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (6 + 16 * rim).toFixed(1) + 'px ' + (1 + 3 * rim).toFixed(1) + 'px rgba(255,250,238,' + (0.75 * rim).toFixed(3) + '), 0 0 2px 1px rgba(255,255,255,' + rim.toFixed(3) + ')' : '';
         }
