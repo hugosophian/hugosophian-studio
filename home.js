@@ -299,13 +299,19 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform float uT;',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform float uT;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
+        // Abstand zum Bahnabschnitt a–b, Wellenfront dort minus gelaufene Strecke (mit weicher Einblendung neuer Punkte)
+        'float segF(vec2 fc, vec4 a, vec4 b, float mx, out vec2 dv, out float d) {',
+        '  vec2 ab = b.xy - a.xy; float l2 = dot(ab, ab);',
+        '  float t = l2 > 0.01 ? clamp(dot(fc - a.xy, ab) / l2, 0.0, 1.0) : 0.0;',
+        '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
+        '  return d - z * mx * 0.15 + (1.0 - smoothstep(0.0, 0.45, z)) * mx * 0.12; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
-        '  vec2 fc = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
+        '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
         '  vec2 ed = min(fc, uRes - fc); float e = min(ed.x, ed.y);',
         // Hugo 23.11.: EINE Welle in der Form der Fingerbewegung. Jeder Punkt der Bahn startet zu seiner Zeit;
@@ -318,58 +324,57 @@
         '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0, rs = 0.0, halo = 0.0, fa = 0.0, org = 0.0; vec3 rbA = vec3(0.0);',
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
-        '    float best = 1e9;',
-        '    for (int j = 0; j < ' + PW + '; j++) {',
-        '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
-        '      float pen = (1.0 - smoothstep(0.0, 0.45, p.z)) * mx * 0.12;',
-        '      best = min(best, length(fc - p.xy) - max(p.z, 0.0) * mx * 0.15 + pen);',
+        // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
+        // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
+        // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
+        '    float w = mx * min(0.016 + 0.028 * age, 0.085), sw = 1.0 / (w * 0.5);',   // schmal beim Auslösen, beim Auslaufen breiter
+        '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0; vec2 dir = vec2(0.0);',
+        '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
+        '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
+        '      vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
+        '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, dv, d);',
+        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0);',
+        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; dir = dir * sc + un; best = f; }',
+        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; dir += q * un; }',
         '    }',
-        '    if (best > 1e8) continue;',
-        '    float w = mx * min(0.016 + 0.028 * age, 0.085);',   // schmal beim Auslösen, beim Auslaufen breiter
-        '    float ws = 0.0, sf = 0.0; vec2 dir = vec2(0.0);',
-        '    for (int j = 0; j < ' + PW + '; j++) {',
-        '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
-        '      vec2 dv = fc - p.xy; float d = length(dv);',
-        '      float f = d - max(p.z, 0.0) * mx * 0.15 + (1.0 - smoothstep(0.0, 0.45, p.z)) * mx * 0.12;',
-        '      float q = exp(-(f - best) / (w * 0.35));',
-        '      ws += q; sf += q * f; dir += q * (d > 0.5 ? dv / d : vec2(0.0));',
-        '    }',
-        '    best = sf / ws; dir /= ws;',
+        '    if (ws <= 0.0) continue;',
+        '    best = sf / ws; dir /= ws; sd /= ws;',
         '    float x = best / w;',
         '    float env = exp(-x * x) * smoothstep(0.0, 0.35, age);',
         '    float amp = exp(-age * 0.45);',
-        '    off += dir * (-x * 1.6 * env * amp) * mx * 0.032;',
+        '    off += dir * (-x * 1.6 * env * amp * smoothstep(0.0, w, sd)) * mx * 0.032;',
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
         '    float on = smoothstep(0.0, 0.35, age) * amp;',
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
-        '    float sd = uHue[k] * 17.0;',
+        '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
-        '    float an = atan(dir.y, dir.x) + xo * 0.22 * sin(uT * 0.6 + sd);',
-        '    vec2 cs = vec2(cos(an), sin(an)) * 2.2;',
-        '    float fl = pow(n2(cs + vec2(sd, uT * 0.3)), 3.5);',
-        '    float ln = 0.5 + fl * (5.0 + 3.0 * n2(cs * 1.7 + vec2(uT * 0.8, sd)));',
+        '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
+        '    float ra = xo * 0.22 * sin(uT * 0.6 + fs);',
+        '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 2.2;',
+        '    float fl = pow(n2(cs + vec2(fs, uT * 0.3)), 3.5);',
+        '    float ln = 0.5 + fl * (5.0 + 3.0 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',
         '    fa = max(fa, fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(0.35, 1.1, age));',   // kein Stern am Startpunkt
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
-        '  float a = smoothstep(0.0, 0.35, ring);',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
         '  rb = mix(vec3(dot(rb, vec3(0.333))), rb, 0.7);',   // etwas weniger bunt
-        '  vec3 col = vec3(0.0); float al = 0.0;',
+        '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0;',
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
         '    vec2 u = (sp - uRect.xy) / uRect.zw;',
         '    vec2 bu = min(u, 1.0 - u) * uRect.zw;',
         '    float inside = smoothstep(0.0, 6.0, min(bu.x, bu.y));',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
-        '    vec2 ca = off * 0.25 / uRect.zw * uCrop.zw;',                                 // leichte Farbtrennung in der Welle
+        '    vec2 ca = off * 0.08 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
         '    vec3 img = vec3(texture2D(uImg, iu + ca).r, texture2D(uImg, iu).g, texture2D(uImg, iu - ca).b);',
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
         '    vec2 bh = min(vec2(u0, v0), 1.0 - vec2(u0, v0)) * uRect.zw;',
-        '    float here = smoothstep(0.0, 6.0, min(bh.x, bh.y));',
-        '    al = a * inside * here; col = img * al;',
+        '    here = smoothstep(0.0, 6.0, min(bh.x, bh.y)) * inside; base = img;',
+        // deckend, wo sich das Bild verschiebt; weich aus, wo es fast stillsteht (kein halbdurchsichtiges Doppelbild)
+        '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al;',
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
         '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
@@ -378,11 +383,21 @@
         '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 6.0), cw = pow(1.0 - abs(2.0 * sv - 1.0), 3.0);',
         '  vec3 sun = vec3(1.0, 0.9, 0.72) * (0.55 * fm + 0.45 * fil) + vec3(1.0, 0.8, 0.5) * fil * 0.35;',
         '  float mixr = clamp(0.25 * smoothstep(0.45, 0.8, n2(q * 0.5 + vec2(uT * 0.06, 3.0))) + 0.75 * org, 0.0, 1.0);',
-        '  vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 3.0 + uT * 0.03 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 1.8 + uT * 0.03 + vec3(0.0, 0.33, 0.67)));',
         '  sun = mix(sun, cr * (0.5 * fm + 0.6 * cw), mixr * cw);',
         '  vec3 gc = mix(rb, vec3(1.0), 0.15) * glow + sun * halo * 0.42 + vec3(1.0, 0.86, 0.62) * fa * (0.45 + 0.45 * fm);',
-        '  col = col + gc * (1.0 - al * 0.4);',                                       // Regenbogen um die Welle (aufhellend)
-        '  al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.9);',
+        '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
+        // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
+        // statt halbdurchsichtig darüber zu liegen
+        '  if (uHas > 0.5 && here > 0.0) {',
+        '    float L = dot(gc, vec3(0.333)), lum = dot(base, vec3(0.3, 0.59, 0.11));',
+        '    vec3 lit = base * (1.0 + L * 1.2) + (gc - L) * (0.2 + 0.4 * lum) + gc * 0.14;',
+        '    float cov = clamp(max(al, L * 6.0), 0.0, 1.0) * here;',
+        '    col = lit * cov; al = cov;',
+        '  } else {',
+        '    col = col + gc * (1.0 - al * 0.4);',
+        '    al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.55);',
+        '  }',
         '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
@@ -394,7 +409,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uP', 'uAge', 'uHue', 'uT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uT', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -431,7 +446,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null, dprCap = 2, slowEma = 16, lastT = 0;
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         var now = performance.now(), last = wv.pts[wv.pts.length - 1];
@@ -449,7 +464,12 @@
         if (!cv.parentNode) stage.appendChild(cv);
         var sr = cv.getBoundingClientRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
-        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; c.viewport(0, 0, w, h); }
+        // volle Bildschirmschärfe (Hugo 23.11.: vorher halbe Auflösung → das verschobene Foto wirkte unscharf und durchsichtig)
+        // passt sich an: wird ein Gerät zu langsam, rechnet die Welle etwas gröber (flüssig geht vor)
+        if (lastT && now - lastT < 200) { slowEma = slowEma * 0.9 + (now - lastT) * 0.1; if (slowEma > 24 && dprCap > 1) { dprCap = Math.max(1, dprCap - 0.5); slowEma = 16; } }
+        lastT = now;
+        var dpr = Math.min(window.devicePixelRatio || 1, dprCap), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; c.viewport(0, 0, pw, ph); }
         for (var k = 0; k < NW; k++) {
           var wv = waves[k];
           ages[k] = wv ? (now - wv.t0) / 1000 : -1;
@@ -476,7 +496,7 @@
           c.uniform4f(U.uCrop, (1 - cw) * op[0], (1 - chh) * op[1], cw, chh);
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
-        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform1f(U.uT, (now / 1000) % 1000);
+        c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform1f(U.uT, (now / 1000) % 1000);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
