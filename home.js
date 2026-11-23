@@ -142,6 +142,9 @@
     /* Ladeanimation (Hugo 23.11., erst Handy): die Bilder kommen als weisse Karten mit leuchtendem Rand */
     'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
     '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #fff; }',
+    /* Hugo 23.11.: wuchtiges Andocken – das Bild schlägt ein: kurzer Stoss nach vorn, federt zurück */
+    '@keyframes hp-dock-hit { 0% { transform: scale(1); } 18% { transform: scale(1.035); } 45% { transform: scale(0.992); } 70% { transform: scale(1.006); } 100% { transform: scale(1); } }',
+    '[data-hp].hp-dock-hit .hp-stage { animation: hp-dock-hit .75s cubic-bezier(.2,.7,.3,1) both; }',
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
     'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
@@ -358,7 +361,7 @@
         '    float amp = exp(-age * 0.45);',
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 1.45);',   // Andocken: kräftiger
+        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 1.7);',   // Andocken: kräftiger
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
@@ -385,7 +388,7 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(5.0, 7.0, et);',   // Hugo 23.11.: Farbe hält länger
-        '    float flash = 1.9 * exp(-et * 2.6) + 0.6 * exp(-et * 0.18);',   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float flash = 2.3 * exp(-et * 2.6) + 0.6 * exp(-et * 0.18);',   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
@@ -610,12 +613,12 @@
             var ex = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), ey = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
             var k = 1 - 0.05 * (1 + Math.sin(th * 3 + ph1)) - 0.035 * (1 + Math.sin(th * 5 + ph2)) - Math.pow(Math.random(), 2) * 0.05;
             var x = w2 / 2 + ex * (w2 / 2 + inset) * k, y = h2 / 2 + ey * (h2 / 2 + inset) * k;
-            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 220, m: 0.12 + 1.9 * Math.pow(Math.random(), 1.6) });
+            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 220, m: 0.15 + 1.3 * Math.pow(Math.random(), 1.6) });   // nicht so tief, dass sich die Seiten in der Mitte treffen
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        ring(0, 6, 0.17);   // Hugo 23.11.: nur eine Explosion nach innen
+        ring(0, 6, 0.15);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
@@ -1626,6 +1629,7 @@
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (ripple && ripple.dock) ripple.dock();
           html.classList.remove('hp-ldpre');   // Logo und About blenden ein
+          root.classList.add('hp-dock-hit'); setTimeout(function () { root.classList.remove('hp-dock-hit'); }, 800);
         }
       };
     })();
