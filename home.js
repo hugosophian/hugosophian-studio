@@ -139,11 +139,21 @@
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); will-change: translate, scale; }',
     /* Ladeanimation (Hugo 23.11., erst Handy): die Bilder kommen als weisse Karten mit leuchtendem Rand */
     'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
-    '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(130% 100% at 50% 50%, #fff 0%, #fffdf7 55%, #fff1d6 100%); }',
+    '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #fff; }',
+    /* Logo und About erst, wenn das Bild angedockt ist */
+    'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
+    'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  // Andocken wie ein Magnet (Hugo 23.11.): das Bild wird langsamer, fast bis zum Stillstand, und wird dann zum Rand
+  // hin angezogen – zuletzt immer schneller, bis es einrastet
+  function easeMagnet(x) {
+    var a = 0.78, k = 0.94;
+    if (x < a) { var t = x / a; return k * (1 - Math.pow(1 - t, 3)); }
+    var u = (x - a) / (1 - a); return k + (1 - k) * u * u * u;
+  }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
@@ -281,7 +291,6 @@
     // WebGL nachgezeichnet und an der Welle verschoben), um die Welle schimmert ein feiner Regenbogen.
     // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
     // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
-    var NF = 8;    // Solar Flares beim Andocken nach dem Laden (Hugo 23.11.: weniger, ungleich stark)
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
@@ -292,7 +301,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform vec4 uFl[' + NF + ']; uniform vec4 uFl2[' + NF + '];',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -366,7 +375,7 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(5.0, 7.0, et);',   // Hugo 23.11.: Farbe hält länger
-        '    float flash = 0.8 * exp(-et * 3.0) + 0.5 * exp(-et * 0.18);',
+        '    float flash = 1.2 * exp(-et * 2.6) + 0.6 * exp(-et * 0.18);',   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
@@ -375,28 +384,19 @@
         // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
         '    float patch = 0.2 + 1.0 * smoothstep(0.3, 0.75, n2(ca * 2.6 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
-        '    band = exp(-max(e, 0.0) * max(e, 0.0) / (560.0 * bw * bw));',
-        '    eacc = ecol * band * flash * 1.1 * patch;',
-        '    for (int i = 0; i < ' + NF + '; i++) {',
-        '      vec4 f1 = uFl[i]; vec4 f2 = uFl2[i]; if (f2.y <= 0.001) continue;',
-        '      vec2 uv;',                                                                     // Randseite: u entlang, v nach innen
-        '      if (f1.x < 0.5) uv = fc;',
-        '      else if (f1.x < 1.5) uv = vec2(fc.y, uRes.x - fc.x);',
-        '      else if (f1.x < 2.5) uv = vec2(uRes.x - fc.x, uRes.y - fc.y);',
-        '      else uv = vec2(uRes.y - fc.y, fc.x);',
-        // Hugo 23.11.: schmale Bögen wie auf der Sonne – steigen aus dem Rand, biegen sich und landen wieder im Rand;
-        // kleine Spannweite = schlanke Zunge, grosse = Bogen. Die Linie windet sich lebendig.
-        '      float aa = abs(f1.w) * 0.5 + f2.x * 0.8, hh = max(f1.z, 1.0);',
-        '      vec2 qq = vec2((uv.x - f1.y - f1.w * 0.5) / aa, max(uv.y, 0.0) / hh);',
-        '      float rr = length(qq); if (rr > 2.4) continue;',
-        '      float th = atan(qq.y, qq.x);',
-        '      rr += 0.04 * sin(th * 3.0 - uT * 1.1 + f2.w) + 0.02 * sin(th * 5.0 + uT * 0.7 + f2.w * 1.7);',   // sanft gewunden, nicht zackig
-        '      float dpx = (rr - 1.0) * length(vec2(aa * qq.x, hh * qq.y)) / max(rr, 0.001);',
-        '      float I = (exp(-dpx * dpx / (f2.x * f2.x)) + 0.35 * (1.0 - smoothstep(0.6, 1.0, rr))) * mix(1.0, 0.45, smoothstep(0.2, 1.0, qq.y)) * f2.y;',   // weich gefüllt, Rand heller
-        '      float sv2 = qq.y;',
-        '      vec3 fcol = mix(vec3(1.0, 0.86, 0.62), 0.5 + 0.5 * cos(6.2832 * (f2.z + sv2 * 0.25 + vec3(0.0, 0.33, 0.67))), 0.12);',   // Gold wie bei der Fingerwelle
-        '      eacc += fcol * I * 0.8; fI += I;',
-        '    }',
+        '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
+        '    eacc = ecol * band * flash * 1.25 * mix(1.0, patch, smoothstep(0.2, 1.2, et));',   // erst rundherum, dann ungleich
+        // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
+        // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
+        '    float ra = 0.22 * sin(uT * 0.6);',
+        '    vec2 cs = vec2(ca.x * cos(ra) - ca.y * sin(ra), ca.x * sin(ra) + ca.y * cos(ra)) * 3.4;',
+        '    float efl = pow(n2(cs + vec2(uSeed, uT * 0.3)), 2.8);',
+        '    float eln = 0.5 + efl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, uSeed)));',
+        '    float exo = max(e, 0.0) / (mx * 0.024);',
+        '    float egr = smoothstep(0.05, 0.7, et) * (1.0 - smoothstep(4.0, 6.2, et));',
+        '    float efa = efl * exp(-exo * exo / eln) * egr;',
+        '    float efm = smoothstep(0.35, 0.85, n2(fc / mx * 2.6 + vec2(uT * 0.05, 3.0)));',
+        '    eacc += vec3(1.0, 0.86, 0.62) * efa * (0.6 + 0.5 * efm) * 1.1; fI = efa;',
         '    eacc *= fade;',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
@@ -462,7 +462,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uFl', 'uFl2', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -576,71 +576,16 @@
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
-        if (et >= 0) { flStep(et, w, h); c.uniform4fv(U.uFl, fl1); c.uniform4fv(U.uFl2, fl2); }
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
       function ok() { return !desk && !root.classList.contains('is-info'); }
-      // Solar Flares beim Andocken: jede Flare hat einen Fuss am Rand und eine Spitze. Der Fuss wandert langsam und
-      // organisch, die Spitze folgt federnd; kommen sich zwei Spitzen (oder Füsse) auf derselben Seite nahe, stossen
-      // sie sich wie Magnete ab und biegen aus. Die Biegung (Spitze − Fuss) geht an den Shader.
-      var fl1 = new Float32Array(NF * 4), fl2 = new Float32Array(NF * 4), FL = [], flLast = 0;
-      function flInit(w, h) {
-        FL = [];
-        var mx = Math.max(w, h);
-        // ein bis zwei grössere, der Rest klein; alle schmal (Hugo 23.11.)
-        var strong = Math.random() < 0.5 ? 1 : 2, s0 = Math.floor(Math.random() * 4);
-        for (var i = 0; i < NF; i++) {
-          var big = i < strong;
-          var side = big ? (s0 + i * 2) % 4 : Math.floor(Math.random() * 4), len = side % 2 ? h : w;
-          var L = mx * (big ? 0.1 + 0.06 * Math.random() : 0.03 + 0.045 * Math.random());
-          FL.push({ side: side, u: len * (0.1 + 0.8 * Math.random()), vu: 0, len: len, L: L,
-            sg: Math.random() < 0.5 ? -1 : 1, span: 0, vs: 0,
-            amp: big ? 0.8 + 0.2 * Math.random() : 0.4 + 0.35 * Math.random(),
-            wd: mx * (big ? 0.009 + 0.004 * Math.random() : 0.005 + 0.004 * Math.random()),
-            hue: Math.random(), dl: Math.random() * 0.5, ph: Math.random() * 100 });
-        }
-        flLast = 0;
-      }
-      // Bögen: der erste Fuss wandert langsam, der zweite Fuss (Spannweite) atmet organisch. Kommt das Ende eines Bogens
-      // in die Nähe eines anderen Fusses, wird es magnetisch dorthin gezogen – die Bögen fliessen ineinander – und löst
-      // sich später wieder. Füsse, die sich zu nahe kommen, stossen sich ab.
-      function flStep(et, w, h) {
-        if (!FL.length) flInit(w, h);
-        var dt = flLast ? Math.min(0.05, et - flLast) : 0.016; flLast = et;
-        var mx = Math.max(w, h);
-        FL.forEach(function (f, i) {
-          var drift = Math.sin(et * 0.3 + f.ph) * 0.6 + Math.sin(et * 0.19 + f.ph * 1.7) * 0.4;
-          var fu = drift * mx * 0.018;
-          var rest = f.sg * f.L * (0.08 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(et * 0.42 + f.ph * 0.7), 2.0));   // meist schlanke Zunge, ab und zu ein Bogen
-          var fs = (rest - f.span) * 1.6;
-          var tip = f.u + f.span;
-          FL.forEach(function (g, j) {
-            if (i === j || g.side !== f.side) return;
-            var d = f.u - g.u, ad = Math.abs(d) + 1;
-            fu += Math.sign(d) * mx * 0.16 * Math.exp(-ad / (mx * 0.05));
-            [g.u, g.u + g.span].forEach(function (t) {
-              var dd = t - tip, a2 = Math.abs(dd);
-              if (a2 < mx * 0.16) fs += dd * 2.6 * Math.exp(-a2 / (mx * 0.06));   // magnetisch angezogen
-            });
-          });
-          f.vu += (fu - f.vu * 1.6) * dt; f.u += f.vu * dt;
-          f.u = Math.max(f.len * 0.03, Math.min(f.len * 0.97, f.u));
-          f.vs += (fs - f.vs * 1.8) * dt; f.span += f.vs * dt;
-          f.span = Math.max(-f.L * 2.2, Math.min(f.L * 2.2, f.span));
-          var grow = Math.max(0, Math.min(1, (et - f.dl * 0.6) / 1.0)); grow = grow * grow * (3 - 2 * grow);
-          var life = 1 - Math.max(0, Math.min(1, (et - 4.4 - f.dl) / 2.0));
-          var Lb = f.L * (0.85 + 0.15 * Math.sin(et * 0.8 + f.ph * 2.3));
-          fl1[i * 4] = f.side; fl1[i * 4 + 1] = f.u; fl1[i * 4 + 2] = Lb * (0.1 + 0.9 * grow); fl1[i * 4 + 3] = f.span;
-          fl2[i * 4] = f.wd; fl2[i * 4 + 1] = f.amp * grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = f.ph;
-        });
-      }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       function dock() {
         var cs = slides[current()]; if (!cs) return;
         gImg = cs.img; texFor(gImg);
         var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
-        edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97); FL = [];
+        edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
@@ -686,7 +631,7 @@
           k = r + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
-          E = easeDock(clamp((P - 0.25) / 0.75, 0, 1));
+          E = LD ? easeMagnet(clamp((P - 0.25) / 0.75, 0, 1)) : easeDock(clamp((P - 0.25) / 0.75, 0, 1));
           ay = H / 2 + r * (ah + 4);
         }
         var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
@@ -706,7 +651,7 @@
         if (s.gold) {
           var gv = 1 - smoothstep(0.1, 0.8, E), rim = 1 - smoothstep(0.6, 1, E);
           s.gold.style.opacity = gv.toFixed(3);
-          s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (10 + 30 * rim).toFixed(1) + 'px ' + (2 + 6 * rim).toFixed(1) + 'px rgba(255,226,170,' + (0.9 * rim).toFixed(3) + '), 0 0 3px 1px rgba(255,255,255,' + rim.toFixed(3) + ')' : '';
+          s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (6 + 16 * rim).toFixed(1) + 'px ' + (1 + 3 * rim).toFixed(1) + 'px rgba(255,250,238,' + (0.75 * rim).toFixed(3) + '), 0 0 2px 1px rgba(255,255,255,' + rim.toFixed(3) + ')' : '';
         }
       }
     }
@@ -1627,8 +1572,9 @@
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
       var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
-      if (desk || reduce || seen) return null;
+      if (desk || reduce || seen) { html.classList.remove('hp-ldpre'); return null; }
       try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
+      html.classList.add('hp-ldpre');
       slides.forEach(function (s) {
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
         if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
@@ -1641,6 +1587,7 @@
           if (docked) return; docked = true;
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (ripple && ripple.dock) ripple.dock();
+          html.classList.remove('hp-ldpre');   // Logo und About blenden ein
         }
       };
     })();
