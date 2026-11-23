@@ -638,7 +638,10 @@
           k = r + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
-          E = LD ? easeMagnet(clamp((P - 0.25) / 0.75, 0, 1)) : easeDock(clamp((P - 0.25) / 0.75, 0, 1));
+          // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
+          // und holen bis zum Einrasten wieder auf
+          var xin = clamp((P - 0.25) / 0.75, 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
+          E = LD ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
         var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
@@ -647,7 +650,7 @@
         ay = cy - hA / 2;
         // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
         var gapY = 0;
-        if (LD && !desk) { var xm = clamp((P - 0.25) / 0.75, 0, 1); gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xm)); }
+        if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
         rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
         s.el.style.zIndex = (!desk && rel(j) === 0) ? 3 : 2;
