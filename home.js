@@ -297,7 +297,7 @@
     // WebGL nachgezeichnet und an der Welle verschoben), um die Welle schimmert ein feiner Regenbogen.
     // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
     // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
-    var NF = 16;   // Solar Flares beim Andocken nach dem Laden
+    var NF = 8;    // Solar Flares beim Andocken nach dem Laden (Hugo 23.11.: weniger, ungleich stark)
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
@@ -432,7 +432,7 @@
         '      float wob = 0.75 + 0.25 * n2(vec2(sv2 * 3.0 - uT * 0.4, float(i) * 3.7));',       // lebendig, nicht glatt
         '      float I = exp(-dd * dd) * exp(-pow(sv2, 1.5)) * wob * f2.y;',
         '      vec3 fcol = mix(vec3(1.0, 0.84, 0.56), 0.5 + 0.5 * cos(6.2832 * (f2.z + sv2 * 0.25 + vec3(0.0, 0.33, 0.67))), 0.35);',
-        '      eacc += fcol * I * 0.5;',
+        '      eacc += fcol * I * 0.8;',
         '    }',
         '    eacc *= fade;',
         '  }',
@@ -446,7 +446,7 @@
         '    float dk = 1.0 - lum;',
         '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
-        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.6) + eacc * 0.3;',      // Andock-Licht: färbt auch Weiss golden
+        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.6) + eacc * 0.45;',      // Andock-Licht: färbt auch Weiss golden
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
@@ -590,11 +590,16 @@
       function flInit(w, h) {
         FL = [];
         var mx = Math.max(w, h);
+        // ein bis zwei kräftige, die weit ins Bild reichen (auf verschiedenen Seiten), der Rest schwächer und kürzer
+        var strong = Math.random() < 0.5 ? 1 : 2, s0 = Math.floor(Math.random() * 4);
         for (var i = 0; i < NF; i++) {
-          var side = i % 4, len = side % 2 ? h : w;
-          FL.push({ side: side, u: len * (0.08 + 0.84 * Math.random()), du: 0, vu: 0, vt: 0, len: len,
-            L: mx * (0.06 + 0.3 * Math.pow(Math.random(), 1.8)),   // die meisten kurz, einzelne weit ins Bild
-            wd: mx * (0.018 + 0.022 * Math.random()), hue: Math.random(), dl: Math.random() * 0.5, ph: Math.random() * 100 });
+          var big = i < strong;
+          var side = big ? (s0 + i * 2) % 4 : Math.floor(Math.random() * 4), len = side % 2 ? h : w;
+          FL.push({ side: side, u: len * (0.1 + 0.8 * Math.random()), du: 0, vu: 0, vt: 0, len: len,
+            L: mx * (big ? 0.26 + 0.14 * Math.random() : 0.05 + 0.11 * Math.pow(Math.random(), 1.5)),
+            amp: big ? 0.9 + 0.1 * Math.random() : 0.25 + 0.4 * Math.random(),
+            wd: mx * (big ? 0.03 + 0.012 * Math.random() : 0.015 + 0.015 * Math.random()),
+            hue: Math.random(), dl: Math.random() * 0.5, ph: Math.random() * 100 });
         }
         flLast = 0;
       }
@@ -621,7 +626,7 @@
           var grow = Math.max(0, Math.min(1, (et - f.dl * 0.6) / 1.2)); grow = grow * grow * (3 - 2 * grow);
           var life = 1 - Math.max(0, Math.min(1, (et - 3.2 - f.dl) / 1.6));
           fl1[i * 4] = f.side; fl1[i * 4 + 1] = f.u; fl1[i * 4 + 2] = f.L * (0.15 + 0.85 * grow); fl1[i * 4 + 3] = f.du;
-          fl2[i * 4] = f.wd; fl2[i * 4 + 1] = grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = 0;
+          fl2[i * 4] = f.wd; fl2[i * 4 + 1] = f.amp * grow * life; fl2[i * 4 + 2] = f.hue + et * 0.05; fl2[i * 4 + 3] = 0;
         });
       }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
