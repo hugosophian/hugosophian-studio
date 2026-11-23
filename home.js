@@ -137,10 +137,27 @@
     /* Klein (55 %) nur im versteckten Zustand vor dem Hochbouncen; beim Wegfallen bleibt er gross */
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.hp-mb-small { scale: .55; }',
     'html.hp-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, 1.3s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, 1.3s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); will-change: translate, scale; }',
+    /* Ladeanimation (Hugo 23.11., erst Handy): weiss, «Hugo Sophian Studio» gross in der Mitte von der Sonne angestrahlt,
+       gleitet dann in die Ecke; die Bilder kommen als leuchtende Vierecke im goldenen Licht, beim Andocken wird es schwarz */
+    'html.hp-on, html.hp-on body { transition: background-color .8s ease; }',
+    'html.hp-preload, html.hp-preload body, html.hp-ld, html.hp-ld body { background: #fff !important; }',
+    'html.hp-preload [data-hp] { visibility: hidden; }',
+    '[data-hp].hp-ld, [data-hp].hp-ld .hp-stage { background: transparent !important; }',
+    '[data-hp].hp-ld-a .hp-stage, [data-hp].hp-ld-nb .hp-brand:not(.hp-ld-brand) { visibility: hidden; }',
+    '[data-hp].hp-ld-nab .hp-about-btn { opacity: 0; pointer-events: none; }',
+    '[data-hp]:not(.hp-ld-nab) .hp-about-btn { transition: opacity .6s ease; }',
+    '[data-hp] .hp-info-sun.hp-ldx { transform: none !important; }',
+    '[data-hp] .hp-sun-light.hp-ldx { visibility: visible !important; transition: opacity 1.2s ease; }',
+    '[data-hp] .hp-sun-back.hp-ldx { z-index: 0; transition: opacity 1s ease; }',
+    '[data-hp] .hp-ldx.hp-out { opacity: 0; }',
+    '[data-hp] .hp-ld-brand { position: fixed !important; margin: 0 !important; z-index: 7 !important; color: #141414 !important; mix-blend-mode: normal !important; pointer-events: none; visibility: visible !important; transform: none; }',
+    '[data-hp] .hp-ld-brand .hp-ld-l { display: inline-block; will-change: transform; }',
+    '[data-hp] .hp-gold { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, #fffaf0 0%, #ffe2a0 45%, #f6bd5c 100%); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
   // Kurve wie Marios Einflug: cubic-bezier(.72, 0, .11, 1) – langsamer Anlauf, sehr weiches Andocken
@@ -250,7 +267,7 @@
 
     var F = 0, C = 0, W = 1, H = 1, raf = 0, last = 0;   // F = angezeigt, C = Ziel (in Bildern)
     var hov = -1, deskMoving = false;
-    var introOn = !reduce, introT0 = 0, introP = 0;
+    var introOn = !reduce, introT0 = 0, introP = 0, LD = null;
     function wrap(x) { return ((x % n) + n) % n; }
     function rel(j) { var d = wrap(j - F); return d > n / 2 ? d - n : d; }
     function current() { return wrap(Math.round(F)); }
@@ -292,11 +309,11 @@
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
         // Abstand zum Bahnabschnitt a–b, Wellenfront dort minus gelaufene Strecke (mit weicher Einblendung neuer Punkte)
-        'float segF(vec2 fc, vec4 a, vec4 b, float mx, out vec2 dv, out float d) {',
+        'float segF(vec2 fc, vec4 a, vec4 b, float mx, float sp, out vec2 dv, out float d) {',
         '  vec2 ab = b.xy - a.xy; float l2 = dot(ab, ab);',
         '  float t = l2 > 0.01 ? clamp(dot(fc - a.xy, ab) / l2, 0.0, 1.0) : 0.0;',
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
-        '  return d - z * mx * 0.15 + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
+        '  return d - z * mx * 0.15 * sp + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
@@ -313,7 +330,7 @@
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         // schwache Handys: Pixel weit weg von dieser Welle rechnen die Bahn gar nicht erst durch
-        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 > mx * 0.62) continue;',
+        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * uB[k].w > mx * 0.62) continue;',
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
@@ -322,7 +339,7 @@
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
         '      vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
-        '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, dv, d);',
+        '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, uB[k].w, dv, d);',
         '      vec2 un = d > 0.5 ? dv / d : vec2(0.0);',
         '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; dir = dir * sc + un; best = f; }',
         '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; dir += q * un; }',
@@ -502,7 +519,7 @@
           var cx = 0, cy = 0, rr = 0, np = wv ? wv.pts.length : 0;
           for (var j0 = 0; j0 < np; j0++) { cx += wv.pts[j0].x; cy += wv.pts[j0].y; }
           if (np) { cx /= np; cy /= np; for (j0 = 0; j0 < np; j0++) rr = Math.max(rr, Math.hypot(wv.pts[j0].x - cx, wv.pts[j0].y - cy)); }
-          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = 0;
+          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = (wv && wv.sp2) || 1;   // Tempo der Welle (Andocken: schneller)
           for (var j = 0; j < PW; j++) {
             var i = k * PW + j, q = wv && wv.pts[j];
             if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
@@ -525,6 +542,16 @@
         if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
       function ok() { return !desk && !root.classList.contains('is-info'); }
+      // Andocken nach dem Laden (Hugo 23.11.): eine schnelle Welle aus der Bildmitte, die am Rand den Regenbogen auslöst
+      function dock() {
+        var cs = slides[current()]; if (!cs) return;
+        gImg = cs.img; texFor(gImg);
+        var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
+        var r = (md || stage).getBoundingClientRect(), now = performance.now();
+        waves.push({ t0: now, pts: [{ x: r.left + r.width / 2, y: r.top + r.height / 2, t: now }], sp2: 3.2 }); if (waves.length > NW) waves.shift();
+        if (!raf) raf = requestAnimationFrame(draw);
+      }
+      cv.dock = dock;
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
@@ -580,6 +607,12 @@
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
+        // Ladeanimation: stark leuchtende Vierecke im goldenen Licht; je näher sie kommen, desto mehr erkennt man das Bild
+        if (s.gold) {
+          var gv = 1 - smoothstep(0.08, 0.85, E);
+          s.gold.style.opacity = gv.toFixed(3);
+          s.el.style.boxShadow = gv > 0.01 ? '0 0 ' + (34 * gv).toFixed(1) + 'px ' + (8 * gv).toFixed(1) + 'px rgba(255,200,110,' + (0.85 * gv).toFixed(3) + ')' : '';
+        }
       }
     }
 
@@ -668,6 +701,7 @@
 
     function endIntro() {
       introOn = false;
+      if (LD) LD.dock();
       clearInline();
       root.classList.remove('hp-run');
       fitTitles();
@@ -682,7 +716,10 @@
         if (done) return; done = true;
         // Kommt man über „zum Studio“ (Seite gleitet nach oben weg), setzt die Animation leicht versetzt ein
         var d = document.documentElement.classList.contains('hs-vt-studio') ? CONFIG.vtDelay : 0;
-        setTimeout(function () { introT0 = 0; kick(); }, d);
+        setTimeout(function () {
+          if (LD) LD.ready(function () { introT0 = 0; kick(); });   // Ladeanimation: erst wenn der Schriftzug lange genug leuchtete
+          else { introT0 = 0; kick(); }
+        }, d);
       }
       Promise.all(imgs.map(function (im) {
         return im.decode ? im.decode().catch(function () {}) : Promise.resolve();
@@ -860,7 +897,15 @@
       trailAmt: 0.75,
       res: 1                     // Auflösung (1 = CSS-Pixel; scharf genug für die Glaskanten)
     };
-    var sun = (function () {
+    // Eigene Sonne der Ladeanimation (Hugo 23.11.: getrennt vom About – hier ändern wirkt nur beim Laden)
+    var SUN_LD = {
+      src: [0.86, -0.3], rays: [8, 19], drift: [0.16, -0.24], edge: [0.37, 0.82], reach: 2.6, strength: 1.2, ambient: 0.2,
+      shade: [0.8, 0.81, 0.835], shadeLow: [0.8, 0.81, 0.835], lit: [1.0, 0.985, 0.95],
+      textLight: [1.0, 0.74, 0.36], textAmt: 0.62,
+      occLen: 0.9, occAmt: 0.75, refr: 0.02, depth: 0.3, shadowW: 0.05, trailLife: 0.9, trailAmt: 0.75, res: 1
+    };
+    // Hugo 23.11.: About und Ladeanimation haben je ihre eigene Sonne (eigene Werte, eigene Leinwand), gleiche Bauart
+    function makeSun(SUN, mode) {
       var gcv = document.createElement('canvas');
       var c = null;
       try { c = gcv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true }); } catch (e) {}
@@ -1018,6 +1063,7 @@
       var occ = { on: 0, t: 0, want: 0, el: null }, pw = 1, ph = 1;
       function pot(v) { var p = 1; while (p < v) p *= 2; return p; }
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
+      // mode: 'info' = About, 'load' = Ladeanimation der Startseite
       // Glas-Ausschnitt: der Titelbereich wird extra in voller Retina-Auflösung gerechnet (scharfe Glaskanten),
       // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
       var G = null, srcT = null;
@@ -1130,12 +1176,12 @@
         c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
         c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
         // Licht erst, wenn der Titel angekommen ist: in 1.8 s weich einstrahlen; beim Schliessen rasch weg
-        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 3200);   // 2.6 s, Strahl für Strahl
+        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / (mode === 'load' ? 2200 : 3200));   // 2.6 s, Strahl für Strahl
         else lightOn.v = Math.max(0, lightOn.v - dt / 1.2);                                   // während die Seite wegfährt
         var lo = lightOn.v; c.uniform1f(U.uOn, lo * lo * (3 - 2 * lo));
         // Erster Strahl (Hugo 22.11.): kommt zuerst und fällt auf «Galerie öffnen», damit man den Schatten gleich sieht
         var hero = 0, ha = 0, hw = 0.05;
-        if (infoOpen.offsetWidth) {
+        if (mode === 'info' && infoOpen.offsetWidth) {
           var br = infoOpen.getBoundingClientRect();
           var Sx = SUN.src[0] * rect.width, Sy = SUN.src[1] * rect.height;   // Sonne in CSS-Pixeln der Leinwand (y nach unten)
           var bxx = br.left - rect.left + br.width * 0.45, byy = br.top - rect.top + br.height * 0.5;
@@ -1162,7 +1208,7 @@
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
       var px = null, btnL = 0, pf = 0, heroNow = 0;
       function probe(rect, sx) {
-        if (++pf % 5 || !infoOpen.offsetWidth) return;
+        if (mode !== 'info' || ++pf % 5 || !infoOpen.offsetWidth) return;
         var r = infoOpen.getBoundingClientRect();
         var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
@@ -1183,7 +1229,8 @@
       }
       function loop(now) {
         raf = 0;
-        if (ip.v >= 1 && !root.classList.contains('is-info')) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
+        if (mode === 'load' && !lightOn.want && lightOn.v <= 0) return;                 // Laden fertig, Licht aus
+        if (mode === 'info' && ip.v >= 1 && !root.classList.contains('is-info')) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
         draw(now);
         if (!reduce || trail.length || Math.abs(occ.want - occ.on) > 0.01) raf = requestAnimationFrame(loop);
       }
@@ -1217,9 +1264,14 @@
           if (T) { var a = T.map(T.ox, T.oy), b = T.map(T.ox + T.tw, T.oy + T.th); G = { bx: a[0], by: a[1], bw: b[0] - a[0], bh: b[1] - a[1] }; }
           occ.want = 0; start();
         },
-        light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); }
+        light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); },
+        // Laden: Boden (Sonnenoberfläche) beginnt knapp unter dem Schriftzug
+        horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); },
+        // Ladeanimation fertig: Leinwand und Speicher freigeben
+        destroy: function () { lightOn.want = false; lightOn.v = 0; if (raf) cancelAnimationFrame(raf); raf = 0; var lx2 = c.getExtension('WEBGL_lose_context'); if (lx2) lx2.loseContext(); }
       };
-    })();
+    }
+    var sun = makeSun(SUN, 'info');
     if (sun) {
       info.insertBefore(sun.back, infoPanel); root.appendChild(sun.glow);   // Lichtebene über Text UND Titel
       root.classList.add('hp-info-sunlit');
@@ -1466,6 +1518,113 @@
       mbShow();
     }
     if (deskMQ.addEventListener) deskMQ.addEventListener('change', setMode); else if (deskMQ.addListener) deskMQ.addListener(setMode);
+
+
+    // ---------- Ladeanimation (Hugo 23.11., vorerst nur Handy) ----------
+    //   1. Weiss, auch Safaris Ränder. «Hugo Sophian Studio» steht gross in der Mitte, die eigene Lade-Sonne (SUN_LD)
+    //      strahlt Strahl für Strahl ein und lässt die Schrift golden aufleuchten – gleichmässig, nicht nach Ladefortschritt;
+    //      am Boden die Sonnenoberfläche.
+    //   2. Sind die Bilder bereit (frühestens nach LD.min): der Schriftzug fliesst wie ein Stoffband in die Ecke, die Bilder
+    //      kommen als stark leuchtende goldene Vierecke, je näher sie kommen, desto mehr erkennt man sie.
+    //   3. Andocken: der Hintergrund wird schwarz, eine schnelle Welle aus der Mitte lässt den Rand im Regenbogen leuchten.
+    //   Nur beim ersten Besuch pro Sitzung; Tippen verkürzt das Warten; mit «Bewegung reduzieren» ohne.
+    LD = (function () {
+      var LDC = { min: 1900, swoosh: 1350, stagger: 32, lightOff: 2100, size: 0.42 };
+      var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
+      function bare() { html.classList.remove('hp-preload'); return null; }
+      if (desk || reduce || seen || !brand || html.classList.contains('hs-vt-studio')) return bare();
+      var ls = makeSun(SUN_LD, 'load');
+      if (!ls) return bare();
+      try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
+      var t0 = performance.now(), W0 = window.innerWidth, H0 = window.innerHeight;
+      var meta = document.querySelector('meta[name="theme-color"]'), metaOld = meta && meta.getAttribute('content');
+      if (meta) meta.setAttribute('content', '#ffffff');
+      html.classList.add('hp-ld'); root.classList.add('hp-ld', 'hp-ld-a', 'hp-ld-nb', 'hp-ld-nab');
+      ls.back.classList.add('hp-ldx'); ls.glow.classList.add('hp-ldx');
+      root.insertBefore(ls.back, root.firstChild); root.appendChild(ls.glow);
+
+      // Schriftzug: Kopie mit einzelnen Buchstaben, gross in der Mitte (in echter Schriftgrösse, nicht hochskaliert → scharf)
+      var B = brand.getBoundingClientRect(), bcs = getComputedStyle(brand);
+      var cl = brand.cloneNode(false); cl.classList.add('hp-ld-brand'); cl.setAttribute('aria-hidden', 'true'); cl.removeAttribute('id');
+      var letters = [];
+      [].forEach.call(brand.childNodes, function (nd) {
+        if (nd.nodeType !== 3) { cl.appendChild(nd.cloneNode(true)); return; }
+        nd.textContent.split('').forEach(function (ch) {
+          if (!ch.trim()) { cl.appendChild(document.createTextNode(ch)); return; }
+          var sp = document.createElement('span'); sp.className = 'hp-ld-l'; sp.textContent = ch; cl.appendChild(sp); letters.push(sp);
+        });
+      });
+      var S = Math.max(1, Math.min(LDC.size * H0 / Math.max(1, B.height), 0.8 * W0 / Math.max(1, B.width)));
+      cl.style.fontSize = (parseFloat(bcs.fontSize) * S).toFixed(2) + 'px';
+      if (/px$/.test(bcs.letterSpacing)) cl.style.letterSpacing = (parseFloat(bcs.letterSpacing) * S).toFixed(2) + 'px';
+      cl.style.left = '0px'; cl.style.top = '0px';
+      root.appendChild(cl);
+      var R = cl.getBoundingClientRect();
+      var cx = (W0 - R.width) / 2, cy = (H0 - R.height) / 2 - H0 * 0.04;
+      cl.style.left = cx.toFixed(1) + 'px'; cl.style.top = cy.toFixed(1) + 'px';
+      ls.horizon(cy, cy + R.height + H0 * 0.03);   // Boden knapp unter dem Schriftzug
+      html.classList.remove('hp-preload');
+      setTimeout(function () { ls.light(true); }, 200);
+
+      var pending = null, phase = 'a';
+      root.addEventListener('touchstart', function () { if (phase === 'a' && pending) go(); }, { passive: true });
+      function go() {
+        if (phase !== 'a' || !pending) return;
+        phase = 'b';
+        root.classList.remove('hp-ld-a');
+        slides.forEach(function (s) {
+          var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
+          if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
+          s.gold = g;
+        });
+        var cb = pending; pending = null; cb();
+        swoosh();
+        ls.glow.style.opacity = '0.6';   // auf den Bildern eher goldenes Licht als bunte Prismenränder
+        setTimeout(function () { ls.light(false); ls.back.classList.add('hp-out'); ls.glow.classList.add('hp-out'); }, LDC.lightOff);
+      }
+      // Wie ein Stoffband: die Buchstaben ziehen nacheinander los, eine Welle läuft quer durch das Band,
+      // jeder Buchstabe schwingt und dreht sich leicht, bis alles genau an seiner Stelle oben links liegt
+      function swoosh() {
+        var C = cl.getBoundingClientRect(), Cc = [C.left + C.width / 2, C.top + C.height / 2], Bc = [B.left + B.width / 2, B.top + B.height / 2];
+        var L = letters.map(function (sp, i) {
+          var r = sp.getBoundingClientRect(), p = [r.left + r.width / 2, r.top + r.height / 2];
+          var t = [Bc[0] + (p[0] - Cc[0]) / S, Bc[1] + (p[1] - Cc[1]) / S];
+          return { sp: sp, i: i, dx: t[0] - p[0], dy: t[1] - p[1] };
+        });
+        var dir = [Bc[0] - Cc[0], Bc[1] - Cc[1]], dl = Math.hypot(dir[0], dir[1]) || 1, nx = -dir[1] / dl, ny = dir[0] / dl;
+        var A = Math.min(W0, H0) * 0.07, ts = performance.now();
+        function ease(u) { return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; }
+        function fr(now) {
+          var all = true;
+          L.forEach(function (o) {
+            var u = clamp((now - ts - o.i * LDC.stagger) / LDC.swoosh, 0, 1); if (u < 1) all = false;
+            var e = ease(u), bell = Math.sin(Math.PI * u);
+            var wv = Math.sin(6.2832 * (u * 1.15) + o.i * 0.55);
+            var off = bell * A * wv, rot = bell * 16 * Math.cos(6.2832 * (u * 1.15) + o.i * 0.55);
+            var sc = Math.exp(Math.log(1 / S) * e);
+            o.sp.style.transform = 'translate3d(' + (o.dx * e + nx * off).toFixed(2) + 'px,' + (o.dy * e + ny * off).toFixed(2) + 'px,0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
+          });
+          if (!all) requestAnimationFrame(fr);
+          else { root.classList.remove('hp-ld-nb'); requestAnimationFrame(function () { if (cl.parentNode) cl.parentNode.removeChild(cl); }); }
+        }
+        requestAnimationFrame(fr);
+      }
+      var docked = false;
+      return {
+        // Bilder bereit: weiter, sobald der Schriftzug lange genug geleuchtet hat
+        ready: function (cb) { pending = cb; setTimeout(go, Math.max(0, LDC.min - (performance.now() - t0))); },
+        // Bilder angedockt: schwarz werden, Regenbogen am Rand
+        dock: function () {
+          if (docked) return; docked = true;
+          html.classList.remove('hp-ld'); root.classList.remove('hp-ld', 'hp-ld-nab', 'hp-ld-nb');
+          if (meta) meta.setAttribute('content', metaOld || '#000000');
+          slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
+          if (cl.parentNode) cl.parentNode.removeChild(cl);
+          if (ripple && ripple.dock) ripple.dock();
+          setTimeout(function () { ls.destroy(); ls.back.remove(); ls.glow.remove(); }, 1400);
+        }
+      };
+    })();
 
     // ---------- Start ----------
     // Barrierefreiheit (Lighthouse 21.11.): Webflow-Listenrollen passen nicht mehr, weil die Einträge umgebaut werden
