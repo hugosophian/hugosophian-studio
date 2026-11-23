@@ -293,12 +293,13 @@
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
       cv.className = 'hp-ripple'; cv.setAttribute('aria-hidden', 'true');
-      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;';
+      // liegt im berührten Bild, direkt über dem Foto und unter der Überschrift; wird mit dem Bild beschnitten
+      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
       try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) {}
       if (!c) return null;
-      var NP = 24;
+      var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge;',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
+        'uniform vec2 uRes; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + '];',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
@@ -307,30 +308,33 @@
         // Hugo 23.11.: EINE Welle in der Form der Fingerbewegung. Jeder Punkt der Bahn startet zu seiner Zeit;
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
-        '  float best = 1e9; vec2 dir = vec2(0.0);',
-        '  for (int i = 0; i < ' + NP + '; i++) {',
-        '    vec4 p = uP[i]; if (p.w <= 0.0) continue;',
-        '    vec2 dv = fc - p.xy; float d = length(dv);',
-        '    float f = d - max(p.z, 0.0) * mx * 0.15;',
-        '    best = min(best, f);',
+        // Hugo 23.11.: mehrere Wellen gleichzeitig (schnell hintereinander verschwindet die erste nicht)
+        '  vec2 off = vec2(0.0); float ring = 0.0, ph = 0.0, edge = 0.0;',
+        '  for (int k = 0; k < ' + NW + '; k++) {',
+        '    float age = uAge[k]; if (age < 0.0) continue;',
+        '    float best = 1e9;',
+        '    for (int j = 0; j < ' + PW + '; j++) {',
+        '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
+        '      best = min(best, length(fc - p.xy) - max(p.z, 0.0) * mx * 0.15);',
+        '    }',
+        '    if (best > 1e8) continue;',
+        '    float w = mx * (0.05 + 0.025 * age);',
+        '    float ws = 0.0, sf = 0.0; vec2 dir = vec2(0.0);',
+        '    for (int j = 0; j < ' + PW + '; j++) {',
+        '      vec4 p = uP[k * ' + PW + ' + j]; if (p.w <= 0.0) continue;',
+        '      vec2 dv = fc - p.xy; float d = length(dv);',
+        '      float f = d - max(p.z, 0.0) * mx * 0.15;',
+        '      float q = exp(-(f - best) / (w * 0.35));',
+        '      ws += q; sf += q * f; dir += q * (d > 0.5 ? dv / d : vec2(0.0));',
+        '    }',
+        '    best = sf / ws; dir /= ws;',
+        '    float x = best / w;',
+        '    float env = exp(-x * x) * smoothstep(0.0, 0.35, age);',
+        '    float amp = exp(-age * 0.45);',
+        '    off += dir * (-x * 1.6 * env * amp) * mx * 0.032;',
+        '    float r = env * amp; if (r > ring) { ring = r; ph = x; }',
+        '    edge = max(edge, env * exp(-age * 0.4) * exp(-e * e / 420.0));',
         '  }',
-        '  float w = mx * (0.05 + 0.025 * uAge);',
-        '  float ws = 0.0, sf = 0.0;',
-        '  for (int i = 0; i < ' + NP + '; i++) {',
-        '    vec4 p = uP[i]; if (p.w <= 0.0) continue;',
-        '    vec2 dv = fc - p.xy; float d = length(dv);',
-        '    float f = d - max(p.z, 0.0) * mx * 0.15;',
-        '    float k = exp(-(f - best) / (w * 0.35));',
-        '    ws += k; sf += k * f; dir += k * (d > 0.5 ? dv / d : vec2(0.0));',
-        '  }',
-        '  if (ws > 0.0) { best = sf / ws; dir /= ws; }',
-        '  float x = best / w;',
-        '  float env = exp(-x * x) * smoothstep(0.0, 0.35, uAge);',
-        '  float amp = exp(-uAge * 0.55);',
-        '  float h = -x * 1.6 * env * amp;',                                      // ein Berg, ein Tal
-        '  vec2 off = dir * h * mx * 0.02;',
-        '  float ring = env * amp, ph = x;',
-        '  float edge = env * exp(-uAge * 0.4) * exp(-e * e / 420.0);',
         '  float a = clamp(ring * 3.0, 0.0, 1.0);',
         '  vec3 rb = 0.5 + 0.5 * cos(6.2832 * (ph * 0.18 + vec3(0.0, 0.33, 0.67)));',
         '  vec3 col = vec3(0.0); float al = 0.0;',
@@ -345,7 +349,7 @@
         '    float here = step(0.0, u0) * step(u0, 1.0) * step(0.0, v0) * step(v0, 1.0);',
         '    al = a * inside * here; col = img * al;',
         '  }',
-        '  float glow = clamp(ring * (0.18 + 0.28 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.1, 0.0, 1.0);',
+        '  float glow = clamp(ring * (0.3 + 0.45 * abs(ph) * exp(-ph * ph * 0.5)) + edge * 1.2, 0.0, 1.0);',
         '  vec3 gc = mix(rb, vec3(1.0), 0.2) * glow;',
         '  col = col + gc * (1.0 - al * 0.4);',                                       // Regenbogen um die Welle (aufhellend)
         '  al = max(al, max(gc.r, max(gc.g, gc.b)) * 0.9);',
@@ -397,25 +401,29 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var pts = [], buf = new Float32Array(NP * 4), raf = 0, LIFE = 5.5, g0 = 0, gImg = null;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), raf = 0, LIFE = 5.5, gImg = null;
       function add(x, y) {
-        var r = stage.getBoundingClientRect(), now = performance.now(), last = pts[pts.length - 1];
-        if (last && Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 18) return;
-        if (pts.length >= NP) return;                                   // Bahn voll: die Welle hat ihre Form
-        pts.push({ x: x - r.left, y: y - r.top, t: now });
+        var wv = waves[waves.length - 1]; if (!wv) return;
+        var now = performance.now(), last = wv.pts[wv.pts.length - 1];
+        if (last && Math.hypot(last.x - x, last.y - y) < 18) return;
+        if (wv.pts.length >= PW) return;                                // Bahn voll: die Welle hat ihre Form
+        wv.pts.push({ x: x, y: y, t: now });
         if (!raf) raf = requestAnimationFrame(draw);
       }
       function draw(now) {
         raf = 0;
-        var age = (now - g0) / 1000;
-        if (age > LIFE) { pts = []; }
-        var sr = stage.getBoundingClientRect();
+        waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
+        var sr = cv.getBoundingClientRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
         if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; c.viewport(0, 0, w, h); }
-        for (var i = 0; i < NP; i++) {
-          var q = pts[i];
-          if (q) { buf[i * 4] = q.x; buf[i * 4 + 1] = q.y; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
-          else buf[i * 4 + 3] = 0;
+        for (var k = 0; k < NW; k++) {
+          var wv = waves[k];
+          ages[k] = wv ? (now - wv.t0) / 1000 : -1;
+          for (var j = 0; j < PW; j++) {
+            var i = k * PW + j, q = wv && wv.pts[j];
+            if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = 1; }
+            else buf[i * 4 + 3] = 0;
+          }
         }
         var im = gImg; texFor(im);
         if (texOk && im) {
@@ -428,18 +436,22 @@
           c.uniform4f(U.uCrop, (1 - cw) * op[0], (1 - chh) * op[1], cw, chh);
           c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
-        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf); c.uniform1f(U.uAge, age);
+        c.uniform2f(U.uRes, w, h); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
-        if (pts.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
+        if (waves.length) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
-      stage.appendChild(cv);
       function ok() { return !desk && !root.classList.contains('is-info'); }
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
-        var t = e.touches[0]; pts = []; g0 = performance.now(); gImg = imgAt(t.clientX, t.clientY); texFor(gImg); add(t.clientX, t.clientY);
+        var t = e.touches[0], im = imgAt(t.clientX, t.clientY);
+        if (im !== gImg) { waves = []; gImg = im; texFor(gImg); }     // anderes Bild: dort neu beginnen
+        var md = gImg && gImg.closest('.hp-media');
+        if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
+        waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) waves.shift();
+        add(t.clientX, t.clientY);
       }, { passive: true });
-      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0] && pts.length) add(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0] && waves.length) add(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
       return cv;
     })();
 
