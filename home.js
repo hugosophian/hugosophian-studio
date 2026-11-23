@@ -294,29 +294,38 @@
       cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;mix-blend-mode:soft-light;';
       try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false }); } catch (e) {}
       if (!c) return null;
-      var NP = 12;
+      var NP = 6;
+      // Eine einzige, ruhige Welle pro Berührung: ein breites Lichtband, darin das fliessende Sonnenmuster
+      // der About-Seite mit schillerndem Regenbogen (Iridescence). Es wandert zum Bildschirmrand, dort leuchten
+      // die Farben noch einmal weich auf, dann verblasst es.
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform vec4 uP[' + NP + '];',   // x, y (px), Alter (s), Stärke
+        'uniform vec2 uRes; uniform float uT; uniform vec4 uP[' + NP + '];',   // x, y (px), Alter (s), Stärke
+        'float h2(vec2 n) { return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453); }',
+        'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+        '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',
         'void main() {',
-        '  vec2 fc = gl_FragCoord.xy; float W = 0.0, E = 0.0;',
+        '  vec2 fc = gl_FragCoord.xy; float mx = max(uRes.x, uRes.y);',
         '  vec2 ed = min(fc, uRes - fc); float e = min(ed.x, ed.y);',
-        '  float per = (fc.x < ed.y + 0.5 && fc.x < uRes.x - fc.x) || (uRes.x - fc.x < ed.y) ? fc.y / uRes.y : fc.x / uRes.x;',
-        '  float mx = max(uRes.x, uRes.y);',
+        '  vec2 q = fc / uRes.y * 5.0;',
+        '  vec2 wq = vec2(n2(q * 0.9 + vec2(uT * 0.11, -uT * 0.07)), n2(q + vec2(-uT * 0.09, uT * 0.13) + 5.2));',
+        '  float sv = n2(q * 1.4 + wq * 2.2 + vec2(0.0, uT * 0.05));',
+        '  float fil = pow(1.0 - abs(2.0 * sv - 1.0), 5.0);',
+        '  float A = 0.0, G = 0.0, ph = 0.0;',
         '  for (int i = 0; i < ' + NP + '; i++) {',
         '    vec4 p = uP[i]; if (p.w <= 0.0) continue;',
-        '    float d = length(fc - p.xy); float R = p.z * mx * 0.38;',
-        '    float env = exp(-pow((d - R) / (mx * 0.16), 2.0));',                       // Wellenpaket um die Front
-        '    float fade = exp(-p.z * 0.75) * (1.0 - smoothstep(0.0, 1.3, d / mx)) * 0.85;',      // klingt zum Rand hin aus
-        '    W += sin((d - R) * 0.09) * env * fade * p.w;',
-        '    float reach = exp(-pow((d - R) / (mx * 0.12), 2.0)) * exp(-p.z * 0.8);',   // Front erreicht den Rand
-        '    E = max(E, reach * p.w);',
+        '    float d = length(fc - p.xy); float R = p.z * mx * 0.26;',
+        '    float wd = mx * (0.07 + 0.05 * p.z);',                                    // Band wird beim Wandern breiter
+        '    float env = exp(-pow((d - R) / wd, 2.0)) * smoothstep(0.0, 0.5, p.z);',  // weich einblenden
+        '    float out_ = 1.0 - smoothstep(0.75, 1.25, d / mx);',
+        '    float life = 1.0 - smoothstep(2.2, 3.4, p.z);',
+        '    float a = env * out_ * life * p.w;',
+        '    A = max(A, a); ph += a * d / mx;',
+        '    G = max(G, a * exp(-e * e / 260.0));',                                    // am Rand: noch einmal aufleuchten
         '  }',
-        '  vec3 spec = 0.5 + 0.5 * cos(6.2832 * (per * 2.5 + vec3(0.0, 0.33, 0.67)));',
-        '  float band = exp(-e * e / 160.0) * E;',
-        '  vec3 col = vec3(0.5 + 0.5 * clamp(W * 1.4, -1.0, 1.0));',
-        '  col = mix(col, spec, clamp(band * 1.3, 0.0, 0.9));',
-        '  float a = clamp(abs(W) * 2.2 + band * 1.4, 0.0, 1.0);',
-        '  gl_FragColor = vec4(col, a);',
+        '  vec3 ir = 0.5 + 0.5 * cos(6.2832 * (sv * 1.4 + ph * 1.5 + fil * 0.3 - uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
+        '  vec3 col = mix(vec3(0.5 + 0.18 * (sv - 0.5) + 0.12 * fil), ir, 0.55 + 0.45 * G);',
+        '  float alpha = clamp(A * (0.24 + 0.2 * fil) + G * 0.7, 0.0, 0.75);',
+        '  gl_FragColor = vec4(col, alpha);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       function sh(t, src) { var x = c.createShader(t); c.shaderSource(x, src); c.compileShader(x); return c.getShaderParameter(x, c.COMPILE_STATUS) ? x : null; }
@@ -327,11 +336,12 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var uRes = c.getUniformLocation(p, 'uRes'), uP = c.getUniformLocation(p, 'uP');
-      var pts = [], buf = new Float32Array(NP * 4), raf = 0, RS = 0.5, LIFE = 2.8;
+      var uRes = c.getUniformLocation(p, 'uRes'), uP = c.getUniformLocation(p, 'uP'), uT = c.getUniformLocation(p, 'uT');
+      var pts = [], buf = new Float32Array(NP * 4), raf = 0, RS = 0.5, LIFE = 3.5;
       function add(x, y, s) {
         var r = stage.getBoundingClientRect(), now = performance.now(), last = pts[pts.length - 1];
-        if (last && Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 40 && now - last.t < 120) return;
+        // seltener (Hugo 23.11.): beim Ziehen höchstens alle 0.9 s und erst nach einem Stück Weg eine neue Welle
+        if (last && (now - last.t < 900 || Math.hypot(last.x - (x - r.left), last.y - (y - r.top)) < 90)) return;
         pts.push({ x: x - r.left, y: y - r.top, t: now, s: s });
         if (pts.length > NP) pts.shift();
         if (!raf) raf = requestAnimationFrame(draw);
@@ -346,7 +356,7 @@
           if (q) { buf[i * 4] = q.x * RS; buf[i * 4 + 1] = h - q.y * RS; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.s; }
           else buf[i * 4 + 3] = 0;
         }
-        c.uniform2f(uRes, w, h); c.uniform4fv(uP, buf);
+        c.uniform2f(uRes, w, h); c.uniform4fv(uP, buf); c.uniform1f(uT, (now / 1000) % 1000);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         if (pts.length) raf = requestAnimationFrame(draw);
@@ -354,7 +364,7 @@
       stage.appendChild(cv);
       function ok() { return !desk && !root.classList.contains('is-info'); }
       stage.addEventListener('touchstart', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 1); }, { passive: true });
-      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 0.7); }, { passive: true });
+      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0]) add(e.touches[0].clientX, e.touches[0].clientY, 0.8); }, { passive: true });
       return cv;
     })();
 
