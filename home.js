@@ -392,10 +392,10 @@
         '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
         '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.25 + 0.4 * egm);',
         // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
-        '    float patch = 0.2 + 1.0 * smoothstep(0.3, 0.75, n2(ca * 2.6 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',
+        '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.8 * mix(1.0, patch, smoothstep(0.2, 1.2, et));',   // erst rundherum, dann ungleich
+        '    eacc = ecol * band * flash * 0.8 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -608,9 +608,9 @@
             if (d < w2) { x = d; y = 0; } else if (d < w2 + h2) { x = w2; y = d - w2; }
             else if (d < 2 * w2 + h2) { x = w2 - (d - w2 - h2); y = h2; } else { x = 0; y = h2 - (d - 2 * w2 - h2); }
             // knapp innerhalb des Rands, nicht überall gleich weit
-            var ins = inset * (0.6 + 0.8 * Math.random());
+            var ins = inset + Math.pow(Math.random(), 2) * Math.min(w2, h2) * 0.12;   // Hugo 23.11.: unregelmässig, kein Rahmen
             x = Math.min(w2 - ins, Math.max(ins, x)); y = Math.min(h2 - ins, Math.max(ins, y));
-            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 140, m: 0.35 + 1.3 * Math.random() });
+            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 220, m: 0.12 + 1.9 * Math.pow(Math.random(), 1.6) });
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
