@@ -151,11 +151,13 @@
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   // Andocken wie ein Magnet (Hugo 23.11.): das Bild wird langsamer, fast bis zum Stillstand, und wird dann zum Rand
   // hin angezogen – zuletzt immer schneller, bis es einrastet
-  // Hugo 23.11.: die ursprüngliche Bewegung (Kurve wie Mario), aber knapp vor dem Ziel übernimmt weich ein Magnet:
+  // Hugo 23.11.: Heranzoomen kubisch (langsam an, schnell, langsam aus), knapp vor dem Ziel übernimmt weich ein Magnet:
   // das Bild wird langsamer, ohne anzuhalten, und dann immer schneller zum Rand gezogen, bis es einrastet
+  function magnetPull(x) { var x0 = 0.66; return x > x0 ? Math.pow((x - x0) / (1 - x0), 4) : 0; }
   function easeMagnet(x) {
-    var k = 0.9, x0 = 0.7, m = x > x0 ? Math.pow((x - x0) / (1 - x0), 4.5) : 0;   // Hugo 23.11.: etwas weniger weich
-    return k * easeDock(x) + (1 - k) * m;
+    var k = 0.88, a = 0.86, t = Math.min(1, x / a);
+    var c = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -635,13 +637,16 @@
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
           E = LD ? easeMagnet(clamp((P - 0.25) / 0.75, 0, 1)) : easeDock(clamp((P - 0.25) / 0.75, 0, 1));
-          ay = H / 2 + r * (ah + (LD ? 2.5 : 4));
+          ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
         var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
-        rect(s, lerp(ax, bx, E), lerp(ay, by, E), lerp(aw, bw, E), lerp(hA, bh, E));
+        // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
+        var gapY = 0;
+        if (LD && !desk) { var xm = clamp((P - 0.25) / 0.75, 0, 1); gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xm)); }
+        rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
         s.el.style.zIndex = (!desk && rel(j) === 0) ? 3 : 2;
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
