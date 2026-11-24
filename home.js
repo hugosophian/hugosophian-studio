@@ -125,8 +125,8 @@
     '[data-hp] .hp-side { display: none; }',
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
     '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
-    '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; }',
-    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 2; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
+    '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; z-index: 5; }',   // über der Andock-Leinwand (z 4)
+    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
     '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: flex-end; gap: 2.2vh; }',
     '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; color: inherit; opacity: 1; transform: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
@@ -726,6 +726,50 @@
         }
         return null;
       }
+      // Computer: Leinwand über der ganzen Bühne (über den Bildern, unter Titeln und Textspalte)
+      function deskCanvas() {
+        if (cv.parentNode !== stage) stage.appendChild(cv);
+        cv.style.zIndex = '4';
+      }
+      var comp = document.createElement('canvas'), cctx = comp.getContext('2d'), compSig = '', compOk = false;
+      function srcOf(img) { return img && (img.currentSrc || img.src); }
+      function loadAll() {
+        slides.forEach(function (sl) {
+          var src = srcOf(sl.img); if (!src || cache[src]) return;
+          var e = cache[src] = { im: new Image(), ok: false };
+          e.im.crossOrigin = 'anonymous'; e.im.onload = function () { e.ok = true; compSig = ''; }; e.im.src = src;
+        });
+      }
+      // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
+      // neu nur, wenn sich etwas bewegt hat (Aufprall, Hover am Rand)
+      function compTex(sr) {
+        if (!cctx) return false;
+        loadAll();
+        var sc = Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var parts = [], sig = cw2 + 'x' + ch2;
+        slides.forEach(function (sl) {
+          var e = cache[srcOf(sl.img)]; if (!e || !e.ok) { sig += '|-'; return; }
+          var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect();
+          parts.push({ e: e, im: sl.img, ir: ir, er: er });
+          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.width].map(function (v) { return Math.round(v); }).join(',');
+        });
+        if (sig === compSig) return compOk;
+        compSig = sig;
+        if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
+        cctx.fillStyle = '#000'; cctx.fillRect(0, 0, cw2, ch2);
+        parts.forEach(function (p) {
+          var iw = p.e.im.naturalWidth || 1, ih = p.e.im.naturalHeight || 1, ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
+          var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
+          var op = objPos(p.im), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
+          cctx.save();
+          cctx.beginPath(); cctx.rect((p.er.left - sr.left) * sc, (p.er.top - sr.top) * sc, p.er.width * sc, p.er.height * sc); cctx.clip();
+          cctx.drawImage(p.e.im, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
+          cctx.restore();
+        });
+        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = parts.length > 0; texSrc = ''; }
+        catch (er) { compOk = false; }
+        return compOk;
+      }
       function objPos(im) {
         var op = (getComputedStyle(im).objectPosition || '50% 50%').split(' ');
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
@@ -734,7 +778,7 @@
       var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
-      var dprCap = weak ? 1 : 2;
+      var dprCap = weak ? 1 : (desk ? 1.5 : 2);   // Computer: ganze Bildschirmfläche, darum etwas gröber starten
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
@@ -761,7 +805,8 @@
         raf = 0;
         waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
         // immer im gerade gezeigten Bild (auch nach dem Wischen): Leinwand dorthin, dessen Foto als Textur
-        var cs = slides[current()];
+        var cs = desk ? null : slides[current()];
+        if (desk) deskCanvas();
         if (cs) { if (cs.img !== gImg) { gImg = cs.img; } var md0 = cs.media; if (md0 && cv.previousSibling !== md0) md0.parentNode.insertBefore(cv, md0.nextSibling); }
         if (!cv.parentNode) stage.appendChild(cv);
         var sr = cv.getBoundingClientRect();
@@ -795,8 +840,15 @@
             else buf[i * 4 + 3] = 0;
           }
         }
-        var im = gImg; texFor(im);
-        if (texOk && im) {
+        var im = gImg;
+        if (desk) {
+          // Computer (Hugo 24.11.): der ganze Bildschirm leuchtet – Textur = alle Spalten zusammen, wie sie gerade stehen
+          if (compTex(sr)) {
+            c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
+          } else c.uniform1f(U.uHas, 0);
+        } else texFor(im);
+        if (desk) {}
+        else if (texOk && im) {
           var r = im.getBoundingClientRect();
           // object-fit: cover (mit object-position) → sichtbarer Ausschnitt des Bilds
           var iw = im.naturalWidth || 1, ih = im.naturalHeight || 1, ra = r.width / r.height, ia = iw / ih;
@@ -815,8 +867,11 @@
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       function dock() {
         var cs = slides[current()]; if (!cs) return;
-        gImg = cs.img; texFor(gImg);
-        var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
+        if (desk) { deskCanvas(); compSig = ''; }
+        else {
+          gImg = cs.img; texFor(gImg);
+          var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
+        }
         edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
         // Hugo 23.11. (wie die Fingerwelle im Video): das Andocken löst echte Wellen aus, die rundherum am Rand beginnen
         // und nach innen durchs Bild laufen – mit Prisma-Regenbogen, Verzerrung und Solar Flares, die darauf surfen.
@@ -867,10 +922,24 @@
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild
     function renderIntro() {
-      var P = introP;
+      var P = introP, minE = 1, gapX = 0, xjD = 0;
       for (var j = 0; j < n; j++) {
         var s = slides[j], ax, ay, aw, ah, bx, by, bw, bh, k, E;
-        if (desk) {
+        if (desk && LD) {
+          // Hugo 24.11.: Ladeanimation am Computer – gleich wie am Handy, nur als Reihe: kleine weisse Karten (im
+          // Seitenverhältnis der Spalten) mitten im Schwarz, die inneren führen, die äusseren hängen nach; der Abstand
+          // wächst mit und schliesst sich mit dem Magneten
+          ah = H * 0.09; aw = ah * (W / n) / H;
+          k = j;
+          var dj = j - (n - 1) / 2, lagD = Math.max(0, Math.abs(dj) - 0.5);
+          ax = W / 2 + dj * aw - aw / 2;
+          bx = j * W / n; by = 0; bw = W / n; bh = H;
+          var xinD = clamp((P - 0.17) / 0.83, 0, 1);
+          xjD = clamp(xinD - 0.085 * lagD * Math.sin(Math.PI * xinD), 0, 1);
+          E = easeMagnet(xjD);
+          gapX = dj * 2.5 * (lerp(aw, bw, E) / aw) * (1 - magnetPull(xjD));
+          minE = Math.min(minE, E);
+        } else if (desk) {
           aw = W * 0.055; ah = H * 0.2;
           var g = W * 0.008;
           k = j;
@@ -897,9 +966,9 @@
         // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
         var gapY = 0;
         if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
-        rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
+        rect(s, lerp(ax, bx, E) + (desk ? gapX : 0), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
-        s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren
+        s.el.style.zIndex = desk ? (LD ? (Math.abs(j - (n - 1) / 2) < 1 ? 3 : 2) : 2) : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // innere Karten vorn   // äussere Karten liegen hinter inneren
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
@@ -915,6 +984,7 @@
           s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (5 + 12 * rim).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rim).toFixed(3) + ')' : '';
         }
       }
+      if (LD && desk && minE > 0.978) LD.dock();   // Computer: Knall, sobald auch die äussersten Karten einrasten
     }
 
     // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario). Ohne Bewegungsunschärfe (Hugo 23.11.)
@@ -1833,7 +1903,7 @@
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
-      if (desk || reduce) { html.classList.remove('hp-ldpre'); return null; }
+      if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
       slides.forEach(function (s) {
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
