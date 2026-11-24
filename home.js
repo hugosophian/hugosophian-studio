@@ -654,6 +654,10 @@
         '    vec2 dE = max(min(fc, uRes - fc), 0.0), sgE = sign(fc - uRes * 0.5 + 0.001);',
         '    vec2 aO = max(off * sgE, 0.0);',   // Anteil nach aussen
         '    vec2 offE = off - sgE * (aO - aO * dE / (dE + aO + 1e-3));',
+        // Computer (Hugo 24.11.): beim starken Andocken wurde die oberste Bildzeile nach unten gezogen – dort klingt die
+        // Verschiebung nach aussen jetzt sanft über eine breitere Zone aus (höchstens doppelt gedehnt, ganz am Rand gar nicht)
+        '    vec2 rmp = smoothstep(vec2(0.0), max(aO * 3.0, vec2(1.0)), dE);',
+        '    offE = mix(offE, off - sgE * aO * (1.0 - rmp), uDesk);',
         '    vec2 sp = fc + offE;',
         '    vec2 u = (sp - uRect.xy) / uRect.zw;',
         // Hugo 24.11.: Leinwand = ganzer Bildschirm – was die Welle über den Rand hinaus holt, wird gespiegelt statt
