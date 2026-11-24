@@ -1351,8 +1351,11 @@
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
       if (sun) sun.blind(true);
-      clearTimeout(shimT); if (ripple && ripple.flareShimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.flareShimmer(true); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
-      els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: (CONFIG.closeHold || 0), easing: 'ease', fill: 'backwards' }); } catch (er) {} });
+      // Hugo 24.11. (18:40): am Handy blendet About erst ein, wenn der Strahl schon hell ist – vorher schien die weisse Sonne
+      // durch das Foto, bevor der Blitz es verdeckte (wirkte, als würde das Bild schon ausblenden)
+      var rvD = desk ? (CONFIG.closeHold || 0) : CONFIG.closeBeam * 0.85;
+      clearTimeout(shimT); if (ripple && ripple.flareShimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.flareShimmer(true); }, rvD + CONFIG.deskSunFade);
+      els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: rvD, easing: 'ease', fill: 'backwards' }); } catch (er) {} });
       if (onPass) rv.raf = setTimeout(function () { onPass(1e6, 0, 0); }, CONFIG.deskSunFade * 0.5);
     }
     // Eintauchen (Hugo 24.11., 13:50): das Bild zoomt zur Stelle von Maus bzw. Finger hin, während die Welle die Sonne
@@ -2154,7 +2157,7 @@
       if (sun) {
         // Sonne erst, wenn der Titel eingeflogen ist (Hugo 22.11.)
         clearTimeout(sunL); sun.light(false);
-        sun.light(true, reduce ? 0 : 800);   // wie am Computer: Strahlen kommen schon mit der Welle
+        sun.light(true, 0);   // Hugo 24.11. (18:40): ohne Vorlauf – die Strahlen wachsen unter dem Blitz heran (vorher lagen sie schon als senkrechte Streifen über dem Foto)
       }
       // Hugo 24.11. (13:36): wie am Computer – keine Bildbewegung mehr. Die Sonne mit dem Text wird von einer Welle ab dem
       // Finger nach aussen aufgedeckt, darunter läuft die Fingerwelle weiter. «close» blendet aus.
