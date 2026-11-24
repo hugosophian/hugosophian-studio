@@ -766,7 +766,7 @@
       function compTex(sr) {
         if (!cctx) return false;
         loadAll();
-        var sc = Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
@@ -805,7 +805,7 @@
       var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, lockS = null, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
-      var dprCap = weak ? 1 : (desk ? 1.5 : 2);   // Computer: ganze Bildschirmfläche, darum etwas gröber starten
+      var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
@@ -950,6 +950,7 @@
         if (!raf) raf = requestAnimationFrame(draw);
       }
       cv.dock = dock;
+      try { loadAll(); } catch (e) {}   // Hugo 24.11.: Bilder für den Effekt schon beim Laden holen (nicht erst beim Aufprall – sonst Ruckler)
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
@@ -1012,7 +1013,7 @@
         if (LC && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
         rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
-        s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren   // äussere Karten liegen hinter inneren
+        s.el.style.zIndex = desk ? (Math.abs(j - (n - 1) / 2) < 1 ? 3 : 2) : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren (Handy und Computer)
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
