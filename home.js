@@ -1835,9 +1835,8 @@
     //   wabbert kurz und kleine goldene Solar Flares züngeln aus dem Rand.
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
-      var seen = false; try { seen = sessionStorage.getItem('hp-ld') === '1'; } catch (e) {}
-      if (desk || reduce || seen) { html.classList.remove('hp-ldpre'); return null; }
-      try { sessionStorage.setItem('hp-ld', '1'); } catch (e) {}
+      // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
+      if (desk || reduce) { html.classList.remove('hp-ldpre'); return null; }
       html.classList.add('hp-ldpre');
       slides.forEach(function (s) {
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
