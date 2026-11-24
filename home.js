@@ -158,7 +158,7 @@
   // hin angezogen – zuletzt immer schneller, bis es einrastet
   // Hugo 23.11.: Heranzoomen kubisch (langsam an, schnell, langsam aus), knapp vor dem Ziel übernimmt weich ein Magnet:
   // das Bild wird langsamer, ohne anzuhalten, und dann immer schneller zum Rand gezogen, bis es einrastet
-  function magnetPull(x) { var x0 = 0.62; return x > x0 ? Math.pow((x - x0) / (1 - x0), 6.5) : 0; }   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
+  function magnetPull(x) { var x0 = 0.59; return x > x0 ? Math.pow(Math.min(1, (x - x0) / 0.25), 6.5) : 0; }   // Hugo 24.11.: setzt dort ein, wo die (schneller abbremsende) Annäherung endet – kein Warten vor dem Magnet; Kurve wie gehabt   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 24.11.: bis der Magnet zieht, dieselbe schwungvolle Kurve wie am Computer (easeDock); Magnet unverändert
@@ -1000,7 +1000,7 @@
           s.el.style.boxShadow = visD > 0.01 ? '0 0 ' + sizeD.toFixed(1) + 'px 0 rgba(255,250,238,' + (0.25 * visD).toFixed(3) + ')' : '';
         }
         if (s.gold) {
-          var gv = desk ? 1 - smoothstep(0.035 + 0.015 * k, 0.07 + 0.015 * k, P) : 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
+          var gv = desk ? 1 - smoothstep(0.035 + 0.015 * k, 0.07 + 0.015 * k, P) : 1 - smoothstep(0.035 + 0.015 * k, 0.07 + 0.015 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
           s.gold.style.opacity = gv.toFixed(3);
           // Hugo 23.11.: kein Blenden an den Ecken – das Leuchten ohne Ausdehnung (spread) und schwächer, so addieren
           // sich die Lichthöfe benachbarter Karten in den Ecken nicht zu hellen Punkten
