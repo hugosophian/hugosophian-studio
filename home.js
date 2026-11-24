@@ -977,7 +977,7 @@
           s.el.style.boxShadow = rimD > 0.01 ? '0 0 ' + (5 + 12 * rimD).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rimD).toFixed(3) + ')' : '';
         }
         if (s.gold) {
-          var gv = 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
+          var gv = desk ? 1 - smoothstep(0.1 + 0.03 * k, 0.2 + 0.03 * k, P) : 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
           s.gold.style.opacity = gv.toFixed(3);
           // Hugo 23.11.: kein Blenden an den Ecken – das Leuchten ohne Ausdehnung (spread) und schwächer, so addieren
           // sich die Lichthöfe benachbarter Karten in den Ecken nicht zu hellen Punkten
@@ -1905,7 +1905,7 @@
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
       if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
-      if (!desk && CONFIG.ldCards) slides.forEach(function (s) {
+      if (desk || CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten auch am Computer
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
         if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
         s.gold = g;
