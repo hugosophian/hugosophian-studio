@@ -158,18 +158,28 @@
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
     'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
-    /* Computer: Sonne nach 1 s Ruhe (Hugo 24.11.). Wand mit Strahlen liegt in der Bühne über den Bildern (z 4), unter
-       Titeln und Textspalte (z 5); das Licht (screen) liegt wie am Handy über allem. */
-    '[data-hp].is-desk .hp-stage > .hp-sun-back { transform: none; z-index: 4; opacity: 0; visibility: hidden; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s linear var(--hp-dsun-fade, .9s); }',
-    '[data-hp].is-desk.hp-dsun .hp-stage > .hp-sun-back { opacity: 1; visibility: visible; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s; }',
+    /* Computer: Sonne nach 1 s Ruhe (Hugo 24.11.). Die Wand mit den Strahlen liegt ganz unten in der Bühne (unter den
+       Bildern) und ist sofort ganz da; Bilder, Titel und der schwarze Grund der Textspalte blenden über ihr aus. So sieht
+       man die Strahlen schon beim Ausblenden, ohne grauen Zwischenzustand. Das Licht (screen) liegt wie am Handy über allem. */
+    '[data-hp].is-desk .hp-stage > .hp-sun-back { transform: none; z-index: 0; visibility: hidden; }',
+    '[data-hp].is-desk.hp-dsun-live .hp-stage > .hp-sun-back { visibility: visible; }',
+    '[data-hp].is-desk.hp-dsun-live .hp-slide { background-color: transparent !important; }',   // falls die Karte einen eigenen Grund hat: Wand bleibt sichtbar
     '[data-hp].is-desk.hp-dsun-live > .hp-sun-light { visibility: visible; transform: none; }',
     '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun > .hp-sun-light { opacity: 1; }',
-    '[data-hp].is-desk .hp-media, [data-hp].is-desk .hp-ripple { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-ripple, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk .hp-media { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease, color var(--hp-dsun-fade, .9s) ease; }',
+    // Hugo 24.11. (Video 12:34): die Welle vom Wischen verschwindet sofort, sonst liegt sie wie ein Schatten auf dem Weiss
+    '[data-hp].is-desk .hp-ripple { transition: opacity .25s ease; }',
+    '[data-hp].is-desk.hp-dsun .hp-ripple { opacity: 0 !important; }',
+    '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
+    // Text: statt grau über grau blendet er hell aus und dunkel wieder ein (beim Zurück umgekehrt)
+    '@keyframes hp-dsun-txt-in { 0% { opacity: 1; color: var(--hp-side-fg, #fff); } 40% { opacity: 0; color: var(--hp-side-fg, #fff); } 60% { opacity: 0; color: var(--hp-info-fg, #000); } 100% { opacity: 1; color: var(--hp-info-fg, #000); } }',
+    '@keyframes hp-dsun-txt-out { 0% { opacity: 1; color: var(--hp-info-fg, #000); } 40% { opacity: 0; color: var(--hp-info-fg, #000); } 60% { opacity: 0; color: var(--hp-side-fg, #fff); } 100% { opacity: 1; color: var(--hp-side-fg, #fff); } }',
+    '[data-hp].is-desk.hp-dsun .hp-side-in > * { animation: hp-dsun-txt-in var(--hp-dsun-fade, .9s) ease both; }',
+    '[data-hp].is-desk.hp-dsun-live:not(.hp-dsun) .hp-side-in > * { animation: hp-dsun-txt-out var(--hp-dsun-fade, .9s) ease both; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -1277,7 +1287,7 @@
       root.classList.add('hp-dsun-live', 'hp-dsun');
       sun.start();
       clearTimeout(dsunL);
-      sun.light(true);   // Hugo 24.11.: Strahlen kommen schon während des Ausblendens (vorher erst nach 0.6 s)
+      sun.light(true, reduce ? 0 : 1200);   // Hugo 24.11. (Video 12:34): die ersten Strahlen sind schon beim Ausblenden da, die übrigen kommen danach Strahl für Strahl
     }
     function dsunStop() {
       clearTimeout(dsunT);
@@ -1790,7 +1800,7 @@
           if (T) { var a = T.map(T.ox, T.oy), b = T.map(T.ox + T.tw, T.oy + T.th); G = { bx: a[0], by: a[1], bw: b[0] - a[0], bh: b[1] - a[1] }; }
           occ.want = 0; start();
         },
-        light: function (on) { if (on && !lightOn.want) lightOn.t0 = performance.now(); lightOn.want = !!on; start(); },
+        light: function (on, lead) { if (on && !lightOn.want) lightOn.t0 = performance.now() - (lead || 0); lightOn.want = !!on; start(); },   // lead: so viele ms ist das Einstrahlen schon weiter
         // Laden: Boden (Sonnenoberfläche) beginnt knapp unter dem Schriftzug
         horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); },
         // Lichtbild der Schrift (zweite Hälfte der Rechenleinwand): Quelle und Ausschnitt für drawImage
@@ -1817,7 +1827,7 @@
     // Wand mit Strahlen: am Handy im About, am Computer in der Bühne (für die Sonne nach 1 s Ruhe, Hugo 24.11.)
     function sunHome() {
       if (!sun) return;
-      if (desk) { if (sun.back.parentNode !== stage) stage.appendChild(sun.back); }
+      if (desk) { if (sun.back.parentNode !== stage || stage.firstChild !== sun.back) stage.insertBefore(sun.back, stage.firstChild); }   // ganz unten, unter den Bildern
       else if (sun.back.parentNode !== info) info.insertBefore(sun.back, infoPanel);
     }
     sunHome();
