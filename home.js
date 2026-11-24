@@ -932,7 +932,7 @@
         // Hugo 24.11. (15:20): während die Sonne einblendet, liegt die Welle normal (mit Foto) UNTER ihr und blendet mit dem
         // Bild aus – keine Foto-Fetzen auf dem Weiss mehr. Danach liegt sie darüber und erscheint weich als Prisma-Licht.
         var lf = lightFade(now), sinceF = (now - lightT0) / 1000 - CONFIG.deskSunFade / 1000;
-        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = lf > 0.001 ? '2' : '9'; }
+        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = '2'; }   // Hugo 24.11. (15:41): die Tippwelle bleibt immer unter der Sonne – sie verschwindet weich mit dem Einblenden und ist danach nicht mehr zu sehen
         else if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
         var sr = refRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
@@ -1960,7 +1960,8 @@
           var angC = Math.atan2(rect.width * 0.5 - Sx2, rect.height * 0.5 - Sy2);
           var amt = smoothstep(0.05, CONFIG.closeBeam / 1000 + 0.1, bt) * 0.92 - smoothstep(CONFIG.closeBeam / 1000 + 0.15, CONFIG.closeBeam / 1000 + 0.9, bt) * 0.3;
           var ko = 1;
-          if (blOpen) { ko = 1 - smoothstep(CONFIG.closeBeam / 1000 + 0.2, CONFIG.closeBeam / 1000 + 1.6, bt); amt *= ko; if (bt > CONFIG.closeBeam / 1000 + 1.7) { blT0 = 0; blOpen = false; } }   // Hugo 24.11. (15:37): auch der Strahl selbst klingt weich ab (verschwand vorher auf einmal)
+          // Hugo 24.11. (15:41): der Blitz löst sich langsamer und weicher ins Sonnenlicht auf (2.4 s, sanfte Kurve)
+          if (blOpen) { var kt = clamp((bt - CONFIG.closeBeam / 1000 - 0.1) / 2.4, 0, 1); ko = 1 - kt * kt * (3 - 2 * kt); ko *= ko; amt = Math.min(amt, 0.92) * ko; if (kt >= 1) { blT0 = 0; blOpen = false; } }   // Hugo 24.11. (15:37): auch der Strahl selbst klingt weich ab (verschwand vorher auf einmal)
           c.uniform4f(U.uBl, Math.max(0, amt), angC + 0.8 * (1 - bo), 0.05 + 0.3 * (1 - Math.pow(1 - sw, 3)), (1 - Math.pow(1 - Math.min(1, bt / 0.3), 3)) * ko);
         } else c.uniform4f(U.uBl, 0, 0, 1, 0);
         if (noG) c.uniform4f(U.uNoG, (noG.left - rect.left) * sx, chh - (noG.bottom - rect.top) * sx, (noG.right - rect.left) * sx, chh - (noG.top - rect.top) * sx);
