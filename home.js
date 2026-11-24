@@ -975,7 +975,7 @@
         // Hugo 24.11.: Lichtschein am Rand, während die Karten aufgehen, auch am Computer (dort ohne weisse Karten)
         if (LD && desk) {
           // Hugo 24.11. (10:10): halb so stark, bleibt bis kurz vor dem Ziel sichtbar und wird dabei kleiner; verschwindet erst beim Andocken
-          var visD = 1 - smoothstep(0.965, 0.995, E), sizeD = 4 + 13 * (1 - E);
+          var visD = 1 - smoothstep(0.0, 0.94, E), sizeD = 4 + 13 * (1 - E);   // Hugo 24.11. (10:12): am Anfang sichtbar, bis zum Magnet erloschen
           s.el.style.boxShadow = visD > 0.01 ? '0 0 ' + sizeD.toFixed(1) + 'px 0 rgba(255,250,238,' + (0.25 * visD).toFixed(3) + ')' : '';
         }
         if (s.gold) {
