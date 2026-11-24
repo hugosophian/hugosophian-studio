@@ -81,6 +81,7 @@
     titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
     revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
+    closeFlares: 0.7,   // Hugo 24.11. (15:12): Solar Flares beim Andocken nach dem close (Anteil)
     closeDock:  0.22    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
 
@@ -922,7 +923,7 @@
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
-        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = '6'; }   // über der Sonne, unter Text und Titel
+        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = '9'; }   // über der Sonne und der Blendung
         else if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
         var sr = refRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
@@ -957,13 +958,13 @@
           }
         }
         // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
-        if (!lightMode && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
+        if (lightFade(now) > 0.001 && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
           c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode ? 0 : 1); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightFade(now)); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1014,11 +1015,11 @@
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       var dockAmt = 1, dockFl = 1;
-      function dock(amt, fl) {
+      function dock(amt, fl, clr) {
         dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; killT0 = 0;
         // Hugo 24.11. (14:35): beim Schliessen die alten Wellen (Tippen, Sonnenwelle) weg – sie lagen unter dem Licht und
         // wischten das Leuchten des Rands noch bis zu 6.5 s weg (darum kam es verzögert, wenn man früh schloss)
-        if (fl === 0) waves = [];
+        if (fl === 0 || clr) waves = [];
         var cs = slides[current()]; if (!cs) return;
         if (desk) deskCanvas();
         compSig = '';
@@ -1054,8 +1055,11 @@
         cancelAnimationFrame(raf); req();
       };
       cv.dock = dock;
-      var lightMode = false;
-      cv.lightOnly = function (on) { lightMode = !!on; if (!on && cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } if (!raf) req(); };
+      var lightMode = false, lightT0 = 0;
+      // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
+      // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
+      function lightFade(now) { return lightMode ? 1 - smoothstep(0, CONFIG.deskSunFade / 1000, (now - lightT0) / 1000) : 1; }
+      cv.lightOnly = function (on) { if (on && !lightMode) lightT0 = performance.now(); lightMode = !!on; if (!on && cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } if (!raf) req(); };
       // Hugo 24.11. (13:37): Welle, die die Sonne aufdeckt – ein Punkt, läuft als Ring schnell nach aussen
       cv.dropTap = function () { var now = performance.now(); waves = waves.filter(function (q) { return q.sp2 || now - q.t0 > 800 || q.pts.length > 3; }); };
       cv.burst = function (x, y, sp) {
@@ -1337,7 +1341,7 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      setTimeout(function () { ripple.dock(CONFIG.closeDock, 0); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
+      setTimeout(function () { ripple.dock(CONFIG.closeDock, CONFIG.closeFlares, true); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       if (rv.raf) clearTimeout(rv.raf); rv.raf = 0;
