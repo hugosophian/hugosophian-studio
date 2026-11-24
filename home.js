@@ -162,7 +162,7 @@
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 24.11.: bis der Magnet zieht, dieselbe schwungvolle Kurve wie am Computer (easeDock); Magnet unverändert
-    var c = easeDock(t);
+    var c = easeDockF(t);
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
@@ -184,6 +184,9 @@
     };
   }
   var easeDock = bezier(0.72, 0, 0.11, 1);
+  // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
+  // Tempo bleibt stetig)
+  function easeDockF(t) { var w = t <= 0.45 ? t : t + 1.2 * (t - 0.45) * (t - 0.45) / 1.1; return easeDock(Math.min(1, w)); }
   var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
 
   function init(root) {
@@ -955,8 +958,8 @@
             // Hugo 24.11.: am Computer zoomen die Bilder heran, werden langsam und stehen kurz still (knapp vor dem Ziel);
             // erst wenn alle vier stehen, zieht der Magnet sie gemeinsam an – alle docken im selben Moment an
             // Heranzoomen unverändert (easeDock), nur kurz vor dem Ziel weich anhalten (bei 95 %)
-            var e0 = easeDock(xD), eh = e0 < 0.9 ? e0 : 0.9 + 0.05 * (1 - Math.exp(-(e0 - 0.9) / 0.05));
-            var mg2 = clamp((P - 0.84) / 0.13, 0, 1);   // die letzte Karte steht ab etwa P 0.80
+            var e0 = easeDockF(xD), eh = e0 < 0.9 ? e0 : 0.9 + 0.05 * (1 - Math.exp(-(e0 - 0.9) / 0.05));
+            var mg2 = clamp((P - 0.80) / 0.13, 0, 1);   // die letzte Karte steht ab etwa P 0.77
             E = eh + (1 - eh) * Math.pow(mg2, 2.5);
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
