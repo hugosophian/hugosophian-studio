@@ -173,9 +173,9 @@
     // Hugo 24.11. (12:46): die Regenbogenwelle der Maus läuft zu Ende, während das Licht kommt; nur das verschobene Foto
     // in ihr blendet mit den Bildern aus (uFade im Wellen-Shader), der Regenbogen bleibt
     '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
-    // Hugo 24.11. (13:01): die Textspalte ist von Anfang an ein weisser Block (die Wand darunter), Text sofort dunkel;
-    // beim Zurück blendet die Spalte wieder in ihre Farbe (--hp-side-bg)
-    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); transition: none; }',
+    // Hugo 24.11. (13:06): der weisse Grund der Textspalte blendet im selben Takt wie die Bilder in die Wand über
+    // (vorher sprang er sofort weg); Text bleibt dunkel
+    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
     '[data-hp].is-desk.hp-dsun .hp-side-in > * { color: var(--hp-info-fg, #000); }',
     // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
     // der Grund hell genug ist (bei 40 % des Ausblendens); beim Zurück umgekehrt
