@@ -81,6 +81,7 @@
     titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
     revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
+    shimAmt:    0.5,    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
     closeFlares: 0.7,   // Hugo 24.11. (15:12): Solar Flares beim Andocken nach dem close (Anteil)
     closeDock:  0.22    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
@@ -1075,7 +1076,7 @@
       // close (Hugo 24.11., 16:01): dieselbe organische Fingerwelle auf der zurückkommenden Seite, ohne Rand-Leuchten
       // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
       // kein Leuchten am Rand
-      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.closeDock, CONFIG.closeFlares, true, 0); };
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 1); };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
       cv.closeWave = function (x, y) { lightOff(); cv.shimmer(x, y, true); noEdge = true; };
       cv.shimmer = function (x, y, plain) {
         waves = []; edgeT0 = 0; killT0 = 0; shimOn = !plain; noEdge = false;
