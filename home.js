@@ -2114,16 +2114,21 @@
     // nicht eine Farbe; beim Ankommen deckt die eigene Farbe (schwarz) das Licht zu
     var SPEC = 'linear-gradient(100deg, #ff2d55, #ff9500, #ffd60a, #34c759, #32ade6, #5856d6, #af52de, #ff2d55)';
     var IRI = 'linear-gradient(100deg, #fff, #ffe3f1, #fff6dc, #e2fbe9, #ddf1ff, #ece4ff, #fff)';
+    // Hugo 24.11. (14:51): jeder Buchstabe kommt von der Sonne her (dort, wo die Strahlen herkommen), nicht mehr von hinten
+    // rechts – Weg und Streckung zeigen für jeden Buchstaben genau zur Sonne
+    function sunTf(x, y, a, k, sc) { return 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotate(' + a.toFixed(1) + 'deg) scaleX(' + k + ') rotate(' + (-a).toFixed(1) + 'deg) scale(' + sc + ')'; }
     function lightFrames(u, iri) {
-      var fin = getComputedStyle(u).color;
+      var fin = getComputedStyle(u).color, rr0 = root.getBoundingClientRect(), ub = u.getBoundingClientRect();
+      var sxp = rr0.left + SUN.src[0] * rr0.width, syp = rr0.top + SUN.src[1] * rr0.height;
+      var vx = sxp - (ub.left + ub.width / 2), vy = syp - (ub.top + ub.height / 2), va = Math.atan2(vy, vx) * 180 / Math.PI;
       var st = u.style;
       st.backgroundImage = iri ? IRI : SPEC; st.backgroundSize = '300% 100%'; st.backgroundPosition = Math.round(Math.random() * 100) + '% 0';
       st.webkitBackgroundClip = 'text'; st.backgroundClip = 'text';
       return [
-        { transform: tf(90, -36, -650, 4), opacity: 0, color: 'rgba(0,0,0,0)', offset: 0 },
+        { transform: sunTf(vx * 0.92, vy * 0.92, va, 4, 0.25), opacity: 0, color: 'rgba(0,0,0,0)', offset: 0 },
         { opacity: 1, offset: 0.12 },
-        { transform: tf(8, -3, -40, 2.2), opacity: 1, color: 'rgba(0,0,0,0)', offset: 0.5 },
-        { transform: tf(0, 0, 0, 1), opacity: 1, color: fin, offset: 1 }
+        { transform: sunTf(vx * 0.1, vy * 0.1, va, 2.4, 0.9), opacity: 1, color: 'rgba(0,0,0,0)', offset: 0.5 },
+        { transform: sunTf(0, 0, va, 1, 1), opacity: 1, color: fin, offset: 1 }
       ];
     }
     function lightClear(u) { var st = u.style; st.backgroundImage = st.backgroundSize = st.backgroundPosition = st.webkitBackgroundClip = st.backgroundClip = ''; }
@@ -2147,7 +2152,6 @@
         });
         t.parentNode.replaceChild(frag, t);
       });
-      el.style.perspective = '700px'; el.style.perspectiveOrigin = '100% 0';
       var N = units.length, total = Math.min(maxT || 1700, 400 + N * 3.2), each = 700, d0 = d0x == null ? 280 : d0x;
       // Hugo 24.11. (14:44): die Buchstaben bestehen erst aus Licht – bunt (Regenbogen) – und werden beim Ankommen zu ihrer
       // Farbe (schwarz); sie kommen in zufälliger Reihenfolge
@@ -2159,10 +2163,18 @@
         } catch (er) {}
       });
       // «Galerie öffnen» kommt als Letztes, perlmuttweiss (Hugo 24.11., 14:47)
-      if (tail) { try { tail.animate(lightFrames(tail, true), { duration: each, delay: d0 + total + 120, easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} }
+      // Hugo 24.11. (14:51): auch «Galerie öffnen» Buchstabe für Buchstabe (perlmuttweiss), als Letztes
+      var tLab = tail && tail.querySelector('.lib-sort-label'), tTxt = tLab ? tLab.textContent : '', tU = [];
+      if (tail) {
+        if (tLab) { tLab.textContent = ''; for (var ti = 0; ti < tTxt.length; ti++) { if (tTxt[ti] === ' ') { tLab.appendChild(document.createTextNode(' ')); continue; } var tsp = document.createElement('span'); tsp.style.display = 'inline-block'; tsp.textContent = tTxt[ti]; tLab.appendChild(tsp); tU.push(tsp); } }
+        var tArr = tail.querySelector('.lib-sort-arrow'); if (tArr) tU.push(tArr);
+        tU.forEach(function (u) { try { u.animate(lightFrames(u, true), { duration: each, delay: d0 + total + 120 + 320 * Math.random(), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} });
+        var tSh = tail.querySelector('.hp-go-sh');   // Schatten erst, wenn die Buchstaben da sind
+        if (tSh) { try { tSh.animate([{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.85 }, { offset: 1 }], { duration: d0 + total + 440 + each, easing: 'linear' }); } catch (er) {} }
+      }
       // danach wieder der ursprüngliche Text (markierbar, leicht)
-      var endT = d0 + total + (tail ? 120 : 0);
-      var tm = setTimeout(function () { if (tail) { if (tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(tail); } if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
+      var endT = d0 + total + (tail ? 440 : 0);
+      var tm = setTimeout(function () { if (tail) { tU.forEach(function (u) { if (u.getAnimations) u.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(u); }); if (tLab) tLab.textContent = tTxt; } if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
       if (el === infoText) hyT = tm;
       return endT;
     }
@@ -2272,7 +2284,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
-      if (infoOpen.getAnimations) infoOpen.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(infoOpen);
+      if (infoOpen.getAnimations) infoOpen.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
