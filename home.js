@@ -984,7 +984,7 @@
             // Hugo 24.11.: am Computer gleich snappig wie am Handy – dieselbe Kurve und dasselbe Tempo; die Bilder bremsen
             // weiter weg ab (84 % wie am Handy) und warten aufeinander, dann zieht der Magnet alle gemeinsam an
             var xM = clamp((P - 0.25 - 0.02 * j) / 0.61, 0, 1), xL = clamp((P - 0.25 - 0.02 * (n - 1)) / 0.61, 0, 1);
-            E = 0.81 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.19 * Math.pow(clamp((xL - 0.64) / 0.25, 0, 1), 6.2);   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
+            E = 0.79 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.21 * Math.pow(clamp((xL - 0.64) / 0.25, 0, 1), 5.4);   // Hugo 24.11.: weiter weg (79 %), Zug nimmt schneller Schwung auf   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
@@ -1176,8 +1176,14 @@
       });
       kick();
     }
-    root.addEventListener('pointerover', function (e) {
+    // Hugo 24.11.: Spalten öffnen erst, wenn die Maus wirklich bewegt wird – nicht schon, weil sie beim Laden auf einem
+    // Bild liegt (der Browser meldet sonst «darüber», sobald sich die Spalten unter der ruhenden Maus aufbauen)
+    var ax0 = -1, ay0 = -1;
+    root.addEventListener('pointermove', function (e) {
       if (!desk || busy() || e.pointerType === 'touch') return;
+      if (ax0 < 0) { ax0 = e.clientX; ay0 = e.clientY; return; }
+      if (Math.hypot(e.clientX - ax0, e.clientY - ay0) < 3) return;
+      ax0 = e.clientX; ay0 = e.clientY;
       var el = e.target.closest && e.target.closest('.hp-slide');
       if (!el) return;
       for (var j = 0; j < n; j++) if (slides[j].el === el) { setHov(j); break; }
