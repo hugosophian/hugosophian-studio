@@ -1746,7 +1746,7 @@
         '      float rr = length(fc - (S + ax * k)) / R;',
         '      ghc += (0.55 + 0.45 * cos(6.2832 * (rr * 0.7 + float(i) * 0.2 + vec3(0.0, 0.33, 0.67)))) * exp(-pow((rr - 1.0) * 3.5, 2.0)) * 0.05;',
         '    }',
-        '    float B = clamp(uBl.x * (0.9 + 0.1 * fil * 3.0) + uBl.w * beamB * 0.9, 0.0, 1.0);',
+        '    float B = clamp(uBl.x * (0.9 + 0.3 * fil * (1.0 - uMode)) + uBl.w * beamB * 0.9, 0.0, 1.0);',   // Hugo 24.11. (18:45): auf der Lichtebene (über dem Foto) ohne Sonnenoberflächen-Muster – sonst Bodenwellen und senkrechte Streifen über dem Bild
         '    col = mix(col, vec3(1.0, 0.975, 0.92), B);',
         '    col += ((rbw - 0.5) * edgeB * 0.09 + ghc) * uBl.w * (1.0 - 0.6 * uBl.x);',
         '  }',
