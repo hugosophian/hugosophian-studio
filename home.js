@@ -847,7 +847,8 @@
       // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
       // neu nur, wenn sich etwas bewegt hat (Aufprall, Hover am Rand)
       function compTex(sr) {
-        if (!desk && compOk && slides.some(function (x) { return x.dive; })) return compOk;   // Handy beim Eintauchen: Textur bleibt, die Effekt-Leinwand zoomt mit (Hugo 24.11., 14:43: weniger Rechenarbeit)
+        // Hugo 24.11. (15:37): beim Eintauchen die Textur wieder mit dem gezoomten Bild nachführen (eingefroren zeigte die
+        // Welle das Bild in alter Grösse über dem gezoomten – doppeltes Bild)
         if (!cctx) return false;
         loadAll();
         var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
@@ -998,7 +999,7 @@
           f2.style.display = '';
           var er = sl.el.getBoundingClientRect();
           f2.style.width = sr.width + 'px'; f2.style.height = sr.height + 'px';
-          f2.style.transform = 'translate3d(' + (sr.left - er.left).toFixed(2) + 'px,' + (sr.top - er.top).toFixed(2) + 'px,0)' + (sl.diveTf ? ' ' + sl.diveTf : '');
+          f2.style.transform = 'translate3d(' + (sr.left - er.left).toFixed(2) + 'px,' + (sr.top - er.top).toFixed(2) + 'px,0)';
           if (f2.width !== pw || f2.height !== ph) { f2.width = pw; f2.height = ph; }
           sl.fxc.clearRect(0, 0, pw, ph);
           sl.fxc.drawImage(cv, 0, 0);
@@ -1956,8 +1957,9 @@
           var Sx2 = SUN.src[0] * rect.width, Sy2 = SUN.src[1] * rect.height;
           var angC = Math.atan2(rect.width * 0.5 - Sx2, rect.height * 0.5 - Sy2);
           var amt = smoothstep(0.05, CONFIG.closeBeam / 1000 + 0.1, bt) * 0.92 - smoothstep(CONFIG.closeBeam / 1000 + 0.15, CONFIG.closeBeam / 1000 + 0.9, bt) * 0.3;
-          if (blOpen) { var ko = 1 - smoothstep(CONFIG.closeBeam / 1000 + 0.2, CONFIG.closeBeam / 1000 + 1.3, bt); amt *= ko; if (bt > CONFIG.closeBeam / 1000 + 1.4) { blT0 = 0; blOpen = false; } }
-          c.uniform4f(U.uBl, Math.max(0, amt), angC + 0.8 * (1 - bo), 0.05 + 0.3 * (1 - Math.pow(1 - sw, 3)), 1 - Math.pow(1 - Math.min(1, bt / 0.3), 3));
+          var ko = 1;
+          if (blOpen) { ko = 1 - smoothstep(CONFIG.closeBeam / 1000 + 0.2, CONFIG.closeBeam / 1000 + 1.6, bt); amt *= ko; if (bt > CONFIG.closeBeam / 1000 + 1.7) { blT0 = 0; blOpen = false; } }   // Hugo 24.11. (15:37): auch der Strahl selbst klingt weich ab (verschwand vorher auf einmal)
+          c.uniform4f(U.uBl, Math.max(0, amt), angC + 0.8 * (1 - bo), 0.05 + 0.3 * (1 - Math.pow(1 - sw, 3)), (1 - Math.pow(1 - Math.min(1, bt / 0.3), 3)) * ko);
         } else c.uniform4f(U.uBl, 0, 0, 1, 0);
         if (noG) c.uniform4f(U.uNoG, (noG.left - rect.left) * sx, chh - (noG.bottom - rect.top) * sx, (noG.right - rect.left) * sx, chh - (noG.top - rect.top) * sx);
         else c.uniform4f(U.uNoG, -1, -1, -1, -1);
