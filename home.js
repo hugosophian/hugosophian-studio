@@ -162,7 +162,7 @@
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 24.11.: bis der Magnet zieht, dieselbe schwungvolle Kurve wie am Computer (easeDock); Magnet unverändert
-    var c = easeDockF(t, easeDockM, 0.95);   // Hugo 24.11.: Handy bremst minimal länger ab (vorher 1.2)
+    var c = easeDockF(t, easeDockM, 1.08);   // Hugo 24.11.: Abbremsen zwischen 0.95 und 1.2
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
@@ -994,7 +994,7 @@
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
           var x0i = LC ? 0.21 : 0.25;   // Hugo 24.11.: wartet etwas auf das Erscheinen der anderen Karten (vorher 0.17, dann 0.24)   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
-          var xin = clamp((P - x0i) / (LC ? 0.61 : 1 - x0i), 0, 1), xj = LC ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
+          var xin = clamp((P - x0i) / (LC ? 0.65 : 1 - x0i), 0, 1), xj = LC ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
           E = LC ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LC ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
