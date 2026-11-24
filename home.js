@@ -74,6 +74,7 @@
     diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
+    shimRim:    0.4,    // Hugo 24.11. (17:50): bunter Rand beim Schimmer (Öffnen/Schliessen) leicht sichtbar (Anteil vom Rand der Ladeanimation)
     shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
   };
 
@@ -131,9 +132,11 @@
     '[data-hp].is-info .hp-brand, [data-hp].hp-info-anim .hp-brand { z-index: 8; }',
     '[data-hp] .hp-brand { transition: color .25s ease; }',
     '[data-hp] .hp-brand.hp-on-white { color: var(--hp-info-fg, #000) !important; mix-blend-mode: normal !important; }',
-    // Hugo 24.11. (17:35): «Hugo Sophian Studio» liegt während About über dem Licht – im Blitz verschwand der Schriftzug sonst
-    // und tauchte wieder auf. Der Farbwechsel geschieht im Weiss des Blitzes ohne Übergang (dort sehen beide gleich aus)
-    '[data-hp] .hp-brand.hp-brand-top { z-index: 10 !important; transition: opacity .9s ease !important; }',
+    // Hugo 24.11. (17:35/17:48): im Blitz verschwand «Hugo Sophian Studio» unter dem Licht und tauchte wieder auf. Eine Kopie
+    // liegt während des Blitzes darüber und blendet weich aus, wenn er abklingt – darunter wird das Original von den
+    // Strahlen beleuchtet. Der Farbwechsel geschieht im Weiss des Blitzes ohne Übergang (dort sehen beide gleich aus)
+    '[data-hp] .hp-brand.hp-brand-top { z-index: 10 !important; pointer-events: none !important; }',
+    '[data-hp].is-info .hp-brand:not(.hp-brand-top), [data-hp].hp-dsun-live .hp-brand:not(.hp-brand-top) { transition: none !important; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
     /* Desktop: nebeneinander, Textspalte neben dem geöffneten Bild (nur Text und Link zur Galerie) */
     '[data-hp] .hp-side { display: none; }',
@@ -1011,7 +1014,7 @@
         }
         // Hugo 24.11. (16:41): der Schimmer (ohne Rand-Leuchten) startet ausserhalb des Bildschirms und fährt nur nach innen –
         // vorher lief er knapp am Rand entlang, wie gegen einen unsichtbaren Rahmen; die Ladeanimation bleibt unverändert
-        if (dockFl > 0) { if (dockRim) ring(0, 6, 0.2); else ring(0, Math.min(r.width, r.height) * 0.08, 0.3); }   // Hugo 23.11.: nur eine Explosion nach innen
+        if (dockFl > 0) { if (dockRim >= 1) ring(0, 6, 0.2); else ring(0, Math.min(r.width, r.height) * 0.08, 0.3); }   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) req();
       }
       // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
@@ -1034,7 +1037,7 @@
       // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
       // kein Leuchten am Rand
       // Hugo 24.11. (16:15): ohne Rand-Leuchten (am iPhone sah man oben eine Lichtlinie)
-      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 0); noEdge = true; };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, CONFIG.shimRim); noEdge = true; };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
       var noEdge = false;   // close-Welle: kein Nachleuchten am Rand (Hugo 24.11., 16:01)
       function edgeOffV(now) { return noEdge ? 1 : lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { if (!v) shimOn = false; if (!raf) req(); };
@@ -1442,7 +1445,7 @@
       dIn = inOval(dsunX, dsunY);
       sun.horizon(0, H * 0.22);   // Boden wie am Handy knapp unter dem oberen Fünftel
       root.classList.add('hp-dsun-live', 'hp-dsun');
-      if (brand) brand.classList.add('hp-brand-top');
+      brandTopOn(); brandTopFade();
       sun.start();
       sun.light(true, reduce ? 0 : 800);
       if (wasLive) revealStop(true); else reveal(dsunX, dsunY, [dLayer, sun.glow]);
@@ -1455,6 +1458,7 @@
       revealStop(false);   // Maske bleibt, wo sie ist, und blendet mit aus
       if (dDive) { var dd0 = dDive; setTimeout(function () { if (dDive !== dd0) dive(dd0, 0, 0, false); }, closeHold); dDive = null; }   // nicht herauszoomen, wenn die Sonne inzwischen wieder auf demselben Bild ist
       root.classList.remove('hp-dsun');
+      brandTopOn();
       if (sun) { sun.light(false); sun.blind(); }
       if (ripple && ripple.tint) ripple.tint(0);
       closeRipple();
@@ -1463,7 +1467,7 @@
         if (dsunOn) return;
         revealStop(true);
         dsunLive = false; root.classList.remove('hp-dsun-live'); if (ripple && ripple.lightOnly) ripple.lightOnly(false);
-        if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-brand-top');
+        if (!root.classList.contains('is-info')) brandTopOff();
         dText.innerHTML = ''; sunBtn = null;
         if (dSide) { dSide.style.visibility = ''; dSide = null; }
         if (sun) { sun.noGlow(null); sun.glow.style.clipPath = ''; }
@@ -1924,6 +1928,30 @@
     var infoSlide = null, iz = { v: 0, a: null }, ix = { v: 0, a: null }, infoClosing = false;
     var ip = { v: 1, a: null };   // weisse Seite: 1 = rechts draussen, 0 = ganz da (im selben Takt wie das Bild)
     var brand = root.querySelector('.hp-brand');
+    // Kopie des Schriftzugs über dem Licht (nur während des Blitzes)
+    var brandTop = null;
+    // Solange die Kopie darüber liegt und beide weiss mit Differenz sind, ist das Original versteckt (zwei Differenz-Schriften
+    // übereinander heben sich auf); schwarz liegen beide deckungsgleich übereinander
+    function brandWhite(on) {
+      if (!brand) return; brand.classList.toggle('hp-on-white', on);
+      if (brandTop) { brandTop.classList.toggle('hp-on-white', on); brand.style.opacity = on ? '' : '0'; }
+    }
+    function brandTopOn() {
+      if (!brand || reduce) return;
+      if (!brandTop) {
+        brandTop = brand.cloneNode(true); brandTop.removeAttribute('id'); brandTop.removeAttribute('href'); brandTop.setAttribute('aria-hidden', 'true');
+        brandTop.classList.add('hp-brand-top'); brand.parentNode.insertBefore(brandTop, brand.nextSibling);
+      }
+      brandTop.classList.toggle('hp-on-white', brand.classList.contains('hp-on-white'));
+      brandTop.style.transition = 'none'; brandTop.style.opacity = '1';
+      brand.style.transition = 'none'; brand.style.opacity = brand.classList.contains('hp-on-white') ? '' : '0';
+    }
+    function brandTopFade() {   // wenn der Blitz abklingt (er löst sich in 2.4 s ins Sonnenlicht auf)
+      if (!brandTop) return;
+      brandTop.getBoundingClientRect();   // Startwert festhalten, sonst springt der Übergang
+      brandTop.style.transition = 'opacity 1.4s ease 1.4s'; brandTop.style.opacity = '0';
+    }
+    function brandTopOff() { if (brandTop) { brandTop.remove(); brandTop = null; } if (brand) { brand.style.opacity = ''; brand.style.transition = ''; } }
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
@@ -2114,18 +2142,18 @@
       infoClosing = false;
       var wasOpen = ip.v < 1;   // schliesst noch: nicht von vorn aufdecken
       clearTimeout(ipT); ip.a = null; ip.v = 0; applyPanel();
-      if (brand) brand.classList.remove('hp-on-white');
+      brandWhite(false);
       var tp = infoFrom || { x: W / 2, y: H / 2 }; infoFrom = null;
       if (tapDive !== s) dive(s, tp.x, tp.y, true); tapDive = null; infoDive = s;
-      if (wasOpen) { revealStop(true); if (brand) brand.classList.add('hp-on-white'); }
+      if (wasOpen) { revealStop(true); brandWhite(true); }
       else reveal(tp.x, tp.y, sun ? [info, sun.glow] : [info], function (rad, lx, ly) {
         // Schriftzug wird dunkel, sobald die Welle ihn überquert hat
         if (brand && !brand.classList.contains('hp-on-white')) {
           var bx = brand.offsetLeft + brand.offsetWidth / 2, by = brand.offsetTop + Math.min(brand.offsetHeight, 120) / 2;
-          if (Math.hypot(bx - lx, by - ly) < rad) brand.classList.add('hp-on-white');
+          if (Math.hypot(bx - lx, by - ly) < rad) brandWhite(true);
         }
       }, tp.t);
-      if (reduce && brand) brand.classList.add('hp-on-white');
+      if (reduce) brandWhite(true);
       // Hugo 24.11. (14:27/14:34): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) – Buchstabe für Buchstabe
       // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
       // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
@@ -2138,19 +2166,20 @@
       if (titleHy && tClone && !wasOpen) hyperText(tClone, Math.max(300, 740 - 250), 320, true);   // Titel im selben Takt wie bisher (nach 0.49 s)
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
-      if (brand) brand.classList.add('hp-brand-top');
+      brandTopOn(); brandTopFade();
       mbPop(true);
       if (s.href && !s.pref) { s.pref = true; var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }   // Audit 24.11.: nur einmal pro Bereich (vorher bei jedem Öffnen ein weiteres <link>)
     }
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
+      brandTopOn();
       mbPop(false);
       revealStop(false);   // Maske bleibt stehen und blendet mit aus
       if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, closeHold); infoDive = null; }
       clearTimeout(ipT);
-      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; if (brand && !dsunLive) brand.classList.remove('hp-brand-top'); revealStop(true); if (ripple && ripple.lightOnly) ripple.lightOnly(false); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
-      clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, reduce ? 0 : CONFIG.closeBeam + 50);   // Hugo 24.11. (17:35): im hellsten Moment des Strahls (dort sehen Schwarz und die weisse Differenz-Schrift gleich aus)
+      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; if (!dsunLive) brandTopOff(); revealStop(true); if (ripple && ripple.lightOnly) ripple.lightOnly(false); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
+      clearTimeout(brandT); brandT = setTimeout(function () { if (!root.classList.contains('is-info')) brandWhite(false); }, reduce ? 0 : CONFIG.closeBeam + 50);   // Hugo 24.11. (17:35): im hellsten Moment des Strahls (dort sehen Schwarz und die weisse Differenz-Schrift gleich aus)
       // Hugo 24.11. (14:09): kein Zurückfliegen – der Titel verschwindet im Licht des Strahls und steht danach schon
       // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
