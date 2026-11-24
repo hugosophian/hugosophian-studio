@@ -974,8 +974,9 @@
         if (LD && !desk && rel(j) === 0 && E > 0.978) LD.dock();   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
         // Hugo 24.11.: Lichtschein am Rand, während die Karten aufgehen, auch am Computer (dort ohne weisse Karten)
         if (LD && desk) {
-          var rimD = 1 - smoothstep(0.6, 1, E);
-          s.el.style.boxShadow = rimD > 0.01 ? '0 0 ' + (5 + 12 * rimD).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rimD).toFixed(3) + ')' : '';
+          // Hugo 24.11. (10:10): halb so stark, bleibt bis kurz vor dem Ziel sichtbar und wird dabei kleiner; verschwindet erst beim Andocken
+          var visD = 1 - smoothstep(0.965, 0.995, E), sizeD = 4 + 13 * (1 - E);
+          s.el.style.boxShadow = visD > 0.01 ? '0 0 ' + sizeD.toFixed(1) + 'px 0 rgba(255,250,238,' + (0.25 * visD).toFixed(3) + ')' : '';
         }
         if (s.gold) {
           var gv = desk ? 1 - smoothstep(0.035 + 0.015 * k, 0.07 + 0.015 * k, P) : 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
