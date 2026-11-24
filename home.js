@@ -131,7 +131,7 @@
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
     '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
     '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; z-index: 5; }',   // über der Andock-Leinwand (z 4)
-    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, #fff); color: var(--hp-side-fg, #000); }',   // Hugo 24.11. (13:04): weiss mit schwarzem Text (vorher schwarz mit weiss)
+    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, transparent); color: var(--hp-side-fg, #000); }',   // Hugo 24.11.: schwarzer Text; der weisse Grund ist die Sonnenwand darunter (13:11), so gibt es beim Übergang keinen Kasten
     '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: center; gap: 2.2vh; }',   // Hugo 24.11.: Text in der Spalte mittig (vorher unten)
     '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; color: inherit; opacity: 1; transform: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
@@ -162,6 +162,9 @@
        Bildern) und ist sofort ganz da; Bilder, Titel und der schwarze Grund der Textspalte blenden über ihr aus. So sieht
        man die Strahlen schon beim Ausblenden, ohne grauen Zwischenzustand. Das Licht (screen) liegt wie am Handy über allem. */
     '[data-hp].is-desk .hp-stage > .hp-sun-back { transform: none; z-index: 0; visibility: hidden; }',
+    // Computer: die Wand liegt nach dem Einflug immer unter den Bildern (ohne Strahlen = weiss) – sie ist der Grund der Textspalte
+    'html:not(.hp-ldpre) [data-hp].is-desk:not(.hp-run) .hp-stage > .hp-sun-back { visibility: visible; }',
+    'html:not(.hp-ldpre) [data-hp].is-desk:not(.hp-run) .hp-slide { background-color: transparent !important; }',
     '[data-hp].is-desk.hp-dsun-live .hp-stage > .hp-sun-back { visibility: visible; }',
     '[data-hp].is-desk.hp-dsun-live .hp-slide { background-color: transparent !important; }',   // falls die Karte einen eigenen Grund hat: Wand bleibt sichtbar
     '[data-hp].is-desk.hp-dsun-live > .hp-sun-light { visibility: visible; transform: none; }',
@@ -172,10 +175,7 @@
     '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     // Hugo 24.11. (12:46): die Regenbogenwelle der Maus läuft zu Ende, während das Licht kommt; nur das verschobene Foto
     // in ihr blendet mit den Bildern aus (uFade im Wellen-Shader), der Regenbogen bleibt
-    '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
-    // Hugo 24.11. (13:06): der weisse Grund der Textspalte blendet im selben Takt wie die Bilder in die Wand über
-    // (vorher sprang er sofort weg); Text bleibt dunkel
-    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
+    '[data-hp].is-desk.hp-dsun .hp-side { color: var(--hp-info-fg, #000); }',
     '[data-hp].is-desk.hp-dsun .hp-side-in > * { color: var(--hp-info-fg, #000); }',
     // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
     // der Grund hell genug ist (bei 40 % des Ausblendens); beim Zurück umgekehrt
@@ -808,8 +808,9 @@
           if (!desk && !sl.vis) return;
           var e = cache[srcOf(sl.img)]; if (!e || !e.ok) { sig += '|-'; return; }
           var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect(), z = parseFloat(sl.el.style.zIndex) || 0;
-          parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length });
-          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z;
+          var sdr = desk && sl.side && sl.side.offsetWidth > 0 ? sl.side.getBoundingClientRect() : null;   // Textspalte (Computer): weiss
+          parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length, sd: sdr });
+          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z + (sdr ? ',' + Math.round(sdr.left) + ',' + Math.round(sdr.width) : '');
         });
         // Hugo 24.11.: in der Reihenfolge wie auf dem Bildschirm übereinanderlegen (hintere Karten zuerst) – sonst lag beim
         // Andocken die Nachbarkarte, die hinter dem Bild ein paar Pixel übersteht, im Effekt obenauf (Linie oben/unten)
@@ -830,6 +831,9 @@
           cx1 = cx1 > cw2 - 2 ? cw2 : Math.ceil(cx1); cy1 = cy1 > ch2 - 2 ? ch2 : Math.ceil(cy1);
           cctx.beginPath(); cctx.rect(cx0, cy0, cx1 - cx0, cy1 - cy0); cctx.clip();
           cctx.drawImage(p.e.im, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
+          // Hugo 24.11. (13:11): die Textspalte ist durchsichtig über der weissen Wand – für die Welle ist sie darum weiss
+          // (sonst zieht die Welle Schwarz in die Spalte)
+          if (p.sd) { cctx.fillStyle = '#fff'; cctx.fillRect((p.sd.left - sr.left) * sc, (p.sd.top - sr.top) * sc, p.sd.width * sc, p.sd.height * sc); }
           cctx.restore();
         });
         try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = parts.length > 0; texSrc = ''; }
@@ -1184,6 +1188,7 @@
       root.classList.remove('hp-run');
       fitTitles();
       mbShow();
+      dsunWall();
     }
     function startIntro() {
       if (!introOn) { render(); return; }
@@ -1279,6 +1284,10 @@
       var r = slides[hov].el.getBoundingClientRect();
       return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
     }
+    // Wand einmal ohne Strahlen zeichnen (weiss), damit sie als Grund der Textspalte bereitsteht
+    function dsunWall() { if (sun && desk && !introOn) { sunHome(); sun.start(); } }
+    var dsunRz = 0;
+    window.addEventListener('resize', function () { clearTimeout(dsunRz); dsunRz = setTimeout(dsunWall, 120); });
     function dsunArm() {
       clearTimeout(dsunT);
       if (!sun || !desk || busy() || hov < 0 || dsunOn) return;
@@ -1318,7 +1327,7 @@
       clearTimeout(dsunEnd);
       dsunEnd = setTimeout(function () {
         if (dsunOn) return;
-        dsunLive = false; root.classList.remove('hp-dsun-live');
+        dsunLive = false; root.classList.remove('hp-dsun-live'); dsunWall();
         if (sunBtn) { sunBtn.style.setProperty('--hp-lit', '0'); }
         slides.forEach(function (x) { if (x.sideSh && x.sideSh.parentNode) x.sideSh.parentNode.removeChild(x.sideSh); });
         sunBtn = null;
@@ -1851,6 +1860,7 @@
       else if (sun.back.parentNode !== info) info.insertBefore(sun.back, infoPanel);
     }
     sunHome();
+    if (!introOn) dsunWall();   // ohne Einflug (Bewegung reduzieren): weisse Wand gleich bereit
 
     var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
@@ -2083,7 +2093,7 @@
       if (d === desk) return;
       desk = d;
       root.classList.toggle('is-desk', desk);
-      closeInfo(); setHov(-1); dsunStop(); sunHome();
+      closeInfo(); setHov(-1); dsunStop(); sunHome(); dsunWall();
       slides.forEach(function (s) { s.o = 0; s.ov = 0; });
       F = C = Math.round(F);
       clearInline();
