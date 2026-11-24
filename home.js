@@ -781,7 +781,12 @@
           var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
           var op = objPos(p.im), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
           cctx.save();
-          cctx.beginPath(); cctx.rect((p.er.left - sr.left) * sc, (p.er.top - sr.top) * sc, p.er.width * sc, p.er.height * sc); cctx.clip();
+          // Hugo 24.11.: Ausschnitt auf ganze Pixel runden und an den Bühnenrändern bis zur Kante ziehen – sonst bleibt am
+          // unteren Rand eine halbe schwarze Zeile, die der Effekt als dunkle farbige Linie zeigt
+          var cx0 = (p.er.left - sr.left) * sc, cy0 = (p.er.top - sr.top) * sc, cx1 = cx0 + p.er.width * sc, cy1 = cy0 + p.er.height * sc;
+          cx0 = cx0 < 2 ? 0 : Math.floor(cx0); cy0 = cy0 < 2 ? 0 : Math.floor(cy0);
+          cx1 = cx1 > cw2 - 2 ? cw2 : Math.ceil(cx1); cy1 = cy1 > ch2 - 2 ? ch2 : Math.ceil(cy1);
+          cctx.beginPath(); cctx.rect(cx0, cy0, cx1 - cx0, cy1 - cy0); cctx.clip();
           cctx.drawImage(p.e.im, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
           cctx.restore();
         });
