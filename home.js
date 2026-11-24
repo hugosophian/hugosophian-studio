@@ -162,7 +162,7 @@
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
     // Hugo 24.11.: bis der Magnet zieht, dieselbe schwungvolle Kurve wie am Computer (easeDock); Magnet unverändert
-    var c = easeDockF(t, easeDockM);
+    var c = easeDockF(t, easeDockM, 0.95);   // Hugo 24.11.: Handy bremst minimal länger ab (vorher 1.2)
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
@@ -186,7 +186,7 @@
   var easeDock = bezier(0.72, 0, 0.11, 1);
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
   // Tempo bleibt stetig)
-  function easeDockF(t, ez) { var w = t <= 0.45 ? t : t + 1.2 * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
+  function easeDockF(t, ez, b) { var w = t <= 0.45 ? t : t + (b == null ? 1.2 : b) * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
   var easeDockM = bezier(0.66, 0, 0.09, 1);   // Hugo 24.11.: zieht am Anfang mehr an   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
   var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
 
