@@ -772,10 +772,13 @@
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
           var e = cache[srcOf(sl.img)]; if (!e || !e.ok) { sig += '|-'; return; }
-          var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect();
-          parts.push({ e: e, im: sl.img, ir: ir, er: er });
-          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.width].map(function (v) { return Math.round(v); }).join(',');
+          var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect(), z = parseFloat(sl.el.style.zIndex) || 0;
+          parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length });
+          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z;
         });
+        // Hugo 24.11.: in der Reihenfolge wie auf dem Bildschirm übereinanderlegen (hintere Karten zuerst) – sonst lag beim
+        // Andocken die Nachbarkarte, die hinter dem Bild ein paar Pixel übersteht, im Effekt obenauf (Linie oben/unten)
+        parts.sort(function (a, b) { return a.z - b.z || a.i - b.i; });
         if (sig === compSig) return compOk;
         compSig = sig;
         if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
@@ -911,7 +914,7 @@
       function refRect() { return desk ? cv.getBoundingClientRect() : stage.getBoundingClientRect(); }
       function ok() { return !desk && !root.classList.contains('is-info'); }
       function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
-      // Computer (Hugo 24.11.): solange der Andock-Effekt läuft, zieht die Maus eine Welle wie der Finger und wischt ihn weg
+      // Computer (Hugo 24.11.): die Maus zieht immer eine Welle wie der Finger am Handy und wischt den Andock-Effekt weg
       var mWave = 0;
       var lmx = -1, lmy = -1;
       stage.addEventListener('mousemove', function (e) {
