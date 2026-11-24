@@ -2120,6 +2120,59 @@
       ];
     }
     function lightClear(u) { var st = u.style; st.backgroundImage = st.backgroundSize = st.backgroundPosition = st.webkitBackgroundClip = st.backgroundClip = ''; }
+    // Text blendet fleckig ein: weiche Flecken (Maske aus Kreisen an zufälligen Stellen) wachsen versetzt, bis alles da ist
+    var blRaf = 0;
+    function blotchIn(el, delay, ms) {
+      if (blRaf) cancelAnimationFrame(blRaf); blRaf = 0;
+      function setM(m) { el.style.webkitMaskImage = m; el.style.maskImage = m; }
+      if (reduce || !el) { setM(''); return; }
+      var NB = 11, bs = [];
+      for (var i = 0; i < NB; i++) bs.push({ x: 5 + Math.random() * 90, y: 5 + Math.random() * 90, d: Math.random() * 0.55, k: 0.7 + Math.random() * 0.6 });
+      var w = Math.max(el.offsetWidth, el.offsetHeight) || 300;
+      setM('linear-gradient(transparent, transparent)');
+      var t0 = performance.now() + delay;
+      function f(now) {
+        var t = (now - t0) / ms;
+        if (t >= 1) { setM(''); blRaf = 0; return; }
+        if (t > 0) {
+          var L = bs.map(function (b) {
+            var u = clamp((t - b.d) / 0.45, 0, 1); u = u * u * (3 - 2 * u);
+            var r = u * w * 0.75 * b.k;
+            return 'radial-gradient(circle at ' + b.x.toFixed(1) + '% ' + b.y.toFixed(1) + '%, #000 ' + (r * 0.45).toFixed(1) + 'px, transparent ' + r.toFixed(1) + 'px)';
+          });
+          setM(L.join(', '));
+        }
+        blRaf = requestAnimationFrame(f);
+      }
+      blRaf = requestAnimationFrame(f);
+    }
+    // Hugo 24.11. (15:07): der Text blendet fleckig weich ein – weiche Lichtflecken an zufälligen Stellen wachsen, bis alles da
+    // ist (eine Maske auf dem ganzen Textblock, kaum Rechenarbeit)
+    var blotR = 0;
+    function blotIn(el, delay, ms) {
+      cancelAnimationFrame(blotR);
+      if (!el || reduce) return;
+      var r = el.getBoundingClientRect(), w = r.width || 1, h = r.height || 1, sp = [], n = Math.max(6, Math.min(18, Math.round(w * h / 9000)));
+      for (var i = 0; i < n; i++) sp.push({ x: Math.random() * w, y: Math.random() * h, t: Math.random() * 0.55, k: 0.6 + 0.8 * Math.random() });
+      var R = Math.hypot(w, h) * 0.55, t0 = performance.now() + delay;
+      function set(m) { el.style.webkitMaskImage = m; el.style.maskImage = m; }
+      function f(now) {
+        var t = (now - t0) / ms;
+        if (t >= 1) { set(''); return; }
+        var L = [];
+        sp.forEach(function (p) {
+          var u = Math.max(0, Math.min(1, (t - p.t) / 0.45)); u = u * u * (3 - 2 * u);
+          var rr = R * p.k * u;
+          L.push('radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px, rgba(0,0,0,' + (0.25 + 0.75 * u).toFixed(2) + ') 0, rgba(0,0,0,' + (0.6 * u).toFixed(2) + ') ' + (rr * 0.45).toFixed(0) + 'px, transparent ' + Math.max(1, rr).toFixed(0) + 'px)');
+        });
+        var all = Math.max(0, (t - 0.7) / 0.3);   // zum Schluss legt sich alles weich zusammen
+        L.push('linear-gradient(rgba(0,0,0,' + all.toFixed(2) + '), rgba(0,0,0,' + all.toFixed(2) + '))');
+        set(L.join(', '));
+        blotR = requestAnimationFrame(f);
+      }
+      set('linear-gradient(transparent, transparent)');
+      blotR = requestAnimationFrame(f);
+    }
     function hyperText(el, tail, d0x, maxT, iri, onlyTail) {
       if (el === infoText) clearTimeout(hyT);
       if (!el || !el.animate || reduce) return;
@@ -2254,6 +2307,8 @@
       // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
       // Hugo 24.11. (15:04): der Text lädt wieder normal (kommt mit der Sonne), nur Titel und «Galerie öffnen» aus Licht
       var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 0, 300, false, true) : 0;
+      if (!wasOpen) blotIn(infoText, 250, 1300);
+      if (!wasOpen) blotchIn(infoText, 250, 1300);   // Hugo 24.11. (15:05): der Text blendet fleckig weich ein
       if (titleHy && tClone) { if (tEnd) hyperText(tClone, null, Math.max(300, tEnd - 250), 320, true); }
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
@@ -2275,6 +2330,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
+      cancelAnimationFrame(blotR); infoText.style.webkitMaskImage = infoText.style.maskImage = '';
       if (infoOpen.getAnimations) infoOpen.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
