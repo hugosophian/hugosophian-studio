@@ -978,7 +978,7 @@
           s.el.style.boxShadow = rimD > 0.01 ? '0 0 ' + (5 + 12 * rimD).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rimD).toFixed(3) + ')' : '';
         }
         if (s.gold) {
-          var gv = desk ? 1 - smoothstep(0.05 + 0.02 * k, 0.11 + 0.02 * k, P) : 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
+          var gv = desk ? 1 - smoothstep(0.035 + 0.015 * k, 0.07 + 0.015 * k, P) : 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
           s.gold.style.opacity = gv.toFixed(3);
           // Hugo 23.11.: kein Blenden an den Ecken – das Leuchten ohne Ausdehnung (spread) und schwächer, so addieren
           // sich die Lichthöfe benachbarter Karten in den Ecken nicht zu hellen Punkten
