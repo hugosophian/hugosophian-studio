@@ -654,7 +654,7 @@
         for (var i = 0; i < np; i++) {
           var sg = Math.random() < 0.5 ? -1 : 1;
           DF.push({ kind: 1, p: p0 + i / np + rnd(-0.08, 0.08), rot: sg * rnd(0.55, 1.05), cs: (Math.random() < 0.5 ? -1 : 1) * rnd(0.3, 0.55),
-            Lm: dockPath.mn * rnd(0.75, 1.05), W: dockPath.mn * rnd(0.018, 0.026), s: rnd(0.85, 1), dl: i * 0.1 + rnd(0, 0.1), ph: rnd(0, 100), next: rnd(0.25, 0.5) });
+            Lm: dockPath.mn * rnd(0.75, 1.05), W: dockPath.mn * rnd(0.018, 0.026), s: rnd(0.85, 1), dl: i * 0.1 + rnd(0, 0.1), ph: rnd(0, 100) });
         }
       }
       function geo(f, et) {   // aktuelle Lage einer grossen Flare
@@ -674,20 +674,27 @@
         if (!DF.length) dfInit();
         var mn = dockPath.mn, parents = DF.filter(function (f) { return f.kind === 1; });
         parents.forEach(function (f) { geo(f, et); });
-        // kleine Ableger auslösen
+        // Hugo 24.11.: keine zeitlichen Ableger mehr – pro Kollision wirft das Paar genau einen kleinen Flare aus, der
+        // weich aus der Berührungsstelle quillt; erst wenn sich die beiden wieder trennen, kann die nächste Kollision kommen
         parents.forEach(function (f, pi) {
-          if (et > f.next && et < 3.4 && DF.length < NDF) {
-            f.next = et + rnd(0.35, 0.75);
-            DF.push({ kind: 2, par: f, fr: rnd(0.35, 0.95), side: Math.random() < 0.5 ? -1 : 1, off: rnd(0.5, 1.1), Lm: mn * rnd(0.07, 0.17),
-              W: mn * rnd(0.011, 0.017), s: rnd(0.45, 0.75), t0: et, life: rnd(1.1, 1.9), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
-          }
-          parents.forEach(function (g, gi) {   // Funke, wo sich zwei Spitzen treffen
-            if (gi <= pi || DF.length >= NDF || (f.spark && et - f.spark < 0.6)) return;
-            var a = along(f, f.L * 0.85), b = along(g, g.L * 0.85);
-            if (Math.hypot(a.x - b.x, a.y - b.y) < mn * 0.16) {
-              f.spark = et;
-              DF.push({ kind: 3, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, a0: rnd(0, 6.28), Lm: mn * rnd(0.08, 0.14), W: mn * rnd(0.012, 0.016), s: 0.7, t0: et, life: 1.2, cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
+          parents.forEach(function (g, gi) {
+            if (gi <= pi || et < 0.25) return;
+            var best = 1e9, bp = null, bq = null;
+            [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fa) {
+              var a = along(f, f.L * fa);
+              [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fb) {
+                var b = along(g, g.L * fb), d = Math.hypot(a.x - b.x, a.y - b.y);
+                if (d < best) { best = d; bp = a; bq = b; }
+              });
+            });
+            var key = pi + '-' + gi; f.touch = f.touch || {};
+            var near = best < mn * 0.09;
+            if (near && !f.touch[key] && DF.length < NDF) {
+              var am = Math.atan2(Math.sin(bp.a) + Math.sin(bq.a), Math.cos(bp.a) + Math.cos(bq.a));
+              DF.push({ kind: 3, x: (bp.x + bq.x) / 2, y: (bp.y + bq.y) / 2, a0: am + (Math.random() < 0.5 ? -1 : 1) * rnd(0.5, 1.0),
+                Lm: mn * rnd(0.12, 0.2), W: mn * rnd(0.016, 0.022), s: 0.75, t0: et, life: rnd(1.5, 2.2), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
             }
+            if (near) f.touch[key] = true; else if (best > mn * 0.16) f.touch[key] = false;
           });
         });
         DF = DF.filter(function (f) { return f.kind === 1 || et - f.t0 < f.life; });
@@ -703,8 +710,8 @@
             if (f.kind === 2) { var pt = along(f.par, f.par.L * f.fr); x = pt.x; y = pt.y; a = pt.a + f.side * f.off; }
             else { x = f.x; y = f.y; a = f.a0; }
             a += 0.2 * Math.sin(et * 0.8 + f.ph);
-            L = f.Lm * (1 - Math.exp(-tc * 4)); c = f.cs / f.Lm;
-            lv = f.s * sm(0, 0.12, tc) * (1 - sm(0.5, 1, k)) * (1 - sm(3.0, 5.4, et));
+            L = f.Lm * (1 - Math.exp(-tc * (f.kind === 3 ? 2.2 : 4))); c = f.cs / f.Lm;   // Kollisions-Flare quillt weich heraus
+            lv = f.s * sm(0, f.kind === 3 ? 0.4 : 0.12, tc) * (1 - sm(0.5, 1, k)) * (1 - sm(3.0, 5.4, et));
           }
           df1[i * 4] = x - sr.left; df1[i * 4 + 1] = y - sr.top; df1[i * 4 + 2] = a; df1[i * 4 + 3] = c;
           df2[i * 4] = Math.max(1, L); df2[i * 4 + 1] = f.W; df2[i * 4 + 2] = lv * 1.4; df2[i * 4 + 3] = 0;
