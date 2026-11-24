@@ -63,7 +63,11 @@
     deskStiff:  150,    // Feder beim Aufschieben
     deskDamp:   0.6,    // kleiner = mehr Nachwippen
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
-    infoMs:     1500    // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
+    infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
+    // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
+    // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
+    deskSunIdle: 1000,  // ms ohne Mausbewegung
+    deskSunFade: 900    // ms Aus- und Einblenden
   };
 
   var css = [
@@ -154,6 +158,18 @@
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
     'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
+    /* Computer: Sonne nach 1 s Ruhe (Hugo 24.11.). Wand mit Strahlen liegt in der Bühne über den Bildern (z 4), unter
+       Titeln und Textspalte (z 5); das Licht (screen) liegt wie am Handy über allem. */
+    '[data-hp].is-desk .hp-stage > .hp-sun-back { transform: none; z-index: 4; opacity: 0; visibility: hidden; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s linear var(--hp-dsun-fade, .9s); }',
+    '[data-hp].is-desk.hp-dsun .hp-stage > .hp-sun-back { opacity: 1; visibility: visible; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s; }',
+    '[data-hp].is-desk.hp-dsun-live > .hp-sun-light { visibility: visible; transform: none; }',
+    '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk.hp-dsun > .hp-sun-light { opacity: 1; }',
+    '[data-hp].is-desk .hp-media, [data-hp].is-desk .hp-ripple { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-ripple, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease, color var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -1196,6 +1212,7 @@
     // ---------- Desktop: Maus ----------
     function setHov(i) {
       if (i === hov) return;
+      dsunStop();
       hov = i;
       slides.forEach(function (s, j) {
         s.el.classList.toggle('is-open', j === i);
@@ -1203,12 +1220,14 @@
         s.side.setAttribute('aria-hidden', j === i ? 'false' : 'true');
       });
       kick();
+      dsunArm();   // Hugo 24.11.: ab jetzt zählt die Ruhezeit für die Sonne
     }
     // Hugo 24.11.: Spalten öffnen erst, wenn die Maus wirklich bewegt wird – nicht schon, weil sie beim Laden auf einem
     // Bild liegt (der Browser meldet sonst «darüber», sobald sich die Spalten unter der ruhenden Maus aufbauen)
     var ax0 = -1, ay0 = -1;
     root.addEventListener('pointermove', function (e) {
       if (!desk || busy() || e.pointerType === 'touch') return;
+      dsunMove(e.clientX, e.clientY);
       if (ax0 < 0) { ax0 = e.clientX; ay0 = e.clientY; return; }
       if (Math.hypot(e.clientX - ax0, e.clientY - ay0) < 3) return;
       ax0 = e.clientX; ay0 = e.clientY;
@@ -1216,7 +1235,65 @@
       if (!el) return;
       for (var j = 0; j < n; j++) if (slides[j].el === el) { setHov(j); break; }
     });
-    root.addEventListener('pointerleave', function (e) { if (desk && e.pointerType !== 'touch') setHov(-1); });
+    root.addEventListener('pointerleave', function (e) { if (desk && e.pointerType !== 'touch') { setHov(-1); dsunStop(); } });
+
+    // ---------- Computer: Sonne nach 1 s Ruhe (Hugo 24.11.) ----------
+    // Ist ein Bereich offen und die Maus ruht 1 s darauf, blendet alles ausser Text und «Galerie öffnen» aus und die
+    // Sonne wie im About am Handy geht an (Wand, Strahl für Strahl, erster Strahl auf «Galerie öffnen» mit Schatten,
+    // Mausschatten wie der Fingerschatten). Bewegt sich die Maus innerhalb des Bereichs, bleibt es so; ausserhalb blenden
+    // die anderen Bereiche wieder ein und die Strahlen verblassen.
+    var sunBtn = null, dsunOn = false, dsunLive = false, dsunT = 0, dsunL = 0, dsunEnd = 0, dsunX = -1, dsunY = -1;
+    root.style.setProperty('--hp-dsun-fade', (CONFIG.deskSunFade / 1000) + 's');
+    function inHov(x, y) {
+      if (hov < 0) return false;
+      var r = slides[hov].el.getBoundingClientRect();
+      return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+    }
+    function dsunArm() {
+      clearTimeout(dsunT);
+      if (!sun || !desk || busy() || hov < 0 || dsunOn) return;
+      dsunT = setTimeout(dsunStart, CONFIG.deskSunIdle);
+    }
+    function dsunMove(x, y) {
+      dsunX = x; dsunY = y;
+      if (dsunOn) { if (!inHov(x, y)) { dsunStop(); dsunArm(); } return; }
+      dsunArm();
+    }
+    function dsunStart() {
+      if (dsunOn || !sun || !desk || busy() || hov < 0 || !inHov(dsunX, dsunY)) return;
+      var s = slides[hov];
+      if (s.o < 0.5) { dsunArm(); return; }   // Spalte geht noch auf
+      dsunOn = dsunLive = true; clearTimeout(dsunEnd);
+      sunHome();
+      sunBtn = s.sideLink || null;
+      if (sunBtn && !reduce) {
+        if (!s.sideSh) {
+          s.sideSh = document.createElement('span'); s.sideSh.className = 'hp-go-sh'; s.sideSh.setAttribute('aria-hidden', 'true');
+          [].forEach.call(sunBtn.querySelectorAll('.lib-sort-label, .lib-sort-arrow'), function (x) { s.sideSh.appendChild(x.cloneNode(true)); });
+        }
+        if (!s.sideSh.parentNode) sunBtn.appendChild(s.sideSh);
+      }
+      sun.horizon(0, H * 0.22);   // Boden wie am Handy knapp unter dem oberen Fünftel
+      root.classList.add('hp-dsun-live', 'hp-dsun');
+      sun.start();
+      clearTimeout(dsunL);
+      dsunL = setTimeout(function () { if (dsunOn) sun.light(true); }, reduce ? 0 : CONFIG.infoMs * 0.4);   // wie am Handy: erster Strahl kurz nach dem Start
+    }
+    function dsunStop() {
+      clearTimeout(dsunT);
+      if (!dsunOn) return;
+      dsunOn = false; clearTimeout(dsunL);
+      root.classList.remove('hp-dsun');
+      if (sun) sun.light(false);
+      clearTimeout(dsunEnd);
+      dsunEnd = setTimeout(function () {
+        if (dsunOn) return;
+        dsunLive = false; root.classList.remove('hp-dsun-live');
+        if (sunBtn) { sunBtn.style.setProperty('--hp-lit', '0'); }
+        slides.forEach(function (x) { if (x.sideSh && x.sideSh.parentNode) x.sideSh.parentNode.removeChild(x.sideSh); });
+        sunBtn = null;
+      }, Math.max(CONFIG.deskSunFade, 1250));   // Strahlen verblassen in 1.2 s
+    }
     root.addEventListener('click', function (e) {
       if (!desk || busy()) return;
       var el = e.target.closest('.hp-slide');
@@ -1628,8 +1705,9 @@
         var lo = lightOn.v; c.uniform1f(U.uOn, lo * lo * (3 - 2 * lo));
         // Erster Strahl (Hugo 22.11.): kommt zuerst und fällt auf «Galerie öffnen», damit man den Schatten gleich sieht
         var hero = 0, ha = 0, hw = 0.05;
-        if (mode === 'info' && infoOpen.offsetWidth) {
-          var br = infoOpen.getBoundingClientRect();
+        var hb = sunBtn || infoOpen;
+        if (mode === 'info' && hb.offsetWidth) {
+          var br = hb.getBoundingClientRect();
           var Sx = SUN.src[0] * rect.width, Sy = SUN.src[1] * rect.height;   // Sonne in CSS-Pixeln der Leinwand (y nach unten)
           var bxx = br.left - rect.left + br.width * 0.45, byy = br.top - rect.top + br.height * 0.5;
           ha = Math.atan2(bxx - Sx, byy - Sy) + Math.sin(tm * 0.21) * 0.012;
@@ -1655,8 +1733,9 @@
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
       var px = null, btnL = 0, pf = 0, heroNow = 0;
       function probe(rect, sx) {
-        if (mode !== 'info' || ++pf % 5 || !infoOpen.offsetWidth) return;
-        var r = infoOpen.getBoundingClientRect();
+        var hb = sunBtn || infoOpen;
+        if (mode !== 'info' || ++pf % 5 || !hb.offsetWidth) return;
+        var r = hb.getBoundingClientRect();
         var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
         if (w < 1 || y < 0 || y >= chh) return;
@@ -1667,17 +1746,17 @@
         // CTA (Hugo 22.11.): Schatten folgt vor allem dem pulsierenden Strahl auf dem Button, andere Strahlen nur schwach
         v = Math.max(v * 0.08, heroNow);
         btnL += (v - btnL) * 0.35;
-        infoOpen.style.setProperty('--hp-lit', btnL.toFixed(3));
+        hb.style.setProperty('--hp-lit', btnL.toFixed(3));
         // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
         var Sx = rect.left + SUN.src[0] * rect.width, Sy = rect.top + SUN.src[1] * rect.height;
         var ddx = r.left + r.width * 0.5 - Sx, ddy = Math.max(1, r.top + r.height * 0.5 - Sy);
         var sk = Math.max(-65, Math.min(65, Math.atan(ddx / ddy) * 180 / Math.PI));
-        infoOpen.style.setProperty('--hp-skew', sk.toFixed(1) + 'deg');
+        hb.style.setProperty('--hp-skew', sk.toFixed(1) + 'deg');
       }
       function loop(now) {
         raf = 0;
         if (mode === 'load' && !lightOn.want && lightOn.v <= 0) return;                 // Laden fertig, Licht aus
-        if (mode === 'info' && ip.v >= 1 && !root.classList.contains('is-info')) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
+        if (mode === 'info' && ip.v >= 1 && !root.classList.contains('is-info') && !dsunLive) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
         draw(now);
         if (!reduce || trail.length || Math.abs(occ.want - occ.on) > 0.01) raf = requestAnimationFrame(loop);
       }
@@ -1685,7 +1764,7 @@
       // erst beim Loslassen verblasst er. Touch-Ereignisse statt Pointer, weil Pointer beim Scrollen abbrechen.
       var held = false;
       function addPt(x, y) {
-        if (reduce || !root.classList.contains('is-info')) return;
+        if (reduce || !(root.classList.contains('is-info') || dsunOn)) return;   // Computer: Mausschatten auch bei der Sonne nach 1 s Ruhe
         var now = performance.now(), last = trail[trail.length - 1];
         if (last && Math.abs(last.x - x) + Math.abs(last.y - y) < 8 && now - last.t < 50) { last.t = now; return; }
         trail.push({ x: x, y: y, t: now });
@@ -1735,6 +1814,13 @@
       root.classList.add('hp-info-sunlit');
       infoPanel.style.background = 'transparent';
     }
+    // Wand mit Strahlen: am Handy im About, am Computer in der Bühne (für die Sonne nach 1 s Ruhe, Hugo 24.11.)
+    function sunHome() {
+      if (!sun) return;
+      if (desk) { if (sun.back.parentNode !== stage) stage.appendChild(sun.back); }
+      else if (sun.back.parentNode !== info) info.insertBefore(sun.back, infoPanel);
+    }
+    sunHome();
 
     var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
@@ -1967,7 +2053,7 @@
       if (d === desk) return;
       desk = d;
       root.classList.toggle('is-desk', desk);
-      closeInfo(); setHov(-1);
+      closeInfo(); setHov(-1); dsunStop(); sunHome();
       slides.forEach(function (s) { s.o = 0; s.ov = 0; });
       F = C = Math.round(F);
       clearInline();
