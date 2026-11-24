@@ -1013,6 +1013,9 @@
       var dockAmt = 1, dockFl = 1;
       function dock(amt, fl) {
         dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; killT0 = 0;
+        // Hugo 24.11. (14:35): beim Schliessen die alten Wellen (Tippen, Sonnenwelle) weg – sie lagen unter dem Licht und
+        // wischten das Leuchten des Rands noch bis zu 6.5 s weg (darum kam es verzögert, wenn man früh schloss)
+        if (fl === 0) waves = [];
         var cs = slides[current()]; if (!cs) return;
         if (desk) deskCanvas();
         compSig = '';
@@ -2099,6 +2102,44 @@
       s.el.style.transform = 'translate3d(' + (ix.v * W).toFixed(1) + 'px,0,0)';
       if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / (1 - 0.97 * iz.v)).toFixed(4) + ')'; }
     }
+    var hyT = 0;
+    function hyperText(el, tail) {
+      clearTimeout(hyT);
+      if (!el || !el.animate || reduce) return;
+      var html0 = el.innerHTML, nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
+      while ((nd = tw.nextNode())) nodes.push(nd);
+      var units = [], chars = 0;
+      nodes.forEach(function (t) { chars += t.nodeValue.replace(/\s/g, '').length; });
+      var perWord = chars > 700;   // sehr lange Texte: Wort für Wort (schont das Handy)
+      nodes.forEach(function (t) {
+        var parts = t.nodeValue.split(/(\s+)/), frag = document.createDocumentFragment();
+        parts.forEach(function (w) {
+          if (!w) return;
+          if (/^\s+$/.test(w)) { frag.appendChild(document.createTextNode(w)); return; }
+          var ws = document.createElement('span'); ws.style.whiteSpace = 'nowrap'; ws.style.display = 'inline-block';
+          if (perWord) { ws.textContent = w; units.push(ws); }
+          else for (var ci = 0; ci < w.length; ci++) { var c = document.createElement('span'); c.style.display = 'inline-block'; c.textContent = w[ci]; ws.appendChild(c); units.push(c); }
+          frag.appendChild(ws);
+        });
+        t.parentNode.replaceChild(frag, t);
+      });
+      if (tail) units.push(tail);
+      el.style.perspective = '700px'; el.style.perspectiveOrigin = '100% 0';
+      var N = units.length, total = Math.min(1700, 400 + N * 3.2), each = 700, d0 = 280;
+      function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
+      units.forEach(function (u, i) {
+        try {
+          u.animate([
+            { transform: tf(90, -36, -650, 4), opacity: 0, offset: 0 },
+            { opacity: 1, offset: 0.12 },
+            { transform: tf(8, -3, -40, 2.2), opacity: 1, offset: 0.55 },
+            { transform: tf(0, 0, 0, 1), opacity: 1, offset: 1 }
+          ], { duration: each, delay: d0 + total * i / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
+        } catch (er) {}
+      });
+      // danach wieder der ursprüngliche Text (markierbar, leicht)
+      hyT = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, d0 + total + each + 80);
+    }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
       var s = slides[current()];
@@ -2204,19 +2245,9 @@
         }
       }, tp.t);
       if (reduce && brand) brand.classList.add('hp-on-white');
-      // Hugo 24.11. (14:27): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) von hinten rechts nach vorn an seinen
-      // Platz – erst weit weg, hell und mit Lichtspur, dann bremst er hart ab
-      if (infoScroll.animate && !reduce && !wasOpen) {
-        var shA = '22px -8px 8px rgba(255,255,255,.75), 46px -17px 16px rgba(255,255,255,.45), 80px -30px 26px rgba(255,255,255,.22)', shB = '0 0 0 rgba(255,255,255,0), 0 0 0 rgba(255,255,255,0), 0 0 0 rgba(255,255,255,0)';
-        try {
-          infoScroll.animate([
-            { transform: 'perspective(900px) translate3d(42vw,-16vh,-2200px)', opacity: 0, filter: 'blur(5px) brightness(2.4)', textShadow: shA, offset: 0 },
-            { opacity: 1, offset: 0.1 },
-            { transform: 'perspective(900px) translate3d(2vw,-0.6vh,-60px)', filter: 'blur(1px) brightness(1.3)', textShadow: shA, offset: 0.55 },
-            { transform: 'perspective(900px) translate3d(0,0,0)', opacity: 1, filter: 'blur(0px) brightness(1)', textShadow: shB, offset: 1 }
-          ], { duration: CONFIG.textWarp, delay: 120, easing: 'cubic-bezier(.12,.75,.2,1)', fill: 'backwards' });
-        } catch (er) {}
-      }
+      // Hugo 24.11. (14:27/14:34): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) – Buchstabe für Buchstabe
+      // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
+      if (!wasOpen) hyperText(infoText, infoOpen);
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
@@ -2236,6 +2267,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
+      if (infoOpen.getAnimations) infoOpen.getAnimations().forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
