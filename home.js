@@ -933,7 +933,13 @@
           ax = W / 2 + (j - (n - 1) / 2) * (aw + g) - aw / 2;
           bx = j * W / n; by = 0; bw = W / n; bh = H;
           var xD = clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1);
-          E = LD ? easeMagnet(xD) : easeDock(xD);   // Hugo 24.11.: auch am Computer magnetisch einrasten
+          if (LD) {
+            // Hugo 24.11.: am Computer zoomen die Bilder heran, werden langsam und stehen kurz still (knapp vor dem Ziel);
+            // erst wenn alle vier stehen, zieht der Magnet sie gemeinsam an – alle docken im selben Moment an
+            var app = 1 - Math.pow(1 - clamp(xD / 0.75, 0, 1), 3);
+            var mg2 = clamp((P - 0.84) / 0.13, 0, 1);
+            E = 0.88 * app + 0.12 * Math.pow(mg2, 2.5);
+          } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
           var r = rel(j);
