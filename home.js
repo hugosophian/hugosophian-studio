@@ -51,11 +51,11 @@
     introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
     vtDelay:    0,      // nach „zum Studio“: Animation so viel später (ms); 0 = sofort, die alte Seite ist dann schon weg (Hugo 17:12)
-    stripW:     0.105,  // Säule: Breite (Anteil Bildschirm) – Hugo 24.11.: näher (vorher 0.07)
-    stripH:     0.128,  // Säule: Höhe pro Bild (Anteil Bildschirm) – vorher 0.085
-    ldCards:    false,  // Hugo 24.11.: false = Handy-Einflug wie am Computer (Bilder gleich sichtbar), true = weisse Karten mit Magnet
-    ldStripW:   0.038,  // Ladeanimation (Hugo 23.11.): Karten starten weiter weg, also kleiner
-    ldStripH:   0.046,
+    stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
+    stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
+    ldCards:    true,   // Hugo 24.11.: true = weisse Karten mit Magnet (Handy), false = Einflug wie am Computer
+    ldStripW:   0.05,   // Ladeanimation: Startgrösse der Karten (Hugo 24.11.: etwas näher, vorher 0.038 × 0.046)
+    ldStripH:   0.061,
     // Desktop
     desk:       992,    // ab dieser Breite (px) und mit Maus: Bilder nebeneinander
     deskOpen:   0.52,   // Breite des geöffneten Bildes samt Text (Anteil)
@@ -947,7 +947,7 @@
           E = LC ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LC ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
-        var ap = (LC && !desk) ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
+        var ap = easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));   // Hugo 24.11.: Karten erscheinen am Handy so weich wie am Computer
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
