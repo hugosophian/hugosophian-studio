@@ -169,8 +169,10 @@
     '[data-hp].is-desk.hp-dsun-live .hp-stage > .hp-sun-back { visibility: visible; }',
     '[data-hp].is-desk.hp-dsun-live .hp-slide { background-color: transparent !important; }',   // falls die Karte einen eigenen Grund hat: Wand bleibt sichtbar
     '[data-hp].is-desk.hp-dsun-live > .hp-sun-light { visibility: visible; transform: none; }',
-    '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    '[data-hp].is-desk.hp-dsun > .hp-sun-light { opacity: 1; }',
+    // Hugo 24.11. (13:14): das Licht über allem (screen) erst, wenn die Bilder weg sind – sonst leuchteten Strahlen auf den
+    // dunklen Fotos, nicht aber auf der weissen Textspalte, und die Spalte stand als weisser Kasten da. Beim Zurück rasch weg.
+    '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity .3s ease; }',
+    '[data-hp].is-desk.hp-dsun > .hp-sun-light { opacity: 1; transition: opacity .6s ease var(--hp-dsun-fade, .9s); }',
     '[data-hp].is-desk .hp-media { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
