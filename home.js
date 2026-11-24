@@ -652,10 +652,11 @@
         '    float inside = 1.0;',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
         '    vec2 ca = off * 0.08 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
-        '    vec3 img = vec3(texture2D(uImg, iu + ca).r, texture2D(uImg, iu).g, texture2D(uImg, iu - ca).b);',
+        '    vec2 iuA = 1.0 - abs(1.0 - abs(iu + ca)), iuB = 1.0 - abs(1.0 - abs(iu - ca));',
+        '    vec3 img = vec3(texture2D(uImg, iuA).r, texture2D(uImg, iu).g, texture2D(uImg, iuB).b);',
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
         '    vec2 bh = min(vec2(u0, v0), 1.0 - vec2(u0, v0)) * uRect.zw;',
-        '    here = smoothstep(0.0, 6.0, min(bh.x, bh.y)) * inside; base = img;',
+        '    here = step(0.0, min(bh.x, bh.y)) * inside; base = img;',   // Hugo 24.11.: kein Ausblenden am Bildschirmrand mehr (sonst dunkler Rahmen mit dem unverzerrten Foto)
         // deckend, wo sich das Bild verschiebt; weich aus, wo es fast stillsteht (kein halbdurchsichtiges Doppelbild)
         '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al;',
         '  }',
