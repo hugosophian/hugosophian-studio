@@ -867,7 +867,7 @@
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
           var x0i = LD ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
-          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
+          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.min(Math.abs(r), 1) * Math.sin(Math.PI * xin), 0, 1) : xin;   // Hugo 24.11.: die 4. Karte hängt gleich nach wie die 3. (sonst schiebt sie sich darüber)
           E = LD ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
@@ -880,7 +880,7 @@
         if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
         rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
-        s.el.style.zIndex = (!desk && rel(j) === 0) ? 3 : 2;
+        s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
