@@ -1389,7 +1389,7 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      setTimeout(function () { ripple.flareShimmer(false); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
+      setTimeout(function () { if (root.classList.contains('is-info') || dsunOn) return; ripple.flareShimmer(false); }, CONFIG.closeBeam * 0.6);   // Audit 24.11.: nicht, wenn schon wieder geöffnet   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       clearTimeout(shimT);
@@ -2285,7 +2285,11 @@
       return endT;
     }
     function openInfo() {
-      if (desk || busy() || Math.abs(C - F) > 0.02) return;
+      if (desk || busy() || Math.abs(C - F) > 0.02) {
+        // Audit 24.11.: wurde nach dem Tippen doch gewischt, das schon begonnene Eintauchen zurücknehmen (sonst blieb das Bild vergrössert)
+        if (tapDive && !root.classList.contains('is-info')) { dive(tapDive, 0, 0, false); tapDive = null; }
+        return;
+      }
       var s = slides[current()];
       clearTimeout(infoT);
       if (tClone) { tClone.remove(); tClone = null; }
@@ -2370,13 +2374,13 @@
       // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
       // Hugo 24.11. (15:04): der Text lädt wieder normal (kommt mit der Sonne), nur Titel und «Galerie öffnen» aus Licht
       var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 0, 300, false, true) : 0;
-      if (!wasOpen) blotIn(infoText, 250, 1300);
+      // Audit 24.11.: blotIn lief hier zusätzlich und schrieb in jedem Bild dieselbe Maske (sichtbar war nur blotchIn) – entfernt
       if (!wasOpen) blotchIn(infoText, 250, 1300);   // Hugo 24.11. (15:05): der Text blendet fleckig weich ein
       if (titleHy && tClone) { if (tEnd) hyperText(tClone, null, Math.max(300, tEnd - 250), 320, true); }
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
-      if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
+      if (s.href && !s.pref) { s.pref = true; var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }   // Audit 24.11.: nur einmal pro Bereich (vorher bei jedem Öffnen ein weiteres <link>)
     }
     function closeInfo() {
       if (!root.classList.contains('is-info')) return;
@@ -2393,7 +2397,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
-      cancelAnimationFrame(blotR); infoText.style.webkitMaskImage = infoText.style.maskImage = '';
+      cancelAnimationFrame(blotR); if (blRaf) { cancelAnimationFrame(blRaf); blRaf = 0; } infoText.style.webkitMaskImage = infoText.style.maskImage = '';
       if (infoOpen.getAnimations) infoOpen.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       if (ripple && ripple.tint) ripple.tint(0);
