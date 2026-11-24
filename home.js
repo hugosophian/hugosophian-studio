@@ -662,9 +662,9 @@
         nx /= nl; ny /= nl;
         var trv = 1 - Math.exp(-et * 2.6);
         f.x = q.x + nx * mn * dockPath.reach * q.m * trv; f.y = q.y + ny * mn * dockPath.reach * q.m * trv;
-        f.a = Math.atan2(ny, nx) + f.rot + 0.16 * Math.sin(et * 0.5 + f.ph);
+        f.a = Math.atan2(ny, nx) + f.rot + 0.16 * Math.sin(et * 0.5 + f.ph) + (f.da || 0);
         f.L = f.Lm * (1 - Math.exp(-Math.max(0, et - f.dl) * 1.5));
-        f.c = f.cs / f.Lm * (1 + 0.25 * Math.sin(et * 0.7 + f.ph * 1.3));
+        f.c = f.cs / f.Lm * (1 + 0.25 * Math.sin(et * 0.7 + f.ph * 1.3)) + (f.dc || 0) / f.Lm;
       }
       function along(f, u) {   // Punkt und Richtung auf der gebogenen Flare
         var dx = Math.cos(f.a), dy = Math.sin(f.a), px = -dy, py = dx, o = f.c * u * u;
@@ -674,28 +674,50 @@
         if (!DF.length) dfInit();
         var mn = dockPath.mn, parents = DF.filter(function (f) { return f.kind === 1; });
         parents.forEach(function (f) { geo(f, et); });
-        // Hugo 24.11.: keine zeitlichen Ableger mehr – pro Kollision wirft das Paar genau einen kleinen Flare aus, der
-        // weich aus der Berührungsstelle quillt; erst wenn sich die beiden wieder trennen, kann die nächste Kollision kommen
+        // Hugo 24.11.: magnetisches Spiel – je näher sich zwei grosse Flares kommen, desto stärker ziehen sie sich an:
+        // sie drehen und biegen sich weich zueinander (gefederte Bewegung, nichts starr). Berühren sie sich, verschmelzen
+        // sie: beide schwenken in eine gemeinsame neue Richtung, werfen einen kleinen Flare aus und blenden dann aus.
+        var dt = dfLast ? Math.min(0.05, et - dfLast) : 0.016; dfLast = et;
+        function wrap(x) { while (x > Math.PI) x -= 6.2832; while (x < -Math.PI) x += 6.2832; return x; }
+        parents.forEach(function (f) { f.fa = -(f.da || 0) * 0.5 - (f.vda || 0) * 1.4; f.fc = -(f.dc || 0) * 0.6 - (f.vdc || 0) * 1.4; });
         parents.forEach(function (f, pi) {
           parents.forEach(function (g, gi) {
-            if (gi <= pi || et < 0.25) return;
-            var best = 1e9, bp = null, bq = null;
+            if (gi <= pi || et < 0.2) return;
+            var best = 1e9, bp = null, bq = null, bfa = 0, bfb = 0;
             [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fa) {
               var a = along(f, f.L * fa);
               [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fb) {
                 var b = along(g, g.L * fb), d = Math.hypot(a.x - b.x, a.y - b.y);
-                if (d < best) { best = d; bp = a; bq = b; }
+                if (d < best) { best = d; bp = a; bq = b; bfa = fa; bfb = fb; }
               });
             });
-            var key = pi + '-' + gi; f.touch = f.touch || {};
-            var near = best < mn * 0.09;
-            if (near && !f.touch[key] && DF.length < NDF) {
-              var am = Math.atan2(Math.sin(bp.a) + Math.sin(bq.a), Math.cos(bp.a) + Math.cos(bq.a));
-              DF.push({ kind: 3, x: (bp.x + bq.x) / 2, y: (bp.y + bq.y) / 2, a0: am + (Math.random() < 0.5 ? -1 : 1) * rnd(0.5, 1.0),
-                Lm: mn * rnd(0.12, 0.2), W: mn * rnd(0.016, 0.022), s: 0.75, t0: et, life: rnd(1.5, 2.2), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
+            var R = mn * 0.4;
+            if (best < R && !f.mt && !g.mt) {
+              var k = Math.pow(1 - best / R, 2);
+              // f dreht/biegt Richtung g und umgekehrt (an der nächsten Stelle gemessen)
+              [[f, bp, bq, bfa], [g, bq, bp, bfb]].forEach(function (z) {
+                var h = z[0], P = z[1], Q = z[2], u = Math.max(0.2, z[3]);
+                var want = Math.atan2(Q.y - h.y, Q.x - h.x), have = Math.atan2(P.y - h.y, P.x - h.x);
+                var dA = wrap(want - have);
+                h.fa += dA * k * 3.2 / u;
+                var cr = Math.cos(P.a) * (Q.y - P.y) - Math.sin(P.a) * (Q.x - P.x);
+                h.fc += (cr > 0 ? 1 : -1) * k * 0.9;
+              });
             }
-            if (near) f.touch[key] = true; else if (best > mn * 0.16) f.touch[key] = false;
+            if (best < mn * 0.06 && !f.mt && !g.mt) {
+              // verschmelzen: gemeinsame neue Richtung, dann ausblenden
+              var am = Math.atan2(Math.sin(f.a) + Math.sin(g.a), Math.cos(f.a) + Math.cos(g.a)) + rnd(-0.35, 0.35);
+              f.mt = g.mt = et; f.ma = am; g.ma = am;
+              if (DF.length < NDF) DF.push({ kind: 3, x: (bp.x + bq.x) / 2, y: (bp.y + bq.y) / 2, a0: am, Lm: mn * rnd(0.14, 0.22), W: mn * rnd(0.018, 0.024),
+                s: 0.8, t0: et, life: rnd(1.6, 2.3), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
+            }
           });
+        });
+        parents.forEach(function (f) {
+          if (f.mt) f.fa += wrap(f.ma - f.a) * 2.2;   // in die gemeinsame Richtung schwenken
+          f.vda = (f.vda || 0) + f.fa * dt; f.da = Math.max(-1.6, Math.min(1.6, (f.da || 0) + f.vda * dt));
+          f.vdc = (f.vdc || 0) + f.fc * dt; f.dc = Math.max(-1.2, Math.min(1.2, (f.dc || 0) + f.vdc * dt));
+          geo(f, et);
         });
         DF = DF.filter(function (f) { return f.kind === 1 || et - f.t0 < f.life; });
         for (var i = 0; i < NDF; i++) {
@@ -704,7 +726,7 @@
           var x, y, a, L, c, lv;
           if (f.kind === 1) {
             x = f.x; y = f.y; a = f.a; L = f.L; c = f.c;
-            lv = f.s * sm(f.dl, f.dl + 0.08, et) * (1 - sm(3.0, 5.4, et));
+            lv = f.s * sm(f.dl, f.dl + 0.08, et) * (1 - sm(3.0, 5.4, et)) * (f.mt ? 1 - sm(0.2, 1.8, et - f.mt) : 1);   // nach dem Verschmelzen schwächer werdend
           } else {
             var tc = et - f.t0, k = tc / f.life;
             if (f.kind === 2) { var pt = along(f.par, f.par.L * f.fr); x = pt.x; y = pt.y; a = pt.a + f.side * f.off; }
