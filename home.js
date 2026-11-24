@@ -343,10 +343,25 @@
         '}',
         // Anziehung (Hugo 24.11.): in der Nähe eines leuchtenden Fadens der anderen Schar biegen die Linien zu ihm hin,
         // laufen ein Stück mit ihm zusammen und lösen sich wieder – weich, ohne Ruck
+        // Hugo 24.11. (8:50): zwei direkt benachbarte Fäden leuchten nie gleichzeitig – nur der stärkere. So verteilen sie
+        // sich übers Bild und ballen sich nicht (seltene chaotische Ausreisser)
+        'float flLit(float id, float sd) {',
+        '  float h = h2(vec2(id, sd * 1.7));',
+        '  if (h < 0.78 || h2(vec2(id - 1.0, sd * 1.7)) > h || h2(vec2(id + 1.0, sd * 1.7)) > h) return 0.0;',
+        '  return h;',
+        '}',
+        // Faltschutz: die Anziehung wird nur dort gedrosselt, wo sich ein Faden sonst zurückfalten würde (Zickzack)
+        'vec3 flNoFold(vec3 P, vec3 F, float att) {',
+        '  vec2 gP = vec2(P.y - P.x, P.z - P.x), gF = vec2(F.y - F.x, F.z - F.x);',
+        '  float dpf = dot(gF, gP), a = att;',
+        '  if (dpf < 0.0) a = min(att, 0.6 * dot(gP, gP) / max(-dpf, 1e-7));',
+        '  return P + a * F;',
+        '}',
         'float flPull(float pa, float sd) {',
         '  float id = floor(pa + 0.5), dl = pa - id;',
         '  float k = 1.0 - 4.0 * dl * dl;',   // läuft zur Grenze hin sauber auf 0 aus (keine Nahtlinien)
-        '  return smoothstep(0.78, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.16) * k * k;',
+        '  float hl = flLit(id, sd);',
+        '  return (hl > 0.0 ? smoothstep(0.78, 1.0, hl) : 0.0) * dl * exp(-dl * dl / 0.16) * k * k;',
         '}',
         // Hugo 24.11. (Video 8:21): Kollision statt Kreuzen. Für einen Faden wird geprüft, ob er auf dem Weg vom Ursprung
         // bis hier einen Faden der anderen Schar überquert hat. War jener stärker, endet er dort (der Stärkere nimmt ihn mit),
@@ -363,7 +378,7 @@
         '  for (int k = 0; k < 8; k++) {',
         '    float iy = k0 + float(k);',
         '    if (iy >= hi) break;',
-        '    float hy = h2(vec2(iy, Y.w * 1.7));',
+        '    float hy = flLit(iy, Y.w);',
         '    if (hy < 0.78) continue;',
         '    float hry = h2(vec2(iy + 11.0, Y.w)), sty = smoothstep(0.78, 1.0, hy);',
         '    float sfy = -smy + 2.0 * smy * (0.4 + 0.9 * hry * (0.5 + 0.5 * sty)) * (1.0 - exp(-et * 1.3));',
@@ -401,7 +416,7 @@
         '  for (int n = -1; n <= 1; n++) {',
         '    float id = id0 + float(n);',
         '    float hs = h2(vec2(id, sd * 1.7)), hr = h2(vec2(id + 11.0, sd));',
-        '    if (hs < 0.78) continue;',
+        '    if (flLit(id, sd) < 0.78) continue;',
         '    float str = smoothstep(0.78, 1.0, hs);',
         '    float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '    float sd2 = abs(ps - id) / gl;',
@@ -593,14 +608,14 @@
         '      vec3 PA = vec3(flPsi(fc, uRes, uT, dA, sw, sA), flPsi(fc + o1, uRes, uT, dA, sw, sA), flPsi(fc + o2, uRes, uT, dA, sw, sA));',
         '      vec3 PB = vec3(flPsi(fc, uRes, tB0, dB, -sw, sB), flPsi(fc + o1, uRes, tB0, dB, -sw, sB), flPsi(fc + o2, uRes, tB0, dB, -sw, sB));',
         '      float att = 3.0 * smoothstep(0.2, 1.2, et);',   // Anziehung wächst, sobald sie unterwegs sind
-        '      vec3 QA = PA + att * vec3(flPull(PB.x, sB), flPull(PB.y, sB), flPull(PB.z, sB));',
-        '      vec3 QB = PB + att * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
+        '      vec3 QA = flNoFold(PA, vec3(flPull(PB.x, sB), flPull(PB.y, sB), flPull(PB.z, sB)), att);',
+        '      vec3 QB = flNoFold(PB, vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA)), att);',
         '      float vA = 0.0, vB = 0.0;',
         '      vec3 tC; float sC = uSeed + 13.1, tC0 = uT * 0.93 + 9.0, aC = a0 + 1.5708 * sw + 0.3;',
         '      vec2 dC = vec2(cos(aC), sin(aC));',
         '      vec3 PC = vec3(flPsi(fc, uRes, tC0, dC, sw, sC), flPsi(fc + o1, uRes, tC0, dC, sw, sC), flPsi(fc + o2, uRes, tC0, dC, sw, sC));',
         '      float PC0 = PC.x;',
-        '      PC += att * 0.8 * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
+        '      PC = flNoFold(PC, vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA)), att * 0.8);',
         '      float aB = a0 + 3.1416 + 0.35 * sw, nAC = abs(sin(aC - a0)), nBC = abs(sin(aC - aB));',
         '      float gA = length(vec2(QA.y - QA.x, QA.z - QA.x)) / 1.5, gB = length(vec2(QB.y - QB.x, QB.z - QB.x)) / 1.5, gC = length(vec2(PC.y - PC.x, PC.z - PC.x)) / 1.5;',
         '      vec2 oA = flO(fc, dA), oB = flO(fc, dB), oC = flO(fc, dC);',
