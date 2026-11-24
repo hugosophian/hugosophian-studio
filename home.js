@@ -402,7 +402,7 @@
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.85 * mix(0.6, 1.0, smoothstep(0.0, 0.3, et)) * patch;',   // Hugo 23.11.: am Rand wieder etwas mehr   // von Anfang an ungleich
+        '    eacc = ecol * band * flash * 0.85 * mix(1.0, patch, smoothstep(0.15, 0.7, et));',   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -465,10 +465,8 @@
         '    lit = mix(lit, lit * vec3(1.0, 0.9, 0.68), fdv * 0.45 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.18 + 0.42 * dk);',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
         '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.6) + eacc * (0.45 + 0.7 * dk);',   // auf Dunklem deutlicher      // Andock-Licht: färbt auch Weiss golden
-        // Belichtungsblitz beim Aufprall (Hugo 23.11.): das ganze Bild blitzt für einen Augenblick hell auf
-        '    float xf = uEdgeT >= 0.0 ? exp(-uEdgeT * 11.0) * 0.6 : 0.0;',
-        '    lit += (1.0 - lit) * xf;',
-        '    float cov = clamp(max(max(max(al, L * 6.0), ea * 6.0), xf * 8.0), 0.0, 1.0) * here;',
+        // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
+        '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
         '  } else {',
         '    col = col + gc * (1.0 - al * 0.4) + eacc;',
