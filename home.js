@@ -346,7 +346,7 @@
         'float flPull(float pa, float sd) {',
         '  float id = floor(pa + 0.5), dl = pa - id;',
         '  float k = 1.0 - 4.0 * dl * dl;',   // läuft zur Grenze hin sauber auf 0 aus (keine Nahtlinien)
-        '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.11) * k * k;',
+        '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.16) * k * k;',
         '}',
         'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, out vec3 tint) {',
         '  tint = vec3(0.0);',
@@ -360,7 +360,7 @@
         '  float u = clamp((s + smx) / (2.0 * smx), 0.0, 1.0);',                                   // 0 = Ursprung, 1 = Gegenseite
         '  float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '  float sd2 = abs(ps - id) / gl;',
-        '  float swd = mn * (0.005 + 0.008 * str) * (1.35 - 0.65 * u), sw2 = swd * 1.55;',
+        '  float swd = mn * (0.009 + 0.007 * str) * (1.2 - 0.35 * u), sw2 = swd * 1.45;',
         '  float thin = exp(-sd2 * sd2 / (swd * swd)) + 0.25 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
         // Hugo 24.11.: gemischt mit den Lichtströmen – feiner Faden plus weiche verwobene Fasern mit mitlaufendem Licht
         '  float fib = 0.3 * exp(-sd2 * sd2 / (sw2 * sw2 * 9.0));',
@@ -533,7 +533,7 @@
         '      vec2 o1 = vec2(1.5, 0.0), o2 = vec2(0.0, 1.5);',
         '      vec3 PA = vec3(flPsi(fc, uRes, uT, dA, sw, sA), flPsi(fc + o1, uRes, uT, dA, sw, sA), flPsi(fc + o2, uRes, uT, dA, sw, sA));',
         '      vec3 PB = vec3(flPsi(fc, uRes, tB0, dB, -sw, sB), flPsi(fc + o1, uRes, tB0, dB, -sw, sB), flPsi(fc + o2, uRes, tB0, dB, -sw, sB));',
-        '      float att = 2.2 * smoothstep(0.2, 1.2, et);',   // Anziehung wächst, sobald sie unterwegs sind
+        '      float att = 3.0 * smoothstep(0.2, 1.2, et);',   // Anziehung wächst, sobald sie unterwegs sind
         '      vec3 QA = PA + att * vec3(flPull(PB.x, sB), flPull(PB.y, sB), flPull(PB.z, sB));',
         '      vec3 QB = PB + att * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
         '      float vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, tA);',
