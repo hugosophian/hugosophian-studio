@@ -173,12 +173,13 @@
     // Hugo 24.11. (12:46): die Regenbogenwelle der Maus läuft zu Ende, während das Licht kommt; nur das verschobene Foto
     // in ihr blendet mit den Bildern aus (uFade im Wellen-Shader), der Regenbogen bleibt
     '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
-    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
+    // Hugo 24.11. (13:01): die Textspalte ist von Anfang an ein weisser Block (die Wand darunter), Text sofort dunkel;
+    // beim Zurück wird sie wie gehabt wieder schwarz
+    '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); transition: none; }',
+    '[data-hp].is-desk.hp-dsun .hp-side-in > * { color: var(--hp-info-fg, #000); }',
     // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
     // der Grund hell genug ist (bei 40 % des Ausblendens); beim Zurück umgekehrt
-    '@keyframes hp-dsun-txt-in { 0%, 39.9% { color: var(--hp-side-fg, #fff); } 40%, 100% { color: var(--hp-info-fg, #000); } }',
     '@keyframes hp-dsun-txt-out { 0%, 39.9% { color: var(--hp-info-fg, #000); } 40%, 100% { color: var(--hp-side-fg, #fff); } }',
-    '[data-hp].is-desk.hp-dsun .hp-side-in > * { animation: hp-dsun-txt-in var(--hp-dsun-fade, .9s) linear both; }',
     '[data-hp].is-desk.hp-dsun-live:not(.hp-dsun) .hp-side-in > * { animation: hp-dsun-txt-out var(--hp-dsun-fade, .9s) linear both; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
@@ -1266,7 +1267,15 @@
       var t = clamp((now - dsF.t0) / CONFIG.deskSunFade, 0, 1);
       return dsF.from + (dsF.to - dsF.from) * easeCss(t);
     }
-    function dsunFadeTo(v) { var now = performance.now(); dsF.from = dsunImg(now); dsF.to = v; dsF.t0 = now; }
+    // Hugo 24.11. (13:01): halb ausgeblendet lag das verschobene Foto der Welle doppelt über dem Foto darunter und zog eine
+    // Schattenspur. Darum ist es bei der Sonne sofort weg (die Welle läuft nur als Licht weiter) und kommt erst zurück,
+    // wenn die Bilder wieder ganz da sind.
+    var dsImgT = 0;
+    function dsunFadeTo(v) {
+      clearTimeout(dsImgT);
+      if (!v) { dsF.from = dsF.to = 0; dsF.t0 = 0; return; }
+      dsImgT = setTimeout(function () { if (!dsunOn) { dsF.from = dsF.to = 1; dsF.t0 = 0; } }, CONFIG.deskSunFade);
+    }
     function inHov(x, y) {
       if (hov < 0) return false;
       var r = slides[hov].el.getBoundingClientRect();
