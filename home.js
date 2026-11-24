@@ -753,7 +753,10 @@
         '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
         '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm) + vec3(1.0, 0.9, 0.72) * faD * 0.5;',
-        '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',                                       // gegen Farbstufen im Verlauf
+        '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',
+        // Hugo 24.11. (16:41): kein Ausblenden am Rand mehr (sah aus wie ein unsichtbarer Rahmen); der helle Strich oben am
+        // iPhone kam von der Schimmerwelle, die knapp am Rand lag – sie startet jetzt ausserhalb des Bildschirms (siehe dock)
+                                      // gegen Farbstufen im Verlauf
         // Hugo 23.11.: kein milchiger Schleier — das Licht fällt AUF das Foto (Dunkles bleibt dunkel, Helles leuchtet farbig),
         // statt halbdurchsichtig darüber zu liegen
         '  if (uHas > 0.5 && here > 0.0) {',
@@ -784,9 +787,6 @@
         '    vec3 cD = al > 1e-4 ? col * (alD / al) : vec3(0.0);',   // Hugo 24.11. (15:16): über der Sonne nur das verschobene Foto der Welle zeigen (sonst stand am Rand ein dunkler Rahmen)
         '    col = mix(cR, cD, uFade); al = mix(aR, alD, uFade);',
         '  }',
-        // Hugo 24.11. (16:23): beim Schimmer (ohne Rand-Leuchten) läuft der Effekt zu den Bildschirmrändern hin weich aus –
-        // am iPhone blieb sonst oben unter der Statusleiste ein heller Strich stehen
-        '  if (uRim < 0.5) { float tE = smoothstep(0.0, 14.0, min(min(fc.y, uRes.y - fc.y), min(fc.x, uRes.x - fc.x))); col *= tE; al *= tE; }',
         '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
@@ -1057,7 +1057,9 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        if (dockFl > 0) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen (beim Schliessen ohne)
+        // Hugo 24.11. (16:41): der Schimmer (ohne Rand-Leuchten) startet ausserhalb des Bildschirms und fährt nur nach innen –
+        // vorher lief er knapp am Rand entlang, wie gegen einen unsichtbaren Rahmen; die Ladeanimation bleibt unverändert
+        if (dockFl > 0) { if (dockRim) ring(0, 6, 0.2); else ring(0, Math.min(r.width, r.height) * 0.08, 0.3); }   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) req();
       }
       // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
@@ -2147,7 +2149,6 @@
       s.el.style.transform = 'translate3d(' + (ix.v * W).toFixed(1) + 'px,0,0)';
       if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / (1 - 0.97 * iz.v)).toFixed(4) + ')'; }
     }
-    var hyT = 0;
     // Buchstabe aus Licht: von hinten rechts, in Flugrichtung gestreckt; bunt (Regenbogen) oder perlmuttweiss (iri), am Ende
     // in seiner Farbe
     function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
@@ -2232,11 +2233,10 @@
       set('linear-gradient(transparent, transparent)');
       blotR = requestAnimationFrame(f);
     }
-    function hyperText(el, tail, d0x, maxT, iri, onlyTail) {
-      if (el === infoText) clearTimeout(hyT);
+    function hyperText(el, d0x, maxT, iri) {
       if (!el || !el.animate || reduce) return;
-      var html0 = el.innerHTML, nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
-      while (!onlyTail && (nd = tw.nextNode())) nodes.push(nd);
+      var nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
+      while ((nd = tw.nextNode())) nodes.push(nd);
       var units = [], chars = 0;
       nodes.forEach(function (t) { chars += t.nodeValue.replace(/\s/g, '').length; });
       var perWord = chars > 700;   // sehr lange Texte: Wort für Wort (schont das Handy)
@@ -2254,7 +2254,7 @@
       });
       var N = units.length, total = Math.min(maxT || 1700, 400 + N * 3.2), each = 700, d0 = d0x == null ? 280 : d0x;
       // Hugo 24.11. (14:44): die Buchstaben bestehen erst aus Licht – bunt (Regenbogen) – und werden beim Ankommen zu ihrer
-      // Farbe (schwarz); sie kommen in zufälliger Reihenfolge
+      // Farbe; sie kommen in zufälliger Reihenfolge
       var ord = units.map(function (u, i) { return i; });
       for (var oi = ord.length - 1; oi > 0; oi--) { var oj = Math.floor(Math.random() * (oi + 1)), ot = ord[oi]; ord[oi] = ord[oj]; ord[oj] = ot; }
       var pres = lightRead(units);
@@ -2263,26 +2263,9 @@
           u.animate(lightFrames(u, iri, pres[i]), { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
         } catch (er) {}
       });
-      // «Galerie öffnen» kommt als Letztes, perlmuttweiss (Hugo 24.11., 14:47)
-      // Hugo 24.11. (14:51): auch «Galerie öffnen» Buchstabe für Buchstabe (perlmuttweiss), als Letztes
-      var tLab = tail && tail.querySelector('.lib-sort-label'), tTxt = tLab ? tLab.textContent : '', tU = [];
-      if (tail) {
-        if (tLab) { tLab.textContent = ''; for (var ti = 0; ti < tTxt.length; ti++) { if (tTxt[ti] === ' ') { tLab.appendChild(document.createTextNode(' ')); continue; } var tsp = document.createElement('span'); tsp.style.display = 'inline-block'; tsp.textContent = tTxt[ti]; tLab.appendChild(tsp); tU.push(tsp); } }
-        var tArr = tail.querySelector('.lib-sort-arrow'); if (tArr) tU.push(tArr);
-        var tPre = lightRead(tU);
-        tU.forEach(function (u, ti2) { try { u.animate(lightFrames(u, true, tPre[ti2]), { duration: each, delay: d0 + total + 120 + 320 * Math.random(), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} });
-        var tSh = tail.querySelector('.hp-go-sh');   // Schatten erst, wenn die Buchstaben da sind
-        if (tSh) { try { tSh.animate([{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.85 }, { offset: 1 }], { duration: d0 + total + 440 + each, easing: 'linear' }); } catch (er) {} }
-      }
-      // danach wieder der ursprüngliche Text (markierbar, leicht)
-      var endT = d0 + total + (tail ? 440 : 0);
-      var tm = setTimeout(function () { if (tail) { tU.forEach(function (u) { if (u.getAnimations) u.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(u); }); if (tLab) tLab.textContent = tTxt; }
-        // Hugo 24.11. (16:15): der Titel bleibt in seinen Buchstaben stehen (zurücksetzen liess ihn am Ende ein zweites Mal
-        // aufblitzen); nur das Licht wird entfernt
-        if (el !== infoText) { units.forEach(lightClear); return; }
-        if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
-      if (el === infoText) hyT = tm;
-      return endT;
+      // Hugo 24.11. (16:15): der Titel bleibt in seinen Buchstaben stehen (zurücksetzen liess ihn am Ende ein zweites Mal
+      // aufblitzen); nur das Licht wird danach entfernt
+      setTimeout(function () { units.forEach(lightClear); }, d0 + total + each + 80);
     }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) {
@@ -2373,10 +2356,12 @@
       // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
       // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
       // Hugo 24.11. (15:04): der Text lädt wieder normal (kommt mit der Sonne), nur Titel und «Galerie öffnen» aus Licht
-      var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 0, 300, false, true) : 0;
-      // Audit 24.11.: blotIn lief hier zusätzlich und schrieb in jedem Bild dieselbe Maske (sichtbar war nur blotchIn) – entfernt
-      if (!wasOpen) blotchIn(infoText, 250, 1300);   // Hugo 24.11. (15:05): der Text blendet fleckig weich ein
-      if (titleHy && tClone) { if (tEnd) hyperText(tClone, null, Math.max(300, tEnd - 250), 320, true); }
+      // Hugo 24.11. (16:40): «Galerie öffnen» kommt nicht mehr Buchstabe für Buchstabe, sondern blendet zusammen mit dem Text ein
+      if (!wasOpen) {
+        blotchIn(infoText, 250, 1300);   // Hugo 24.11. (15:05): der Text blendet fleckig weich ein
+        try { infoOpen.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1300, delay: 250, easing: 'ease-in-out', fill: 'backwards' }); } catch (er) {}
+      }
+      if (titleHy && tClone && !wasOpen) hyperText(tClone, Math.max(300, 740 - 250), 320, true);   // Titel im selben Takt wie bisher (nach 0.49 s)
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
