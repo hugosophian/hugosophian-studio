@@ -922,30 +922,17 @@
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild
     function renderIntro() {
-      var P = introP, minE = 1, gapX = 0, xjD = 0;
+      var P = introP, minE = 1;
       for (var j = 0; j < n; j++) {
         var s = slides[j], ax, ay, aw, ah, bx, by, bw, bh, k, E;
-        if (desk && LD) {
-          // Hugo 24.11.: Ladeanimation am Computer – gleich wie am Handy, nur als Reihe: kleine weisse Karten (im
-          // Seitenverhältnis der Spalten) mitten im Schwarz, die inneren führen, die äusseren hängen nach; der Abstand
-          // wächst mit und schliesst sich mit dem Magneten
-          ah = H * 0.09; aw = ah * (W / n) / H;
-          k = j;
-          var dj = j - (n - 1) / 2, lagD = Math.max(0, Math.abs(dj) - 0.5);
-          ax = W / 2 + dj * aw - aw / 2;
-          bx = j * W / n; by = 0; bw = W / n; bh = H;
-          var xinD = clamp((P - 0.17) / 0.83, 0, 1);
-          xjD = clamp(xinD - 0.085 * lagD * Math.sin(Math.PI * xinD), 0, 1);
-          E = easeMagnet(xjD);
-          gapX = dj * 2.5 * (lerp(aw, bw, E) / aw) * (1 - magnetPull(xjD));
-          minE = Math.min(minE, E);
-        } else if (desk) {
+        if (desk) {
           aw = W * 0.055; ah = H * 0.2;
           var g = W * 0.008;
           k = j;
           ax = W / 2 + (j - (n - 1) / 2) * (aw + g) - aw / 2;
           bx = j * W / n; by = 0; bw = W / n; bh = H;
           E = easeDock(clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1));
+          minE = Math.min(minE, E);   // Hugo 24.11.: Karten-Einflug am Computer wie bisher, nur das Andocken leuchtet
         } else {
           var r = rel(j);
           aw = W * (LD ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LD ? CONFIG.ldStripH : CONFIG.stripH);
@@ -959,16 +946,16 @@
           E = LD ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
-        var ap = LD ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
+        var ap = (LD && !desk) ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
         // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
         var gapY = 0;
         if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
-        rect(s, lerp(ax, bx, E) + (desk ? gapX : 0), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
+        rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
-        s.el.style.zIndex = desk ? (LD ? (Math.abs(j - (n - 1) / 2) < 1 ? 3 : 2) : 2) : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // innere Karten vorn   // äussere Karten liegen hinter inneren
+        s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren   // äussere Karten liegen hinter inneren
         // gleiche Bildgrösse wie danach beim Wischen, damit am Ende nichts springt
         if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = desk ? 'none' : 'scale(' + CONFIG.imgBase + ')'; s.media.style.width = ''; }
         setVis(s, ap > 0);
@@ -1905,7 +1892,7 @@
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
       if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
-      slides.forEach(function (s) {
+      if (!desk) slides.forEach(function (s) {
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
         if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
         s.gold = g;
