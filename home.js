@@ -307,7 +307,7 @@
     function rel(j) { var d = wrap(j - F); return d > n / 2 ? d - n : d; }
     function current() { return wrap(Math.round(F)); }
 
-    function stepDue() { return !!raf; }   // Bühne bewegt sich (step() ist für diesen Takt angemeldet)
+    var tickNow = -1;   // Zeitstempel des laufenden Takts (während step()/Effekt), sonst -1 (z. B. bei Fingerbewegung)
     function setVis(s, on) { if (on !== !!s.vis) { s.el.classList.toggle('is-vis', on); s.vis = on; } }
     function rect(s, x, y, w, h) {
       var st = s.el.style;
@@ -811,7 +811,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, lockS = null, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, lockS = null, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
@@ -837,10 +837,10 @@
             pts.push({ x: x, y: y, t: now, tip: true });
           }
         }
-        if (!raf) raf = requestAnimationFrame(frame);
+        if (!raf) req();
       }
       function draw(now) {
-        raf = 0;
+        raf = 0; tickNow = now;
         waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
@@ -891,7 +891,8 @@
         var on = waves.length || edgeT0;
         if (on) c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         if (!desk) showFx(sr, pw, ph, on);
-        if (on) raf = requestAnimationFrame(frame);
+        if (on) req();
+        tickNow = -1;
       }
       // Handy: jedes sichtbare Bild zeigt seinen Ausschnitt der Bildschirm-Leinwand (gegen seine Verschiebung gehalten,
       // wie der Titel) – so steht der Effekt still, auch während man wischt
@@ -959,16 +960,15 @@
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
         ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
-        if (!raf) raf = requestAnimationFrame(frame);
+        if (!raf) req();
       }
-      // Hugo 24.11.: der Effekt wird immer erst NACH dem Verschieben der Bilder gezeichnet (im selben Takt). Sonst hinkt er
-      // beim Wischen einen Takt hinterher und oben bzw. unten bleibt ein Streifen ohne Effekt. Läuft das Wischen/Öffnen,
-      // zeichnet step() ihn gleich nach render(); steht alles still, zeichnet er sich selbst.
-      function frame(now) { raf = 0; if (stepDue()) return; draw(now); }
-      cv.sync = function () {
-        if (!(waves.length || edgeT0)) return;
-        if (raf) { cancelAnimationFrame(raf); raf = 0; }
-        draw(performance.now());
+      // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
+      // schon angemeldet (vor der Bühne) oder ausserhalb eines Takts (Fingerbewegung), meldet er sich hinter ihr neu an;
+      // eine Anmeldung aus einem früheren Takt läuft ohnehin nach step()
+      function req() { raf = requestAnimationFrame(draw); regAt = tickNow; }
+      cv.order = function () {
+        if (!raf || (tickNow >= 0 && regAt !== tickNow)) return;
+        cancelAnimationFrame(raf); req();
       };
       cv.dock = dock;
       try { loadAll(); } catch (e) {}   // Hugo 24.11.: Bilder für den Effekt schon beim Laden holen (nicht erst beim Aufprall – sonst Ruckler)
@@ -1106,7 +1106,7 @@
 
     // ---------- Federn und Takt ----------
     function step(now) {
-      raf = 0;
+      raf = 0; tickNow = now;
       var dt = last ? Math.min(0.034, (now - last) / 1000) : 0.016;
       last = now;
       var more = false;
@@ -1139,10 +1139,12 @@
       applyPanel();
       if (infoClosing) more = true;
       render(dt);
-      if (ripple && ripple.sync) ripple.sync();
       if (more) kick(); else last = 0;
+      tickNow = -1;
     }
-    function kick() { if (!raf) raf = requestAnimationFrame(step); }
+    // Hugo 24.11.: wird die Bühne für den nächsten Takt angemeldet, reiht sich der Effekt dahinter ein – so zeichnet er
+    // im selben Takt immer erst NACH dem Verschieben der Bilder (sonst beim Wischen Streifen ohne Effekt)
+    function kick() { if (!raf) { raf = requestAnimationFrame(step); if (ripple && ripple.order) ripple.order(); } }
     function goTo(t) { C = t; kick(); }
 
     function endIntro() {
