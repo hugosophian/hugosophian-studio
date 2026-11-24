@@ -758,6 +758,7 @@
         var sc = Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
+          if (!desk && !sl.vis) return;
           var e = cache[srcOf(sl.img)]; if (!e || !e.ok) { sig += '|-'; return; }
           var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect();
           parts.push({ e: e, im: sl.img, ir: ir, er: er });
@@ -795,7 +796,7 @@
         // dem Finger und wird erst festgelegt, wenn der Finger ein Stück weiter ist; ist die Bahn voll, wird sie
         // ausgedünnt statt angehalten, so geht auch ein langer Zug bis zum Schluss mit
         // Hugo 24.11.: Punkte relativ zur Leinwand (zum Bild) – beim Wischen fährt die Welle mit ihrem Bild mit
-        var cr = cv.getBoundingClientRect(); x -= cr.left; y -= cr.top;
+        var cr = refRect(); x -= cr.left; y -= cr.top;
         var now = performance.now(), pts = wv.pts, last = pts[pts.length - 1];
         if (!last) { pts.push({ x: x, y: y, t: now }); wv.sp = 14; }
         else {
@@ -816,13 +817,11 @@
       function draw(now) {
         raf = 0;
         waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
-        // immer im gerade gezeigten Bild (auch nach dem Wischen): Leinwand dorthin, dessen Foto als Textur
-        if (!waves.length && !edgeT0) lockS = null;
-        var cs = desk ? null : (lockS || slides[current()]);   // Hugo 24.11.: bleibt im Bild, in dem der Effekt begann
-        if (desk) deskCanvas();
-        if (cs) { if (cs.img !== gImg) { gImg = cs.img; } var md0 = cs.media; if (md0 && cv.previousSibling !== md0) md0.parentNode.insertBefore(cv, md0.nextSibling); }
-        if (!cv.parentNode) stage.appendChild(cv);
-        var sr = cv.getBoundingClientRect();
+        // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
+        // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
+        // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
+        if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
+        var sr = refRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
         // volle Bildschirmschärfe (Hugo 23.11.: vorher halbe Auflösung → das verschobene Foto wirkte unscharf und durchsichtig)
         // passt sich an: wird ein Gerät zu langsam, rechnet die Welle etwas gröber (flüssig geht vor)
@@ -854,31 +853,44 @@
             else buf[i * 4 + 3] = 0;
           }
         }
-        var im = gImg;
-        if (desk) {
-          // Computer (Hugo 24.11.): der ganze Bildschirm leuchtet – Textur = alle Spalten zusammen, wie sie gerade stehen
-          if (compTex(sr)) {
-            c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
-          } else c.uniform1f(U.uHas, 0);
-        } else texFor(im);
-        if (desk) {}
-        else if (texOk && im) {
-          var r = im.getBoundingClientRect();
-          // object-fit: cover (mit object-position) → sichtbarer Ausschnitt des Bilds
-          var iw = im.naturalWidth || 1, ih = im.naturalHeight || 1, ra = r.width / r.height, ia = iw / ih;
-          var cw = 1, chh = 1; if (ia > ra) cw = ra / ia; else chh = ia / ra;
-          var op = objPos(im);
-          c.uniform4f(U.uRect, r.left - sr.left, r.top - sr.top, r.width, r.height);
-          c.uniform4f(U.uCrop, (1 - cw) * op[0], (1 - chh) * op[1], cw, chh);
-          c.uniform1f(U.uHas, 1);
+        // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
+        if (compTex(sr)) {
+          c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
-        if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
+        var on = waves.length || edgeT0;
+        if (on) c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
+        if (!desk) showFx(sr, pw, ph, on);
+        if (on) raf = requestAnimationFrame(draw);
       }
+      // Handy: jedes sichtbare Bild zeigt seinen Ausschnitt der Bildschirm-Leinwand (gegen seine Verschiebung gehalten,
+      // wie der Titel) – so steht der Effekt still, auch während man wischt
+      function showFx(sr, pw, ph, on) {
+        slides.forEach(function (sl) {
+          var vis = on && sl.vis;
+          if (!sl.fx) {
+            if (!vis) return;
+            var f = document.createElement('canvas'); f.className = 'hp-fx'; f.setAttribute('aria-hidden', 'true');
+            f.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;';
+            if (sl.media && sl.media.nextSibling) sl.el.insertBefore(f, sl.media.nextSibling); else sl.el.appendChild(f);
+            sl.fx = f; sl.fxc = f.getContext('2d');
+          }
+          var f2 = sl.fx;
+          if (!vis) { if (f2.style.display !== 'none') { f2.style.display = 'none'; } return; }
+          f2.style.display = '';
+          var er = sl.el.getBoundingClientRect();
+          f2.style.width = sr.width + 'px'; f2.style.height = sr.height + 'px';
+          f2.style.transform = 'translate3d(' + (sr.left - er.left).toFixed(2) + 'px,' + (sr.top - er.top).toFixed(2) + 'px,0)';
+          if (f2.width !== pw || f2.height !== ph) { f2.width = pw; f2.height = ph; }
+          sl.fxc.clearRect(0, 0, pw, ph);
+          sl.fxc.drawImage(cv, 0, 0);
+        });
+      }
+      function refRect() { return desk ? cv.getBoundingClientRect() : stage.getBoundingClientRect(); }
       function ok() { return !desk && !root.classList.contains('is-info'); }
       function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
       // Computer (Hugo 24.11.): solange der Andock-Effekt läuft, zieht die Maus eine Welle wie der Finger und wischt ihn weg
@@ -892,11 +904,8 @@
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       function dock() {
         var cs = slides[current()]; if (!cs) return;
-        if (desk) { deskCanvas(); compSig = ''; }
-        else {
-          gImg = cs.img; texFor(gImg); lockS = cs;
-          var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
-        }
+        if (desk) deskCanvas();
+        compSig = '';
         edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
         // Hugo 23.11. (wie die Fingerwelle im Video): das Andocken löst echte Wellen aus, die rundherum am Rand beginnen
         // und nach innen durchs Bild laufen – mit Prisma-Regenbogen, Verzerrung und Solar Flares, die darauf surfen.
@@ -924,14 +933,7 @@
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
-        var t = e.touches[0], cs = slides[current()], im = (cs && cs.img) || imgAt(t.clientX, t.clientY);
-        // Hugo 24.11.: Berührung in einem anderen Bild – was im alten (schon weggewischten) Bild lief, endet dort
-        if (lockS && lockS !== cs) { waves = []; edgeT0 = 0; killT0 = 0; }
-        lockS = cs;
-        if (im !== gImg) { gImg = im; texFor(gImg); }
-        var md = cs ? cs.media : (gImg && gImg.closest('.hp-media'));
-        if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
-        if (!cv.parentNode) stage.appendChild(cv);
+        var t = e.touches[0];
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
         if (edgeT0 && !killT0) killT0 = performance.now();
         add(t.clientX, t.clientY);
