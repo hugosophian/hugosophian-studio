@@ -916,10 +916,13 @@
       var lmx = -1, lmy = -1;
       stage.addEventListener('mousemove', function (e) {
         // nur echte Mausbewegung (der Browser meldet auch «Bewegung», wenn sich unter der ruhenden Maus etwas verschiebt)
-        var moved = lmx >= 0 && Math.hypot(e.clientX - lmx, e.clientY - lmy) > 2; lmx = e.clientX; lmy = e.clientY;
-        if (!moved || !desk || !edgeT0 || root.classList.contains('is-info')) return;
+        if (lmx < 0) { lmx = e.clientX; lmy = e.clientY; return; }
+        if (Math.hypot(e.clientX - lmx, e.clientY - lmy) < 3) return;
+        lmx = e.clientX; lmy = e.clientY;
+        // Hugo 24.11.: die Maus zieht am Computer immer eine Welle wie der Finger am Handy (Text liegt darüber, bleibt ruhig)
+        if (!desk || busy() || root.classList.contains('is-info')) return;
         var now = performance.now(), wv = waves[waves.length - 1];
-        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (!killT0) killT0 = now; }
+        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
