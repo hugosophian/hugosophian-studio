@@ -81,7 +81,7 @@
     titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
     revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
-    closeDock:  0.5     // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
+    closeDock:  0.22    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
 
   var css = [
@@ -957,7 +957,7 @@
           }
         }
         // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
-        if (compTex(sr)) {
+        if (!lightMode && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
           c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
@@ -2099,10 +2099,16 @@
     // Hugo 24.11. (14:51): jeder Buchstabe kommt von der Sonne her (dort, wo die Strahlen herkommen), nicht mehr von hinten
     // rechts – Weg und Streckung zeigen für jeden Buchstaben genau zur Sonne
     function sunTf(x, y, a, k, sc) { return 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotate(' + a.toFixed(1) + 'deg) scaleX(' + k + ') rotate(' + (-a).toFixed(1) + 'deg) scale(' + sc + ')'; }
-    function lightFrames(u, iri) {
-      var fin = getComputedStyle(u).color, rr0 = root.getBoundingClientRect(), ub = u.getBoundingClientRect();
-      var sxp = rr0.left + SUN.src[0] * rr0.width, syp = rr0.top + SUN.src[1] * rr0.height;
-      var vx = sxp - (ub.left + ub.width / 2), vy = syp - (ub.top + ub.height / 2), va = Math.atan2(vy, vx) * 180 / Math.PI;
+    // Hugo 24.11. (15:03): schneller ohne den Effekt zu ändern – erst alle Lagen und Farben lesen (lightRead), dann schreiben.
+    // Vorher wurde pro Buchstabe abwechselnd gelesen und geschrieben, das zwang den Browser hunderte Male zum Neu-Layout
+    // (Hänger beim Erscheinen des Textes)
+    function lightRead(us) {
+      var rr0 = root.getBoundingClientRect(), sxp = rr0.left + SUN.src[0] * rr0.width, syp = rr0.top + SUN.src[1] * rr0.height;
+      return us.map(function (u) { var ub = u.getBoundingClientRect(); return { fin: getComputedStyle(u).color, vx: sxp - (ub.left + ub.width / 2), vy: syp - (ub.top + ub.height / 2) }; });
+    }
+    function lightFrames(u, iri, pre) {
+      if (!pre) pre = lightRead([u])[0];
+      var fin = pre.fin, vx = pre.vx, vy = pre.vy, va = Math.atan2(vy, vx) * 180 / Math.PI;
       var st = u.style;
       st.backgroundImage = iri ? IRI : SPEC; st.backgroundSize = '300% 100%'; st.backgroundPosition = Math.round(Math.random() * 100) + '% 0';
       st.webkitBackgroundClip = 'text'; st.backgroundClip = 'text';
@@ -2114,11 +2120,11 @@
       ];
     }
     function lightClear(u) { var st = u.style; st.backgroundImage = st.backgroundSize = st.backgroundPosition = st.webkitBackgroundClip = st.backgroundClip = ''; }
-    function hyperText(el, tail, d0x, maxT, iri) {
+    function hyperText(el, tail, d0x, maxT, iri, onlyTail) {
       if (el === infoText) clearTimeout(hyT);
       if (!el || !el.animate || reduce) return;
       var html0 = el.innerHTML, nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
-      while ((nd = tw.nextNode())) nodes.push(nd);
+      while (!onlyTail && (nd = tw.nextNode())) nodes.push(nd);
       var units = [], chars = 0;
       nodes.forEach(function (t) { chars += t.nodeValue.replace(/\s/g, '').length; });
       var perWord = chars > 700;   // sehr lange Texte: Wort für Wort (schont das Handy)
@@ -2139,9 +2145,10 @@
       // Farbe (schwarz); sie kommen in zufälliger Reihenfolge
       var ord = units.map(function (u, i) { return i; });
       for (var oi = ord.length - 1; oi > 0; oi--) { var oj = Math.floor(Math.random() * (oi + 1)), ot = ord[oi]; ord[oi] = ord[oj]; ord[oj] = ot; }
+      var pres = lightRead(units);
       units.forEach(function (u, i) {
         try {
-          u.animate(lightFrames(u, iri), { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
+          u.animate(lightFrames(u, iri, pres[i]), { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
         } catch (er) {}
       });
       // «Galerie öffnen» kommt als Letztes, perlmuttweiss (Hugo 24.11., 14:47)
@@ -2150,7 +2157,8 @@
       if (tail) {
         if (tLab) { tLab.textContent = ''; for (var ti = 0; ti < tTxt.length; ti++) { if (tTxt[ti] === ' ') { tLab.appendChild(document.createTextNode(' ')); continue; } var tsp = document.createElement('span'); tsp.style.display = 'inline-block'; tsp.textContent = tTxt[ti]; tLab.appendChild(tsp); tU.push(tsp); } }
         var tArr = tail.querySelector('.lib-sort-arrow'); if (tArr) tU.push(tArr);
-        tU.forEach(function (u) { try { u.animate(lightFrames(u, true), { duration: each, delay: d0 + total + 120 + 320 * Math.random(), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} });
+        var tPre = lightRead(tU);
+        tU.forEach(function (u, ti2) { try { u.animate(lightFrames(u, true, tPre[ti2]), { duration: each, delay: d0 + total + 120 + 320 * Math.random(), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} });
         var tSh = tail.querySelector('.hp-go-sh');   // Schatten erst, wenn die Buchstaben da sind
         if (tSh) { try { tSh.animate([{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.85 }, { offset: 1 }], { duration: d0 + total + 440 + each, easing: 'linear' }); } catch (er) {} }
       }
@@ -2244,7 +2252,8 @@
       // Hugo 24.11. (14:27/14:34): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) – Buchstabe für Buchstabe
       // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
       // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
-      var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 300) : 0;
+      // Hugo 24.11. (15:04): der Text lädt wieder normal (kommt mit der Sonne), nur Titel und «Galerie öffnen» aus Licht
+      var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 0, 300, false, true) : 0;
       if (titleHy && tClone) { if (tEnd) hyperText(tClone, null, Math.max(300, tEnd - 250), 320, true); }
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
