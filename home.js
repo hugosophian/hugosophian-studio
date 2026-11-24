@@ -539,7 +539,7 @@
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
-        '  vec2 ed = min(fc, uRes - fc); float eR = mix(18.0, 90.0, max(uDesk, uSoft)); float e = -eR * log(exp(-ed.x / eR) + exp(-ed.y / eR));',   // Computer: Ecken viel runder (Hugo 24.11.: sonst Viereck-Rahmen)   // weich gerundet: keine Diagonalen in den Ecken
+        '  vec2 ed = min(fc, uRes - fc); float eR = mix(18.0, 90.0, uDesk); float e = -eR * log(exp(-ed.x / eR) + exp(-ed.y / eR));',   // Computer: Ecken viel runder (Hugo 24.11.: sonst Viereck-Rahmen)   // weich gerundet: keine Diagonalen in den Ecken
         // Hugo 23.11.: EINE Welle in der Form der Fingerbewegung. Jeder Punkt der Bahn startet zu seiner Zeit;
         // die Wellenfront ist dort, wo die Welle zuerst ankommt (kleinster Abstand minus gelaufene Strecke).
         // Zähflüssiger als Wasser: langsam, ein einziger weicher Berg mit Tal, lange gedämpft.
@@ -574,7 +574,7 @@
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
         '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',   // Rand und Welle des Andockens: uDA
-        '    float env = exp(-x * x) * smoothstep(0.0, dockW ? 0.03 : 0.35, age) * kD;',
+        '    float env = exp(-x * x) * smoothstep(0.0, dockW ? mix(0.03, 0.6, uSoft) : 0.35, age) * kD;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
         '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
@@ -602,7 +602,7 @@
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
         '    float fl = dockW ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
         '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
-        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
+        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? mix(0.06, 0.6, uSoft) : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv * uDF / max(uDA, 0.01)); else fa = max(fa, fv);',   // Flares des Andockens: uDF (Hugo 24.11., 15:16: Flares ja, Rand wenig)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
@@ -615,7 +615,7 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(3.6, 5.6, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
-        '    float flash = uSoft > 0.5 ? 0.0 : 1.9 * uImp * exp(-et * 3.2) + 0.75 * exp(-et * 0.3);',   // Hugo 24.11. (18:14): Schimmer – kein bunter Rand (weder Aufleuchten noch Flecken), nur die Flares der Ladeanimation   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float flash = uSoft > 0.5 ? smoothstep(0.0, 0.8, et) * 0.75 * exp(-et * 0.3) : 1.9 * uImp * exp(-et * 3.2) + 0.75 * exp(-et * 0.3);',   // Hugo 24.11. (18:19): Schimmer = Ladeanimation ohne den Aufprall – das Nachleuchten blendet weich ein   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
@@ -625,7 +625,7 @@
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = mix(0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0)), 0.35 + 1.4 * n2(ca * 5.0 + vec2(-uT * 0.1, 2.0)), uDesk);',   // Computer: Breite stark wechselnd
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.85 * mix(1.0, patch, max(max(smoothstep(0.15, 0.7, et), 0.8 * uDesk), uSoft));',   // Schimmer (18:02): von Anfang an fleckig, kein Rahmen   // Computer: von Anfang an ungleich (kein Rahmen)   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
+        '    eacc = ecol * band * flash * 0.85 * mix(1.0, patch, max(smoothstep(0.15, 0.7, et), 0.8 * uDesk));',   // Computer: von Anfang an ungleich (kein Rahmen)   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -983,8 +983,8 @@
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       var dockAmt = 1, dockFl = 1, dockRim = 1, dockSoft = 0;
-      function dock(amt, fl, clr, rim, noWave) {
-        dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; dockRim = rim == null ? 1 : rim; dockSoft = noWave ? 1 : 0; killT0 = 0;
+      function dock(amt, fl, clr, rim, soft) {
+        dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; dockRim = rim == null ? 1 : rim; dockSoft = soft ? 1 : 0; killT0 = 0;
         // Hugo 24.11. (14:35): beim Schliessen die alten Wellen (Tippen, Sonnenwelle) weg – sie lagen unter dem Licht und
         // wischten das Leuchten des Rands noch bis zu 6.5 s weg (darum kam es verzögert, wenn man früh schloss)
         if (fl === 0 || clr) waves = [];
@@ -1011,8 +1011,7 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        // Hugo 24.11. (17:58): der Schimmer (noWave) zeigt nur das Licht des Aufpralls – ohne die Welle, die das Bild verzieht
-        if (dockFl > 0 && !noWave) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
+        if (dockFl > 0) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) req();
       }
       // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
@@ -1035,7 +1034,7 @@
       // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
       // kein Leuchten am Rand
       // Hugo 24.11. (16:15): ohne Rand-Leuchten (am iPhone sah man oben eine Lichtlinie)
-      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 1, true); noEdge = true; };   // Hugo 24.11. (16:09/17:58): das Licht der Ladeanimation (bunter Rand, Aufprall, Flare-Fäden) halb so stark, ohne Andocken und Verziehen
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 1, true); noEdge = true; };   // Hugo 24.11. (16:09/18:19): genau die Ladeanimation, halb so stark, ohne den Aufprall
       var noEdge = false;   // close-Welle: kein Nachleuchten am Rand (Hugo 24.11., 16:01)
       function edgeOffV(now) { return noEdge ? 1 : lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { if (!v) shimOn = false; if (!raf) req(); };
