@@ -303,7 +303,7 @@
     // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
     // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
     var NDF = 12;   // Ursprünge der grossen Andock-Flares (für die Flare-Welle dort)
-    var NCH = 5, NPT = 12;   // Andock-Flares als Ketten: Anzahl Ketten, Punkte pro Kette
+    var NCH = 7, NPT = 12;   // Andock-Flares als Ketten: Anzahl Ketten, Punkte pro Kette
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
@@ -669,11 +669,12 @@
       function wrapA(x) { while (x > Math.PI) x -= 6.2832; while (x < -Math.PI) x += 6.2832; return x; }
       function dfInit() {
         DF = []; dfLast = 0;
-        var mn = dockPath.mn, np = Math.random() < 0.5 ? 2 : 3, p0 = Math.random();
+        // Hugo 24.11.: ein bis zwei grosse und ein paar kleine, damit sie sich öfter über den Weg laufen
+        var mn = dockPath.mn, nb = Math.random() < 0.5 ? 1 : 2, ns = Math.random() < 0.5 ? 3 : 4, np = nb + ns, p0 = Math.random();
         for (var i = 0; i < np; i++) {
-          var sg = Math.random() < 0.5 ? -1 : 1;
-          DF.push(mkChain({ kind: 1, p: p0 + i / np + rnd(-0.08, 0.08), turn: sg * rnd(0.5, 1.0), Lm: mn * rnd(0.8, 1.1), W: mn * rnd(0.016, 0.024),
-            s: rnd(0.85, 1), t0: i * 0.1 + rnd(0, 0.1), ph: rnd(0, 100), life: 99 }));
+          var sg = Math.random() < 0.5 ? -1 : 1, bg = i < nb;
+          DF.push(mkChain({ kind: 1, p: p0 + i / np + rnd(-0.05, 0.05), turn: sg * rnd(0.5, 1.0), Lm: mn * (bg ? rnd(0.8, 1.1) : rnd(0.3, 0.5)),
+            W: mn * (bg ? rnd(0.016, 0.024) : rnd(0.009, 0.013)), s: bg ? rnd(0.85, 1) : rnd(0.45, 0.7), t0: rnd(0, 0.25), ph: rnd(0, 100), life: 99 }));
         }
       }
       function mkChain(o) { o.n = []; for (var k = 0; k < NPT; k++) o.n.push({ x: 0, y: 0, px: 0, py: 0 }); o.init = false; o.hv = 0; o.tq = 0; return o; }
@@ -692,8 +693,8 @@
           f.rx = R.x; f.ry = R.y; f.init = true;
         }
         // Richtung: Grundneigung + langsames Schwenken + Drehmoment (Anziehung, Peitschenschlag), gefedert
-        var tgt = R.a + f.turn + 0.35 * Math.sin(et * 0.7 + f.ph) + 0.2 * Math.sin(et * 1.3 + f.ph * 2.1);
-        f.hv += (wrapA(tgt - f.h) * 1.6 - f.hv * 1.5 + f.tq) * dt; f.h += f.hv * dt; f.tq *= Math.exp(-dt * 3);
+        var tgt = R.a + f.turn + 0.5 * Math.sin(et * 0.8 + f.ph) + 0.3 * Math.sin(et * 1.5 + f.ph * 2.1);   // mehr Schlängeln
+        f.hv += (wrapA(tgt - f.h) * 1.2 - f.hv * 1.8 + f.tq) * dt; f.h += f.hv * dt; f.tq *= Math.exp(-dt * 1.2);   // weich, langsam abklingend
         // Bewegung der Welle mitnehmen: Verschiebung des Fusses überträgt sich nach oben hin abnehmend
         var dx = R.x - f.rx, dy = R.y - f.ry; f.rx = R.x; f.ry = R.y;
         for (k = 1; k < N; k++) { var wgt = Math.pow(1 - k / (N - 1), 1.5); n[k].x += dx * wgt; n[k].y += dy * wgt; n[k].px += dx * wgt; n[k].py += dy * wgt; }
@@ -704,8 +705,8 @@
         }
         // Spitze wird in Richtung gezogen (bzw. beim Verschmelzen an die Stärkere)
         var tx = R.x + Math.cos(f.h) * L, ty = R.y + Math.sin(f.h) * L;
-        if (f.att) { var an = f.att.f.n[Math.min(N - 1, Math.floor(f.att.i))]; tx = an.x; ty = an.y; f.att.i = Math.min(N - 1, f.att.i + dt * 6); }
-        var tip = n[N - 1], pull = Math.min(1, dt * (f.att ? 6 : 2.4));
+        if (f.att) { var an = f.att.f.n[Math.min(N - 1, Math.floor(f.att.i))]; tx = an.x; ty = an.y; f.att.i = Math.min(N - 1, f.att.i + dt * 2.2); }
+        var tip = n[N - 1], pull = Math.min(1, dt * (f.att ? 1.8 : 1.6));
         tip.x += (tx - tip.x) * pull; tip.y += (ty - tip.y) * pull;
         // erste Glieder steigen senkrecht aus der Welle auf
         var a1 = n[1]; a1.x += (R.x + Math.cos(R.a) * seg - a1.x) * 0.35; a1.y += (R.y + Math.sin(R.a) * seg - a1.y) * 0.35;
@@ -732,15 +733,15 @@
             for (var a = 3; a < NPT; a++) for (var b = 3; b < NPT; b++) {
               var d = Math.hypot(f.n[a].x - g.n[b].x, f.n[a].y - g.n[b].y); if (d < best) { best = d; bi = a; bj = b; }
             }
-            var Rr = mn * 0.4;
+            var Rr = mn * 0.45;
             if (best < Rr) {
               var k = Math.pow(1 - best / Rr, 2);
               [[f, g, bi, bj], [g, f, bj, bi]].forEach(function (z) {
                 var h = z[0], o = z[1], P = h.n[z[2]], Q = o.n[z[3]], ws = o.s / (h.s + o.s);
                 for (var m = Math.max(1, z[2] - 2); m <= Math.min(NPT - 1, z[2] + 2); m++) {   // Körper gleitet hin
-                  h.n[m].x += (Q.x - P.x) * k * dt * 1.4 * ws; h.n[m].y += (Q.y - P.y) * k * dt * 1.4 * ws;
+                  h.n[m].x += (Q.x - P.x) * k * dt * 0.45 * ws; h.n[m].y += (Q.y - P.y) * k * dt * 0.45 * ws;
                 }
-                h.tq += (wrapA(o.h - h.h) * 2.0 + (o.hv - h.hv) * 1.5) * k * ws;   // angleichen
+                h.tq += ((wrapA(o.h - h.h) * 0.9 + (o.hv - h.hv) * 0.7) * k * ws - h.tq) * Math.min(1, dt * 2);   // angleichen, sanft eingeblendet
               });
             }
             if (best < mn * 0.05) {
@@ -748,7 +749,7 @@
               var tvx = 0, tvy = 0;
               [st, wk].forEach(function (h) { var tp = h.n[NPT - 1]; tvx += (tp.x - tp.px) * h.s + Math.cos(h.h) * h.s; tvy += (tp.y - tp.py) * h.s + Math.sin(h.h) * h.s; });
               var nh = Math.atan2(tvy, tvx);
-              st.tq += wrapA(nh - st.h) * 14;   // Peitschenschlag in die neue Richtung
+              st.tq += wrapA(nh - st.h) * 3.2;   // sanfter Peitschenschwung in die neue Richtung
               st.mt = et; wk.mt = et; wk.att = { f: st, i: st === f ? bi : bj };
               var idx = st === f ? bi : bj, free = DF.length < NCH;
               if (free) DF.push(mkChain({ kind: 3, par: st, pi: idx, a0: nh + (Math.random() < 0.5 ? -1 : 1) * rnd(0.6, 1.1), turn: (Math.random() < 0.5 ? -1 : 1) * rnd(0.3, 0.7),
@@ -761,7 +762,7 @@
         for (var c = 0; c < NCH; c++) {
           var f = DF[c]; if (!f || !chainStep(f, et, dt)) continue;
           var age = et - f.t0, lv;
-          if (f.kind === 1) lv = f.s * sm(0, 0.08, age) * (1 - sm(3.0, 5.4, et)) * (f.mt ? (f.att ? 1 - sm(0.1, 1.3, et - f.mt) : (1 + 0.25 * (1 - sm(0, 0.8, et - f.mt))) * (1 - sm(0.6, 2.8, et - f.mt))) : 1);
+          if (f.kind === 1) lv = f.s * sm(0, 0.08, age) * (1 - sm(3.0, 5.4, et)) * (f.mt ? (f.att ? 1 - sm(0.2, 2.0, et - f.mt) : (1 + 0.25 * (1 - sm(0, 0.8, et - f.mt))) * (1 - sm(0.6, 2.8, et - f.mt))) : 1);
           else lv = f.s * sm(0, 0.35, age) * (1 - sm(0.5, 1, age / f.life)) * (1 - sm(3.0, 5.4, et));
           var cx = 0, cy = 0;
           for (var k = 0; k < NPT; k++) {
