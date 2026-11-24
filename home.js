@@ -879,8 +879,11 @@
           E = easeDock(clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1));
         } else {
           var r = rel(j);
+          // Hugo 24.11.: die kleine Säule steht immer in der normalen Reihenfolge (wie ohne Link); die gewählte Karte
+          // wird aus ihrem Platz in der Säule nach vorn geholt (z. B. ?model: die oberste Karte)
+          var r0 = wrap(j); if (r0 > n / 2) r0 -= n;
           aw = W * (LD ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LD ? CONFIG.ldStripH : CONFIG.stripH);
-          k = r + Math.floor(n / 2);
+          k = r0 + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
@@ -888,7 +891,7 @@
           var x0i = LD ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
           var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
           E = LD ? easeMagnet(xj) : easeDock(xin);
-          ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
+          ay = H / 2 + r0 * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
         var ap = LD ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
@@ -896,7 +899,7 @@
         ay = cy - hA / 2;
         // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
         var gapY = 0;
-        if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
+        if (LD && !desk) gapY = lerp(r0, rel(j), E) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
         rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
         s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren
