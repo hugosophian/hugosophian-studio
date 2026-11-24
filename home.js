@@ -274,6 +274,25 @@
     }
 
     var F = 0, C = 0, W = 1, H = 1, raf = 0, last = 0;   // F = angezeigt, C = Ziel (in Bildern)
+    // Hugo 24.11.: Start-Karte über den Link wählen – z. B. hugosophian.studio/?model oder /?creator (auch ?start=model
+    // oder #model). Passt auf den CMS-Namen (mechanic, kunst, musik, persona) oder den Titel (Alchemist, Creator, Singer, Model).
+    // Diese Karte fliegt in der Mitte ein und ist danach das erste Bild; ohne Angabe wie bisher die erste Karte.
+    (function () {
+      var keys = [];
+      try {
+        var sp = new URLSearchParams(location.search);
+        if (sp.get('start')) keys.push(sp.get('start'));
+        sp.forEach(function (v, k) { if (k !== 'start') keys.push(k); });
+      } catch (e) {}
+      if (location.hash.length > 1) keys.push(decodeURIComponent(location.hash.slice(1)));
+      for (var q = 0; q < keys.length; q++) {
+        var key = String(keys[q]).trim().toLowerCase();
+        if (!key) continue;
+        for (var i = 0; i < n; i++) {
+          if (slides[i].name.toLowerCase() === key || slides[i].label.toLowerCase() === key) { F = C = i; return; }
+        }
+      }
+    })();
     var hov = -1, deskMoving = false;
     var introOn = !reduce, introT0 = 0, introP = 0, LD = null;
     function wrap(x) { return ((x % n) + n) % n; }
