@@ -71,6 +71,7 @@
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
+    diveZoomIn: 2.4,    // Hugo 24.11. (19:48): so tief taucht das Bild beim Öffnen ein (gleichmässig, wie früher kräftig); danach unsichtbar zurück auf diveZoom
     diveMs:     1200,   // Dauer des Eintauchens (startet am Handy schon beim Tippen); Hugo 24.11. (19:46): gleichmässig, ohne Abbremsen, bis das Bild unter dem Licht ist
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
@@ -1371,17 +1372,24 @@
         if (s.dv.k <= 1.0001) { s.dv.px = x - (r.left + r.width / 2); s.dv.py = y - (r.top + r.height / 2); }
       }
       if (!s.dv) return;
-      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : desk ? easeDiveOutD : easeDiveOut;
+      var d = s.dv, from = d.k, to = on ? (desk ? CONFIG.diveZoom : CONFIG.diveZoomIn) : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : desk ? easeDiveOutD : easeDiveOut;
       s.dive = true; if (d.raf) cancelAnimationFrame(d.raf);
-      function f(now) {
-        var t = clamp((now - t0) / ms, 0, 1);
-        d.k = from + (to - from) * ez(t);
+      function apply() {
         m.style.transformOrigin = '50% 50%';
         var zt = 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + d.k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px)';
         m.style.transform = zt + ' scale(' + base + ')';
         if (!desk) { s.diveTf = zt; if (s.fx) { s.fx.style.transformOrigin = '50% 50%'; } }
+      }
+      clearTimeout(d.rt);
+      function f(now) {
+        var t = clamp((now - t0) / ms, 0, 1);
+        d.k = from + (to - from) * ez(t);
+        apply();
         if (t < 1) { d.raf = requestAnimationFrame(f); return; }
         d.raf = 0;
+        // Hugo 24.11. (19:48): am Handy taucht das Bild tiefer ein als es offen bleibt; ganz verdeckt von der Sonne springt es
+        // unsichtbar auf die normale Tiefe zurück – so bleibt das Herauszoomen beim Schliessen genau wie bisher
+        if (on && to !== CONFIG.diveZoom) d.rt = setTimeout(function () { if (s.dv === d && !d.raf && root.classList.contains('is-info')) { d.k = CONFIG.diveZoom; apply(); } }, 700);
         if (!on) { s.dive = false; s.dv = null; s.diveTf = ''; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
       }
       d.raf = requestAnimationFrame(f);
