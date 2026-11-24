@@ -398,7 +398,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -776,6 +776,9 @@
         // Computer, Sonne nach 1 s Ruhe (Hugo 24.11.): ohne Foto bleibt nur das Licht der Welle (Regenbogen, Flares)
         '  if (uFade < 0.999) {',
         '    vec3 cR = gc + eacc; float aR = max(max(gc.r, max(gc.g, gc.b)) * 0.55, max(eacc.r, max(eacc.g, eacc.b)));',
+        // Hugo 24.11. (15:19): über der weissen Sonne wäre addiertes Licht unsichtbar (Weiss + Licht = Weiss) – die Welle
+        // verschwand darum abrupt, sobald das Foto weg war. Hier als Farbe auf Weiss (Prisma), sie klingt weich in der Sonne aus
+        '    if (uTint > 0.0) { float mR = max(cR.r, max(cR.g, cR.b)); vec3 tc = mR > 1e-3 ? cR / mR : vec3(1.0); tc = clamp(mix(vec3(dot(tc, vec3(0.333))), tc, 1.5), 0.0, 1.0) * 0.9; float ta = clamp(mR * 0.8, 0.0, 0.8); cR = mix(cR, tc * ta, uTint); aR = mix(aR, ta, uTint); }',
         '    vec3 cD = al > 1e-4 ? col * (alD / al) : vec3(0.0);',   // Hugo 24.11. (15:16): über der Sonne nur das verschobene Foto der Welle zeigen (sonst stand am Rand ein dunkler Rahmen)
         '    col = mix(cR, cD, uFade); al = mix(aR, alD, uFade);',
         '  }',
@@ -790,7 +793,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -924,7 +927,10 @@
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
-        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = '9'; }   // über der Sonne und der Blendung
+        // Hugo 24.11. (15:20): während die Sonne einblendet, liegt die Welle normal (mit Foto) UNTER ihr und blendet mit dem
+        // Bild aus – keine Foto-Fetzen auf dem Weiss mehr. Danach liegt sie darüber und erscheint weich als Prisma-Licht.
+        var lf = lightFade(now), sinceF = (now - lightT0) / 1000 - CONFIG.deskSunFade / 1000;
+        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = lf > 0.001 ? '2' : '9'; }
         else if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
         var sr = refRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
@@ -959,16 +965,17 @@
           }
         }
         // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
-        if (lightFade(now) > 0.001 && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
+        if ((!lightMode || lf > 0.001) && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
           c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightFade(now)); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && lf <= 0.001 ? tintV * sm01(0, 0.5, sinceF) : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
+        if (pendingOff && !on) lightOff();
         if (on) c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         if (!desk) showFx(sr, pw, ph, on && !lightMode);
         if (on) req();
@@ -1011,7 +1018,7 @@
         // Hugo 24.11.: die Maus zieht am Computer immer eine Welle wie der Finger am Handy (Text liegt darüber, bleibt ruhig)
         if (!desk || busy() || root.classList.contains('is-info') || dsunOn) return;   // bei der Sonne keine neuen Wellen (die laufende läuft zu Ende)
         var now = performance.now(), wv = waves[waves.length - 1];
-        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
+        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
@@ -1056,11 +1063,18 @@
         cancelAnimationFrame(raf); req();
       };
       cv.dock = dock;
-      var lightMode = false, lightT0 = 0;
+      var lightMode = false, lightT0 = 0, tintV = 0;
+      cv.tint = function (v) { tintV = v; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
       // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
       function lightFade(now) { return lightMode ? 1 - smoothstep(0, CONFIG.deskSunFade / 1000, (now - lightT0) / 1000) : 1; }
-      cv.lightOnly = function (on) { if (on && !lightMode) lightT0 = performance.now(); lightMode = !!on; if (!on && cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } if (!raf) req(); };
+      // Hugo 24.11. (15:19): nach dem close nicht sofort zurückschalten – der Wechsel vom Licht zur Bild-Darstellung machte das
+      // Bild mitten im Schimmer kurz dunkler (und die Textur musste neu geladen werden, Ruckler). Erst wenn nichts mehr läuft
+      // oder eine neue Welle beginnt
+      var pendingOff = false;
+      function lightOff() { pendingOff = false; lightMode = false; if (cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } }
+      cv.lightOnly = function (on) { if (on) { pendingOff = false; if (!lightMode) lightT0 = performance.now(); lightMode = true; } else if (lightMode) pendingOff = true; if (!raf) req(); };
+      cv.newWave = function () { if (pendingOff) lightOff(); };
       // Hugo 24.11. (13:37): Welle, die die Sonne aufdeckt – ein Punkt, läuft als Ring schnell nach aussen
       cv.dropTap = function () { var now = performance.now(); waves = waves.filter(function (q) { return q.sp2 || now - q.t0 > 800 || q.pts.length > 3; }); };
       cv.burst = function (x, y, sp) {
@@ -1075,6 +1089,7 @@
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
         var t = e.touches[0];
+        if (pendingOff) lightOff();
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
         if (edgeT0 && !killT0) killT0 = performance.now();
         add(t.clientX, t.clientY);
@@ -1353,7 +1368,7 @@
     function reveal(x, y, els, onPass, tb) {
       revealStop(true);
       rv.els = els;
-      if (ripple && ripple.lightOnly) ripple.lightOnly(true);
+      if (ripple && ripple.lightOnly) { ripple.lightOnly(true); ripple.tint(1); }
       if (reduce) { if (onPass) onPass(1e6, 0, 0); return; }
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
@@ -1472,6 +1487,7 @@
       if (dDive) { var dd0 = dDive; setTimeout(function () { if (dDive !== dd0) dive(dd0, 0, 0, false); }, closeHold); dDive = null; }   // nicht herauszoomen, wenn die Sonne inzwischen wieder auf demselben Bild ist
       root.classList.remove('hp-dsun');
       if (sun) { sun.light(false); sun.blind(); }
+      if (ripple && ripple.tint) ripple.tint(0);
       closeRipple();
       clearTimeout(dsunEnd);
       dsunEnd = setTimeout(function () {
@@ -2338,6 +2354,7 @@
       cancelAnimationFrame(blotR); infoText.style.webkitMaskImage = infoText.style.maskImage = '';
       if (infoOpen.getAnimations) infoOpen.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
+      if (ripple && ripple.tint) ripple.tint(0);
       closeRipple();
       clearTimeout(infoT);
       infoT = setTimeout(function () {
