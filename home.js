@@ -323,17 +323,21 @@
         // Zwei Scharen schiessen von gegenüberliegenden Seiten über die Mitte bis auf die Gegenseite, gleiten ineinander,
         // werden unterwegs schwächer und nehmen die Randfarbe ihres Ursprungs mit; die Welle läuft weich die Fäden entlang
         'float flPsi(vec2 fc, vec2 res, float t, vec2 d, float sw, float sd) {',
-        '  float mn = min(res.x, res.y); vec2 q = fc / mn, c = (fc - res * 0.5) / mn; float s = dot(c, d);',
+        '  float mn = min(res.x, res.y); vec2 q = fc / mn, c = (fc - res * 0.5) / mn;',
+        '  float ra = 0.75 * (n2(q * 0.7 + vec2(sd * 1.3, t * 0.02)) - 0.5); c = mat2(cos(ra), sin(ra), -sin(ra), cos(ra)) * c;',   // Hugo 24.11.: fächert auf
+        '  c -= d * 0.45 * smoothstep(2.0, 6.0, uEdgeT);',   // Hugo 24.11.: beim Verglimmen weiterziehen statt stehen
+        '  float s = dot(c, d);',
         '  vec2 pp = vec2(-d.y, d.x); float smx = 0.5 * (abs(d.x) * res.x + abs(d.y) * res.y) / mn;',
         '  float ps = dot(c, pp) * 4.5 + sw * s * s * 1.1 + 0.9 * n2(q * 1.8 + vec2(t * 0.07, -t * 0.05) + sd) + 0.45 * n2(q * 4.0 + vec2(-t * 0.1, s * 2.5 - t * 0.45));',
         // Hugo 24.11. (Skizze): am Ursprung starten sie als gebogene Korona-Schlaufen (Füsse am Rand), die aufgehen
         // organischer (Skizze): weicher S-Peitschenschwung, der langsam die Fäden entlangläuft
         '  ps += 0.55 * sw * sin(s * 2.4 - t * 0.55 + sd * 3.0) * smoothstep(-smx, -smx + 0.5, s);',
-        '  float op = exp(-max(uEdgeT, 0.0) * 0.55);',
+        '  float op = exp(-max(uEdgeT, 0.0) * 1.1);',
         '  for (int k = 0; k < 2; k++) {',
-        '    float fk = float(k), hk = h2(vec2(sd + fk * 3.1, 2.7)), rk = 0.13 + 0.1 * h2(vec2(sd, fk + 5.0));',
+        '    float fk = float(k), hk = h2(vec2(sd + fk * 3.1, 2.7)), rk = 0.12 + 0.08 * h2(vec2(sd, fk + 5.0));',
         '    vec2 c0 = -d * (smx - 0.14) + pp * ((hk - 0.5) * 1.5);',
-        '    vec2 dc = c - c0; ps += (fk < 0.5 ? 1.0 : -1.0) * (0.9 + 0.8 * op) * exp(-dot(dc, dc) / (rk * rk));',
+        '    vec2 dc = c - c0; float da = dot(dc, d) / rk, db = dot(dc, pp) / (rk * 1.9);',   // flacher Bogen
+        '    ps += (fk < 0.5 ? 1.0 : -1.0) * (0.45 + 0.9 * op) * exp(-da * da - db * db);',
         '  }',
         '  return ps;',
         '}',
@@ -341,7 +345,8 @@
         // laufen ein Stück mit ihm zusammen und lösen sich wieder – weich, ohne Ruck
         'float flPull(float pa, float sd) {',
         '  float id = floor(pa + 0.5), dl = pa - id;',
-        '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.11);',
+        '  float k = 1.0 - 4.0 * dl * dl;',   // läuft zur Grenze hin sauber auf 0 aus (keine Nahtlinien)
+        '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.11) * k * k;',
         '}',
         'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, out vec3 tint) {',
         '  tint = vec3(0.0);',
@@ -356,9 +361,9 @@
         '  float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '  float sd2 = abs(ps - id) / gl;',
         '  float swd = mn * (0.005 + 0.008 * str) * (1.35 - 0.65 * u), sw2 = swd * 1.55;',
-        '  float thin = exp(-sd2 * sd2 / (swd * swd)) + 0.35 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
+        '  float thin = exp(-sd2 * sd2 / (swd * swd)) + 0.25 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
         // Hugo 24.11.: gemischt mit den Lichtströmen – feiner Faden plus weiche verwobene Fasern mit mitlaufendem Licht
-        '  float fib = 0.45 * exp(-sd2 * sd2 / (sw2 * sw2 * 9.0));',
+        '  float fib = 0.3 * exp(-sd2 * sd2 / (sw2 * sw2 * 9.0));',
         '  for (int j = -1; j <= 1; j++) {',
         '    float fj = float(j), of = fj * (0.06 + 0.06 * n2(vec2(s * 3.0 - t * 0.3, id * 2.0 + fj * 5.0)));',
         '    float dj = abs(ps - id - of) / gl;',
@@ -367,14 +372,15 @@
         '  fib *= 0.75 + 0.35 * sin(s * 8.0 - t * 2.0 + id * 1.7);',
         '  float core = 0.6 * thin + 0.6 * fib;',
         '  float wfn = 0.04 + 0.13 * (1.0 - exp(-et * 1.8));',   // Lage der Flare-Welle (Abstand vom Rand)
-        '  float along = smoothstep(wfn - 0.05, wfn + 0.03, ee / mn) * (1.0 - smoothstep(sf - 0.3, sf, s));',
+        '  float tl = -smx - 0.3 + (2.0 * smx + 0.3) * smoothstep(2.2, 6.0, et);',   // Ende: Schwanz löst sich vom Ursprung her auf
+        '  float along = smoothstep(wfn - 0.05, wfn + 0.03, ee / mn) * (1.0 - smoothstep(sf - 0.3, sf, s)) * smoothstep(tl, tl + 0.35, s);',
         '  float life = smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.6, 6.2, et));',
         '  float weak = mix(1.0, 0.28, smoothstep(0.05, 1.0, u));',
         '  float flick = 0.8 + 0.2 * n2(vec2(s * 6.0 - t * 1.5, id * 3.0));',
-        '  float sv = core * along * life * flick * weak * (0.45 + 0.75 * str);',
+        '  float sv = core * along * life * flick * weak * (0.5 + 0.55 * str);',
         '  vec2 o = c - d * (s + smx); o = normalize(o * mn + vec2(0.001));',                  // Ursprung am Rand
         '  vec3 oc = 0.5 + 0.5 * cos(6.2832 * (atan(o.y, o.x) / 6.2832 * 2.0 + t * 0.06 + vec3(0.0, 0.33, 0.67)));',
-        '  tint = mix(oc, vec3(1.0, 0.82, 0.55), 0.35) * sv * (1.0 - smoothstep(0.0, 0.75, u));',   // trägt die Ursprungsfarbe mit
+        '  tint = mix(oc, vec3(1.0, 0.82, 0.55), 0.25) * sv * (1.0 - smoothstep(0.1, 0.95, u));',   // trägt die Ursprungsfarbe mit
         '  return sv;',
         '}',
         'float segF(vec2 fc, vec4 a, vec4 b, float mx, float sp, out vec2 dv, out float d) {',
@@ -532,11 +538,16 @@
         '      vec3 QB = PB + att * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
         '      float vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, tA);',
         '      float vB = flFam(fc, uRes, tB0, et, ee, sB, a0 + 3.1416 + 0.35 * sw, QB, tB);',
-        '      float sv = vA + vB; sv = sv / (1.0 + 0.45 * sv);',   // wo sie sich treffen: weich verschmelzen statt aufaddieren
+        '      vec3 tC; float sC = uSeed + 13.1, tC0 = uT * 0.93 + 9.0, aC = a0 + 1.5708 * sw + 0.3;',
+        '      vec2 dC = vec2(cos(aC), sin(aC));',
+        '      vec3 PC = vec3(flPsi(fc, uRes, tC0, dC, sw, sC), flPsi(fc + o1, uRes, tC0, dC, sw, sC), flPsi(fc + o2, uRes, tC0, dC, sw, sC));',
+        '      PC += att * 0.8 * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
+        '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, tC);',
+        '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1));',   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
         '      float wfc = 0.04 + 0.13 * (1.0 - exp(-et * 1.8)), dw = (ee / mnS - wfc) / 0.07;',
         '      float sb = max(1.0 - smoothstep(0.03, 0.3, ee / mnS), 0.85 * exp(-dw * dw));',
         '      faD += sv * (1.0 - 0.7 * sb) * 1.3;',
-        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + tB) * 0.45 * (1.0 - sb);',
+        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + tB + tC * 0.75) * 0.6 * (1.0 - sb);',
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
