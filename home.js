@@ -353,8 +353,6 @@
         '  vec2 gP = vec2(P.y - P.x, P.z - P.x), gF = vec2(F.y - F.x, F.z - F.x);',
         '  float dpf = dot(gF, gP), a = att;',
         '  if (dpf < 0.0) a = min(att, 0.6 * dot(gP, gP) / max(-dpf, 1e-7));',
-        // Hugo 24.11. (9:28): auch kein scharfes seitliches Abknicken (Zickzack) – höchstens rund 50° auf einmal
-        '  a = min(a, 1.2 * length(gP) / max(length(gF), 1e-7));',
         '  return P + a * F;',
         '}',
         'float flPull(float pa, float sd) {',
@@ -424,7 +422,7 @@
         '             * smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.6, 6.2, et)) * mix(1.0, 0.28, smoothstep(0.05, 1.0, u));',
         '  float sv = 0.0;',
         '  if (base < 0.002) return 0.0;',
-        '  for (int n = -2; n <= 2; n++) {',   // Hugo 24.11. (9:28): auch der übernächste Faden – sein breiter Schein reicht bis hier (sonst harte Kante daneben)
+        '  for (int n = -1; n <= 1; n++) {',
         '    float id = id0 + float(n);',
         '    float hs = h2(vec2(id, sd * 1.7)), hr = h2(vec2(id + 11.0, sd));',
         '    if (flLit(id, sd) < 0.78) continue;',
