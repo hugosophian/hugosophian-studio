@@ -302,7 +302,8 @@
     // WebGL nachgezeichnet und an der Welle verschoben), um die Welle schimmert ein feiner Regenbogen.
     // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
     // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
-    var NDF = 12;   // grosse Andock-Flares + ihre kleinen Ableger
+    var NDF = 12;   // Ursprünge der grossen Andock-Flares (für die Flare-Welle dort)
+    var NCH = 5, NPT = 12;   // Andock-Flares als Ketten: Anzahl Ketten, Punkte pro Kette
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
@@ -313,7 +314,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform vec4 uDF[' + NDF + ']; uniform vec4 uDF2[' + NDF + '];',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform vec4 uDF[' + NDF + ']; uniform vec4 uDF2[' + NDF + ']; uniform vec4 uCP[' + (NCH * NPT) + ']; uniform vec4 uCB[' + NCH + '];',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -411,26 +412,27 @@
         // bei der Fingerwelle) und das Andocken lässt weiche Solar Flares aus dem Rand schiessen. Die Flares bewegen sich
         // langsam und organisch; kommen sich zwei nahe, weichen sie einander wie Magnete aus (berechnet in draw()).
         '  vec3 eacc = vec3(0.0); float fI = 0.0;',
-        // Grosse Andock-Flares als Objekte (Hugo 24.11.): wenige starke, die schräg und gebogen weit ins Bild schiessen
-        // (jede in eigener Richtung, darum kein gemeinsamer Punkt in der Mitte) und unterwegs kleine Flares auslösen.
-        // Weiche Zunge: Kern + Schein, leicht gewunden, flackernd.
-        '  for (int i = 0; i < ' + NDF + '; i++) {',
-        '    vec4 oa = uDF[i]; vec4 ob = uDF2[i]; if (ob.z <= 0.001) continue;',
-        '    vec2 od = vec2(cos(oa.z), sin(oa.z)); vec2 op = fc - oa.xy;',
-        '    float ou = dot(op, od), ov = dot(op, vec2(-od.y, od.x));',
-        '    if (ou < -ob.y * 3.0 || ou > ob.x * 1.25) continue;',
-        '    float uc = clamp(ou, 0.0, ob.x), tt = uc / max(ob.x, 1.0);',
-        '    float vc = ov - oa.w * uc * uc - sin(uc * 0.02 - uT * 1.2 + float(i) * 2.3) * ob.y * 0.9 * tt;',
-        '    float wd = ob.y * (0.6 + 0.8 * tt) * (1.0 - 0.55 * smoothstep(0.65, 1.0, tt));',
-        '    float oc = exp(-vc * vc / (wd * wd)) + 0.4 * exp(-vc * vc / (wd * wd * 7.0));',
-        '    float oal = smoothstep(-ob.y * 4.0, ob.y * 1.5, ou) * (1.0 - smoothstep(ob.x * 0.75, ob.x * 1.2, ou));',
-        '    float ofl = ob.z * (0.75 + 0.25 * n2(vec2(ou * 0.03 - uT * 1.6, float(i) * 7.0)));',
-        // Hugo 24.11.: der Ursprung verschmilzt mit dem Umfeld – unten weich und in den Randfarben, erst weiter oben weissgolden
-        '    float obase = 1.0 - smoothstep(0.05, 0.45, tt);',
-        '    faD += oc * oal * ofl * (1.0 - 0.75 * obase);',
-        '    vec2 oca = normalize(fc - uRes * 0.5 + vec2(0.001));',
-        '    vec3 orb = 0.5 + 0.5 * cos(6.2832 * (atan(oca.y, oca.x) / 6.2832 * 2.0 + uT * 0.06 + tt * 0.4 + vec3(0.0, 0.33, 0.67)));',
-        '    eacc += mix(orb, vec3(1.0, 0.82, 0.55), 0.3) * exp(-vc * vc / (wd * wd * 12.0)) * oal * ofl * obase * 0.55;',
+        // Grosse Andock-Flares als biegsame Bänder (Hugo 24.11.): jede ist eine Kette aus Punkten (Seil-Physik in JS),
+        // entspringt einer Flare-Welle, nimmt die Bewegung der Welle mit und schlängelt sich wie eine Peitsche.
+        // Weich: Kern + Schein; am Ursprung in den Randfarben, weiter oben weissgolden.
+        '  vec2 oca = normalize(fc - uRes * 0.5 + vec2(0.001));',
+        '  vec3 orb = 0.5 + 0.5 * cos(6.2832 * (atan(oca.y, oca.x) / 6.2832 * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
+        '  for (int c = 0; c < ' + NCH + '; c++) {',
+        '    vec4 cb = uCB[c]; if (cb.w <= 0.001) continue;',
+        '    if (length(fc - cb.xy) > cb.z) continue;',
+        '    float bv = 0.0, bb = 0.0;',
+        '    for (int j = 0; j < ' + (NPT - 1) + '; j++) {',
+        '      vec4 pa = uCP[c * ' + NPT + ' + j]; vec4 pb = uCP[c * ' + NPT + ' + j + 1];',
+        '      vec2 ab = pb.xy - pa.xy; float l2 = max(dot(ab, ab), 0.01);',
+        '      float t = clamp(dot(fc - pa.xy, ab) / l2, 0.0, 1.0);',
+        '      float d = length(fc - pa.xy - ab * t), w = max(mix(pa.z, pb.z, t), 0.5), I = mix(pa.w, pb.w, t);',
+        '      float s = (float(j) + t) / ' + (NPT - 1) + '.0, base = 1.0 - smoothstep(0.04, 0.35, s);',
+        '      float wob = 0.78 + 0.22 * n2(vec2(s * 7.0 - uT * 1.7, float(c) * 7.0));',
+        '      bv = max(bv, (exp(-d * d / (w * w)) + 0.4 * exp(-d * d / (w * w * 7.0))) * I * wob * (1.0 - 0.75 * base));',
+        '      bb = max(bb, exp(-d * d / (w * w * 12.0)) * I * base);',
+        '    }',
+        '    faD += bv * cb.w;',
+        '    eacc += mix(orb, vec3(1.0, 0.82, 0.55), 0.3) * bb * cb.w * 0.55;',
         '  }',
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
@@ -526,7 +528,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uDF', 'uDF2', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uDF', 'uDF2', 'uCP', 'uCB', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -563,7 +565,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, dockPath = null, DF = [], dfLast = 0, df1 = new Float32Array(NDF * 4), df2 = new Float32Array(NDF * 4), gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, dockPath = null, DF = [], dfLast = 0, df1 = new Float32Array(NDF * 4), df2 = new Float32Array(NDF * 4), cpb = new Float32Array(NCH * NPT * 4), cbb = new Float32Array(NCH * 4), gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : 2;
@@ -640,8 +642,8 @@
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
-        if (et >= 0 && dockPath) dfStep(et, sr); else { df2.fill(0); DF = []; }
-        c.uniform4fv(U.uDF, df1); c.uniform4fv(U.uDF2, df2);
+        if (et >= 0 && dockPath) dfStep(et, sr); else { df2.fill(0); cbb.fill(0); DF = []; }
+        c.uniform4fv(U.uDF, df1); c.uniform4fv(U.uDF2, df2); c.uniform4fv(U.uCP, cpb); c.uniform4fv(U.uCB, cbb);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
@@ -659,108 +661,122 @@
       }
       function rnd(a, b) { return a + (b - a) * Math.random(); }
       function sm(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+      // Grosse Andock-Flares als Ketten (Hugo 24.11., nach Hugos Skizze): der Fuss sitzt auf der Andock-Welle und wandert
+      // mit ihr, die Spitze wird in eine sich langsam drehende Richtung gezogen, der Körper folgt wie ein Seil – so
+      // entstehen weiche S-Kurven. Kommen sich zwei nahe, ziehen sie sich an und gleichen sich an; berühren sie sich,
+      // gleitet die schwächere in die stärkere hinein, die stärkere bekommt aus dem gemeinsamen Schwung eine neue
+      // Richtung (Peitschenschlag) und an der Stelle peitscht ein kleiner Flare heraus. Alles blendet weich aus.
+      function wrapA(x) { while (x > Math.PI) x -= 6.2832; while (x < -Math.PI) x += 6.2832; return x; }
       function dfInit() {
         DF = []; dfLast = 0;
-        var np = Math.random() < 0.5 ? 2 : 3, p0 = Math.random();
+        var mn = dockPath.mn, np = Math.random() < 0.5 ? 2 : 3, p0 = Math.random();
         for (var i = 0; i < np; i++) {
           var sg = Math.random() < 0.5 ? -1 : 1;
-          DF.push({ kind: 1, p: p0 + i / np + rnd(-0.08, 0.08), rot: sg * rnd(0.55, 1.05), cs: (Math.random() < 0.5 ? -1 : 1) * rnd(0.3, 0.55),
-            Lm: dockPath.mn * rnd(0.75, 1.05), W: dockPath.mn * rnd(0.018, 0.026), s: rnd(0.85, 1), dl: i * 0.1 + rnd(0, 0.1), ph: rnd(0, 100) });
+          DF.push(mkChain({ kind: 1, p: p0 + i / np + rnd(-0.08, 0.08), turn: sg * rnd(0.5, 1.0), Lm: mn * rnd(0.8, 1.1), W: mn * rnd(0.016, 0.024),
+            s: rnd(0.85, 1), t0: i * 0.1 + rnd(0, 0.1), ph: rnd(0, 100), life: 99 }));
         }
       }
-      function geo(f, et) {   // aktuelle Lage einer grossen Flare
-        var mn = dockPath.mn, q = pathAt(f.p), nx = dockPath.cx - q.x, ny = dockPath.cy - q.y, nl = Math.hypot(nx, ny) || 1;
-        nx /= nl; ny /= nl;
+      function mkChain(o) { o.n = []; for (var k = 0; k < NPT; k++) o.n.push({ x: 0, y: 0, px: 0, py: 0 }); o.init = false; o.hv = 0; o.tq = 0; return o; }
+      function rootOf(f, et) {
+        if (f.kind === 3) { var pn = f.par.n[f.pi]; return { x: pn.x, y: pn.y, a: f.a0 }; }
+        var mn = dockPath.mn, q = pathAt(f.p), nx = dockPath.cx - q.x, ny = dockPath.cy - q.y, nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
         var trv = 1 - Math.exp(-et * 2.6);
-        f.x = q.x + nx * mn * dockPath.reach * q.m * trv; f.y = q.y + ny * mn * dockPath.reach * q.m * trv;
-        f.a = Math.atan2(ny, nx) + f.rot + 0.16 * Math.sin(et * 0.5 + f.ph) + (f.da || 0);
-        f.L = f.Lm * (1 - Math.exp(-Math.max(0, et - f.dl) * 1.5));
-        f.c = f.cs / f.Lm * (1 + 0.25 * Math.sin(et * 0.7 + f.ph * 1.3)) + (f.dc || 0) / f.Lm;
+        return { x: q.x + nx * mn * dockPath.reach * q.m * trv, y: q.y + ny * mn * dockPath.reach * q.m * trv, a: Math.atan2(ny, nx) };
       }
-      function along(f, u) {   // Punkt und Richtung auf der gebogenen Flare
-        var dx = Math.cos(f.a), dy = Math.sin(f.a), px = -dy, py = dx, o = f.c * u * u;
-        return { x: f.x + dx * u + px * o, y: f.y + dy * u + py * o, a: Math.atan2(dy + py * 2 * f.c * u, dx + px * 2 * f.c * u) };
+      function chainStep(f, et, dt) {
+        var age = et - f.t0; if (age < 0) return false;
+        var R = rootOf(f, et), N = NPT, n = f.n, L = f.Lm * (1 - Math.exp(-age * (f.kind === 3 ? 2.4 : 1.6))), seg = Math.max(0.5, L / (N - 1));
+        if (!f.init) {
+          f.h = R.a + f.turn * 0.4;
+          for (var k = 0; k < N; k++) { n[k].x = n[k].px = R.x; n[k].y = n[k].py = R.y; }
+          f.rx = R.x; f.ry = R.y; f.init = true;
+        }
+        // Richtung: Grundneigung + langsames Schwenken + Drehmoment (Anziehung, Peitschenschlag), gefedert
+        var tgt = R.a + f.turn + 0.35 * Math.sin(et * 0.7 + f.ph) + 0.2 * Math.sin(et * 1.3 + f.ph * 2.1);
+        f.hv += (wrapA(tgt - f.h) * 1.6 - f.hv * 1.5 + f.tq) * dt; f.h += f.hv * dt; f.tq *= Math.exp(-dt * 3);
+        // Bewegung der Welle mitnehmen: Verschiebung des Fusses überträgt sich nach oben hin abnehmend
+        var dx = R.x - f.rx, dy = R.y - f.ry; f.rx = R.x; f.ry = R.y;
+        for (k = 1; k < N; k++) { var wgt = Math.pow(1 - k / (N - 1), 1.5); n[k].x += dx * wgt; n[k].y += dy * wgt; n[k].px += dx * wgt; n[k].py += dy * wgt; }
+        // Verlet: Körper mit Schwung (weich gedämpft)
+        for (k = 1; k < N; k++) {
+          var vx = (n[k].x - n[k].px) * 0.93, vy = (n[k].y - n[k].py) * 0.93;
+          n[k].px = n[k].x; n[k].py = n[k].y; n[k].x += vx; n[k].y += vy;
+        }
+        // Spitze wird in Richtung gezogen (bzw. beim Verschmelzen an die Stärkere)
+        var tx = R.x + Math.cos(f.h) * L, ty = R.y + Math.sin(f.h) * L;
+        if (f.att) { var an = f.att.f.n[Math.min(N - 1, Math.floor(f.att.i))]; tx = an.x; ty = an.y; f.att.i = Math.min(N - 1, f.att.i + dt * 6); }
+        var tip = n[N - 1], pull = Math.min(1, dt * (f.att ? 6 : 2.4));
+        tip.x += (tx - tip.x) * pull; tip.y += (ty - tip.y) * pull;
+        // erste Glieder steigen senkrecht aus der Welle auf
+        var a1 = n[1]; a1.x += (R.x + Math.cos(R.a) * seg - a1.x) * 0.35; a1.y += (R.y + Math.sin(R.a) * seg - a1.y) * 0.35;
+        // Biegesteifigkeit: weiche Kurven statt Knicke
+        for (k = 1; k < N - 1; k++) { var mxp = (n[k - 1].x + n[k + 1].x) / 2, myp = (n[k - 1].y + n[k + 1].y) / 2; n[k].x += (mxp - n[k].x) * 0.22; n[k].y += (myp - n[k].y) * 0.22; }
+        // Seil: Längen halten, Fuss fest
+        n[0].x = R.x; n[0].y = R.y;
+        for (var it = 0; it < 6; it++) for (k = 0; k < N - 1; k++) {
+          var A = n[k], B = n[k + 1], ex = B.x - A.x, ey = B.y - A.y, d = Math.hypot(ex, ey) || 1e-3, df = (d - seg) / d;
+          var wa = k === 0 ? 0 : 0.5, wb = k === 0 ? 1 : (k + 1 === N - 1 ? 0.35 : 0.5);
+          A.x += ex * df * wa; A.y += ey * df * wa; B.x -= ex * df * wb; B.y -= ey * df * wb;
+        }
+        return true;
       }
       function dfStep(et, sr) {
         if (!DF.length) dfInit();
-        var mn = dockPath.mn, parents = DF.filter(function (f) { return f.kind === 1; });
-        parents.forEach(function (f) { geo(f, et); });
-        // Hugo 24.11.: magnetisches Spiel – je näher sich zwei grosse Flares kommen, desto stärker ziehen sie sich an:
-        // sie drehen und biegen sich weich zueinander (gefederte Bewegung, nichts starr). Berühren sie sich, verschmelzen
-        // sie: beide schwenken in eine gemeinsame neue Richtung, werfen einen kleinen Flare aus und blenden dann aus.
-        var dt = dfLast ? Math.min(0.05, et - dfLast) : 0.016; dfLast = et;
-        function wrap(x) { while (x > Math.PI) x -= 6.2832; while (x < -Math.PI) x += 6.2832; return x; }
-        parents.forEach(function (f) { f.fa = -(f.da || 0) * 0.5 - (f.vda || 0) * 1.4; f.fc = -(f.dc || 0) * 0.6 - (f.vdc || 0) * 1.4; });
-        parents.forEach(function (f, pi) {
-          parents.forEach(function (g, gi) {
-            if (gi <= pi || et < 0.2) return;
-            var best = 1e9, bp = null, bq = null, bfa = 0, bfb = 0;
-            [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fa) {
-              var a = along(f, f.L * fa);
-              [0.3, 0.45, 0.6, 0.75, 0.9].forEach(function (fb) {
-                var b = along(g, g.L * fb), d = Math.hypot(a.x - b.x, a.y - b.y);
-                if (d < best) { best = d; bp = a; bq = b; bfa = fa; bfb = fb; }
-              });
-            });
-            var R = mn * 0.4;
-            if (best < R && !f.mt && !g.mt) {
-              var k = Math.pow(1 - best / R, 2);
-              // f dreht/biegt Richtung g und umgekehrt (an der nächsten Stelle gemessen)
-              [[f, bp, bq, bfa], [g, bq, bp, bfb]].forEach(function (z) {
-                var h = z[0], P = z[1], Q = z[2], u = Math.max(0.2, z[3]);
-                var want = Math.atan2(Q.y - h.y, Q.x - h.x), have = Math.atan2(P.y - h.y, P.x - h.x);
-                var dA = wrap(want - have);
-                h.fa += dA * k * 2.6 / u;
-                // angleichen: Richtung und Schwung werden sich mit zunehmender Nähe ähnlicher
-                var o2 = h === f ? g : f, ws = o2.s / (h.s + o2.s);
-                h.fa += wrap(o2.a - h.a) * k * 1.8 * ws + ((o2.vda || 0) - (h.vda || 0)) * k * 2.0 * ws;
-                var cr = Math.cos(P.a) * (Q.y - P.y) - Math.sin(P.a) * (Q.x - P.x);
-                h.fc += (cr > 0 ? 1 : -1) * k * 0.9;
+        var mn = dockPath.mn, dt = dfLast ? Math.min(0.05, Math.max(0.001, et - dfLast)) : 0.016; dfLast = et;
+        var big = DF.filter(function (f) { return f.kind === 1 && f.init && !f.att; });
+        // Anziehen, Angleichen, Verschmelzen
+        big.forEach(function (f, i) {
+          big.forEach(function (g, j) {
+            if (j <= i || f.mt || g.mt) return;
+            var best = 1e9, bi = 0, bj = 0;
+            for (var a = 3; a < NPT; a++) for (var b = 3; b < NPT; b++) {
+              var d = Math.hypot(f.n[a].x - g.n[b].x, f.n[a].y - g.n[b].y); if (d < best) { best = d; bi = a; bj = b; }
+            }
+            var Rr = mn * 0.4;
+            if (best < Rr) {
+              var k = Math.pow(1 - best / Rr, 2);
+              [[f, g, bi, bj], [g, f, bj, bi]].forEach(function (z) {
+                var h = z[0], o = z[1], P = h.n[z[2]], Q = o.n[z[3]], ws = o.s / (h.s + o.s);
+                for (var m = Math.max(1, z[2] - 2); m <= Math.min(NPT - 1, z[2] + 2); m++) {   // Körper gleitet hin
+                  h.n[m].x += (Q.x - P.x) * k * dt * 1.4 * ws; h.n[m].y += (Q.y - P.y) * k * dt * 1.4 * ws;
+                }
+                h.tq += (wrapA(o.h - h.h) * 2.0 + (o.hv - h.hv) * 1.5) * k * ws;   // angleichen
               });
             }
-            if (best < mn * 0.06 && !f.mt && !g.mt) {
-              // verschmelzen: gemeinsame neue Richtung, dann ausblenden
-              // neue Richtung aus dem Schwung, den beide hatten (nach Stärke gewichtet): der Stärkere trägt die
-              // verschmolzene Flare weiter, der Schwächere geht in ihm auf und erlischt schneller
-              var sx = f.s * Math.cos(f.a) + g.s * Math.cos(g.a), sy = f.s * Math.sin(f.a) + g.s * Math.sin(g.a);
-              var spin = (f.s * (f.vda || 0) + g.s * (g.vda || 0)) / (f.s + g.s);
-              var am = Math.atan2(sy, sx) + spin * 0.6;
+            if (best < mn * 0.05) {
               var st = f.s >= g.s ? f : g, wk = st === f ? g : f;
-              f.mt = g.mt = et; f.ma = am; g.ma = am; st.lead = true; wk.lead = false;
-              st.vda = (st.vda || 0) + spin * 0.5;
-              if (DF.length < NDF) DF.push({ kind: 3, x: (bp.x + bq.x) / 2, y: (bp.y + bq.y) / 2, a0: am, Lm: mn * rnd(0.14, 0.22), W: mn * rnd(0.018, 0.024),
-                s: 0.8, t0: et, life: rnd(1.6, 2.3), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
+              var tvx = 0, tvy = 0;
+              [st, wk].forEach(function (h) { var tp = h.n[NPT - 1]; tvx += (tp.x - tp.px) * h.s + Math.cos(h.h) * h.s; tvy += (tp.y - tp.py) * h.s + Math.sin(h.h) * h.s; });
+              var nh = Math.atan2(tvy, tvx);
+              st.tq += wrapA(nh - st.h) * 14;   // Peitschenschlag in die neue Richtung
+              st.mt = et; wk.mt = et; wk.att = { f: st, i: st === f ? bi : bj };
+              var idx = st === f ? bi : bj, free = DF.length < NCH;
+              if (free) DF.push(mkChain({ kind: 3, par: st, pi: idx, a0: nh + (Math.random() < 0.5 ? -1 : 1) * rnd(0.6, 1.1), turn: (Math.random() < 0.5 ? -1 : 1) * rnd(0.3, 0.7),
+                Lm: mn * rnd(0.18, 0.28), W: mn * rnd(0.012, 0.017), s: 0.8, t0: et, life: rnd(1.6, 2.3), ph: rnd(0, 100) }));
             }
           });
         });
-        parents.forEach(function (f) {
-          if (f.mt) {   // in die gemeinsame Richtung schwenken; der Schwächere schmiegt sich an den Stärkeren
-            f.fa += wrap(f.ma - f.a) * (f.lead ? 1.6 : 3.2);
-            if (!f.lead) { var lead = parents.filter(function (z) { return z.lead && z.mt === f.mt; })[0];
-              if (lead) { var tp = along(lead, lead.L * 0.6), hp = along(f, f.L * 0.6), crs = Math.cos(hp.a) * (tp.y - hp.y) - Math.sin(hp.a) * (tp.x - hp.x); f.fc += (crs > 0 ? 1 : -1) * 1.4; } }
-          }
-          f.vda = (f.vda || 0) + f.fa * dt; f.da = Math.max(-1.6, Math.min(1.6, (f.da || 0) + f.vda * dt));
-          f.vdc = (f.vdc || 0) + f.fc * dt; f.dc = Math.max(-1.2, Math.min(1.2, (f.dc || 0) + f.vdc * dt));
-          geo(f, et);
-        });
         DF = DF.filter(function (f) { return f.kind === 1 || et - f.t0 < f.life; });
-        for (var i = 0; i < NDF; i++) {
-          var f = DF[i];
-          if (!f) { df2[i * 4 + 2] = 0; continue; }
-          var x, y, a, L, c, lv;
-          if (f.kind === 1) {
-            x = f.x; y = f.y; a = f.a; L = f.L; c = f.c;
-            lv = f.s * sm(f.dl, f.dl + 0.08, et) * (1 - sm(3.0, 5.4, et)) * (f.mt ? (f.lead ? (1 + 0.25 * (1 - sm(0, 0.8, et - f.mt))) * (1 - sm(0.6, 2.6, et - f.mt)) : 1 - sm(0.1, 1.1, et - f.mt)) : 1);   // verschmolzen: der Stärkere leuchtet kurz auf und klingt langsam aus, der Schwächere geht schnell in ihm auf
-          } else {
-            var tc = et - f.t0, k = tc / f.life;
-            if (f.kind === 2) { var pt = along(f.par, f.par.L * f.fr); x = pt.x; y = pt.y; a = pt.a + f.side * f.off; }
-            else { x = f.x; y = f.y; a = f.a0; }
-            a += 0.2 * Math.sin(et * 0.8 + f.ph);
-            L = f.Lm * (1 - Math.exp(-tc * (f.kind === 3 ? 2.2 : 4))); c = f.cs / f.Lm;   // Kollisions-Flare quillt weich heraus
-            lv = f.s * sm(0, f.kind === 3 ? 0.4 : 0.12, tc) * (1 - sm(0.5, 1, k)) * (1 - sm(3.0, 5.4, et));
+        df2.fill(0); cbb.fill(0);
+        for (var c = 0; c < NCH; c++) {
+          var f = DF[c]; if (!f || !chainStep(f, et, dt)) continue;
+          var age = et - f.t0, lv;
+          if (f.kind === 1) lv = f.s * sm(0, 0.08, age) * (1 - sm(3.0, 5.4, et)) * (f.mt ? (f.att ? 1 - sm(0.1, 1.3, et - f.mt) : (1 + 0.25 * (1 - sm(0, 0.8, et - f.mt))) * (1 - sm(0.6, 2.8, et - f.mt))) : 1);
+          else lv = f.s * sm(0, 0.35, age) * (1 - sm(0.5, 1, age / f.life)) * (1 - sm(3.0, 5.4, et));
+          var cx = 0, cy = 0;
+          for (var k = 0; k < NPT; k++) {
+            var s = k / (NPT - 1), nd = f.n[k], o = (c * NPT + k) * 4;
+            var sx2 = nd.x, sy2 = nd.y;   // Ausgabe geglättet (rund statt eckig)
+            if (k > 0 && k < NPT - 1) { sx2 = 0.25 * f.n[k - 1].x + 0.5 * nd.x + 0.25 * f.n[k + 1].x; sy2 = 0.25 * f.n[k - 1].y + 0.5 * nd.y + 0.25 * f.n[k + 1].y; }
+            cpb[o] = sx2 - sr.left; cpb[o + 1] = sy2 - sr.top;
+            cpb[o + 2] = f.W * (0.6 + 0.9 * s * (1 - s) * 2) * (1 - 0.55 * sm(0.7, 1, s));
+            cpb[o + 3] = 1.4 * (1 - 0.6 * sm(0.75, 1, s));
+            cx += nd.x; cy += nd.y;
           }
-          df1[i * 4] = x - sr.left; df1[i * 4 + 1] = y - sr.top; df1[i * 4 + 2] = a; df1[i * 4 + 3] = c;
-          df2[i * 4] = Math.max(1, L); df2[i * 4 + 1] = f.W; df2[i * 4 + 2] = lv * 1.4; df2[i * 4 + 3] = f.kind === 1 ? 1 : 0;   // 1 = grosser Strahl (mit Flare-Welle am Ursprung)
+          cx /= NPT; cy /= NPT; var rad = 0;
+          for (k = 0; k < NPT; k++) rad = Math.max(rad, Math.hypot(f.n[k].x - cx, f.n[k].y - cy));
+          cbb[c * 4] = cx - sr.left; cbb[c * 4 + 1] = cy - sr.top; cbb[c * 4 + 2] = rad + f.W * 7; cbb[c * 4 + 3] = lv;
+          if (f.kind === 1 && c < NDF) { df1[c * 4] = f.n[0].x - sr.left; df1[c * 4 + 1] = f.n[0].y - sr.top; df2[c * 4 + 2] = lv * 1.4; df2[c * 4 + 3] = 1; }
         }
       }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
