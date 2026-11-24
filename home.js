@@ -386,9 +386,20 @@
         '    float w = (1.0 - smoothstep(sfy - 0.05, sfy + 0.15, sy)) * smoothstep(mg, mg + mn * 0.06, min(ins.x, ins.y));',
         '    if (w < 0.001) continue;',
         '    if (sty > str + 0.04) {',
-        '      kp = min(kp, mix(1.0, exp(-(dd / mn) / 0.025), w));',
+        '      kp = min(kp, mix(1.0, 0.5 * (1.0 - smoothstep(0.0, 0.035, dd / mn)), w));',   // danach: rasch weg (ab der Hälfte)
         '      if (w * dd > pw * dp) { dp = dd; pw = w; }',
         '    } else bo = max(bo, w * smoothstep(0.0, mn * 0.04, dd));',
+        '  }',
+        // Hugo 24.11. (9:23): schon beim Heranlaufen an einen stärkeren Faden geht der schwächere weich in ihn über
+        // (auf der Mittellinie genau halb) – sonst wird sein breiter Schein dort hart abgeschnitten (durchsichtig, Kanten)
+        '  float sgn = Y.x >= Y.y ? 1.0 : -1.0, ia = sgn > 0.0 ? floor(Y.x) + 1.0 : ceil(Y.x) - 1.0;',
+        '  float ha = flLit(ia, Y.w);',
+        '  if (ha >= 0.78 && smoothstep(0.78, 1.0, ha) > str + 0.04) {',
+        '    float sfa = -smy + 2.0 * smy * (0.4 + 0.9 * h2(vec2(ia + 11.0, Y.w)) * (0.5 + 0.5 * smoothstep(0.78, 1.0, ha))) * (1.0 - exp(-et * 1.3));',
+        '    vec2 ins2 = min(fc, uRes - fc);',
+        '    float wa = (1.0 - smoothstep(sfa - 0.05, sfa + 0.15, sy)) * smoothstep(mg, mg + mn * 0.06, min(ins2.x, ins2.y));',
+        '    float da = abs(ia - Y.x) / max(Y.z, 1e-4);',
+        '    kp = min(kp, mix(1.0, 0.5 + 0.5 * smoothstep(0.0, 0.08, da / mn), wa));',
         '  }',
         '}',
         'vec2 flO(vec2 fc, vec2 d) {',
