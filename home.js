@@ -867,7 +867,7 @@
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
           var x0i = LD ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
-          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.min(Math.abs(r), 1) * Math.sin(Math.PI * xin), 0, 1) : xin;   // Hugo 24.11.: die 4. Karte hängt gleich nach wie die 3. (sonst schiebt sie sich darüber)
+          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
           E = LD ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
