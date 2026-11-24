@@ -1076,7 +1076,8 @@
       // close (Hugo 24.11., 16:01): dieselbe organische Fingerwelle auf der zurückkommenden Seite, ohne Rand-Leuchten
       // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
       // kein Leuchten am Rand
-      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 1); };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
+      // Hugo 24.11. (16:15): ohne Rand-Leuchten (am iPhone sah man oben eine Lichtlinie)
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 0); noEdge = true; };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
       cv.closeWave = function (x, y) { lightOff(); cv.shimmer(x, y, true); noEdge = true; };
       cv.shimmer = function (x, y, plain) {
         waves = []; edgeT0 = 0; killT0 = 0; shimOn = !plain; noEdge = false;
@@ -2272,7 +2273,11 @@
       }
       // danach wieder der ursprüngliche Text (markierbar, leicht)
       var endT = d0 + total + (tail ? 440 : 0);
-      var tm = setTimeout(function () { if (tail) { tU.forEach(function (u) { if (u.getAnimations) u.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(u); }); if (tLab) tLab.textContent = tTxt; } if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
+      var tm = setTimeout(function () { if (tail) { tU.forEach(function (u) { if (u.getAnimations) u.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(u); }); if (tLab) tLab.textContent = tTxt; }
+        // Hugo 24.11. (16:15): der Titel bleibt in seinen Buchstaben stehen (zurücksetzen liess ihn am Ende ein zweites Mal
+        // aufblitzen); nur das Licht wird entfernt
+        if (el !== infoText) { units.forEach(lightClear); return; }
+        if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
       if (el === infoText) hyT = tm;
       return endT;
     }
