@@ -131,6 +131,9 @@
     '[data-hp].is-info .hp-brand, [data-hp].hp-info-anim .hp-brand { z-index: 8; }',
     '[data-hp] .hp-brand { transition: color .25s ease; }',
     '[data-hp] .hp-brand.hp-on-white { color: var(--hp-info-fg, #000) !important; mix-blend-mode: normal !important; }',
+    // Hugo 24.11. (17:35): «Hugo Sophian Studio» liegt während About über dem Licht – im Blitz verschwand der Schriftzug sonst
+    // und tauchte wieder auf. Der Farbwechsel geschieht im Weiss des Blitzes ohne Übergang (dort sehen beide gleich aus)
+    '[data-hp] .hp-brand.hp-brand-top { z-index: 10 !important; transition: opacity .9s ease !important; }',
     '[data-hp].is-desk .hp-about-btn { display: none; }',
     /* Desktop: nebeneinander, Textspalte neben dem geöffneten Bild (nur Text und Link zur Galerie) */
     '[data-hp] .hp-side { display: none; }',
@@ -1439,6 +1442,7 @@
       dIn = inOval(dsunX, dsunY);
       sun.horizon(0, H * 0.22);   // Boden wie am Handy knapp unter dem oberen Fünftel
       root.classList.add('hp-dsun-live', 'hp-dsun');
+      if (brand) brand.classList.add('hp-brand-top');
       sun.start();
       sun.light(true, reduce ? 0 : 800);
       if (wasLive) revealStop(true); else reveal(dsunX, dsunY, [dLayer, sun.glow]);
@@ -1459,6 +1463,7 @@
         if (dsunOn) return;
         revealStop(true);
         dsunLive = false; root.classList.remove('hp-dsun-live'); if (ripple && ripple.lightOnly) ripple.lightOnly(false);
+        if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-brand-top');
         dText.innerHTML = ''; sunBtn = null;
         if (dSide) { dSide.style.visibility = ''; dSide = null; }
         if (sun) { sun.noGlow(null); sun.glow.style.clipPath = ''; }
@@ -2133,6 +2138,7 @@
       if (titleHy && tClone && !wasOpen) hyperText(tClone, Math.max(300, 740 - 250), 320, true);   // Titel im selben Takt wie bisher (nach 0.49 s)
       titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
+      if (brand) brand.classList.add('hp-brand-top');
       mbPop(true);
       if (s.href && !s.pref) { s.pref = true; var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }   // Audit 24.11.: nur einmal pro Bereich (vorher bei jedem Öffnen ein weiteres <link>)
     }
@@ -2143,8 +2149,8 @@
       revealStop(false);   // Maske bleibt stehen und blendet mit aus
       if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, closeHold); infoDive = null; }
       clearTimeout(ipT);
-      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; revealStop(true); if (ripple && ripple.lightOnly) ripple.lightOnly(false); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
-      clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, closeMs - CONFIG.deskSunFade * 0.5);
+      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; if (brand && !dsunLive) brand.classList.remove('hp-brand-top'); revealStop(true); if (ripple && ripple.lightOnly) ripple.lightOnly(false); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
+      clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, reduce ? 0 : CONFIG.closeBeam + 50);   // Hugo 24.11. (17:35): im hellsten Moment des Strahls (dort sehen Schwarz und die weisse Differenz-Schrift gleich aus)
       // Hugo 24.11. (14:09): kein Zurückfliegen – der Titel verschwindet im Licht des Strahls und steht danach schon
       // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
