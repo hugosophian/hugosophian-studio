@@ -187,7 +187,7 @@
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
   // Tempo bleibt stetig)
   function easeDockF(t, ez) { var w = t <= 0.45 ? t : t + 1.2 * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
-  var easeDockM = bezier(0.78, 0, 0.09, 1);   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
+  var easeDockM = bezier(0.66, 0, 0.09, 1);   // Hugo 24.11.: zieht am Anfang mehr an   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
   var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
 
   function init(root) {
@@ -1942,6 +1942,7 @@
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (ripple && ripple.dock) ripple.dock();
           html.classList.remove('hp-ldpre');   // Logo und About blenden ein
+          root.classList.remove('hp-run');     // Hugo 24.11.: Titel erscheint mit dem Schlag (nicht erst am Ende des Einflugs)
           root.classList.add('hp-dock-hit'); setTimeout(function () { root.classList.remove('hp-dock-hit'); }, 800);
         }
       };
