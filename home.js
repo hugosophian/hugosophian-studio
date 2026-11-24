@@ -413,7 +413,7 @@
         '             * smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.6, 6.2, et)) * mix(1.0, 0.28, smoothstep(0.05, 1.0, u));',
         '  float sv = 0.0;',
         '  if (base < 0.002) return 0.0;',
-        '  for (int n = -1; n <= 1; n++) {',
+        '  for (int n = -2; n <= 2; n++) {',   // Hugo 24.11. (9:13): auch der übernächste Faden – bei vielen Flares rücken sie eng zusammen
         '    float id = id0 + float(n);',
         '    float hs = h2(vec2(id, sd * 1.7)), hr = h2(vec2(id + 11.0, sd));',
         '    if (flLit(id, sd) < 0.78) continue;',
