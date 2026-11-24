@@ -936,9 +936,10 @@
           if (LD) {
             // Hugo 24.11.: am Computer zoomen die Bilder heran, werden langsam und stehen kurz still (knapp vor dem Ziel);
             // erst wenn alle vier stehen, zieht der Magnet sie gemeinsam an – alle docken im selben Moment an
-            var app = 1 - Math.pow(1 - clamp(xD / 0.75, 0, 1), 3);
-            var mg2 = clamp((P - 0.84) / 0.13, 0, 1);
-            E = 0.88 * app + 0.12 * Math.pow(mg2, 2.5);
+            // Heranzoomen unverändert (easeDock), nur kurz vor dem Ziel weich anhalten (bei 95 %)
+            var e0 = easeDock(xD), eh = e0 < 0.9 ? e0 : 0.9 + 0.05 * (1 - Math.exp(-(e0 - 0.9) / 0.05));
+            var mg2 = clamp((P - 0.84) / 0.13, 0, 1);   // die letzte Karte steht ab etwa P 0.80
+            E = eh + (1 - eh) * Math.pow(mg2, 2.5);
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
