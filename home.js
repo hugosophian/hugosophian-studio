@@ -72,7 +72,7 @@
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
     revealSp:   4,      // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 4-mal schneller; Hugo 14:16: etwas langsamer)
     revealGlow: 1.2,    // Ring der Sonnenwelle (mal Fingerwelle); Hugo 24.11. (14:43): ruhiger
-    revealFlares: 0,    // Hugo 24.11. (14:43): Sonnenwelle ohne Flares – einfacher, ruhiger, weniger Rechenarbeit
+    revealFlares: 1.2,  // Flares der Schimmer-Welle nach dem Blitz (Hugo 24.11., 15:54)
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
     diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
     textWarp:   1100,   // Hugo 24.11. (14:27): About-Text kommt wie aus der Lichtgeschwindigkeit von hinten rechts nach vorn (ms)
@@ -1068,7 +1068,9 @@
       var lightMode = false, lightT0 = 0, tintV = 0, shimOn = false;
       // Hugo 24.11. (15:48): nach dem Blitz beim Öffnen derselbe Schimmer wie nach dem close (Andocken mit Flares, schwacher
       // Rand), hier über der Sonne als Farbe auf Weiss; die Tippwelle selbst bleibt darunter (kein Ring)
-      cv.shimmer = function (amt, fl) { waves = []; shimOn = true; dock(amt, fl, true); };
+      // Hugo 24.11. (15:54): statt den Rand aufleuchten zu lassen, läuft der Schimmer als Bewegung von der Lichtquelle
+      // (Tippstelle bzw. Maus) bis an den Rand, wie eine Fingerwelle mit Flares – ohne Leuchten am Rand
+      cv.shimmer = function (x, y) { waves = []; edgeT0 = 0; killT0 = 0; shimOn = true; cv.burst(x, y, CONFIG.revealSp); };
       function edgeOffV(now) { return lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { tintV = v; if (!v) shimOn = false; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
@@ -1372,8 +1374,9 @@
     }
     // Hugo 24.11. (14:58): Öffnen wieder wie früher – alles blendet aus, nur die letzte Welle (vom Tippen bzw. der Maus) läuft
     // als Licht weiter über die Sonne, bis sie ausgelaufen ist. Die Sonne blendet ein (keine aufdeckende Welle mehr).
-    var shimT = 0;
+    var shimT = 0, shX = 0, shY = 0;
     function reveal(x, y, els, onPass, tb) {
+      shX = x; shY = y;
       revealStop(true);
       rv.els = els;
       if (ripple && ripple.lightOnly) { ripple.lightOnly(true); ripple.tint(1); }
@@ -1381,7 +1384,7 @@
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
       if (sun) sun.blind(true);
-      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.shimmer(CONFIG.closeDock, CONFIG.closeFlares); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
+      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.shimmer(shX, shY); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
       els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: (CONFIG.closeHold || 0), easing: 'ease', fill: 'backwards' }); } catch (er) {} });
       if (onPass) rv.raf = setTimeout(function () { onPass(1e6, 0, 0); }, CONFIG.deskSunFade * 0.5);
     }
