@@ -26,7 +26,7 @@
                                  a.hp-intro-open, .hp-intro-close
        .hp-about                 About-Panel: .hp-about-panel > .hp-about-title, .hp-about-text, .hp-about-close
    Die Textspalte am Desktop (.hp-side) baut dieses Script selbst, mit Kopien von .hp-intro-text
-   und a.hp-intro-open (gleiches Aussehen wie im Designer). Farben: CSS-Variablen --hp-side-bg, --hp-side-fg.
+   und a.hp-intro-open (gleiches Aussehen wie im Designer). Farben: CSS-Variablen --hp-side-bg (Standard weiss), --hp-side-fg (Standard schwarz).
    Optional am Abschnitt: data-hp-links='{"kunst":"/lab-creator"}' (Name → anderer Link, zum Testen)
    ============================================================ */
 (function () {
@@ -131,7 +131,7 @@
     '[data-hp].is-desk .hp-slide { inset: 0 auto 0 0; visibility: visible; will-change: left, width; }',
     '[data-hp].is-desk .hp-media { right: auto; transform: none; }',
     '[data-hp].is-desk .hp-title { right: auto; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; transform: none; max-width: none; z-index: 5; }',   // über der Andock-Leinwand (z 4)
-    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, #000); color: var(--hp-side-fg, #fff); }',
+    '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, #fff); color: var(--hp-side-fg, #000); }',   // Hugo 24.11. (13:04): weiss mit schwarzem Text (vorher schwarz mit weiss)
     '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: center; gap: 2.2vh; }',   // Hugo 24.11.: Text in der Spalte mittig (vorher unten)
     '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; color: inherit; opacity: 1; transform: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
@@ -174,13 +174,11 @@
     // in ihr blendet mit den Bildern aus (uFade im Wellen-Shader), der Regenbogen bleibt
     '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
     // Hugo 24.11. (13:01): die Textspalte ist von Anfang an ein weisser Block (die Wand darunter), Text sofort dunkel;
-    // beim Zurück wird sie wie gehabt wieder schwarz
+    // beim Zurück blendet die Spalte wieder in ihre Farbe (--hp-side-bg)
     '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); transition: none; }',
     '[data-hp].is-desk.hp-dsun .hp-side-in > * { color: var(--hp-info-fg, #000); }',
     // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
     // der Grund hell genug ist (bei 40 % des Ausblendens); beim Zurück umgekehrt
-    '@keyframes hp-dsun-txt-out { 0%, 39.9% { color: var(--hp-info-fg, #000); } 40%, 100% { color: var(--hp-side-fg, #fff); } }',
-    '[data-hp].is-desk.hp-dsun-live:not(.hp-dsun) .hp-side-in > * { animation: hp-dsun-txt-out var(--hp-dsun-fade, .9s) linear both; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
