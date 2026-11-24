@@ -1942,7 +1942,7 @@
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (ripple && ripple.dock) ripple.dock();
           html.classList.remove('hp-ldpre');   // Logo und About blenden ein
-          root.classList.remove('hp-run');     // Hugo 24.11.: Titel erscheint mit dem Schlag (nicht erst am Ende des Einflugs)
+          fitTitles(); root.classList.remove('hp-run');     // Hugo 24.11.: Titel erscheint mit dem Schlag, gleich in der richtigen Grösse und Lage
           root.classList.add('hp-dock-hit'); setTimeout(function () { root.classList.remove('hp-dock-hit'); }, 800);
         }
       };
