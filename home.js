@@ -327,6 +327,8 @@
         '  vec2 pp = vec2(-d.y, d.x); float smx = 0.5 * (abs(d.x) * res.x + abs(d.y) * res.y) / mn;',
         '  float ps = dot(c, pp) * 4.5 + sw * s * s * 1.1 + 0.9 * n2(q * 1.8 + vec2(t * 0.07, -t * 0.05) + sd) + 0.45 * n2(q * 4.0 + vec2(-t * 0.1, s * 2.5 - t * 0.45));',
         // Hugo 24.11. (Skizze): am Ursprung starten sie als gebogene Korona-Schlaufen (Füsse am Rand), die aufgehen
+        // organischer (Skizze): weicher S-Peitschenschwung, der langsam die Fäden entlangläuft
+        '  ps += 0.55 * sw * sin(s * 2.4 - t * 0.55 + sd * 3.0) * smoothstep(-smx, -smx + 0.5, s);',
         '  float op = exp(-max(uEdgeT, 0.0) * 0.55);',
         '  for (int k = 0; k < 2; k++) {',
         '    float fk = float(k), hk = h2(vec2(sd + fk * 3.1, 2.7)), rk = 0.13 + 0.1 * h2(vec2(sd, fk + 5.0));',
@@ -353,14 +355,8 @@
         '  float u = clamp((s + smx) / (2.0 * smx), 0.0, 1.0);',                                   // 0 = Ursprung, 1 = Gegenseite
         '  float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '  float sd2 = abs(ps - id) / gl;',
-        '  float swd = mn * (0.008 + 0.012 * str) * (1.35 - 0.65 * u);',
-        '  float core = 0.45 * exp(-sd2 * sd2 / (swd * swd * 9.0));',
-        '  for (int j = -1; j <= 1; j++) {',
-        '    float fj = float(j), of = fj * (0.06 + 0.06 * n2(vec2(s * 3.0 - t * 0.3, id * 2.0 + fj * 5.0)));',
-        '    float dj = abs(ps - id - of) / gl;',
-        '    core += (fj == 0.0 ? 0.4 : 0.3) * exp(-dj * dj / (swd * swd * 0.6));',
-        '  }',
-        '  core *= 0.75 + 0.35 * sin(s * 8.0 - t * 2.0 + id * 1.7);',
+        '  float swd = mn * (0.005 + 0.008 * str) * (1.35 - 0.65 * u);',
+        '  float core = exp(-sd2 * sd2 / (swd * swd)) + 0.35 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
         '  float along = smoothstep(0.0, 0.015, ee / mn) * (1.0 - smoothstep(sf - 0.3, sf, s));',
         '  float life = smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.6, 6.2, et));',
         '  float weak = mix(1.0, 0.28, smoothstep(0.05, 1.0, u));',
