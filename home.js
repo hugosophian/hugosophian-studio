@@ -231,9 +231,9 @@
     var e1 = 1 - x(1);
     return function (t) { return x(t) + e1 * t * t * t; };
   }
-  // Öffnen (Hugo 24.11., 19:46): zoomt mit gleichbleibendem Tempo durch das ganze Ausblenden – nie abbremsen; die Endtiefe
-  // ist erst erreicht, wenn das Bild ganz unter dem Licht verschwunden ist
-  var easeDive = function (t) { return t; };
+  // Öffnen (Hugo 24.11., 19:55): weich anziehen, im sichtbaren Teil immer schneller; abgebremst wird erst, wenn das Bild schon
+  // unter dem Licht verschwindet (dieselbe Kurve als Browser-Animation und für die Rechnung)
+  var DIVE_EASE = [0.45, 0, 0.25, 1], easeDive = bezier(DIVE_EASE[0], DIVE_EASE[1], DIVE_EASE[2], DIVE_EASE[3]);
   var easeDiveOut = springEase(0.75, 11);  // Schliessen (Handy: Bild hat Reserve, ein Hauch unter 1 ist unsichtbar)
   var easeDiveOutD = springEase(1, 9);     // Schliessen am Computer: ohne Nachfedern (sonst sähe man den Bildrand)
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
@@ -1385,7 +1385,7 @@
       // mehr, wenn beim Öffnen gleichzeitig Text, Titel und Sonne aufgebaut werden. d.k wird nur noch mitgezählt.
       if (on && m.animate) {
         m.style.transformOrigin = '50% 50%';
-        try { d.an = m.animate([{ transform: tf(from) }, { transform: tf(to) }], { duration: ms, easing: 'linear', fill: 'forwards' }); } catch (er) { d.an = null; }
+        try { d.an = m.animate([{ transform: tf(from) }, { transform: tf(to) }], { duration: ms, easing: 'cubic-bezier(' + DIVE_EASE.join(',') + ')', fill: 'forwards' }); } catch (er) { d.an = null; }
       }
       function f(now) {
         var t = clamp((now - t0) / ms, 0, 1);
