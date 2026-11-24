@@ -71,8 +71,8 @@
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
-    diveZoomIn: 2.4,    // Hugo 24.11. (19:48): so tief taucht das Bild beim Öffnen ein (gleichmässig, wie früher kräftig); danach unsichtbar zurück auf diveZoom
-    diveMs:     1200,   // Dauer des Eintauchens (startet am Handy schon beim Tippen); Hugo 24.11. (19:46): gleichmässig, ohne Abbremsen, bis das Bild unter dem Licht ist
+    diveZoomIn: 3.4,    // Hugo 24.11. (19:48/19:51): so tief taucht das Bild beim Öffnen ein (gleichmässig, schnell); danach unsichtbar zurück auf diveZoom
+    diveMs:     1300,   // Dauer des Eintauchens (startet am Handy schon beim Tippen); gleichmässig ohne Abbremsen, bis das Bild ganz unter dem Licht ist
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
     shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
@@ -1372,25 +1372,32 @@
         if (s.dv.k <= 1.0001) { s.dv.px = x - (r.left + r.width / 2); s.dv.py = y - (r.top + r.height / 2); }
       }
       if (!s.dv) return;
-      var d = s.dv, from = d.k, to = on ? (desk ? CONFIG.diveZoom : CONFIG.diveZoomIn) : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : desk ? easeDiveOutD : easeDiveOut;
-      s.dive = true; if (d.raf) cancelAnimationFrame(d.raf);
-      function apply() {
-        m.style.transformOrigin = '50% 50%';
-        var zt = 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + d.k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px)';
-        m.style.transform = zt + ' scale(' + base + ')';
-        if (!desk) { s.diveTf = zt; if (s.fx) { s.fx.style.transformOrigin = '50% 50%'; } }
-      }
+      var d = s.dv;
+      if (d.raf) cancelAnimationFrame(d.raf); d.raf = 0;
       clearTimeout(d.rt);
+      function tf(k) { return 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px) scale(' + base + ')'; }
+      function apply() { m.style.transformOrigin = '50% 50%'; m.style.transform = tf(d.k); }
+      // laufende Eintauch-Animation an ihrer aktuellen Stelle festhalten (sonst springt das Bild)
+      if (d.an) { apply(); try { d.an.cancel(); } catch (er) {} d.an = null; }
+      var from = d.k, to = on ? (desk ? CONFIG.diveZoom : CONFIG.diveZoomIn) : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : desk ? easeDiveOutD : easeDiveOut;
+      s.dive = true;
+      // Hugo 24.11. (19:51): das Hineinzoomen läuft als Browser-Animation auf der Grafikkarte (gleichmässig) – es ruckelt nicht
+      // mehr, wenn beim Öffnen gleichzeitig Text, Titel und Sonne aufgebaut werden. d.k wird nur noch mitgezählt.
+      if (on && m.animate) {
+        m.style.transformOrigin = '50% 50%';
+        try { d.an = m.animate([{ transform: tf(from) }, { transform: tf(to) }], { duration: ms, easing: 'linear', fill: 'forwards' }); } catch (er) { d.an = null; }
+      }
       function f(now) {
         var t = clamp((now - t0) / ms, 0, 1);
         d.k = from + (to - from) * ez(t);
-        apply();
+        if (!d.an) apply();
         if (t < 1) { d.raf = requestAnimationFrame(f); return; }
         d.raf = 0;
+        if (d.an) { apply(); try { d.an.cancel(); } catch (er) {} d.an = null; }
         // Hugo 24.11. (19:48): am Handy taucht das Bild tiefer ein als es offen bleibt; ganz verdeckt von der Sonne springt es
         // unsichtbar auf die normale Tiefe zurück – so bleibt das Herauszoomen beim Schliessen genau wie bisher
-        if (on && to !== CONFIG.diveZoom) d.rt = setTimeout(function () { if (s.dv === d && !d.raf && root.classList.contains('is-info')) { d.k = CONFIG.diveZoom; apply(); } }, 700);
-        if (!on) { s.dive = false; s.dv = null; s.diveTf = ''; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
+        if (on && to !== CONFIG.diveZoom) d.rt = setTimeout(function () { if (s.dv === d && !d.raf && root.classList.contains('is-info')) { d.k = CONFIG.diveZoom; apply(); } }, 600);
+        if (!on) { s.dive = false; s.dv = null; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
       }
       d.raf = requestAnimationFrame(f);
     }
