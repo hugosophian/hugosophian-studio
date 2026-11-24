@@ -646,8 +646,10 @@
         '  if (uHas > 0.5) {',
         '    vec2 sp = fc + off;',
         '    vec2 u = (sp - uRect.xy) / uRect.zw;',
-        '    vec2 bu = min(u, 1.0 - u) * uRect.zw;',
-        '    float inside = smoothstep(0.0, 6.0, min(bu.x, bu.y));',
+        // Hugo 24.11.: Leinwand = ganzer Bildschirm – was die Welle über den Rand hinaus holt, wird gespiegelt statt
+        // ausgeblendet (sonst ausgefranste Kanten mit dem unverzerrten Bild darunter)
+        '    u = 1.0 - abs(1.0 - abs(u));',
+        '    float inside = 1.0;',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
         '    vec2 ca = off * 0.08 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
         '    vec3 img = vec3(texture2D(uImg, iu + ca).r, texture2D(uImg, iu).g, texture2D(uImg, iu - ca).b);',
