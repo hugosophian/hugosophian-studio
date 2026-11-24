@@ -147,6 +147,9 @@
     '@keyframes hp-dock-hit { 0% { transform: scale(1); } 12% { transform: scale(1.04); } 38% { transform: scale(0.99); } 65% { transform: scale(1.005); } 100% { transform: scale(1); } }',
     /* Hugo 24.11.: nur das Foto stösst vor und zurück – Licht, Farben und Flares darüber bleiben ruhig stehen */
     '[data-hp].hp-dock-hit .hp-slide .hp-img { animation: hp-dock-hit .75s cubic-bezier(.2,.7,.3,1) both; transform-origin: 50% 50%; }',
+    // Hugo 24.11.: am Computer schlägt das Bild etwas schwächer ein (2.5 % statt 4 %)
+    '@keyframes hp-dock-hit-d { 0% { transform: scale(1); } 12% { transform: scale(1.025); } 38% { transform: scale(0.994); } 65% { transform: scale(1.003); } 100% { transform: scale(1); } }',
+    '[data-hp].is-desk.hp-dock-hit .hp-slide .hp-img { animation-name: hp-dock-hit-d; }',
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
     'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
