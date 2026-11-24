@@ -1279,10 +1279,89 @@
     function busy() { return introOn || root.classList.contains('is-info'); }
 
     // ---------- Zur Galerie ----------
+    // Hugo 24.11.: Auf dem Weg zu einer Galerie (Creator, Singer, Model) schaltet die Seite ab wie ein alter Röhrenfernseher.
+    // Das Bild klappt zu einer hellen Linie zusammen (Blitz am Horizont), die Linie schlägt immer schneller zu einem
+    // Lichtpunkt zusammen. Der Punkt bleibt stehen, bis die Galerie da ist; dort fällt er in sich zusammen und explodiert
+    // (galerie.js). Alle anderen Ziele (Alchemist → Werkstatt) wie bisher mit Überblenden.
+    var CRT = {
+      paths:    ['/creator', '/singer', '/model-2027'],   // Seiten mit galerie.js
+      squashMs: 220,    // Bild klappt zur Linie zusammen, wird dabei heller
+      lineMs:   300     // Linie schlägt zum Punkt zusammen (beschleunigt)
+    };
+    var crtCss = [
+      '.hp-crt { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }',
+      '.hp-crt i { position: absolute; display: block; opacity: 0; }',
+      '.hp-crt-line { left: 0; top: 50%; width: 100%; height: 3px; margin-top: -1.5px; background: #fff; box-shadow: 0 0 6px 2px #fff, 0 0 22px 6px rgba(210,230,255,.9), 0 0 70px 18px rgba(140,190,255,.45); }',
+      '.hp-crt-streak { left: -30vw; top: 50%; width: 160vw; height: 90px; margin-top: -45px; background: radial-gradient(ellipse at center, rgba(255,255,255,.95) 0, rgba(200,225,255,.55) 18%, rgba(120,170,255,.12) 45%, rgba(0,0,0,0) 70%); }',
+      '.hp-crt-dot { left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 4px #fff, 0 0 40px 14px rgba(190,220,255,.8); }',
+      '.hp-crt-dot.is-hold { opacity: 1; animation: hpCrtPulse 1.1s ease-in-out infinite; }',
+      '@keyframes hpCrtPulse { 50% { transform: scale(.82); box-shadow: 0 0 8px 3px #fff, 0 0 30px 10px rgba(190,220,255,.6); } }',
+      'html.hp-crt-on, html.hp-crt-on body { background: #000 !important; }'
+    ].join('\n');
+    var crtFx = null;
+    function crtReset() {
+      if (crtFx) { crtFx.remove(); crtFx = null; }
+      document.documentElement.classList.remove('hp-crt-on');
+      var b = document.body; ['transform', 'transform-origin', 'filter', 'visibility'].forEach(function (p) { b.style.removeProperty(p); });
+    }
+    window.addEventListener('pageshow', function (e) { if (e.persisted) crtReset(); });
+    function crtOff(done) {
+      if (crtFx) return;
+      if (!document.getElementById('hp-crt-css')) {
+        var st = document.createElement('style'); st.id = 'hp-crt-css'; st.textContent = crtCss; document.head.appendChild(st);
+      }
+      var R = document.documentElement, b = document.body;
+      crtFx = document.createElement('div'); crtFx.className = 'hp-crt'; crtFx.setAttribute('aria-hidden', 'true');
+      crtFx.innerHTML = '<i class="hp-crt-streak"></i><i class="hp-crt-line"></i><i class="hp-crt-dot"></i>';
+      R.appendChild(crtFx);
+      R.classList.add('hp-crt-on');
+      var streak = crtFx.children[0], line = crtFx.children[1], dotEl = crtFx.children[2];
+      b.style.setProperty('transform-origin', '50% ' + (window.scrollY + window.innerHeight / 2) + 'px', 'important');
+      var t0 = performance.now(), A = CRT.squashMs, B = A + CRT.lineMs;
+      (function step(now) {
+        if (!crtFx) return;
+        var t = now - t0;
+        if (t < A) {
+          // 1) Bild klappt senkrecht zusammen und wird heller
+          var e = Math.pow(t / A, 3);
+          b.style.setProperty('transform', 'scale(' + (1 + .05 * e).toFixed(4) + ',' + Math.max(.004, 1 - e).toFixed(4) + ')', 'important');
+          b.style.setProperty('filter', 'brightness(' + (1 + 4 * e).toFixed(2) + ') contrast(' + (1 + e).toFixed(2) + ')', 'important');
+          streak.style.opacity = Math.max(0, Math.min(1, (t / A - .7) * 3.3)).toFixed(3);
+        } else if (t < B) {
+          // 2) Blitz am Horizont, die Linie schlägt immer schneller zum Punkt zusammen
+          b.style.setProperty('visibility', 'hidden', 'important');
+          var p = (t - A) / CRT.lineMs, q = Math.pow(p, 4);
+          line.style.opacity = '1';
+          line.style.transform = 'scaleX(' + Math.max(.003, 1 - q).toFixed(4) + ')' + (p < .15 ? ' scaleY(' + (1 + 1.5 * (1 - p)).toFixed(3) + ')' : '');
+          var fl = p < .12 ? p / .12 : 1 - (p - .12) * .7;
+          streak.style.opacity = Math.max(0, Math.min(1, fl)).toFixed(3);
+          streak.style.transform = 'scaleX(' + Math.max(.02, 1 - q).toFixed(4) + ') scaleY(' + (1 + .8 * (1 - p)).toFixed(3) + ')';
+          dotEl.style.opacity = Math.max(0, Math.min(1, (p - .75) * 4)).toFixed(3);
+          dotEl.style.transform = 'scale(1.3)';
+        } else {
+          // 3) Lichtpunkt bleibt und pulsiert, bis die Galerie da ist
+          line.style.opacity = '0'; streak.style.opacity = '0';
+          dotEl.style.transform = ''; dotEl.style.opacity = ''; dotEl.classList.add('is-hold');
+          done();
+          return;
+        }
+        requestAnimationFrame(step);
+      })(t0);
+    }
     function go(href) {
       if (!href) return;
       var to = ''; try { to = new URL(href, location.href).pathname; } catch (er) {}
       if (!to) return;
+      var clean = to.replace(/\/$/, '') || '/';
+      if (!reduce && CRT.paths.indexOf(clean) > -1) {
+        // Seite schon jetzt laden, damit der Punkt nicht lange steht
+        try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; document.head.appendChild(l); } catch (er) {}
+        crtOff(function () {
+          window.hsVT = { to: to, type: 'crt' };
+          location.href = href;
+        });
+        return;
+      }
       window.hsVT = { to: to, type: 'fade' };
       location.href = href;
     }
