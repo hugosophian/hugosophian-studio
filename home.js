@@ -908,8 +908,11 @@
       function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
       // Computer (Hugo 24.11.): solange der Andock-Effekt läuft, zieht die Maus eine Welle wie der Finger und wischt ihn weg
       var mWave = 0;
+      var lmx = -1, lmy = -1;
       stage.addEventListener('mousemove', function (e) {
-        if (!desk || !edgeT0 || root.classList.contains('is-info')) return;
+        // nur echte Mausbewegung (der Browser meldet auch «Bewegung», wenn sich unter der ruhenden Maus etwas verschiebt)
+        var moved = lmx >= 0 && Math.hypot(e.clientX - lmx, e.clientY - lmy) > 2; lmx = e.clientX; lmy = e.clientY;
+        if (!moved || !desk || !edgeT0 || root.classList.contains('is-info')) return;
         var now = performance.now(), wv = waves[waves.length - 1];
         if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (!killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
@@ -977,12 +980,10 @@
           bx = j * W / n; by = 0; bw = W / n; bh = H;
           var xD = clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1);
           if (LD) {
-            // Hugo 24.11.: am Computer zoomen die Bilder heran, werden langsam und stehen kurz still (knapp vor dem Ziel);
-            // erst wenn alle vier stehen, zieht der Magnet sie gemeinsam an – alle docken im selben Moment an
-            // Heranzoomen unverändert (easeDock), nur kurz vor dem Ziel weich anhalten (bei 95 %)
-            var e0 = easeDockF(xD), eh = e0 < 0.9 ? e0 : 0.9 + 0.05 * (1 - Math.exp(-(e0 - 0.9) / 0.05));
-            var mg2 = clamp((P - 0.80) / 0.13, 0, 1);   // die letzte Karte steht ab etwa P 0.77
-            E = eh + (1 - eh) * Math.pow(mg2, 2.5);
+            // Hugo 24.11.: am Computer gleich snappig wie am Handy – dieselbe Kurve und dasselbe Tempo; die Bilder bremsen
+            // weiter weg ab (84 % wie am Handy) und warten aufeinander, dann zieht der Magnet alle gemeinsam an
+            var xM = clamp((P - 0.25 - 0.02 * j) / 0.61, 0, 1), xL = clamp((P - 0.25 - 0.02 * (n - 1)) / 0.61, 0, 1);
+            E = 0.84 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.2) + 0.16 * magnetPull(xL);
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
