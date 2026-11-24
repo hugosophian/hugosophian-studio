@@ -70,20 +70,11 @@
     deskSunFade: 900,   // ms Aus- und Einblenden
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
-    revealSp:   4,      // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 4-mal schneller; Hugo 14:16: etwas langsamer)
-    revealGlow: 1.2,    // Ring der Sonnenwelle (mal Fingerwelle); Hugo 24.11. (14:43): ruhiger
-    revealFlares: 1.2,  // Flares der Schimmer-Welle nach dem Blitz (Hugo 24.11., 15:54)
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
     diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
-    textWarp:   1100,   // Hugo 24.11. (14:27): About-Text kommt wie aus der Lichtgeschwindigkeit von hinten rechts nach vorn (ms)
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
-    titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
-    revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
-    revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
-    shimAmt:    0.5,    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
-    closeFlares: 0.7,   // Hugo 24.11. (15:12): Solar Flares beim Andocken nach dem close (Anteil)
-    closeDock:  0.22    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
+    shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
   };
 
   var css = [
@@ -110,7 +101,6 @@
     '[data-hp] .hp-sun-light { z-index: 8; mix-blend-mode: screen; visibility: hidden; }',
     '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
     '[data-hp] .hp-sun-back .hp-sun-wall { left: 0; top: 0; width: 100%; height: 100%; }',
-    '[data-hp] .hp-sun-back .hp-sun-glass { display: none; }',
     '[data-hp] .hp-info-go { position: relative; }',
     // Schatten von «Galerie öffnen»: Licht von hinten → Schatten fällt nach vorne auf den Boden, gespiegelt, lang
     // gezogen und zum Betrachter hin breiter; nur sichtbar, solange ein Strahl den Button trifft (--hp-lit).
@@ -135,7 +125,6 @@
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
-    '[data-hp] .hp-title.hp-info-title.hp-glass { opacity: 0; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .9s ease; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
     /* „Hugo Sophian Studio“ bleibt beim About oben links stehen und wird dunkel, sobald die weisse Seite darunter ist */
@@ -233,25 +222,6 @@
   // Tempo bleibt stetig)
   function easeDockF(t, ez, b) { var w = t <= 0.45 ? t : t + (b == null ? 1.2 : b) * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
   var easeDockM = bezier(0.66, 0, 0.09, 1);   // Hugo 24.11.: zieht am Anfang mehr an   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
-  var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
-  // Sog (Hugo 24.11., 13:53): erst ein Hauch Bewegung, dann zieht es immer stärker, rastet oben ein und federt kaum nach
-  // Hugo 24.11. (14:16): weicher – zieht gleichmässig an, das Tempo steigt und fällt ohne Spitze, oben ein kleines Nachfedern
-  var suckB = bezier(0.62, 0, 0.22, 1);
-  function suckF(t) {
-    var e = 0.86;
-    if (t < e) return suckB(t / e);
-    var v = (t - e) / (1 - e); return 1 + 0.02 * Math.sin(Math.PI * v) * (1 - v);
-  }
-  var suckEase = (function () {
-    var f = suckF;
-    try {
-      if (window.CSS && CSS.supports('transition-timing-function', 'linear(0, 1)')) {
-        var pts = []; for (var i = 0; i <= 60; i++) pts.push(f(i / 60).toFixed(4));
-        return 'linear(' + pts.join(', ') + ')';
-      }
-    } catch (e) {}
-    return 'cubic-bezier(.8, 0, .25, 1)';
-  })();
 
   function init(root) {
     if (root.__hp) return;
@@ -265,9 +235,7 @@
     try { links = JSON.parse(root.getAttribute('data-hp-links') || '{}'); } catch (e) {}
 
     var intro = root.querySelector('.hp-intro');
-    var inTitle = intro && intro.querySelector('.hp-intro-title');
     var inText = intro && intro.querySelector('.hp-intro-text');
-    var inOpen = intro && intro.querySelector('.hp-intro-open');
     var inClose = intro && intro.querySelector('.hp-intro-close');
 
     var slides = [].slice.call(root.querySelectorAll('.hp-slide')).map(function (el, i) {
@@ -582,7 +550,7 @@
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
-        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0) * (uB[k].w > 2.0 ? ' + CONFIG.revealRing.toFixed(2) + ' : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
+        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
         '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
@@ -596,7 +564,7 @@
         '    best = sf / ws; dir /= ws; sd /= ws;',
         '    float x = best / w;',
         // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
-        '    bool dockW = uB[k].w < 0.0, brst = !dockW && uB[k].w > 2.0;',
+        '    bool dockW = uB[k].w < 0.0;',
         // Hugo 24.11. (10:13): die Fingerwelle wischt den Andock-Effekt entlang ihres Weges weg (Fingerwellen kommen in der
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
@@ -605,37 +573,31 @@
         '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 2.0 ? ' + CONFIG.revealWarp.toFixed(2) + ' : uB[k].w > 0.0 ? 1.0 : 2.0);',   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
-        '    float r = env * amp * (brst ? ' + CONFIG.revealGlow.toFixed(2) + ' : 1.0); ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
+        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 2.0);',   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
+        '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
         '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
-        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * (brst ? 0.12 : 0.22)); org = max(org, exp(-dot(d0, d0)) * on * (brst ? 0.0 : 1.0)); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
+        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
         // Hugo 24.11.: Andock-Flares mit eigener Richtung – jede Stelle der Front neigt ihre Flares anders (langsam
         // wanderndes Feld); so laufen sie schräg, kreuzen sich und fliessen weiter ineinander, statt alle zur Mitte zu zeigen
-        // Hugo 24.11. (14:00): an der schnellen Sonnenwelle (Tempo > 2) Flares ungleichmässig wie beim Andocken – sonst wirkten
-        // die gleichmässigen Zacken wie eine Motorsäge
-        '    bool irr = dockW || brst;',
-        // Hugo 24.11. (14:03): die Sonnenwelle dreht sich nicht – ihr Muster hängt nur an der Richtung, die Flares schiessen
-        // gerade nach aussen wie bei der Flare-Explosion der Ladeanimation
-        '    float tq = brst ? 0.0 : uT;',
-        '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, tq * 0.07)) - 0.5) * 2.6;',
+        '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, uT * 0.07)) - 0.5) * 2.6;',
         // Hugo 24.11.: magnetisches Spiel ohne Mittelpunkt – eine Flare biegt weg von der stärkeren Nachbarin (die
         // stärkere drückt die schwächere zur Seite, sie verschmelzen und laufen in neuer Richtung weiter); je weiter
         // ins Bild, desto mehr drehen sie seitlich ab, so sammeln sie sich nie in einem Punkt in der Mitte
         '    vec2 dnL = vec2(dn.x * 0.97 + dn.y * 0.25, -dn.x * 0.25 + dn.y * 0.97), dnR = vec2(dn.x * 0.97 - dn.y * 0.25, dn.x * 0.25 + dn.y * 0.97);',
         '    float push = dockW ? n2(dnR * 1.7 + vec2(fs, uT * 0.3)) - n2(dnL * 1.7 + vec2(fs, uT * 0.3)) : 0.0;',
-        '    float ra = brst ? min(xo, 5.0) * 0.3 * lean : irr ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
+        '    float ra = dockW ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
-        '    float fl = irr ? pow(n2(cs * 0.6 + vec2(fs, tq * 0.3 + age * (brst ? 0.25 : 0.0))), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
-        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(tq * 0.8 + age * (brst ? 0.6 : 0.0), fs)))) * (irr ? 1.35 : 1.0) * (brst ? mix(0.45, 1.4, smoothstep(0.0, 0.8, age)) : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
-        '    float fv = (brst ? ' + CONFIG.revealFlares.toFixed(2) + ' * smoothstep(0.05, 0.6, age) : 1.0) * 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
+        '    float fl = dockW ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
+        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
+        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv * uDF / max(uDA, 0.01)); else fa = max(fa, fv);',   // Flares des Andockens: uDF (Hugo 24.11., 15:16: Flares ja, Rand wenig)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
@@ -804,39 +766,14 @@
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
       c.uniform1i(U.uImg, 0);
-      // Bild der aktuellen Seite als Textur (eigene Kopie mit CORS; klappt das nicht, gibt es nur den Regenbogen)
-      var cache = {}, texSrc = '', texOk = false;
-      function texFor(img) {
-        var src = img && (img.currentSrc || img.src);
-        if (!src) { texOk = false; return; }
-        if (src === texSrc) return;
-        var e = cache[src];
-        if (!e) {
-          e = cache[src] = { im: new Image(), ok: false };
-          e.im.crossOrigin = 'anonymous';
-          e.im.onload = function () { e.ok = true; };
-          e.im.src = src;
-        }
-        if (!e.ok) { texOk = false; return; }
-        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, e.im); texSrc = src; texOk = true; }
-        catch (er) { texOk = false; texSrc = src; }
-      }
-      // das Bild, das unter dem Finger wirklich zu sehen ist (nicht einfach das nächstgelegene)
-      function imgAt(x, y) {
-        var els = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
-        for (var k = 0; k < els.length; k++) {
-          var sl = els[k].closest && els[k].closest('.hp-slide');
-          if (sl) for (var j = 0; j < slides.length; j++) if (slides[j].el === sl) return slides[j].img;
-        }
-        return null;
-      }
+      var cache = {};   // Bilder für den Effekt (eigene Kopien mit CORS; klappt das nicht, gibt es nur den Regenbogen)
       // Computer: Leinwand über der ganzen Bühne (über den Bildern, unter Titeln und Textspalte)
       function sm01(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
       function deskCanvas() {
         if (cv.parentNode !== stage) stage.appendChild(cv);
         cv.style.zIndex = '4';
       }
-      var comp = document.createElement('canvas'), cctx = comp.getContext('2d'), compSig = '', compOk = false;
+      var comp = document.createElement('canvas'), cctx = comp.getContext('2d'), compSig = '', compOk = false, compCrop = null;
       function srcOf(img) { return img && (img.currentSrc || img.src); }
       function loadAll() {
         slides.forEach(function (sl) {
@@ -852,16 +789,28 @@
       // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
       // neu nur, wenn sich etwas bewegt hat (Aufprall, Hover am Rand)
       function compTex(sr) {
-        // Hugo 24.11. (15:37): beim Eintauchen die Textur wieder mit dem gezoomten Bild nachführen (eingefroren zeigte die
-        // Welle das Bild in alter Grösse über dem gezoomten – doppeltes Bild)
+        // Hugo 24.11. (15:37): beim Eintauchen folgt die Textur dem gezoomten Bild (eingefroren zeigte die Welle das Bild in
+        // alter Grösse über dem gezoomten – doppeltes Bild).
+        // Audit 24.11. (Akku): dafür wird das Bild nicht mehr in jedem Bild neu gezeichnet und hochgeladen, sondern einmal
+        // ungezoomt (in höherer Auflösung, gleich scharf) – den Zoom übernimmt die Grafikkarte über den Ausschnitt (uCrop)
         if (!cctx) return false;
         loadAll();
-        var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var dvS = null, nVis = 0;
+        if (!desk) slides.forEach(function (sl) { if (sl.vis) { nVis++; if (sl.dv && sl.dv.k > 1.0001 && sl.media) dvS = sl; } });
+        if (nVis !== 1) dvS = null;   // nur wenn das eintauchende Bild allein zu sehen ist (sonst wie bisher)
+        var dk = 1, qx = 0, qy = 0;
+        if (dvS) {
+          var mr = dvS.media.getBoundingClientRect();
+          dk = dvS.dv.k; qx = mr.left + mr.width / 2 + dk * dvS.dv.px; qy = mr.top + mr.height / 2 + dk * dvS.dv.py;   // Zoom-Mittelpunkt
+          compCrop = [(qx - sr.left) / sr.width * (1 - 1 / dk), (qy - sr.top) / sr.height * (1 - 1 / dk), 1 / dk, 1 / dk];
+        } else compCrop = null;
+        var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
           var e = cache[srcOf(sl.img)]; if (!e || !e.ok) { sig += '|-'; return; }
           var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect(), z = parseFloat(sl.el.style.zIndex) || 0;
+          if (sl === dvS) ir = { left: qx + (ir.left - qx) / dk, top: qy + (ir.top - qy) / dk, width: ir.width / dk, height: ir.height / dk };   // wie ohne Zoom
           var sdr = desk && sl.side && sl.side.offsetWidth > 0 ? sl.side.getBoundingClientRect() : null;   // Textspalte (Computer): weiss
           parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length, sd: sdr });
           sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z + (sdr ? ',' + Math.round(sdr.left) + ',' + Math.round(sdr.width) : '');
@@ -890,7 +839,7 @@
           if (p.sd) { cctx.fillStyle = '#fff'; cctx.fillRect((p.sd.left - sr.left) * sc, (p.sd.top - sr.top) * sc, p.sd.width * sc, p.sd.height * sc); }
           cctx.restore();
         });
-        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = parts.length > 0; texSrc = ''; }
+        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = parts.length > 0; }
         catch (er) { compOk = false; }
         return compOk;
       }
@@ -899,7 +848,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, lockS = null, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
@@ -935,7 +884,7 @@
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
         // Hugo 24.11. (15:20): während die Sonne einblendet, liegt die Welle normal (mit Foto) UNTER ihr und blendet mit dem
         // Bild aus – keine Foto-Fetzen auf dem Weiss mehr. Danach liegt sie darüber und erscheint weich als Prisma-Licht.
-        var lf = lightFade(now), sinceF = (now - lightT0) / 1000 - CONFIG.deskSunFade / 1000;
+        var lf = lightFade(now);
         if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = shimOn ? '9' : '2'; }   // Hugo 24.11. (15:41): die Tippwelle bleibt immer unter der Sonne – sie verschwindet weich mit dem Einblenden und ist danach nicht mehr zu sehen
         else if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
         var sr = refRect();
@@ -944,7 +893,7 @@
         // passt sich an: wird ein Gerät zu langsam, rechnet die Welle etwas gröber (flüssig geht vor)
         if (lastT && now - lastT < 200) {
           slowEma = slowEma * 0.85 + (now - lastT) * 0.15;
-          if (slowEma > 21 && dprCap > 0.6) { dprCap = Math.max(0.6, dprCap - (dprCap > 1 ? 0.5 : 0.2)); slowEma = 16; slowN++; }
+          if (slowEma > 21 && dprCap > 0.6) { dprCap = Math.max(0.6, dprCap - (dprCap > 1 ? 0.5 : 0.2)); slowEma = 16; }
         }
         lastT = now;
         var dpr = Math.min(window.devicePixelRatio || 1, dprCap), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
@@ -972,7 +921,7 @@
         }
         // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
         if ((!lightMode || lf > 0.001) && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
-          c.uniform4f(U.uRect, 0, 0, w, h); c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
+          c.uniform4f(U.uRect, 0, 0, w, h); if (compCrop) c.uniform4f(U.uCrop, compCrop[0], compCrop[1], compCrop[2], compCrop[3]); else c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
@@ -1071,7 +1020,7 @@
         cancelAnimationFrame(raf); req();
       };
       cv.dock = dock;
-      var lightMode = false, lightT0 = 0, tintV = 0, shimOn = false;
+      var lightMode = false, lightT0 = 0, shimOn = false;
       // Hugo 24.11. (15:48): nach dem Blitz beim Öffnen derselbe Schimmer wie nach dem close (Andocken mit Flares, schwacher
       // Rand), hier über der Sonne als Farbe auf Weiss; die Tippwelle selbst bleibt darunter (kein Ring)
       // Hugo 24.11. (15:54): statt den Rand aufleuchten zu lassen, läuft der Schimmer als Bewegung von der Lichtquelle
@@ -1083,21 +1032,9 @@
       // kein Leuchten am Rand
       // Hugo 24.11. (16:15): ohne Rand-Leuchten (am iPhone sah man oben eine Lichtlinie)
       cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 0); noEdge = true; };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
-      cv.closeWave = function (x, y) { lightOff(); cv.shimmer(x, y, true); noEdge = true; };
-      cv.shimmer = function (x, y, plain) {
-        waves = []; edgeT0 = 0; killT0 = 0; shimOn = !plain; noEdge = false;
-        var cr = refRect(), now = performance.now(), pts = [], a = Math.random() * 6.2832, L = Math.min(cr.width, cr.height) * 0.16, N = 9, px = x - cr.left, py = y - cr.top;
-        for (var i = 0; i < N; i++) {
-          var u = i / (N - 1); a += (Math.random() - 0.5) * 0.9;
-          px += Math.cos(a) * L / N; py += Math.sin(a) * L / N;
-          pts.push({ x: px + (Math.random() - 0.5) * 6, y: py + (Math.random() - 0.5) * 6, t: now + u * 260, m: 0.7 + 0.6 * Math.random() });
-        }
-        waves.push({ t0: now, pts: pts });
-        if (!raf) req();
-      };
       var noEdge = false;   // close-Welle: kein Nachleuchten am Rand (Hugo 24.11., 16:01)
       function edgeOffV(now) { return noEdge ? 1 : lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
-      cv.tint = function (v) { tintV = v; if (!v) shimOn = false; if (!raf) req(); };
+      cv.tint = function (v) { if (!v) shimOn = false; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
       // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
       function lightFade(now) { return lightMode ? 1 - smoothstep(0, CONFIG.deskSunFade / 1000, (now - lightT0) / 1000) : 1; }
@@ -1107,16 +1044,7 @@
       var pendingOff = false;
       function lightOff() { pendingOff = false; lightMode = false; shimOn = false; if (cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } }
       cv.lightOnly = function (on) { if (on) { pendingOff = false; if (!lightMode) lightT0 = performance.now(); lightMode = true; } else if (lightMode) pendingOff = true; if (!raf) req(); };
-      cv.newWave = function () { if (pendingOff) lightOff(); };
-      // Hugo 24.11. (13:37): Welle, die die Sonne aufdeckt – ein Punkt, läuft als Ring schnell nach aussen
       cv.dropTap = function () { var now = performance.now(); waves = waves.filter(function (q) { return q.sp2 || now - q.t0 > 800 || q.pts.length > 3; }); };
-      cv.burst = function (x, y, sp) {
-        var now = performance.now();
-        waves.push({ t0: now, pts: [], sp2: sp }); if (waves.length > NW) dropOld();
-        if (edgeT0 && !killT0) killT0 = now;
-        add(x, y); var wv = waves[waves.length - 1]; if (wv && wv.pts[0]) wv.pts[0].t = now;
-        if (!raf) req();
-      };
       try { loadAll(); } catch (e) {}   // Hugo 24.11.: Bilder für den Effekt schon beim Laden holen (nicht erst beim Aufprall – sonst Ruckler)
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
       stage.addEventListener('touchstart', function (e) {
@@ -1400,9 +1328,8 @@
     }
     // Hugo 24.11. (14:58): Öffnen wieder wie früher – alles blendet aus, nur die letzte Welle (vom Tippen bzw. der Maus) läuft
     // als Licht weiter über die Sonne, bis sie ausgelaufen ist. Die Sonne blendet ein (keine aufdeckende Welle mehr).
-    var shimT = 0, shX = 0, shY = 0;
+    var shimT = 0;
     function reveal(x, y, els, onPass, tb) {
-      shX = x; shY = y;
       revealStop(true);
       rv.els = els;
       if (ripple && ripple.lightOnly) { ripple.lightOnly(true); ripple.tint(1); }
@@ -1410,7 +1337,7 @@
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
       if (sun) sun.blind(true);
-      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.flareShimmer(true); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
+      clearTimeout(shimT); if (ripple && ripple.flareShimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.flareShimmer(true); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
       els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: (CONFIG.closeHold || 0), easing: 'ease', fill: 'backwards' }); } catch (er) {} });
       if (onPass) rv.raf = setTimeout(function () { onPass(1e6, 0, 0); }, CONFIG.deskSunFade * 0.5);
     }
@@ -1666,17 +1593,13 @@
       lit: [1.0, 0.985, 0.95],   // Sonne auf der Wand: warmes Weiss
       textLight: [1.0, 0.74, 0.36], // so leuchtet angestrahlte schwarze Schrift (warmes Gold)
       textAmt: 0.62,
-      occLen: 0.9,               // Länge des Glasschattens (Anteil Höhe)
-      occAmt: 0.75,              // der Titel ist die Wolke: Licht kommt nur an den Rändern und durch die Lücken
-      refr: 0.02,                // Lichtbrechung im Glas (Anteil Höhe)
-      depth: 0.3,                // Tiefe des Glastitels (Anteil Schrifthöhe)
       shadowW: 0.05,             // Fingerschatten: Breite als Anteil der Höhe
       trailLife: 0.9,            // s
       trailAmt: 0.75,
-      res: 1                     // Auflösung (1 = CSS-Pixel; scharf genug für die Glaskanten)
+      res: 1                     // Auflösung (1 = CSS-Pixel)
     };
     // Hugo 23.11.: About und Ladeanimation haben je ihre eigene Sonne (eigene Werte, eigene Leinwand), gleiche Bauart
-    function makeSun(SUN, mode) {
+    function makeSun(SUN) {
       var gcv = document.createElement('canvas');
       var c = null;
       try { c = gcv.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true }); } catch (e) {}
@@ -1684,17 +1607,16 @@
       function mk(cls) { var v = document.createElement('canvas'); v.className = 'hp-info-sun ' + cls; v.setAttribute('aria-hidden', 'true'); return v; }
       var back = document.createElement('div'); back.className = 'hp-info-sun hp-sun-back'; back.setAttribute('aria-hidden', 'true');
       var wall = document.createElement('canvas'); wall.className = 'hp-sun-wall';
-      var glass = document.createElement('canvas'); glass.className = 'hp-sun-glass';
-      back.appendChild(wall); back.appendChild(glass);
+      back.appendChild(wall);
       var glow = mk('hp-sun-light');
-      var wx = wall.getContext('2d'), lx = glow.getContext('2d'), gx2 = glass.getContext('2d');
-      if (!wx || !lx || !gx2) return null;
+      var wx = wall.getContext('2d'), lx = glow.getContext('2d');
+      if (!wx || !lx) return null;
       var NT = 10;
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform vec3 uHero; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
+        'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform float uHor; uniform float uOn; uniform vec3 uHero; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit; uniform vec3 uBase;',
-        'uniform vec3 uTextLight; uniform float uTextAmt; uniform float uWallGlow; uniform vec4 uNoG; uniform vec4 uBl; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
+        'uniform vec3 uTextLight; uniform float uTextAmt; uniform float uWallGlow; uniform vec4 uNoG; uniform vec4 uBl;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
@@ -1720,7 +1642,7 @@
         '  return max(smoothstep(uEdge.x - 0.1, uEdge.y - 0.05, r), uHero.z * exp(-hd * hd));',
         '}',
         'void main() {',
-        '  vec2 fc = uOrig + (gl_FragCoord.xy - vec2(uOffX, 0.0)) / uScale;',
+        '  vec2 fc = gl_FragCoord.xy - vec2(uOffX, 0.0);',
         '  S = vec2(uSrc.x * uRes.x, uRes.y * (1.0 - uSrc.y));',
         '  vec2 d = fc - S; float ang = atan(d.x, -d.y); float dist = length(d) / uRes.y;',
         '  float t = uTime;',
@@ -1740,17 +1662,6 @@
         '  float pool = exp(-pow((fc.y - hitY) / pH, 2.0));',
         '  float ray = rayR(fc);',
         '  beam = beam * mix(1.0, 0.5 + 0.5 * air, grd) + ray * pool * grd * (1.0 + 0.6 * dT);',
-        // Glas im Weg der Sonne: lässt Licht durch (heller Schatten), bündelt es an den Kanten (Kaustik)
-        '  float occ = 0.0, caus = 0.0;',
-        '  if (uOccOn > 0.0) {',
-        '    vec2 dv = S - fc; float dl = length(dv); vec2 dir = dv / max(dl, 0.001); float L = min(uOccLen * uRes.y, dl); float j = 0.5;',
-        '    for (int i = 0; i < 30; i++) {',
-        '      float k = (float(i) + j) / 30.0; vec2 p = fc + dir * (k * L);',
-        '      vec4 m = texture2D(uOcc, (p - uMB.xy) / uMB.zw, uLodB + 1.5 + k * L / uRes.y * 14.0); float w = pow(1.0 - k, 1.4);',
-        '      occ = max(occ, m.r); caus = max(caus, m.g * w);',
-        '    }',
-        '    occ *= uOccOn * uOccAmt; caus *= uOccOn;',
-        '  }',
         '  float sh = 0.0;',
         '  for (int i = 0; i < ' + NT + '; i++) {',
         '    vec3 p = uTrail[i]; if (p.z <= 0.0) continue;',
@@ -1771,10 +1682,8 @@
         '  float dw = smoothstep(0.04, 0.55, yh);',
         '  float onG = grd * smoothstep(0.03, 0.35, beam) * smoothstep(0.02, 0.1, yh) * mix(0.35, 1.0, dw);',
         '  beam *= rf;',
-        '  float lit = beam * (1.0 - occ) * (1.0 - sh * uTrailAmt);',
-        '  vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (ang * 2.5 + dist * 1.5 - t * 0.04 + vec3(0.0, 0.33, 0.67)));',
-        '  vec3 causC = caus * beam * (vec3(1.0, 0.88, 0.66) * 0.16 + (rainbow - 0.5) * 0.05);',
-        '  vec3 shade = mix(uShade, uShadeLow, grd * (0.5 + 0.5 * (1.0 - fc.y / max(uHor, 1.0))));',
+        '  float lit = beam * (1.0 - sh * uTrailAmt);',
+                        '  vec3 shade = mix(uShade, uShadeLow, grd * (0.5 + 0.5 * (1.0 - fc.y / max(uHor, 1.0))));',
         '  vec3 col, gl = vec3(0.0);',
         '  bool inG = fc.x > uNoG.x && fc.x < uNoG.z && fc.y > uNoG.y && fc.y < uNoG.w;',
         '  if (uMode > 0.5 || (uWallGlow > 0.5 && !inG)) {',
@@ -1788,14 +1697,14 @@
         '    vec3 tl3 = smoothstep(vec3(0.45), vec3(1.0), lit2 * disp);',
         '    float tm = min(tl3.r, min(tl3.g, tl3.b));',
         '    vec3 tc = vec3(1.0, 0.8, 0.62) * tm * 1.08 + (tl3 - tm) * vec3(1.0, 0.95, 1.25) * 1.35;',
-        '    gl = (tc * uTextAmt + causC * 0.8) * max(smoothstep(0.15, 0.5, uOn), uHero.z * exp(-hh * hh * 0.35));',
+        '    gl = tc * uTextAmt * max(smoothstep(0.15, 0.5, uOn), uHero.z * exp(-hh * hh * 0.35));',
         '  }',
         '  if (uMode < 0.5) {',
         '    float L = clamp(uAmb + lit, 0.0, 1.0);',
         '    float sh2 = onG * smoothstep(0.0, 0.6, uOn);',
         '    float amp = mix(0.8, 1.6, dw);',
         '    L *= mix(1.0, 1.0 - amp * (0.2 - 0.2 * sv + 0.08 * fil), sh2);',
-        '    col = mix(shade, uLit, L) + causC + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
+        '    col = mix(shade, uLit, L) + vec3(0.05, 0.03, 0.0) * clamp(lit - 0.8, 0.0, 1.0) * grd;',
         '    col += vec3(1.0, 0.85, 0.55) * fil * sh2 * 0.1 * amp;',
         '    float cw = pow(1.0 - abs(2.0 * sv - 1.0), 3.0);',
         '    vec3 cr = 0.5 + 0.5 * cos(6.2832 * ((sv - 0.5) * 4.0 + t * 0.02 + vec3(0.0, 0.33, 0.67)));',
@@ -1833,116 +1742,27 @@
       c.useProgram(pr);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uHero', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
-        'uBase', 'uTextLight', 'uTextAmt', 'uWallGlow', 'uNoG', 'uBl', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+      var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uHero', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
+        'uBase', 'uTextLight', 'uTextAmt', 'uWallGlow', 'uNoG', 'uBl', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
       c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uBase, SUN.base || [1, 1, 1]);
       c.uniform3fv(U.uTextLight, SUN.textLight); c.uniform1f(U.uTextAmt, SUN.textAmt);
-      c.uniform1f(U.uOccLen, SUN.occLen); c.uniform1f(U.uOccAmt, SUN.occAmt); c.uniform1f(U.uRefr, SUN.refr); c.uniform2f(U.uExt, 0, 0);
       c.uniform1f(U.uShadowW, SUN.shadowW); c.uniform1f(U.uTrailAmt, SUN.trailAmt);
-      // Maske des Titels (weiss auf schwarz) als Textur
-      var mcv = document.createElement('canvas'), mx = mcv.getContext('2d');
-      var tex = c.createTexture(); c.activeTexture(c.TEXTURE0); c.bindTexture(c.TEXTURE_2D, tex);
-      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
-      c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
-      c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, 1, 1, 0, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-      c.uniform1i(U.uOcc, 0);
-      var occ = { on: 0, t: 0, want: 0, el: null }, pw = 1, ph = 1;
-      function pot(v) { var p = 1; while (p < v) p *= 2; return p; }
       var trail = [], tbuf = new Float32Array(NT * 3), raf = 0, t0 = performance.now() - 40000, cw = 0, chh = 0;
-      // mode: 'info' = About, 'load' = Ladeanimation der Startseite
-      // Glas-Ausschnitt: der Titelbereich wird extra in voller Retina-Auflösung gerechnet (scharfe Glaskanten),
-      // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
-      var G = null, srcT = null;
+      // G = Lage des Titels { bx, by, bw, bh } (CSS-Pixel): knapp darunter liegt der Horizont
+      var G = null, lastT = 0;
       function size() {
         var rs = SUN.res * (desk ? CONFIG.deskSunRes : 0.75);   // Handy: 0.75 (Hugo 24.11., 14:43: weniger Rechenarbeit)   // Computer: halbe Auflösung (die ganze Bildschirmfläche ruckelte beim Übergang)
         var w = Math.max(1, Math.round(wall.clientWidth * rs)), h = Math.max(1, Math.round(wall.clientHeight * rs));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
-
         }
         var GW = 2 * cw, GH = chh;
         if (gcv.width !== GW || gcv.height !== GH) { gcv.width = GW; gcv.height = GH; }
       }
-      // Glastitel in die Maske zeichnen, genau so verzerrt wie die gedrehte Schrift auf dem Bildschirm:
-      // Schrift flach zeichnen, dann in senkrechten Streifen an die perspektivischen Stellen (T.map) setzen.
-      // Die Maske deckt nur den Titelbereich ab, dafür fein. Daraus pro Bildpunkt:
-      // R = Glasdicke (gerundet), G = Kante, B/A = Neigung der Oberfläche (für Brechung, Farben, Glanz).
-      var tcv = document.createElement('canvas'), tx = tcv.getContext('2d');
-      function mask(T) {
-        occ.el = T;
-        var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
-        if (!T.txt || T.tw < 2) return;
-        var cs = [T.map(T.ox, T.oy), T.map(T.ox + T.tw, T.oy), T.map(T.ox, T.oy + T.th), T.map(T.ox + T.tw, T.oy + T.th)];
-        var x0 = Math.min(cs[0][0], cs[2][0]), x1 = Math.max(cs[1][0], cs[3][0]), y0 = Math.min(cs[0][1], cs[1][1]), y1 = Math.max(cs[2][1], cs[3][1]);
-        var mc = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, 0), mb = T.map3(T.ox + T.tw * 0.6, T.oy + T.th * 0.5, -SUN.depth * T.th);
-        var ex = mb[0] - mc[0], ey = mb[1] - mc[1];   // Seitenwände: so weit liegt die Rückseite versetzt
-        var mg = (y1 - y0) * 0.25 + Math.sqrt(ex * ex + ey * ey);
-        var bx = Math.floor(x0 - mg), by = Math.floor(y0 - mg), bw = Math.ceil(x1 - x0 + 2 * mg), bh = Math.ceil(y1 - y0 + 2 * mg);
-        var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-        pw = Math.min(1024, pot(bw * dpr)); ph = Math.min(512, pot(bh * dpr));
-        mcv.width = pw; mcv.height = ph;
-        var mxs = pw / bw, mys = ph / bh;
-        mx.setTransform(1, 0, 0, 1, 0, 0); mx.fillStyle = '#000'; mx.fillRect(0, 0, pw, ph);
-        var k = Math.min(4, Math.max(0.2, (y1 - y0) * mys * 1.5 / T.th));
-        var tw = Math.max(2, Math.round(T.tw * k)), th = Math.max(2, Math.round(T.th * k));
-        tcv.width = tw; tcv.height = th;
-        var fs = 100; tx.font = T.font.replace('{s}', fs + 'px'); tx.textBaseline = 'alphabetic';
-        var m = tx.measureText(T.txt), asc = m.fontBoundingBoxAscent || fs * 0.92, dsc = m.fontBoundingBoxDescent || fs * 0.24;
-        tx.setTransform(tw / Math.max(1, m.width), 0, 0, th / (asc + dsc), 0, 0);
-        tx.fillStyle = '#fff'; tx.fillText(T.txt, 0, asc);
-        var N = 120;
-        for (var i = 0; i < N; i++) {
-          var a = T.map(T.ox + T.tw * i / N, T.oy), b = T.map(T.ox + T.tw * (i + 1) / N, T.oy), cB = T.map(T.ox + T.tw * i / N, T.oy + T.th);
-          mx.drawImage(tcv, tw * i / N, 0, tw / N + 0.5, th, (a[0] - bx) * mxs, (a[1] - by) * mys, (b[0] - a[0]) * mxs + 0.6, (cB[1] - a[1]) * mys);
-        }
-        upload(mx.getImageData(0, 0, pw, ph).data, mxs, mys, (cs[2][1] - cs[0][1]) * mys);
-        c.uniform4f(U.uMB, bx * sx, chh - (by + bh) * sx, bw * sx, bh * sx);
-        c.uniform2f(U.uExt, ex * sx, -ey * sx);
-        G = { bx: bx, by: by, bw: bw, bh: bh, PW: Math.round(bw * dpr), PH: Math.round(bh * dpr), sx: sx };
-        glass.width = G.PW; glass.height = G.PH;
-        glass.style.left = bx + 'px'; glass.style.top = by + 'px'; glass.style.width = bw + 'px'; glass.style.height = bh + 'px';
-      }
-      // Kastenfilter mit laufender Summe (schnell, egal wie gross der Radius)
-      function box(a, b, w, h, r, horiz) {
-        var len = horiz ? w : h, lines = horiz ? h : w, st = horiz ? 1 : w, ls = horiz ? w : 1;
-        for (var L = 0; L < lines; L++) {
-          var base = L * ls, sum = 0, cnt = 0, i;
-          for (i = 0; i <= r && i < len; i++) { sum += a[base + i * st]; cnt++; }
-          for (i = 0; i < len; i++) {
-            b[base + i * st] = sum / cnt;
-            var add = i + r + 1, rem = i - r;
-            if (add < len) { sum += a[base + add * st]; cnt++; }
-            if (rem >= 0) { sum -= a[base + rem * st]; cnt--; }
-          }
-        }
-      }
-      function upload(src, mxs, mys, letterH) {
-        var w = pw, h = ph, n = w * h, out = new Uint8Array(n * 4);
-        var a = new Float32Array(n), b = new Float32Array(n), x, y, i;
-        for (i = 0; i < n; i++) a[i] = src[i * 4] / 255;
-        // dicke, runde Glaskanten: Breite etwa 9 % der Schrifthöhe
-        var r = Math.max(1, Math.round(letterH * 0.014));   // kleine Rundung: flache Flächen, weiche Ecken
-        for (var pass = 0; pass < 3; pass++) { box(a, b, w, h, r, true); box(b, a, w, h, r, false); }
-        var gmax = 1e-6, gx = new Float32Array(n), gy = new Float32Array(n);
-        for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
-          i = y * w + x; gx[i] = (a[i + 1] - a[i - 1]) * 0.5 * mxs; gy[i] = (a[i - w] - a[i + w]) * 0.5 * mys;   // je CSS-Pixel, y nach oben
-          var gm = Math.sqrt(gx[i] * gx[i] + gy[i] * gy[i]); if (gm > gmax) gmax = gm;
-        }
-        for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
-          i = y * w + x; var o4 = ((h - 1 - y) * w + x) * 4;     // Zeilen umdrehen (WebGL zählt von unten)
-          var nx = -gx[i] / gmax, ny = -gy[i] / gmax;
-          out[o4] = Math.round(a[i] * 255); out[o4 + 1] = Math.round(Math.min(1, Math.sqrt(nx * nx + ny * ny) * 1.3) * 255);
-          out[o4 + 2] = Math.round((nx * 0.5 + 0.5) * 255); out[o4 + 3] = Math.round((ny * 0.5 + 0.5) * 255);
-        }
-        c.bindTexture(c.TEXTURE_2D, tex); c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL, false); c.pixelStorei(c.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        c.texImage2D(c.TEXTURE_2D, 0, c.RGBA, w, h, 0, c.RGBA, c.UNSIGNED_BYTE, out);
-        c.generateMipmap(c.TEXTURE_2D); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR_MIPMAP_LINEAR);
-      }
-      function pass(x, w, h, mode, ox, oy, scl) {
-        c.viewport(x, 0, w, h); c.uniform1f(U.uOffX, x); c.uniform1f(U.uMode, mode);
-        c.uniform2f(U.uOrig, ox, oy); c.uniform1f(U.uScale, scl); c.uniform1f(U.uLodB, Math.log(scl) / Math.LN2);   // gleiche Unschärfe wie die Wand
+      function pass(x, w, h, md) {
+        c.viewport(x, 0, w, h); c.uniform1f(U.uOffX, x); c.uniform1f(U.uMode, md);
         c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
       }
       function draw(now) {
@@ -1958,20 +1778,16 @@
             tbuf[i * 3] = (p.x - rect.left) * sx; tbuf[i * 3 + 1] = chh - (p.y - rect.top) * sx; tbuf[i * 3 + 2] = life * life;
           } else tbuf[i * 3 + 2] = 0;
         }
-        // Glas weich ein- und ausblenden
-        var dt = Math.min(0.05, (now - (occ.t || now)) / 1000); occ.t = now;
-        occ.on += (occ.want - occ.on) * (reduce ? 1 : Math.min(1, dt * 3.5));
-        var e = G && srcT ? occ.on * occ.on * (3 - 2 * occ.on) : 0;
-        c.uniform2f(U.uSrc, SUN.src[0] + ((srcT ? srcT[0] : 0) - SUN.src[0]) * e, SUN.src[1] + ((srcT ? srcT[1] : 0) - SUN.src[1]) * e);
+        var dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now;
         c.uniform1f(U.uHor, G ? chh - (G.by + G.bh * 0.62) * sx : chh * 0.78);   // Horizont knapp unter dem Titel
         // Licht erst, wenn der Titel angekommen ist: in 1.8 s weich einstrahlen; beim Schliessen rasch weg
-        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / (mode === 'load' ? 2200 : 3200));   // 2.6 s, Strahl für Strahl
+        if (lightOn.want) lightOn.v = reduce ? 1 : Math.min(1, (now - lightOn.t0) / 3200);   // 2.6 s, Strahl für Strahl
         else lightOn.v = Math.max(0, lightOn.v - dt / 1.2);                                   // während die Seite wegfährt
         var lo = lightOn.v; c.uniform1f(U.uOn, lo * lo * (3 - 2 * lo));
         // Erster Strahl (Hugo 22.11.): kommt zuerst und fällt auf «Galerie öffnen», damit man den Schatten gleich sieht
         var hero = 0, ha = 0, hw = 0.05;
         var hb = sunBtn || infoOpen;
-        if (mode === 'info' && hb.offsetWidth) {
+        if (hb.offsetWidth) {
           var br = hb.getBoundingClientRect();
           var Sx = SUN.src[0] * rect.width, Sy = SUN.src[1] * rect.height;   // Sonne in CSS-Pixeln der Leinwand (y nach unten)
           var bxx = br.left - rect.left + br.width * 0.45, byy = br.top - rect.top + br.height * 0.5;
@@ -2001,33 +1817,26 @@
         } else c.uniform4f(U.uBl, 0, 0, 1, 0);
         if (noG) c.uniform4f(U.uNoG, (noG.left - rect.left) * sx, chh - (noG.bottom - rect.top) * sx, (noG.right - rect.left) * sx, chh - (noG.top - rect.top) * sx);
         else c.uniform4f(U.uNoG, -1, -1, -1, -1);
-        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
-        pass(0, cw, chh, 0, 0, 0, 1);
-        pass(cw, cw, chh, 1, 0, 0, 1);
+        c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf);
+        pass(0, cw, chh, 0);
+        pass(cw, cw, chh, 1);
         probe(rect, sx);
         var H = gcv.height;
         wx.drawImage(gcv, 0, H - chh, cw, chh, 0, 0, cw, chh);
         lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
       }
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
-      var px = null, btnL = 0, pf = 0, heroNow = 0, noG = null, blT0 = 0, blOpen = false;
+      var btnL = 0, pf = 0, heroNow = 0, noG = null, blT0 = 0, blOpen = false;
       function probe(rect, sx) {
         var hb = sunBtn || infoOpen;
-        if (mode !== 'info' || ++pf % 5 || !hb.offsetWidth) return;
+        if (++pf % 5 || !hb.offsetWidth) return;
         var r = hb.getBoundingClientRect();
         var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
         if (w < 1 || y < 0 || y >= chh) return;
-        var v = 0;
-        if (false) {   // Hugo 24.11. (14:43): nie mehr auslesen (hält die Grafikkarte an); der pulsierende Strahl reicht – Computer: ohne Auslesen (hält die Grafikkarte an, Ruckler beim Übergang); der pulsierende Strahl reicht
-          if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
-          c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
-          var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
-          v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
-        }
-        // CTA (Hugo 22.11.): Schatten folgt vor allem dem pulsierenden Strahl auf dem Button, andere Strahlen nur schwach
-        v = Math.max(v * 0.08, heroNow);
-        btnL += (v - btnL) * 0.35;
+        // CTA (Hugo 22.11.): Schatten folgt dem pulsierenden Strahl auf dem Button (Hugo 24.11., 14:43: Licht wird nicht mehr
+        // ausgelesen – das hielt die Grafikkarte an)
+        btnL += (heroNow - btnL) * 0.35;
         hb.style.setProperty('--hp-lit', btnL.toFixed(3));
         // Schatten in Strahlrichtung: weg von der Sonne, schräg über den Boden
         var Sx = rect.left + SUN.src[0] * rect.width, Sy = rect.top + SUN.src[1] * rect.height;
@@ -2035,12 +1844,15 @@
         var sk = Math.max(-65, Math.min(65, Math.atan(ddx / ddy) * 180 / Math.PI));
         hb.style.setProperty('--hp-skew', sk.toFixed(1) + 'deg');
       }
+      var lastDraw = 0;
       function loop(now) {
         raf = 0;
-        if (mode === 'load' && !lightOn.want && lightOn.v <= 0) return;                 // Laden fertig, Licht aus
-        if (mode === 'info' && ip.v >= 1 && !root.classList.contains('is-info') && !dsunLive) { occ.on = 0; return; }   // Seite zu: nichts zeichnen
-        draw(now);
-        if (!reduce || trail.length || Math.abs(occ.want - occ.on) > 0.01) raf = requestAnimationFrame(loop);
+        if (ip.v >= 1 && !root.classList.contains('is-info') && !dsunLive) return;   // Seite zu: nichts zeichnen
+        // Audit 24.11. (Akku): steht alles (Licht ganz an, kein Strahl, kein Finger- oder Mausschatten), rechnet die Sonne
+        // nur noch jedes zweite Bild – die Strahlen wandern so langsam, dass man keinen Unterschied sieht
+        var calm = !reduce && lightOn.want && lightOn.v >= 1 && !blT0 && !trail.length;
+        if (!calm || now - lastDraw > 24) { lastDraw = now; draw(now); }
+        if (!reduce || trail.length) raf = requestAnimationFrame(loop);
       }
       // Fingerschatten: bleibt, solange der Finger auf dem Display liegt, und folgt ihm (auch beim Scrollen);
       // erst beim Loslassen verblasst er. Touch-Ereignisse statt Pointer, weil Pointer beim Scrollen abbrechen.
@@ -2070,29 +1882,16 @@
         // für einige Bilder alles angehalten, Hugos Video 22.11.)
         title: function (T) {
           if (T) { var a = T.map(T.ox, T.oy), b = T.map(T.ox + T.tw, T.oy + T.th); G = { bx: a[0], by: a[1], bw: b[0] - a[0], bh: b[1] - a[1] }; }
-          occ.want = 0; start();
+          start();
         },
         noGlow: function (r) { noG = r; },   // Computer: Feld (CSS-Pixel), in dem die Lichtebene darüber das Licht übernimmt
         light: function (on, lead) { if (on && !lightOn.want) lightOn.t0 = performance.now() - (lead || 0); if (on && !blOpen) blT0 = 0; lightOn.want = !!on; start(); },
         blind: function (open) { if (!reduce) { blT0 = performance.now(); blOpen = !!open; start(); } },   // open: Hugo 24.11. (14:59) auch beim Öffnen, Blendung klingt danach ab   // Schliessen: Strahl mit Schwung, Blendung   // lead: so viele ms ist das Einstrahlen schon weiter
         // Laden: Boden (Sonnenoberfläche) beginnt knapp unter dem Schriftzug
-        horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); },
-        // Lichtbild der Schrift (zweite Hälfte der Rechenleinwand): Quelle und Ausschnitt für drawImage
-        lightSrc: function () { return [gcv, cw, gcv.height - chh, cw, chh]; },
-        // Licht an einer Stelle (CSS-Pixel): 0 … 1, so stark wie angestrahlte Schrift dort leuchten würde
-        lightAt: function (x, y) {
-          var rect = wall.getBoundingClientRect(), sx = cw / Math.max(1, rect.width);
-          var px0 = Math.round((x - rect.left) * sx), py0 = Math.round(chh - (y - rect.top) * sx);
-          if (px0 < 0 || px0 >= cw || py0 < 0 || py0 >= chh) return 0;
-          if (!px) px = new Uint8Array(4);
-          c.readPixels(cw + px0, py0, 1, 1, c.RGBA, c.UNSIGNED_BYTE, px);
-          return Math.min(1, px[0] / 255 / (SUN.textLight[0] * SUN.textAmt));
-        },
-        // Ladeanimation fertig: Leinwand und Speicher freigeben
-        destroy: function () { lightOn.want = false; lightOn.v = 0; if (raf) cancelAnimationFrame(raf); raf = 0; var lx2 = c.getExtension('WEBGL_lose_context'); if (lx2) lx2.loseContext(); }
+        horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); }
       };
     }
-    var sun = makeSun(SUN, 'info');
+    var sun = makeSun(SUN);
     if (sun) {
       info.insertBefore(sun.back, infoPanel); root.appendChild(sun.glow);   // Lichtebene über Text UND Titel
       root.classList.add('hp-info-sunlit');
@@ -2124,8 +1923,6 @@
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
     }
-    function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
-    function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
       if (!o.a) return false;
       var t = clamp((now - o.a.t0) / o.a.ms, 0, 1);
@@ -2151,7 +1948,6 @@
     }
     // Buchstabe aus Licht: von hinten rechts, in Flugrichtung gestreckt; bunt (Regenbogen) oder perlmuttweiss (iri), am Ende
     // in seiner Farbe
-    function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
     // Hugo 24.11. (14:50): der Schweif besteht aus gebrochenem Licht – ein ganzes Spektrum entlang der Streckung (Prisma),
     // nicht eine Farbe; beim Ankommen deckt die eigene Farbe (schwarz) das Licht zu
     var SPEC = 'linear-gradient(100deg, #ff2d55, #ff9500, #ffd60a, #34c759, #32ade6, #5856d6, #af52de, #ff2d55)';
@@ -2205,33 +2001,6 @@
         blRaf = requestAnimationFrame(f);
       }
       blRaf = requestAnimationFrame(f);
-    }
-    // Hugo 24.11. (15:07): der Text blendet fleckig weich ein – weiche Lichtflecken an zufälligen Stellen wachsen, bis alles da
-    // ist (eine Maske auf dem ganzen Textblock, kaum Rechenarbeit)
-    var blotR = 0;
-    function blotIn(el, delay, ms) {
-      cancelAnimationFrame(blotR);
-      if (!el || reduce) return;
-      var r = el.getBoundingClientRect(), w = r.width || 1, h = r.height || 1, sp = [], n = Math.max(6, Math.min(18, Math.round(w * h / 9000)));
-      for (var i = 0; i < n; i++) sp.push({ x: Math.random() * w, y: Math.random() * h, t: Math.random() * 0.55, k: 0.6 + 0.8 * Math.random() });
-      var R = Math.hypot(w, h) * 0.55, t0 = performance.now() + delay;
-      function set(m) { el.style.webkitMaskImage = m; el.style.maskImage = m; }
-      function f(now) {
-        var t = (now - t0) / ms;
-        if (t >= 1) { set(''); return; }
-        var L = [];
-        sp.forEach(function (p) {
-          var u = Math.max(0, Math.min(1, (t - p.t) / 0.45)); u = u * u * (3 - 2 * u);
-          var rr = R * p.k * u;
-          L.push('radial-gradient(circle at ' + p.x.toFixed(0) + 'px ' + p.y.toFixed(0) + 'px, rgba(0,0,0,' + (0.25 + 0.75 * u).toFixed(2) + ') 0, rgba(0,0,0,' + (0.6 * u).toFixed(2) + ') ' + (rr * 0.45).toFixed(0) + 'px, transparent ' + Math.max(1, rr).toFixed(0) + 'px)');
-        });
-        var all = Math.max(0, (t - 0.7) / 0.3);   // zum Schluss legt sich alles weich zusammen
-        L.push('linear-gradient(rgba(0,0,0,' + all.toFixed(2) + '), rgba(0,0,0,' + all.toFixed(2) + '))');
-        set(L.join(', '));
-        blotR = requestAnimationFrame(f);
-      }
-      set('linear-gradient(transparent, transparent)');
-      blotR = requestAnimationFrame(f);
     }
     function hyperText(el, d0x, maxT, iri) {
       if (!el || !el.animate || reduce) return;
@@ -2382,7 +2151,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
-      cancelAnimationFrame(blotR); if (blRaf) { cancelAnimationFrame(blRaf); blRaf = 0; } infoText.style.webkitMaskImage = infoText.style.maskImage = '';
+      if (blRaf) { cancelAnimationFrame(blRaf); blRaf = 0; } infoText.style.webkitMaskImage = infoText.style.maskImage = '';
       if (infoOpen.getAnimations) infoOpen.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       if (ripple && ripple.tint) ripple.tint(0);
