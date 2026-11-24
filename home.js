@@ -2110,16 +2110,23 @@
     // Buchstabe aus Licht: von hinten rechts, in Flugrichtung gestreckt; bunt (Regenbogen) oder perlmuttweiss (iri), am Ende
     // in seiner Farbe
     function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
+    // Hugo 24.11. (14:50): der Schweif besteht aus gebrochenem Licht – ein ganzes Spektrum entlang der Streckung (Prisma),
+    // nicht eine Farbe; beim Ankommen deckt die eigene Farbe (schwarz) das Licht zu
+    var SPEC = 'linear-gradient(100deg, #ff2d55, #ff9500, #ffd60a, #34c759, #32ade6, #5856d6, #af52de, #ff2d55)';
+    var IRI = 'linear-gradient(100deg, #fff, #ffe3f1, #fff6dc, #e2fbe9, #ddf1ff, #ece4ff, #fff)';
     function lightFrames(u, iri) {
-      var fin = getComputedStyle(u).color, hue = Math.floor(Math.random() * 360);
-      var c0 = iri ? 'hsl(' + hue + ',70%,94%)' : 'hsl(' + hue + ',100%,62%)', c1 = iri ? 'hsl(' + ((hue + 70) % 360) + ',55%,90%)' : 'hsl(' + ((hue + 50) % 360) + ',100%,58%)';
+      var fin = getComputedStyle(u).color;
+      var st = u.style;
+      st.backgroundImage = iri ? IRI : SPEC; st.backgroundSize = '300% 100%'; st.backgroundPosition = Math.round(Math.random() * 100) + '% 0';
+      st.webkitBackgroundClip = 'text'; st.backgroundClip = 'text';
       return [
-        { transform: tf(90, -36, -650, 4), opacity: 0, color: c0, offset: 0 },
+        { transform: tf(90, -36, -650, 4), opacity: 0, color: 'rgba(0,0,0,0)', offset: 0 },
         { opacity: 1, offset: 0.12 },
-        { transform: tf(8, -3, -40, 2.2), opacity: 1, color: c1, offset: 0.55 },
+        { transform: tf(8, -3, -40, 2.2), opacity: 1, color: 'rgba(0,0,0,0)', offset: 0.5 },
         { transform: tf(0, 0, 0, 1), opacity: 1, color: fin, offset: 1 }
       ];
     }
+    function lightClear(u) { var st = u.style; st.backgroundImage = st.backgroundSize = st.backgroundPosition = st.webkitBackgroundClip = st.backgroundClip = ''; }
     function hyperText(el, tail, d0x, maxT, iri) {
       if (el === infoText) clearTimeout(hyT);
       if (!el || !el.animate || reduce) return;
@@ -2155,7 +2162,7 @@
       if (tail) { try { tail.animate(lightFrames(tail, true), { duration: each, delay: d0 + total + 120, easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} }
       // danach wieder der ursprüngliche Text (markierbar, leicht)
       var endT = d0 + total + (tail ? 120 : 0);
-      var tm = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
+      var tm = setTimeout(function () { if (tail) { if (tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(tail); } if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
       if (el === infoText) hyT = tm;
       return endT;
     }
@@ -2265,7 +2272,7 @@
       if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
       infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
-      if (infoOpen.getAnimations) infoOpen.getAnimations().forEach(function (a) { a.cancel(); });
+      if (infoOpen.getAnimations) infoOpen.getAnimations().forEach(function (a) { a.cancel(); }); lightClear(infoOpen);
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
