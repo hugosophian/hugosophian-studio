@@ -972,7 +972,7 @@
           bx = 0; by = r * H; bw = W; bh = H;
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
-          var x0i = LC ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
+          var x0i = LC ? 0.24 : 0.25;   // Hugo 24.11.: wartet etwas länger auf das Erscheinen der anderen Karten (vorher 0.17)   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
           var xin = clamp((P - x0i) / (LC ? 0.68 : 1 - x0i), 0, 1), xj = LC ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
           E = LC ? easeMagnet(xj) : easeDock(xin);
           ay = H / 2 + r * (ah + (LC ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
@@ -1067,7 +1067,7 @@
         introP = clamp((now - introT0) / CONFIG.introMs, 0, 1);
 
         // Hugo 24.11.: der Einflug endet im Moment des Andockens – Bild steht sofort an seinem Platz, der Titel bewegt sich nicht mehr
-        if (introHit || introP >= ((LD && !desk && CONFIG.ldCards) ? 0.87 : 1)) endIntro(); else more = true;   // Handy: Heranzoomen ist bei 0.85 fertig
+        if (introHit || introP >= ((LD && !desk && CONFIG.ldCards) ? 0.95 : 1)) endIntro(); else more = true;   // Handy: Heranzoomen ist bei 0.85 fertig
       } else if (desk) {
         deskMoving = false;
         var k = CONFIG.deskStiff, c = 2 * Math.sqrt(k) * CONFIG.deskDamp;
