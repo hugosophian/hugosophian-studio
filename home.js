@@ -388,6 +388,17 @@
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
         '    float fl = dockW ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
+        // Hugo 24.11.: jeder grosse Flare-Strahl entspringt einer Flare-Welle – an seinem Ursprung bäumt sich die Welle
+        // zu einer kräftigen, breiten Flare auf, aus der der Strahl weiterläuft
+        '    if (dockW) {',
+        '      float ob2 = 0.0;',
+        '      for (int j = 0; j < ' + NDF + '; j++) {',
+        '        if (uDF2[j].w < 0.5 || uDF2[j].z <= 0.001) continue;',
+        '        vec2 od2 = fc - uDF[j].xy; float rr2 = min(uRes.x, uRes.y) * 0.075;',
+        '        ob2 = max(ob2, exp(-dot(od2, od2) / (rr2 * rr2)) * min(uDF2[j].z, 1.0));',
+        '      }',
+        '      fl = max(fl, ob2 * 1.35);',
+        '    }',
         '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind eigene Objekte (siehe unten)
@@ -699,22 +710,35 @@
                 var h = z[0], P = z[1], Q = z[2], u = Math.max(0.2, z[3]);
                 var want = Math.atan2(Q.y - h.y, Q.x - h.x), have = Math.atan2(P.y - h.y, P.x - h.x);
                 var dA = wrap(want - have);
-                h.fa += dA * k * 3.2 / u;
+                h.fa += dA * k * 2.6 / u;
+                // angleichen: Richtung und Schwung werden sich mit zunehmender Nähe ähnlicher
+                var o2 = h === f ? g : f, ws = o2.s / (h.s + o2.s);
+                h.fa += wrap(o2.a - h.a) * k * 1.8 * ws + ((o2.vda || 0) - (h.vda || 0)) * k * 2.0 * ws;
                 var cr = Math.cos(P.a) * (Q.y - P.y) - Math.sin(P.a) * (Q.x - P.x);
                 h.fc += (cr > 0 ? 1 : -1) * k * 0.9;
               });
             }
             if (best < mn * 0.06 && !f.mt && !g.mt) {
               // verschmelzen: gemeinsame neue Richtung, dann ausblenden
-              var am = Math.atan2(Math.sin(f.a) + Math.sin(g.a), Math.cos(f.a) + Math.cos(g.a)) + rnd(-0.35, 0.35);
-              f.mt = g.mt = et; f.ma = am; g.ma = am;
+              // neue Richtung aus dem Schwung, den beide hatten (nach Stärke gewichtet): der Stärkere trägt die
+              // verschmolzene Flare weiter, der Schwächere geht in ihm auf und erlischt schneller
+              var sx = f.s * Math.cos(f.a) + g.s * Math.cos(g.a), sy = f.s * Math.sin(f.a) + g.s * Math.sin(g.a);
+              var spin = (f.s * (f.vda || 0) + g.s * (g.vda || 0)) / (f.s + g.s);
+              var am = Math.atan2(sy, sx) + spin * 0.6;
+              var st = f.s >= g.s ? f : g, wk = st === f ? g : f;
+              f.mt = g.mt = et; f.ma = am; g.ma = am; st.lead = true; wk.lead = false;
+              st.vda = (st.vda || 0) + spin * 0.5;
               if (DF.length < NDF) DF.push({ kind: 3, x: (bp.x + bq.x) / 2, y: (bp.y + bq.y) / 2, a0: am, Lm: mn * rnd(0.14, 0.22), W: mn * rnd(0.018, 0.024),
                 s: 0.8, t0: et, life: rnd(1.6, 2.3), cs: rnd(-0.4, 0.4), ph: rnd(0, 100) });
             }
           });
         });
         parents.forEach(function (f) {
-          if (f.mt) f.fa += wrap(f.ma - f.a) * 2.2;   // in die gemeinsame Richtung schwenken
+          if (f.mt) {   // in die gemeinsame Richtung schwenken; der Schwächere schmiegt sich an den Stärkeren
+            f.fa += wrap(f.ma - f.a) * (f.lead ? 1.6 : 3.2);
+            if (!f.lead) { var lead = parents.filter(function (z) { return z.lead && z.mt === f.mt; })[0];
+              if (lead) { var tp = along(lead, lead.L * 0.6), hp = along(f, f.L * 0.6), crs = Math.cos(hp.a) * (tp.y - hp.y) - Math.sin(hp.a) * (tp.x - hp.x); f.fc += (crs > 0 ? 1 : -1) * 1.4; } }
+          }
           f.vda = (f.vda || 0) + f.fa * dt; f.da = Math.max(-1.6, Math.min(1.6, (f.da || 0) + f.vda * dt));
           f.vdc = (f.vdc || 0) + f.fc * dt; f.dc = Math.max(-1.2, Math.min(1.2, (f.dc || 0) + f.vdc * dt));
           geo(f, et);
@@ -726,7 +750,7 @@
           var x, y, a, L, c, lv;
           if (f.kind === 1) {
             x = f.x; y = f.y; a = f.a; L = f.L; c = f.c;
-            lv = f.s * sm(f.dl, f.dl + 0.08, et) * (1 - sm(3.0, 5.4, et)) * (f.mt ? 1 - sm(0.2, 1.8, et - f.mt) : 1);   // nach dem Verschmelzen schwächer werdend
+            lv = f.s * sm(f.dl, f.dl + 0.08, et) * (1 - sm(3.0, 5.4, et)) * (f.mt ? (f.lead ? (1 + 0.25 * (1 - sm(0, 0.8, et - f.mt))) * (1 - sm(0.6, 2.6, et - f.mt)) : 1 - sm(0.1, 1.1, et - f.mt)) : 1);   // verschmolzen: der Stärkere leuchtet kurz auf und klingt langsam aus, der Schwächere geht schnell in ihm auf
           } else {
             var tc = et - f.t0, k = tc / f.life;
             if (f.kind === 2) { var pt = along(f.par, f.par.L * f.fr); x = pt.x; y = pt.y; a = pt.a + f.side * f.off; }
@@ -736,7 +760,7 @@
             lv = f.s * sm(0, f.kind === 3 ? 0.4 : 0.12, tc) * (1 - sm(0.5, 1, k)) * (1 - sm(3.0, 5.4, et));
           }
           df1[i * 4] = x - sr.left; df1[i * 4 + 1] = y - sr.top; df1[i * 4 + 2] = a; df1[i * 4 + 3] = c;
-          df2[i * 4] = Math.max(1, L); df2[i * 4 + 1] = f.W; df2[i * 4 + 2] = lv * 1.4; df2[i * 4 + 3] = 0;
+          df2[i * 4] = Math.max(1, L); df2[i * 4 + 1] = f.W; df2[i * 4 + 2] = lv * 1.4; df2[i * 4 + 3] = f.kind === 1 ? 1 : 0;   // 1 = grosser Strahl (mit Flare-Welle am Ursprung)
         }
       }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
