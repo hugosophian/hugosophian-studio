@@ -170,16 +170,17 @@
     '[data-hp].is-desk .hp-media { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    // Hugo 24.11. (Video 12:34): die Welle vom Wischen verschwindet sofort, sonst liegt sie wie ein Schatten auf dem Weiss
-    '[data-hp].is-desk .hp-ripple { transition: opacity .25s ease; }',
+    // Hugo 24.11. (12:40): die Welle vom Wischen blendet mit allem anderen weg (wirkt wie ein Traum)
+    '[data-hp].is-desk .hp-ripple { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-ripple { opacity: 0 !important; }',
     '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
-    // Text: statt grau über grau blendet er hell aus und dunkel wieder ein (beim Zurück umgekehrt)
-    '@keyframes hp-dsun-txt-in { 0% { opacity: 1; color: var(--hp-side-fg, #fff); } 40% { opacity: 0; color: var(--hp-side-fg, #fff); } 60% { opacity: 0; color: var(--hp-info-fg, #000); } 100% { opacity: 1; color: var(--hp-info-fg, #000); } }',
-    '@keyframes hp-dsun-txt-out { 0% { opacity: 1; color: var(--hp-info-fg, #000); } 40% { opacity: 0; color: var(--hp-info-fg, #000); } 60% { opacity: 0; color: var(--hp-side-fg, #fff); } 100% { opacity: 1; color: var(--hp-side-fg, #fff); } }',
-    '[data-hp].is-desk.hp-dsun .hp-side-in > * { animation: hp-dsun-txt-in var(--hp-dsun-fade, .9s) ease both; }',
-    '[data-hp].is-desk.hp-dsun-live:not(.hp-dsun) .hp-side-in > * { animation: hp-dsun-txt-out var(--hp-dsun-fade, .9s) ease both; }',
+    // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
+    // der Grund hell genug ist (bei 40 % des Ausblendens); beim Zurück umgekehrt
+    '@keyframes hp-dsun-txt-in { 0%, 39.9% { color: var(--hp-side-fg, #fff); } 40%, 100% { color: var(--hp-info-fg, #000); } }',
+    '@keyframes hp-dsun-txt-out { 0%, 39.9% { color: var(--hp-info-fg, #000); } 40%, 100% { color: var(--hp-side-fg, #fff); } }',
+    '[data-hp].is-desk.hp-dsun .hp-side-in > * { animation: hp-dsun-txt-in var(--hp-dsun-fade, .9s) linear both; }',
+    '[data-hp].is-desk.hp-dsun-live:not(.hp-dsun) .hp-side-in > * { animation: hp-dsun-txt-out var(--hp-dsun-fade, .9s) linear both; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -1287,7 +1288,7 @@
       root.classList.add('hp-dsun-live', 'hp-dsun');
       sun.start();
       clearTimeout(dsunL);
-      sun.light(true, reduce ? 0 : 1200);   // Hugo 24.11. (Video 12:34): die ersten Strahlen sind schon beim Ausblenden da, die übrigen kommen danach Strahl für Strahl
+      sun.light(true, reduce ? 0 : 800);   // Hugo 24.11.: die ersten Strahlen kommen beim Ausblenden (12:40: minimal später als mit 1200), die übrigen danach Strahl für Strahl
     }
     function dsunStop() {
       clearTimeout(dsunT);
