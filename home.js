@@ -71,7 +71,7 @@
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
-    diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
+    diveMs:     1000,   // Dauer des Eintauchens (Feder; startet am Handy schon beim Tippen); Hugo 24.11. (18:55): schneller, schwungvoller (vorher 1600)
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
     shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
@@ -230,7 +230,7 @@
     var e1 = 1 - x(1);
     return function (t) { return x(t) + e1 * t * t * t; };
   }
-  var easeDive = springEase(0.7, 10);      // Öffnen
+  var easeDive = springEase(0.6, 12);      // Öffnen (Hugo 24.11., 18:55: mehr Wucht – schiesst hinein, ~10 % über das Ziel, federt zurück)
   var easeDiveOut = springEase(0.75, 11);  // Schliessen (Handy: Bild hat Reserve, ein Hauch unter 1 ist unsichtbar)
   var easeDiveOutD = springEase(1, 9);     // Schliessen am Computer: ohne Nachfedern (sonst sähe man den Bildrand)
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
