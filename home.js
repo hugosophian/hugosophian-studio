@@ -932,7 +932,7 @@
         // Hugo 24.11. (15:20): während die Sonne einblendet, liegt die Welle normal (mit Foto) UNTER ihr und blendet mit dem
         // Bild aus – keine Foto-Fetzen auf dem Weiss mehr. Danach liegt sie darüber und erscheint weich als Prisma-Licht.
         var lf = lightFade(now), sinceF = (now - lightT0) / 1000 - CONFIG.deskSunFade / 1000;
-        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = '2'; }   // Hugo 24.11. (15:41): die Tippwelle bleibt immer unter der Sonne – sie verschwindet weich mit dem Einblenden und ist danach nicht mehr zu sehen
+        if (lightMode) { if (cv.parentNode !== root) root.appendChild(cv); cv.style.zIndex = shimOn ? '9' : '2'; }   // Hugo 24.11. (15:41): die Tippwelle bleibt immer unter der Sonne – sie verschwindet weich mit dem Einblenden und ist danach nicht mehr zu sehen
         else if (desk) deskCanvas(); else if (cv.parentNode) cv.parentNode.removeChild(cv);
         var sr = refRect();
         var w = Math.max(1, Math.round(sr.width)), h = Math.max(1, Math.round(sr.height));
@@ -973,7 +973,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && lf <= 0.001 ? tintV * sm01(0, 0.6, sinceF) * (1 - sm01(0.6, 2.2, sinceF)) : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now));   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now));   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1065,9 +1065,12 @@
         cancelAnimationFrame(raf); req();
       };
       cv.dock = dock;
-      var lightMode = false, lightT0 = 0, tintV = 0;
+      var lightMode = false, lightT0 = 0, tintV = 0, shimOn = false;
+      // Hugo 24.11. (15:48): nach dem Blitz beim Öffnen derselbe Schimmer wie nach dem close (Andocken mit Flares, schwacher
+      // Rand), hier über der Sonne als Farbe auf Weiss; die Tippwelle selbst bleibt darunter (kein Ring)
+      cv.shimmer = function (amt, fl) { waves = []; shimOn = true; dock(amt, fl, true); };
       function edgeOffV(now) { return lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
-      cv.tint = function (v) { tintV = v; if (!raf) req(); };
+      cv.tint = function (v) { tintV = v; if (!v) shimOn = false; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
       // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
       function lightFade(now) { return lightMode ? 1 - smoothstep(0, CONFIG.deskSunFade / 1000, (now - lightT0) / 1000) : 1; }
@@ -1075,7 +1078,7 @@
       // Bild mitten im Schimmer kurz dunkler (und die Textur musste neu geladen werden, Ruckler). Erst wenn nichts mehr läuft
       // oder eine neue Welle beginnt
       var pendingOff = false;
-      function lightOff() { pendingOff = false; lightMode = false; if (cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } }
+      function lightOff() { pendingOff = false; lightMode = false; shimOn = false; if (cv.parentNode === root) { cv.parentNode.removeChild(cv); cv.style.zIndex = ''; } }
       cv.lightOnly = function (on) { if (on) { pendingOff = false; if (!lightMode) lightT0 = performance.now(); lightMode = true; } else if (lightMode) pendingOff = true; if (!raf) req(); };
       cv.newWave = function () { if (pendingOff) lightOff(); };
       // Hugo 24.11. (13:37): Welle, die die Sonne aufdeckt – ein Punkt, läuft als Ring schnell nach aussen
@@ -1363,11 +1366,13 @@
       setTimeout(function () { ripple.dock(CONFIG.closeDock, CONFIG.closeFlares, true); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
+      clearTimeout(shimT);
       if (rv.raf) clearTimeout(rv.raf); rv.raf = 0;
       if (clear) { rv.els.forEach(function (e) { setMask(e, ''); }); rv.els = []; }
     }
     // Hugo 24.11. (14:58): Öffnen wieder wie früher – alles blendet aus, nur die letzte Welle (vom Tippen bzw. der Maus) läuft
     // als Licht weiter über die Sonne, bis sie ausgelaufen ist. Die Sonne blendet ein (keine aufdeckende Welle mehr).
+    var shimT = 0;
     function reveal(x, y, els, onPass, tb) {
       revealStop(true);
       rv.els = els;
@@ -1376,6 +1381,7 @@
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
       if (sun) sun.blind(true);
+      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.shimmer(CONFIG.closeDock, CONFIG.closeFlares); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
       els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: (CONFIG.closeHold || 0), easing: 'ease', fill: 'backwards' }); } catch (er) {} });
       if (onPass) rv.raf = setTimeout(function () { onPass(1e6, 0, 0); }, CONFIG.deskSunFade * 0.5);
     }
