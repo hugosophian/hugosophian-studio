@@ -604,7 +604,7 @@
         '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? mix(0.06, 0.6, uSoft) : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
-        '    if (dockW) faD = max(faD, fv * uDF / max(uDA, 0.01)); else fa = max(fa, fv);',   // Flares des Andockens: uDF (Hugo 24.11., 15:16: Flares ja, Rand wenig)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
+        '    if (dockW) faD = max(faD, fv * uDF / max(uDA, 0.01) * (1.0 - 0.6 * uSoft)); else fa = max(fa, fv);',   // Flares des Andockens: uDF (Hugo 24.11., 15:16: Flares ja, Rand wenig)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
@@ -625,7 +625,7 @@
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = mix(0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0)), 0.35 + 1.4 * n2(ca * 5.0 + vec2(-uT * 0.1, 2.0)), uDesk);',   // Computer: Breite stark wechselnd
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
-        '    eacc = ecol * band * flash * 0.85 * mix(1.0, patch, max(smoothstep(0.15, 0.7, et), 0.8 * uDesk));',   // Computer: von Anfang an ungleich (kein Rahmen)   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
+        '    eacc = ecol * band * flash * 0.85 * (1.0 + 0.7 * uSoft) * mix(1.0, patch, max(smoothstep(0.15, 0.7, et), 0.8 * uDesk));',   // Computer: von Anfang an ungleich (kein Rahmen)   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
         // lebendig; sie wachsen beim Andocken aus dem Rand und ziehen sich wieder zurück
         '    float ra = 0.22 * sin(uT * 0.6);',
@@ -664,11 +664,12 @@
         '      vB = flFam(fc, uRes, tB0, et, ee, sB, aB, QB, PB.x, vec4(PC.x, flPsi(oB, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nBC, off4, off3, 1.0, tB);',
         '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, PC0, vec4(QA.x, flPsi(oC, uRes, uT, dA, sw, sA), gA, sA), vec3(dA, 0.0), nAC,',
         '                                 vec4(QB.x, flPsi(oC, uRes, tB0, dB, -sw, sB), gB, sB), vec3(dB, 0.0), nBC, tC);',
+        '      float kSo = 1.0 - uSoft; vB *= kSo; vC *= kSo;',   // Hugo 24.11. (18:22): Schimmer – nur eine Schar Flare-Fäden (sonst manchmal fünf auf einmal)
         '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1));',   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
         '      float wfc = 0.04 + 0.13 * (1.0 - exp(-et * 1.8)), dw = (ee / mnS - wfc) / 0.07;',
         '      float sb = max(1.0 - smoothstep(0.03, 0.3, ee / mnS), 0.85 * exp(-dw * dw));',
         '      faD += sv * (1.0 - 0.7 * sb) * 1.3;',
-        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + tB + tC * 0.75) * 0.6 * (1.0 - sb);',
+        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + (tB + tC * 0.75) * kSo) * 0.6 * (1.0 - sb);',
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
