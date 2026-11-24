@@ -166,7 +166,7 @@
     // Hugo 24.11.: peppiger – setzt früher und kräftiger an, Spitzentempo höher (Zeit leicht vorgezogen, Potenz 4.6)
     t = Math.pow(t, 0.82);
     // Hugo 24.11.: kürzeres Abbremsen – Anlauf bis 62 % der Zeit (Potenz 4.6), dann kubisch kurz abgebremst (Tempo stetig)
-    var c = t < 0.62 ? 0.5155 * Math.pow(t / 0.62, 4.6) : 1 - 0.4845 * Math.pow((1 - t) / 0.38, 3);
+    var c = t < 0.7 ? 0.5147 * Math.pow(t / 0.7, 5.5) : 1 - 0.4853 * Math.pow((1 - t) / 0.3, 2.5);   // Hugo 24.11.: kräftiger beschleunigen, kürzer bremsen
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
