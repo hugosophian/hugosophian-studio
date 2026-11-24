@@ -420,12 +420,13 @@
         '    float str = smoothstep(0.78, 1.0, hs);',
         '    float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '    float sd2 = abs(ps - id) / gl;',
-        '    float swd = mn * (0.009 + 0.007 * str) * (1.2 - 0.35 * u), sw2 = swd * 1.45;',
+        '    float swd = mn * (0.011 + 0.009 * str) * (1.2 - 0.3 * u), sw2 = swd * 1.45;',
         // Saum läuft weit genug aus, bevor er weggelassen wird (Hugo 24.11.: sonst sichtbarer Beleuchtungsrand)
         '    float thin = 0.0, fib = 0.0;',
-        '    if (sd2 < sw2 * 10.0) {',
-        '      thin = exp(-sd2 * sd2 / (swd * swd)) + 0.25 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
-        '      fib = 0.3 * exp(-sd2 * sd2 / (sw2 * sw2 * 9.0));',
+        '    if (sd2 < sw2 * 14.0) {',
+        // Hugo 24.11. (9:04): dicker, der weiche Schein wirkt weiter in die Umgebung
+        '      thin = exp(-sd2 * sd2 / (swd * swd)) + 0.38 * exp(-sd2 * sd2 / (swd * swd * 14.0));',
+        '      fib = 0.42 * exp(-sd2 * sd2 / (sw2 * sw2 * 16.0));',
         '      for (int j = -1; j <= 1; j++) {',
         '        float fj = float(j), of = fj * (0.06 + 0.06 * n2(vec2(s * 3.0 - t * 0.3, id * 2.0 + fj * 5.0)));',
         '        float dj = abs(ps - id - of) / gl;',
