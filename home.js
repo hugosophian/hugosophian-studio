@@ -74,7 +74,9 @@
     diveZoom:   1.3,    // Hugo 24.11. (13:50): das Bild zoomt beim Übergang hinein, als würde man eintauchen (Mario: viel stärker)
     diveMs:     1500,   // Dauer des Eintauchens (Kurve wie Marios About); zurück im Takt des Ausblendens
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms), dann blendet alles aus
-    titleSuck:  1200    // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
+    titleSuck:  1200,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
+    revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
+    closeRipple: 3      // Hugo 24.11. (14:00): beim Schliessen hinterlässt der Strahl eine Welle mit Schimmer auf der Seite (Tempo)
   };
 
   var css = [
@@ -568,7 +570,7 @@
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
-        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * 0.5);',   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
+        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0) * (uB[k].w > 2.0 ? ' + CONFIG.revealRing.toFixed(2) + ' : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
         '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
@@ -604,17 +606,20 @@
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
         // Hugo 24.11.: Andock-Flares mit eigener Richtung – jede Stelle der Front neigt ihre Flares anders (langsam
         // wanderndes Feld); so laufen sie schräg, kreuzen sich und fliessen weiter ineinander, statt alle zur Mitte zu zeigen
+        // Hugo 24.11. (14:00): an der schnellen Sonnenwelle (Tempo > 2) Flares ungleichmässig wie beim Andocken – sonst wirkten
+        // die gleichmässigen Zacken wie eine Motorsäge
+        '    bool irr = dockW || uB[k].w > 2.0;',
         '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, uT * 0.07)) - 0.5) * 2.6;',
         // Hugo 24.11.: magnetisches Spiel ohne Mittelpunkt – eine Flare biegt weg von der stärkeren Nachbarin (die
         // stärkere drückt die schwächere zur Seite, sie verschmelzen und laufen in neuer Richtung weiter); je weiter
         // ins Bild, desto mehr drehen sie seitlich ab, so sammeln sie sich nie in einem Punkt in der Mitte
         '    vec2 dnL = vec2(dn.x * 0.97 + dn.y * 0.25, -dn.x * 0.25 + dn.y * 0.97), dnR = vec2(dn.x * 0.97 - dn.y * 0.25, dn.x * 0.25 + dn.y * 0.97);',
-        '    float push = dockW ? n2(dnR * 1.7 + vec2(fs, uT * 0.3)) - n2(dnL * 1.7 + vec2(fs, uT * 0.3)) : 0.0;',
-        '    float ra = dockW ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
+        '    float push = irr ? n2(dnR * 1.7 + vec2(fs, uT * 0.3)) - n2(dnL * 1.7 + vec2(fs, uT * 0.3)) : 0.0;',
+        '    float ra = irr ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
-        '    float fl = dockW ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
-        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
+        '    float fl = irr ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
+        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (irr ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
@@ -1301,6 +1306,11 @@
     // wie im Wellen-Shader); die Front selbst läuft darunter auf der Seite sichtbar nach aussen
     var rv = { raf: 0, els: [] };
     function setMask(el, m) { el.style.webkitMaskImage = m; el.style.maskImage = m; }
+    // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
+    function closeRipple() {
+      if (!ripple || reduce) return;
+      setTimeout(function () { ripple.burst((stage.clientWidth || W) * 0.5, (stage.clientHeight || H) * 0.55, CONFIG.closeRipple); }, CONFIG.closeBeam * 0.5);
+    }
     function revealStop(clear) {
       if (rv.raf) cancelAnimationFrame(rv.raf); rv.raf = 0;
       if (clear) { rv.els.forEach(function (e) { setMask(e, ''); }); rv.els = []; }
@@ -1317,7 +1327,7 @@
       ripple.burst(x, y, CONFIG.revealSp);
       var t0 = performance.now();
       function tick(now) {
-        var z = (now - t0) / 1000, w = mx * Math.min(0.019 + 0.02 * z, 0.062);
+        var z = (now - t0) / 1000, w = mx * Math.min(0.019 + 0.02 * z, 0.062) * CONFIG.revealRing;
         var rf = 0.15 * mx * CONFIG.revealSp * z - (1 - smoothstep(0, 0.12, z)) * mx * 0.035;
         var a = Math.max(0, rf - 1.4 * w), b = Math.max(a + 0.5, rf - 0.2 * w);
         if (onPass) onPass(a, lx, ly);
@@ -1436,6 +1446,7 @@
       if (dDive) { var dd0 = dDive; setTimeout(function () { dive(dd0, 0, 0, false); }, reduce ? 0 : CONFIG.closeBeam); dDive = null; }
       root.classList.remove('hp-dsun');
       if (sun) { sun.light(false); sun.blind(); }
+      closeRipple();
       clearTimeout(dsunEnd);
       dsunEnd = setTimeout(function () {
         if (dsunOn) return;
@@ -2145,6 +2156,7 @@
       // Anlauf – er hing oben, während die Seite schon da war, und sprang am Ende)
       if (tClone) { tClone.style.transition = 'transform ' + (CONFIG.deskSunFade / 1000) + 's cubic-bezier(.45,0,.2,1) ' + ((closeMs - CONFIG.deskSunFade) / 1000) + 's, opacity .5s ease'; tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
+      closeRipple();
       clearTimeout(infoT);
       infoT = setTimeout(function () {
         if (root.classList.contains('is-info')) return;
