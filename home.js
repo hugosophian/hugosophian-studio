@@ -377,7 +377,7 @@
         '    float ra = xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
-        '    float fl = dockW ? pow(n2(cs * 1.1 + vec2(fs, uT * 0.3)), 4.5) * 2.0 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
+        '    float fl = dockW ? pow(n2(cs * 0.9 + vec2(fs, uT * 0.3)), 6.5) * 2.9 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
         '    float ln = 0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd);',
         '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
@@ -462,7 +462,7 @@
         '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
         // Andock-Flares sichtbar auch auf Hellem: weissgoldenes Licht, das Helles leicht golden färbt und Dunkles aufhellt
         '    float fdv = clamp(faD, 0.0, 1.2);',
-        '    lit = mix(lit, lit * vec3(1.0, 0.9, 0.68), fdv * 0.45 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.18 + 0.42 * dk);',
+        '    lit = mix(lit, lit * vec3(1.0, 0.9, 0.68), fdv * 0.45 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.3 + 0.5 * dk);',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
         '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.75) + eacc * (0.28 + 0.55 * dk);',   // färbt mehr, hellt weniger auf (nicht weiss)      // Andock-Licht: färbt auch Weiss golden
         // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
