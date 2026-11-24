@@ -76,7 +76,7 @@
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms), dann blendet alles aus
     titleSuck:  1200,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
-    closeRipple: 3      // Hugo 24.11. (14:00): beim Schliessen hinterlässt der Strahl eine Welle mit Schimmer auf der Seite (Tempo)
+    closeRipple: 1      // Hugo 24.11.: beim Schliessen löst der Strahl eine Fingerwelle auf der Seite aus (Tempo 1 = wie der Finger)
   };
 
   var css = [
@@ -226,12 +226,13 @@
   var easeDockM = bezier(0.66, 0, 0.09, 1);   // Hugo 24.11.: zieht am Anfang mehr an   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
   var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
   // Sog (Hugo 24.11., 13:53): erst ein Hauch Bewegung, dann zieht es immer stärker, rastet oben ein und federt kaum nach
+  function suckF(t) {
+    var e = 0.8;
+    if (t < e) { var u = t / e; return 0.1 * (1 - (1 - u) * (1 - u)) + 0.9 * u * u * u * u; }
+    var v = (t - e) / (1 - e); return 1 + 0.035 * Math.sin(Math.PI * v) * (1 - v);
+  }
   var suckEase = (function () {
-    function f(t) {
-      var e = 0.8;
-      if (t < e) { var u = t / e; return 0.1 * (1 - (1 - u) * (1 - u)) + 0.9 * u * u * u * u; }
-      var v = (t - e) / (1 - e); return 1 + 0.035 * Math.sin(Math.PI * v) * (1 - v);
-    }
+    var f = suckF;
     try {
       if (window.CSS && CSS.supports('transition-timing-function', 'linear(0, 1)')) {
         var pts = []; for (var i = 0; i <= 60; i++) pts.push(f(i / 60).toFixed(4));
@@ -608,18 +609,21 @@
         // wanderndes Feld); so laufen sie schräg, kreuzen sich und fliessen weiter ineinander, statt alle zur Mitte zu zeigen
         // Hugo 24.11. (14:00): an der schnellen Sonnenwelle (Tempo > 2) Flares ungleichmässig wie beim Andocken – sonst wirkten
         // die gleichmässigen Zacken wie eine Motorsäge
-        '    bool irr = dockW || uB[k].w > 2.0;',
-        '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, uT * 0.07)) - 0.5) * 2.6;',
+        '    bool irr = dockW || uB[k].w > 2.0, brst = !dockW && uB[k].w > 2.0;',
+        // Hugo 24.11. (14:03): die Sonnenwelle dreht sich nicht – ihr Muster hängt nur an der Richtung, die Flares schiessen
+        // gerade nach aussen wie bei der Flare-Explosion der Ladeanimation
+        '    float tq = brst ? 0.0 : uT;',
+        '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, tq * 0.07)) - 0.5) * 2.6;',
         // Hugo 24.11.: magnetisches Spiel ohne Mittelpunkt – eine Flare biegt weg von der stärkeren Nachbarin (die
         // stärkere drückt die schwächere zur Seite, sie verschmelzen und laufen in neuer Richtung weiter); je weiter
         // ins Bild, desto mehr drehen sie seitlich ab, so sammeln sie sich nie in einem Punkt in der Mitte
         '    vec2 dnL = vec2(dn.x * 0.97 + dn.y * 0.25, -dn.x * 0.25 + dn.y * 0.97), dnR = vec2(dn.x * 0.97 - dn.y * 0.25, dn.x * 0.25 + dn.y * 0.97);',
-        '    float push = irr ? n2(dnR * 1.7 + vec2(fs, uT * 0.3)) - n2(dnL * 1.7 + vec2(fs, uT * 0.3)) : 0.0;',
-        '    float ra = irr ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
+        '    float push = dockW ? n2(dnR * 1.7 + vec2(fs, uT * 0.3)) - n2(dnL * 1.7 + vec2(fs, uT * 0.3)) : 0.0;',
+        '    float ra = brst ? min(xo, 5.0) * 0.3 * lean : irr ? min(xo, 5.0) * (0.42 * lean - 1.1 * push + 0.22 * sin(uT * 0.9 + fs + dn.x * 3.0)) : xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
-        '    float fl = irr ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
-        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (irr ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
+        '    float fl = irr ? pow(n2(cs * 0.6 + vec2(fs, tq * 0.3 + age * (brst ? 0.25 : 0.0))), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
+        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(tq * 0.8 + age * (brst ? 0.6 : 0.0), fs)))) * (irr ? 1.35 : 1.0) * (brst ? 1.4 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
@@ -1309,7 +1313,8 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      setTimeout(function () { ripple.burst((stage.clientWidth || W) * 0.5, (stage.clientHeight || H) * 0.55, CONFIG.closeRipple); }, CONFIG.closeBeam * 0.5);
+      // Hugo 24.11. (14:05): eine echte Fingerwelle, ausgelöst, sobald die Seite unter dem Licht wieder erscheint
+      setTimeout(function () { ripple.burst((stage.clientWidth || W) * 0.5, (stage.clientHeight || H) * 0.55, CONFIG.closeRipple); }, CONFIG.closeBeam);
     }
     function revealStop(clear) {
       if (rv.raf) cancelAnimationFrame(rv.raf); rv.raf = 0;
@@ -1322,8 +1327,20 @@
       var rr = root.getBoundingClientRect(), lx = x - rr.left, ly = y - rr.top;
       var mx = Math.max(stage.clientWidth || W, stage.clientHeight || H);
       var far = Math.max(Math.hypot(lx, ly), Math.hypot(rr.width - lx, ly), Math.hypot(lx, rr.height - ly), Math.hypot(rr.width - lx, rr.height - ly));
-      function m(a, b) { return 'radial-gradient(circle at ' + lx.toFixed(1) + 'px ' + ly.toFixed(1) + 'px, #000 ' + a.toFixed(1) + 'px, transparent ' + b.toFixed(1) + 'px)'; }
-      els.forEach(function (e) { setMask(e, m(0, 0.5)); });
+      // Hugo 24.11. (14:03): der Rand geht wie eine Wolke auf (wie die Flare-Explosion beim Laden): um den Kreis liegen
+      // weiche Bäusche, ungleich gross, die mitwachsen und leicht atmen, an festen Stellen (nichts dreht sich)
+      var NP = 13, pf = [];
+      for (var pi = 0; pi < NP; pi++) { var hh = Math.sin((pi + 1) * 12.9898 + x * 0.013 + y * 0.007) * 43758.5453; hh -= Math.floor(hh); pf.push({ a: (pi + 0.35 * hh) / NP * 6.2832, k: 0.6 + 0.8 * hh, ph: hh * 6.2832 }); }
+      function m(a, b, z) {
+        var L = ['radial-gradient(circle at ' + lx.toFixed(1) + 'px ' + ly.toFixed(1) + 'px, #000 ' + a.toFixed(1) + 'px, transparent ' + b.toFixed(1) + 'px)'];
+        if (a > 4) for (var q = 0; q < NP; q++) {
+          var P = pf[q], rp = (a * 0.2 + 18) * P.k * (1 + 0.12 * Math.sin(z * 2.2 + P.ph)), d0 = a * 0.97;
+          var px = lx + Math.cos(P.a) * d0, py = ly + Math.sin(P.a) * d0;
+          L.push('radial-gradient(circle at ' + px.toFixed(1) + 'px ' + py.toFixed(1) + 'px, #000 ' + (rp * 0.3).toFixed(1) + 'px, transparent ' + rp.toFixed(1) + 'px)');
+        }
+        return L.join(', ');
+      }
+      els.forEach(function (e) { setMask(e, m(0, 0.5, 0)); });
       ripple.burst(x, y, CONFIG.revealSp);
       var t0 = performance.now();
       function tick(now) {
@@ -1331,8 +1348,8 @@
         var rf = 0.15 * mx * CONFIG.revealSp * z - (1 - smoothstep(0, 0.12, z)) * mx * 0.035;
         var a = Math.max(0, rf - 1.4 * w), b = Math.max(a + 0.5, rf - 0.2 * w);
         if (onPass) onPass(a, lx, ly);
-        if (a > far) { revealStop(true); return; }
-        els.forEach(function (e) { setMask(e, m(a, b)); });
+        if (a > far + 40) { revealStop(true); return; }
+        els.forEach(function (e) { setMask(e, m(a, b, z)); });
         rv.raf = requestAnimationFrame(tick);
       }
       rv.raf = requestAnimationFrame(tick);
@@ -2113,6 +2130,20 @@
             map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
+        // Hugo 24.11. (14:03): der Titel verzieht sich im Sog – je schneller, desto mehr wird er in die Länge gezogen, kippt
+        // nach hinten (Tiefe) und wird kurz kleiner, als würde er in die Tiefe gezogen; oben rastet er wieder gerade ein
+        if (tClone.animate && !reduce) {
+          tClone.style.transition = 'opacity .5s ease';
+          var fr = [], NF = 48, vmax = 1e-6, vs = [];
+          for (var fi = 0; fi <= NF; fi++) { var ft = fi / NF; vs[fi] = Math.abs(suckF(Math.min(1, ft + 0.015)) - suckF(Math.max(0, ft - 0.015))); vmax = Math.max(vmax, vs[fi]); }
+          for (fi = 0; fi <= NF; fi++) {
+            var pp = suckF(fi / NF), vn = fi === NF || fi === 0 ? 0 : vs[fi] / vmax;
+            var sp = 1 + (sc - 1) * pp, dip = 1 - 0.16 * Math.sin(Math.PI * Math.min(1, pp)), st = 1 + 0.5 * vn, sq = 1 / Math.sqrt(st);
+            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(700px) rotateX(' + (-24 * vn).toFixed(2) + 'deg) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
+              filter: 'blur(' + (1.3 * vn).toFixed(2) + 'px)', offset: fi / NF });
+          }
+          try { tClone.animate(fr, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
+        }
         clearTimeout(sunT);
         if (sun && glassT) sun.title(glassT);   // Hugo 24.11. (13:36): Horizont gleich setzen – die Sonne ist sofort sichtbar
       }
@@ -2154,6 +2185,7 @@
       clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, closeMs - CONFIG.deskSunFade * 0.5);
       // Hugo 24.11. (13:50): der Titel fliegt im selben Takt zurück, in dem die Sonne ausblendet (vorher 1.5 s mit langsamem
       // Anlauf – er hing oben, während die Seite schon da war, und sprang am Ende)
+      if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
       if (tClone) { tClone.style.transition = 'transform ' + (CONFIG.deskSunFade / 1000) + 's cubic-bezier(.45,0,.2,1) ' + ((closeMs - CONFIG.deskSunFade) / 1000) + 's, opacity .5s ease'; tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
