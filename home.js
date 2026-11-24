@@ -161,12 +161,8 @@
   function magnetPull(x) { var x0 = 0.62; return x > x0 ? Math.pow((x - x0) / (1 - x0), 6.5) : 0; }   // Hugo 23.11.: Magnet episch, aber ohne fast anzuhalten
   function easeMagnet(x) {
     var k = 0.84, a = 0.98, t = Math.min(1, x / a);   // a nahe 1: bremst nicht ganz aus, bevor der Magnet zieht
-    // Hugo 23.11.: der schnelle Teil schneller, das Abdämpfen etwas stärker: Anlauf und Bremsung mit Potenz 4
-    // (stetig angesetzt, Spitzentempo ein Drittel höher als kubisch, bremst kräftiger und läuft länger sanft aus)
-    // Hugo 24.11.: peppiger – setzt früher und kräftiger an, Spitzentempo höher (Zeit leicht vorgezogen, Potenz 4.6)
-    t = Math.pow(t, 0.82);
-    // Hugo 24.11.: kürzeres Abbremsen – Anlauf bis 62 % der Zeit (Potenz 4.6), dann kubisch kurz abgebremst (Tempo stetig)
-    var c = t < 0.7 ? 0.5147 * Math.pow(t / 0.7, 5.5) : 1 - 0.4853 * Math.pow((1 - t) / 0.3, 2.5);   // Hugo 24.11.: kräftiger beschleunigen, kürzer bremsen
+    // Hugo 24.11.: bis der Magnet zieht, dieselbe schwungvolle Kurve wie am Computer (easeDock); Magnet unverändert
+    var c = easeDock(t);
     return k * c + (1 - k) * magnetPull(x);
   }
   function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
