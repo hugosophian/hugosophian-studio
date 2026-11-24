@@ -307,6 +307,7 @@
     function rel(j) { var d = wrap(j - F); return d > n / 2 ? d - n : d; }
     function current() { return wrap(Math.round(F)); }
 
+    function stepDue() { return !!raf; }   // Bühne bewegt sich (step() ist für diesen Takt angemeldet)
     function setVis(s, on) { if (on !== !!s.vis) { s.el.classList.toggle('is-vis', on); s.vis = on; } }
     function rect(s, x, y, w, h) {
       var st = s.el.style;
@@ -832,7 +833,7 @@
             pts.push({ x: x, y: y, t: now, tip: true });
           }
         }
-        if (!raf) raf = requestAnimationFrame(draw);
+        if (!raf) raf = requestAnimationFrame(frame);
       }
       function draw(now) {
         raf = 0;
@@ -886,7 +887,7 @@
         var on = waves.length || edgeT0;
         if (on) c.drawArrays(c.TRIANGLE_STRIP, 0, 4);
         if (!desk) showFx(sr, pw, ph, on);
-        if (on) raf = requestAnimationFrame(draw);
+        if (on) raf = requestAnimationFrame(frame);
       }
       // Handy: jedes sichtbare Bild zeigt seinen Ausschnitt der Bildschirm-Leinwand (gegen seine Verschiebung gehalten,
       // wie der Titel) – so steht der Effekt still, auch während man wischt
@@ -954,8 +955,17 @@
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
         ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
-        if (!raf) raf = requestAnimationFrame(draw);
+        if (!raf) raf = requestAnimationFrame(frame);
       }
+      // Hugo 24.11.: der Effekt wird immer erst NACH dem Verschieben der Bilder gezeichnet (im selben Takt). Sonst hinkt er
+      // beim Wischen einen Takt hinterher und oben bzw. unten bleibt ein Streifen ohne Effekt. Läuft das Wischen/Öffnen,
+      // zeichnet step() ihn gleich nach render(); steht alles still, zeichnet er sich selbst.
+      function frame(now) { raf = 0; if (stepDue()) return; draw(now); }
+      cv.sync = function () {
+        if (!(waves.length || edgeT0)) return;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        draw(performance.now());
+      };
       cv.dock = dock;
       try { loadAll(); } catch (e) {}   // Hugo 24.11.: Bilder für den Effekt schon beim Laden holen (nicht erst beim Aufprall – sonst Ruckler)
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
@@ -1125,6 +1135,7 @@
       applyPanel();
       if (infoClosing) more = true;
       render(dt);
+      if (ripple && ripple.sync) ripple.sync();
       if (more) kick(); else last = 0;
     }
     function kick() { if (!raf) raf = requestAnimationFrame(step); }
