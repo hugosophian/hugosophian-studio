@@ -398,7 +398,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -739,6 +739,7 @@
         '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al; alD = al;',
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
+        '  edge *= 1.0 - uEdgeOff;',   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
         '  float glow = clamp(ring * 1.0 + edge * 1.9, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
@@ -793,7 +794,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -972,7 +973,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && lf <= 0.001 ? tintV * sm01(0, 0.6, sinceF) * (1 - sm01(0.6, 2.2, sinceF)) : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && lf <= 0.001 ? tintV * sm01(0, 0.6, sinceF) * (1 - sm01(0.6, 2.2, sinceF)) : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now));   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1065,6 +1066,7 @@
       };
       cv.dock = dock;
       var lightMode = false, lightT0 = 0, tintV = 0;
+      function edgeOffV(now) { return lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { tintV = v; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
       // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
