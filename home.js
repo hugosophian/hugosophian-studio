@@ -170,9 +170,8 @@
     '[data-hp].is-desk .hp-media { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-media, [data-hp].is-desk.hp-dsun .hp-title, [data-hp].is-desk.hp-dsun .hp-brand { opacity: 0 !important; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun-live .hp-title, [data-hp].is-desk.hp-dsun-live .hp-brand { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    // Hugo 24.11. (12:40): die Welle vom Wischen blendet mit allem anderen weg (wirkt wie ein Traum)
-    '[data-hp].is-desk .hp-ripple { transition: opacity var(--hp-dsun-fade, .9s) ease; }',
-    '[data-hp].is-desk.hp-dsun .hp-ripple { opacity: 0 !important; }',
+    // Hugo 24.11. (12:46): die Regenbogenwelle der Maus läuft zu Ende, während das Licht kommt; nur das verschobene Foto
+    // in ihr blendet mit den Bildern aus (uFade im Wellen-Shader), der Regenbogen bleibt
     '[data-hp].is-desk .hp-side { transition: background-color var(--hp-dsun-fade, .9s) ease; }',
     '[data-hp].is-desk.hp-dsun .hp-side { background-color: transparent; color: var(--hp-info-fg, #000); }',
     // Text: kein Grau und kein Einblenden (Hugo 24.11., 12:40: direkt) – er wechselt auf einen Schlag die Farbe, sobald
@@ -367,7 +366,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -736,6 +735,11 @@
         '    col = col + gc * (1.0 - al * 0.4) + eacc;',
         '    al = max(al, max(max(gc.r, max(gc.g, gc.b)) * 0.55, max(eacc.r, max(eacc.g, eacc.b))));',
         '  }',
+        // Computer, Sonne nach 1 s Ruhe (Hugo 24.11.): ohne Foto bleibt nur das Licht der Welle (Regenbogen, Flares)
+        '  if (uFade < 0.999) {',
+        '    vec3 cR = gc + eacc; float aR = max(max(gc.r, max(gc.g, gc.b)) * 0.55, max(eacc.r, max(eacc.g, eacc.b)));',
+        '    col = mix(cR, col, uFade); al = mix(aR, al, uFade);',
+        '  }',
         '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
@@ -747,7 +751,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -912,7 +916,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0);
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, dsunImg(now));
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -956,7 +960,7 @@
         if (Math.hypot(e.clientX - lmx, e.clientY - lmy) < 3) return;
         lmx = e.clientX; lmy = e.clientY;
         // Hugo 24.11.: die Maus zieht am Computer immer eine Welle wie der Finger am Handy (Text liegt darüber, bleibt ruhig)
-        if (!desk || busy() || root.classList.contains('is-info')) return;
+        if (!desk || busy() || root.classList.contains('is-info') || dsunOn) return;   // bei der Sonne keine neuen Wellen (die laufende läuft zu Ende)
         var now = performance.now(), wv = waves[waves.length - 1];
         if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
@@ -1255,6 +1259,14 @@
     // die anderen Bereiche wieder ein und die Strahlen verblassen.
     var sunBtn = null, dsunOn = false, dsunLive = false, dsunT = 0, dsunL = 0, dsunEnd = 0, dsunX = -1, dsunY = -1;
     root.style.setProperty('--hp-dsun-fade', (CONFIG.deskSunFade / 1000) + 's');
+    // Sichtbarkeit der Fotos (1 = da, 0 = ausgeblendet), im selben Takt wie das CSS-Ausblenden (Kurve «ease»)
+    var easeCss = bezier(0.25, 0.1, 0.25, 1), dsF = { from: 1, to: 1, t0: 0 };
+    function dsunImg(now) {
+      if (!dsF.t0) return dsF.to;
+      var t = clamp((now - dsF.t0) / CONFIG.deskSunFade, 0, 1);
+      return dsF.from + (dsF.to - dsF.from) * easeCss(t);
+    }
+    function dsunFadeTo(v) { var now = performance.now(); dsF.from = dsunImg(now); dsF.to = v; dsF.t0 = now; }
     function inHov(x, y) {
       if (hov < 0) return false;
       var r = slides[hov].el.getBoundingClientRect();
@@ -1285,7 +1297,7 @@
         if (!s.sideSh.parentNode) sunBtn.appendChild(s.sideSh);
       }
       sun.horizon(0, H * 0.22);   // Boden wie am Handy knapp unter dem oberen Fünftel
-      root.classList.add('hp-dsun-live', 'hp-dsun');
+      root.classList.add('hp-dsun-live', 'hp-dsun'); dsunFadeTo(0);
       sun.start();
       clearTimeout(dsunL);
       sun.light(true, reduce ? 0 : 800);   // Hugo 24.11.: die ersten Strahlen kommen beim Ausblenden (12:40: minimal später als mit 1200), die übrigen danach Strahl für Strahl
@@ -1294,7 +1306,7 @@
       clearTimeout(dsunT);
       if (!dsunOn) return;
       dsunOn = false; clearTimeout(dsunL);
-      root.classList.remove('hp-dsun');
+      root.classList.remove('hp-dsun'); dsunFadeTo(1);
       if (sun) sun.light(false);
       clearTimeout(dsunEnd);
       dsunEnd = setTimeout(function () {
