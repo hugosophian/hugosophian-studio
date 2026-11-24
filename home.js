@@ -1906,7 +1906,7 @@
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
       if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
-      if (desk || CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten auch am Computer
+      if (!desk && CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten nur am Handy (am Computer wieder entfernt)
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
         if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
         s.gold = g;
