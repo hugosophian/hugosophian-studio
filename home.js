@@ -54,8 +54,8 @@
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
     ldCards:    true,   // Hugo 24.11.: true = weisse Karten mit Magnet (Handy), false = Einflug wie am Computer
-    ldStripW:   0.05,   // Ladeanimation: Startgrösse der Karten (Hugo 24.11.: etwas näher, vorher 0.038 × 0.046)
-    ldStripH:   0.061,
+    ldStripW:   0.065,  // Ladeanimation: Startgrösse der Karten (Hugo 24.11.: näher, vorher 0.038 × 0.046)
+    ldStripH:   0.079,
     // Desktop
     desk:       992,    // ab dieser Breite (px) und mit Maus: Bilder nebeneinander
     deskOpen:   0.52,   // Breite des geöffneten Bildes samt Text (Anteil)
@@ -965,7 +965,7 @@
         // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
         if (LD && !desk && rel(j) === 0 && E > 0.978) LD.dock();   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
         if (s.gold) {
-          var gv = 1 - smoothstep(0.02, 0.45, E), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 23.11.: Bild blendet früher ein
+          var gv = 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
           s.gold.style.opacity = gv.toFixed(3);
           // Hugo 23.11.: kein Blenden an den Ecken – das Leuchten ohne Ausdehnung (spread) und schwächer, so addieren
           // sich die Lichthöfe benachbarter Karten in den Ecken nicht zu hellen Punkten
