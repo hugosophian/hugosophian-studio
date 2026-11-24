@@ -1951,7 +1951,20 @@
       brandTop.getBoundingClientRect();   // Startwert festhalten, sonst springt der Übergang
       brandTop.style.transition = 'opacity 1.4s ease 1.4s'; brandTop.style.opacity = '0';
     }
-    function brandTopOff() { if (brandTop) { brandTop.remove(); brandTop = null; } if (brand) { brand.style.opacity = ''; brand.style.transition = ''; } }
+    function brandTopOff() {
+      if (brandTop) { brandTop.remove(); brandTop = null; }
+      // Hugo 24.11. (17:53): ohne Übergang zurück (vorher blendete das Original hier fast 1 s neu ein – kurz durchsichtig)
+      if (brand) { brand.style.transition = 'none'; brand.style.opacity = ''; brand.getBoundingClientRect(); brand.style.transition = ''; }
+    }
+    // Schliessen (Hugo 24.11., 17:53): das schwarze Logo (Kopie) blendet weich aus, das weisse mit Differenz (Original) ein –
+    // ein harter Wechsel fiel am iPhone schon auf das durchscheinende Bild und machte den Schriftzug kurz durchsichtig
+    function brandCross() {
+      if (!brand) return;
+      if (!brandTop) { brandWhite(false); return; }
+      brand.style.transition = 'none'; brand.style.opacity = '0'; brand.classList.remove('hp-on-white'); brand.getBoundingClientRect();
+      brand.style.transition = 'opacity .5s ease'; brand.style.opacity = '1';
+      brandTop.style.transition = 'opacity .5s ease'; brandTop.style.opacity = '0';
+    }
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
@@ -2179,7 +2192,7 @@
       if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, closeHold); infoDive = null; }
       clearTimeout(ipT);
       ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; if (!dsunLive) brandTopOff(); revealStop(true); if (ripple && ripple.lightOnly) ripple.lightOnly(false); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
-      clearTimeout(brandT); brandT = setTimeout(function () { if (!root.classList.contains('is-info')) brandWhite(false); }, reduce ? 0 : CONFIG.closeBeam + 50);   // Hugo 24.11. (17:35): im hellsten Moment des Strahls (dort sehen Schwarz und die weisse Differenz-Schrift gleich aus)
+      clearTimeout(brandT); brandT = setTimeout(function () { if (!root.classList.contains('is-info')) brandCross(); }, reduce ? 0 : closeHold + 40);   // Hugo 24.11. (17:53): früh, solange es noch hell ist, und als Überblendung
       // Hugo 24.11. (14:09): kein Zurückfliegen – der Titel verschwindet im Licht des Strahls und steht danach schon
       // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
