@@ -2132,18 +2132,27 @@
             map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
-        // Hugo 24.11. (14:03): der Titel verzieht sich im Sog – je schneller, desto mehr wird er in die Länge gezogen, kippt
-        // nach hinten (Tiefe) und wird kurz kleiner, als würde er in die Tiefe gezogen; oben rastet er wieder gerade ein
+        // Hugo 24.11. (14:03/14:11): Warp wie beim Sprung ins Spiel (Wild Rift): kurz Anlauf (staucht sich, zieht minimal
+        // zurück), dann reisst es ihn nach oben – je schneller, desto mehr wird er in die Länge gezogen, kippt nach hinten,
+        // zieht eine Spur aus Farbstreifen hinter sich (Rot/Blau getrennt) und wird heller; oben schnappt er ein und blitzt kurz.
         if (tClone.animate && !reduce) {
           tClone.style.transition = 'opacity .5s ease';
-          var fr = [], NF = 48, vmax = 1e-6, vs = [];
+          var fr = [], NF = 60, vmax = 1e-6, vs = [];
           for (var fi = 0; fi <= NF; fi++) { var ft = fi / NF; vs[fi] = Math.abs(suckF(Math.min(1, ft + 0.015)) - suckF(Math.max(0, ft - 0.015))); vmax = Math.max(vmax, vs[fi]); }
           for (fi = 0; fi <= NF; fi++) {
-            var pp = suckF(fi / NF), vn = fi === NF || fi === 0 ? 0 : vs[fi] / vmax;
-            // Hugo 24.11. (14:08): stärker, wie über die Welle nach hinten gezogen (kippt weit nach hinten und weicht in die Tiefe)
-            var sp = 1 + (sc - 1) * pp, dip = 1 - 0.3 * Math.sin(Math.PI * Math.min(1, pp)), st = 1 + 1.0 * vn, sq = 1 / Math.sqrt(st);
-            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(600px) rotateX(' + (-58 * vn).toFixed(2) + 'deg) translateZ(' + (-220 * vn).toFixed(1) + 'px) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
-              filter: 'blur(' + (2.2 * vn).toFixed(2) + 'px)', offset: fi / NF });
+            var tt = fi / NF, pp = suckF(tt), vn = fi === NF || fi === 0 ? 0 : Math.pow(vs[fi] / vmax, 1.3);
+            var ant = tt < 0.22 ? Math.sin(Math.PI * tt / 0.22) : 0;   // Anlauf
+            var pq = pp - 0.035 * ant;
+            var sp = 1 + (sc - 1) * pp, st = 1 + 1.7 * vn, sq = 1 / Math.sqrt(st), dip = 1 - 0.22 * Math.sin(Math.PI * Math.min(1, pp));
+            var sqY = 1 - 0.1 * ant, sqX = 1 + 0.06 * ant;
+            var flash = tt > 0.8 ? Math.sin(Math.PI * Math.min(1, (tt - 0.8) / 0.2)) : 0;
+            var ch = 9 * vn, tr = 22 * vn;
+            fr.push({
+              transform: 'translate3d(' + (dx * pq).toFixed(1) + 'px,' + (dy * pq).toFixed(1) + 'px,0) perspective(650px) rotateX(' + (-34 * vn).toFixed(2) + 'deg) translateZ(' + (-140 * vn).toFixed(1) + 'px) scale(' + (sp * dip * sq * sqX).toFixed(4) + ',' + (sp * dip * st * sqY).toFixed(4) + ')',
+              filter: 'blur(' + (1.6 * vn).toFixed(2) + 'px) brightness(' + (1 + 0.5 * vn + 0.6 * flash).toFixed(3) + ')',
+              textShadow: vn > 0.02 ? '0 ' + ch.toFixed(1) + 'px 0 rgba(255,50,90,' + (0.55 * vn).toFixed(3) + '), 0 ' + (-ch).toFixed(1) + 'px 0 rgba(40,190,255,' + (0.55 * vn).toFixed(3) + '), 0 ' + tr.toFixed(1) + 'px ' + (4 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.35 * vn).toFixed(3) + '), 0 ' + (2 * tr).toFixed(1) + 'px ' + (8 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.2 * vn).toFixed(3) + '), 0 ' + (3.2 * tr).toFixed(1) + 'px ' + (14 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.1 * vn).toFixed(3) + ')' : 'none',
+              offset: tt
+            });
           }
           try { tClone.animate(fr, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
         }
