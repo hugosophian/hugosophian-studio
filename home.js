@@ -71,8 +71,8 @@
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
     revealSp:   4,      // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 4-mal schneller; Hugo 14:16: etwas langsamer)
-    revealGlow: 1.6,    // Hugo 24.11. (14:16): Ring der Sonnenwelle deutlicher (mal Fingerwelle)
-    revealFlares: 1.9,  // Hugo 24.11. (14:16): Flares an der Sonnenwelle deutlicher
+    revealGlow: 1.2,    // Ring der Sonnenwelle (mal Fingerwelle); Hugo 24.11. (14:43): ruhiger
+    revealFlares: 0,    // Hugo 24.11. (14:43): Sonnenwelle ohne Flares – einfacher, ruhiger, weniger Rechenarbeit
     diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
     diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
     textWarp:   1100,   // Hugo 24.11. (14:27): About-Text kommt wie aus der Lichtgeschwindigkeit von hinten rechts nach vorn (ms)
@@ -609,7 +609,7 @@
         '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
-        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * (brst ? 0.12 : 0.22)); org = max(org, exp(-dot(d0, d0)) * on * (brst ? 0.3 : 1.0)); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
+        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * (brst ? 0.12 : 0.22)); org = max(org, exp(-dot(d0, d0)) * on * (brst ? 0.0 : 1.0)); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
@@ -841,6 +841,7 @@
       // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
       // neu nur, wenn sich etwas bewegt hat (Aufprall, Hover am Rand)
       function compTex(sr) {
+        if (!desk && compOk && slides.some(function (x) { return x.dive; })) return compOk;   // Handy beim Eintauchen: Textur bleibt, die Effekt-Leinwand zoomt mit (Hugo 24.11., 14:43: weniger Rechenarbeit)
         if (!cctx) return false;
         loadAll();
         var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
@@ -986,7 +987,7 @@
           f2.style.display = '';
           var er = sl.el.getBoundingClientRect();
           f2.style.width = sr.width + 'px'; f2.style.height = sr.height + 'px';
-          f2.style.transform = 'translate3d(' + (sr.left - er.left).toFixed(2) + 'px,' + (sr.top - er.top).toFixed(2) + 'px,0)';
+          f2.style.transform = 'translate3d(' + (sr.left - er.left).toFixed(2) + 'px,' + (sr.top - er.top).toFixed(2) + 'px,0)' + (sl.diveTf ? ' ' + sl.diveTf : '');
           if (f2.width !== pw || f2.height !== ph) { f2.width = pw; f2.height = ph; }
           sl.fxc.clearRect(0, 0, pw, ph);
           sl.fxc.drawImage(cv, 0, 0);
@@ -1052,6 +1053,7 @@
       };
       cv.dock = dock;
       // Hugo 24.11. (13:37): Welle, die die Sonne aufdeckt – ein Punkt, läuft als Ring schnell nach aussen
+      cv.dropTap = function () { var now = performance.now(); waves = waves.filter(function (q) { return q.sp2 || now - q.t0 > 800 || q.pts.length > 3; }); };
       cv.burst = function (x, y, sp) {
         var now = performance.now();
         waves.push({ t0: now, pts: [], sp2: sp }); if (waves.length > NW) dropOld();
@@ -1346,7 +1348,7 @@
       var far = Math.max(Math.hypot(lx, ly), Math.hypot(rr.width - lx, ly), Math.hypot(lx, rr.height - ly), Math.hypot(rr.width - lx, rr.height - ly));
       // Hugo 24.11. (14:03): der Rand geht wie eine Wolke auf (wie die Flare-Explosion beim Laden): um den Kreis liegen
       // weiche Bäusche, ungleich gross, die mitwachsen und leicht atmen, an festen Stellen (nichts dreht sich)
-      var NP = 13, pf = [];
+      var NP = 8, pf = [];   // Hugo 24.11. (14:43): weniger Bäusche, weniger Rechenarbeit
       for (var pi = 0; pi < NP; pi++) { var hh = Math.sin((pi + 1) * 12.9898 + x * 0.013 + y * 0.007) * 43758.5453; hh -= Math.floor(hh); pf.push({ a: (pi + 0.35 * hh) / NP * 6.2832, k: 0.6 + 0.8 * hh, ph: hh * 6.2832 }); }
       function m(a, b, z) {
         var L = ['radial-gradient(circle at ' + lx.toFixed(1) + 'px ' + ly.toFixed(1) + 'px, #000 ' + a.toFixed(1) + 'px, transparent ' + b.toFixed(1) + 'px)'];
@@ -1391,10 +1393,12 @@
         var t = clamp((now - t0) / ms, 0, 1);
         d.k = from + (to - from) * ez(t);
         m.style.transformOrigin = '50% 50%';
-        m.style.transform = 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + d.k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px) scale(' + base + ')';
+        var zt = 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + d.k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px)';
+        m.style.transform = zt + ' scale(' + base + ')';
+        if (!desk) { s.diveTf = zt; if (s.fx) { s.fx.style.transformOrigin = '50% 50%'; } }
         if (t < 1) { d.raf = requestAnimationFrame(f); return; }
         d.raf = 0;
-        if (!on) { s.dive = false; s.dv = null; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
+        if (!on) { s.dive = false; s.dv = null; s.diveTf = ''; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
       }
       d.raf = requestAnimationFrame(f);
     }
@@ -1529,7 +1533,7 @@
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
       else {
         var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2, tb0 = 0;
-        if (ripple && !reduce && Math.abs(C - F) <= 0.02) { ripple.burst(tx, ty, CONFIG.revealSp); tb0 = performance.now(); }   // Flares schon beim Tippen
+        if (ripple && !reduce && Math.abs(C - F) <= 0.02) { if (ripple.dropTap) ripple.dropTap(); ripple.burst(tx, ty, CONFIG.revealSp); tb0 = performance.now(); }   // Welle schon beim Tippen (nur eine)
         if (!reduce && Math.abs(C - F) <= 0.02) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); }   // Bild taucht gleich mit ein
         setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, reduce ? 0 : 200);
       }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
@@ -1812,7 +1816,7 @@
       // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
       var G = null, srcT = null;
       function size() {
-        var rs = SUN.res * (desk ? CONFIG.deskSunRes : 1);   // Computer: halbe Auflösung (die ganze Bildschirmfläche ruckelte beim Übergang)
+        var rs = SUN.res * (desk ? CONFIG.deskSunRes : 0.75);   // Handy: 0.75 (Hugo 24.11., 14:43: weniger Rechenarbeit)   // Computer: halbe Auflösung (die ganze Bildschirmfläche ruckelte beim Übergang)
         var w = Math.max(1, Math.round(wall.clientWidth * rs)), h = Math.max(1, Math.round(wall.clientHeight * rs));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
@@ -1972,7 +1976,7 @@
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
         if (w < 1 || y < 0 || y >= chh) return;
         var v = 0;
-        if (!sunBtn) {   // Computer: ohne Auslesen (hält die Grafikkarte an, Ruckler beim Übergang); der pulsierende Strahl reicht
+        if (false) {   // Hugo 24.11. (14:43): nie mehr auslesen (hält die Grafikkarte an); der pulsierende Strahl reicht – Computer: ohne Auslesen (hält die Grafikkarte an, Ruckler beim Übergang); der pulsierende Strahl reicht
           if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
           c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
           var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
@@ -2103,8 +2107,8 @@
       if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / (1 - 0.97 * iz.v)).toFixed(4) + ')'; }
     }
     var hyT = 0;
-    function hyperText(el, tail) {
-      clearTimeout(hyT);
+    function hyperText(el, tail, d0x, maxT) {
+      if (el === infoText) clearTimeout(hyT);
       if (!el || !el.animate || reduce) return;
       var html0 = el.innerHTML, nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
       while ((nd = tw.nextNode())) nodes.push(nd);
@@ -2125,20 +2129,26 @@
       });
       if (tail) units.push(tail);
       el.style.perspective = '700px'; el.style.perspectiveOrigin = '100% 0';
-      var N = units.length, total = Math.min(1700, 400 + N * 3.2), each = 700, d0 = 280;
+      var N = units.length, total = Math.min(maxT || 1700, 400 + N * 3.2), each = 700, d0 = d0x == null ? 280 : d0x;
       function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
+      // Hugo 24.11. (14:44): die Buchstaben bestehen erst aus Licht – bunt (Regenbogen) – und werden beim Ankommen zu ihrer
+      // Farbe (schwarz); sie kommen in zufälliger Reihenfolge
+      var ord = units.map(function (u, i) { return i; });
+      for (var oi = ord.length - 1; oi > 0; oi--) { var oj = Math.floor(Math.random() * (oi + 1)), ot = ord[oi]; ord[oi] = ord[oj]; ord[oj] = ot; }
       units.forEach(function (u, i) {
         try {
+          var fin = getComputedStyle(u).color, hue = Math.floor(Math.random() * 360);
           u.animate([
-            { transform: tf(90, -36, -650, 4), opacity: 0, offset: 0 },
+            { transform: tf(90, -36, -650, 4), opacity: 0, color: 'hsl(' + hue + ',100%,62%)', offset: 0 },
             { opacity: 1, offset: 0.12 },
-            { transform: tf(8, -3, -40, 2.2), opacity: 1, offset: 0.55 },
-            { transform: tf(0, 0, 0, 1), opacity: 1, offset: 1 }
-          ], { duration: each, delay: d0 + total * i / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
+            { transform: tf(8, -3, -40, 2.2), opacity: 1, color: 'hsl(' + ((hue + 50) % 360) + ',100%,58%)', offset: 0.55 },
+            { transform: tf(0, 0, 0, 1), opacity: 1, color: fin, offset: 1 }
+          ], { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
         } catch (er) {}
       });
       // danach wieder der ursprüngliche Text (markierbar, leicht)
-      hyT = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, d0 + total + each + 80);
+      var tm = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, d0 + total + each + 80);
+      if (el === infoText) hyT = tm;
     }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
@@ -2168,7 +2178,6 @@
         tClone.removeAttribute('id'); tClone.classList.add('hp-info-title'); tClone.setAttribute('aria-hidden', 'true');
         tClone.style.transform = 'translate3d(0,0,0)';
         root.appendChild(tClone);
-        tOrig.style.visibility = 'hidden';
         var cr = tClone.getBoundingClientRect();
         var rg = document.createRange(); rg.selectNodeContents(tClone);
         var tr = rg.getBoundingClientRect();
@@ -2180,7 +2189,7 @@
         var dx = left - (cr.left - rr.left) - sc * minX;
         var dy = top - (cr.top - rr.top) - sc * minY;
         tClone.style.transformOrigin = '0 0';
-        tClone.style.transition = 'transform ' + (CONFIG.titleSuck / 1000) + 's ' + suckEase + ', opacity .5s ease';   // Hugo 24.11. (13:53): wie ein Sog nach oben
+        tClone.style.transition = 'none';
         root.style.setProperty('--hp-info-top', (top + (maxY - minY) * sc + H * 0.035).toFixed(0) + 'px');
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
         if (map0) {
@@ -2192,33 +2201,10 @@
             map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
-        // Hugo 24.11. (14:27): der Titel wird wie ein Stoff nach oben gezogen – das Ganze gleitet weich hoch, die Buchstaben
-        // hängen nach: die Mitte zieht zuerst, nach aussen hin hängen sie mehr nach und werden dabei von oben her in die
-        // Länge gezogen (wie Stoff, der gespannt wird), oben holen sie auf und legen sich glatt
-        if (tClone.animate && !reduce) {
-          tClone.style.transition = 'opacity .5s ease';
-          var fr = [], NF = 60;
-          for (var fi = 0; fi <= NF; fi++) {
-            var tt = fi / NF, pp = suckF(tt), sp = 1 + (sc - 1) * pp;
-            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) scale(' + sp.toFixed(4) + ')', offset: tt });
-          }
-          try { tClone.animate(fr, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
-          if (!tClone.children.length) {
-            var txt0 = tClone.textContent; tClone.textContent = '';
-            for (var ci = 0; ci < txt0.length; ci++) { var sp0 = document.createElement('span'); sp0.className = 'hp-tl'; sp0.textContent = txt0[ci]; if (txt0[ci] === ' ') sp0.innerHTML = '&nbsp;'; tClone.appendChild(sp0); }
-          }
-          var Ls = tClone.querySelectorAll('.hp-tl'), nL = Ls.length, hL = tClone.getBoundingClientRect().height || 100;
-          [].forEach.call(Ls, function (Lz, li) {
-            var cpos = nL > 1 ? li / (nL - 1) - 0.5 : 0, dl = 0.01 + 0.06 * Math.pow(Math.abs(cpos) * 2, 1.4), lf = [];
-            for (var fj = 0; fj <= NF; fj++) {
-              var tj = fj / NF, lag = Math.max(0, suckF(tj) - suckF(Math.max(0, tj - dl))), spj = 1 + (sc - 1) * suckF(tj);
-              var oy = -dy * lag / spj, stY = 1 + 3.5 * lag, kx = cpos * lag * 40;
-              lf.push({ transform: 'translateY(' + oy.toFixed(1) + 'px) skewX(' + kx.toFixed(2) + 'deg) scaleY(' + stY.toFixed(4) + ')', offset: tj });
-            }
-            Lz.style.display = 'inline-block'; Lz.style.transformOrigin = '50% 0';
-            try { Lz.animate(lf, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
-          });
-        }
+        // Hugo 24.11. (14:43): der Titel fliegt nicht mehr hoch, er steht gleich oben und kommt wie der Text Buchstabe für
+        // Buchstabe aus der Lichtgeschwindigkeit; das Original unten bleibt und wird von der Sonne zugedeckt
+        tClone.style.transition = 'opacity .5s ease';
+        if (!reduce) hyperText(tClone, null, 180, 320);
         clearTimeout(sunT);
         if (sun && glassT) sun.title(glassT);   // Hugo 24.11. (13:36): Horizont gleich setzen – die Sonne ist sofort sichtbar
       }
@@ -2247,7 +2233,7 @@
       if (reduce && brand) brand.classList.add('hp-on-white');
       // Hugo 24.11. (14:27/14:34): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) – Buchstabe für Buchstabe
       // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
-      if (!wasOpen) hyperText(infoText, infoOpen);
+      if (!wasOpen) hyperText(infoText, infoOpen, 520);   // nach dem Titel
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
