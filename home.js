@@ -73,14 +73,15 @@
     revealSp:   4,      // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 4-mal schneller; Hugo 14:16: etwas langsamer)
     revealGlow: 1.6,    // Hugo 24.11. (14:16): Ring der Sonnenwelle deutlicher (mal Fingerwelle)
     revealFlares: 1.9,  // Hugo 24.11. (14:16): Flares an der Sonnenwelle deutlicher
-    diveZoom:   1.3,    // Hugo 24.11. (13:50): das Bild zoomt beim Übergang hinein, als würde man eintauchen (Mario: viel stärker)
-    diveMs:     1500,   // Dauer des Eintauchens (Kurve wie Marios About); zurück im Takt des Ausblendens
+    diveZoom:   1.6,    // Hugo 24.11. (13:50/14:27): das Bild zoomt beim Übergang hinein, als würde man eintauchen – früher und stärker
+    diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
+    textWarp:   1100,   // Hugo 24.11. (14:27): About-Text kommt wie aus der Lichtgeschwindigkeit von hinten rechts nach vorn (ms)
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
     titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
     revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
-    closeDock:  0.8     // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
+    closeDock:  0.5     // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
 
   var css = [
@@ -224,6 +225,7 @@
     };
   }
   var easeDock = bezier(0.72, 0, 0.11, 1);
+  var easeDive = bezier(0.3, 0, 0.15, 1);   // Eintauchen: zieht sofort an (Hugo 24.11., 14:27: früher)
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
   // Tempo bleibt stetig)
   function easeDockF(t, ez, b) { var w = t <= 0.45 ? t : t + (b == null ? 1.2 : b) * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
@@ -394,7 +396,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uDA; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -595,7 +597,7 @@
         // Hugo 24.11. (10:13): die Fingerwelle wischt den Andock-Effekt entlang ihres Weges weg (Fingerwellen kommen in der
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
-        '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',
+        '    float kD = dockW ? (1.0 - wipe) * uKeep * uDF : 1.0;',
         '    float env = exp(-x * x) * smoothstep(0.0, dockW ? 0.03 : 0.35, age) * kD;',
         '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
@@ -607,7 +609,7 @@
         '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
-        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',
+        '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * (brst ? 0.12 : 0.22)); org = max(org, exp(-dot(d0, d0)) * on * (brst ? 0.3 : 1.0)); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
@@ -629,8 +631,8 @@
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
         '    float fl = irr ? pow(n2(cs * 0.6 + vec2(fs, tq * 0.3 + age * (brst ? 0.25 : 0.0))), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
-        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(tq * 0.8 + age * (brst ? 0.6 : 0.0), fs)))) * (irr ? 1.35 : 1.0) * (brst ? 1.4 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
-        '    float fv = (brst ? ' + CONFIG.revealFlares.toFixed(2) + ' : 1.0) * 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
+        '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(tq * 0.8 + age * (brst ? 0.6 : 0.0), fs)))) * (irr ? 1.35 : 1.0) * (brst ? mix(0.45, 1.4, smoothstep(0.0, 0.8, age)) : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
+        '    float fv = (brst ? ' + CONFIG.revealFlares.toFixed(2) + ' * smoothstep(0.05, 0.6, age) : 1.0) * 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
@@ -700,7 +702,7 @@
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
-        '    float kE = (1.0 - wipe) * uKeep * uDA; faD *= kE; eacc *= kE; fI *= kE;',   // weggewischt bzw. nach dem ersten Wischen ganz aus
+        '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 + min(fI, 1.2) * 0.9) * fade * kE;',
@@ -785,7 +787,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uDA', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -829,7 +831,11 @@
         slides.forEach(function (sl) {
           var src = srcOf(sl.img); if (!src || cache[src]) return;
           var e = cache[src] = { im: new Image(), ok: false };
-          e.im.crossOrigin = 'anonymous'; e.im.onload = function () { e.ok = true; compSig = ''; }; e.im.src = src;
+          e.im.crossOrigin = 'anonymous'; e.im.onload = function () {
+            // verkleinerte Kopie (höchstens 1400 px): das Neuzeichnen beim Eintauchen und Zurückzoomen geht so viel schneller
+            try { var nw = e.im.naturalWidth, nh = e.im.naturalHeight, k = Math.min(1, 1400 / Math.max(nw, nh)); if (k < 1) { var sc0 = document.createElement('canvas'); sc0.width = Math.round(nw * k); sc0.height = Math.round(nh * k); sc0.getContext('2d').drawImage(e.im, 0, 0, sc0.width, sc0.height); e.sm = sc0; } } catch (er) {}
+            e.ok = true; compSig = '';
+          }; e.im.src = src;
         });
       }
       // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
@@ -855,7 +861,7 @@
         if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
         cctx.fillStyle = '#000'; cctx.fillRect(0, 0, cw2, ch2);
         parts.forEach(function (p) {
-          var iw = p.e.im.naturalWidth || 1, ih = p.e.im.naturalHeight || 1, ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
+          var srcI = p.e.sm || p.e.im, iw = p.e.sm ? p.e.sm.width : (p.e.im.naturalWidth || 1), ih = p.e.sm ? p.e.sm.height : (p.e.im.naturalHeight || 1), ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
           var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
           var op = objPos(p.im), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
           cctx.save();
@@ -865,7 +871,7 @@
           cx0 = cx0 < 2 ? 0 : Math.floor(cx0); cy0 = cy0 < 2 ? 0 : Math.floor(cy0);
           cx1 = cx1 > cw2 - 2 ? cw2 : Math.ceil(cx1); cy1 = cy1 > ch2 - 2 ? ch2 : Math.ceil(cy1);
           cctx.beginPath(); cctx.rect(cx0, cy0, cx1 - cx0, cy1 - cy0); cctx.clip();
-          cctx.drawImage(p.e.im, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
+          cctx.drawImage(srcI, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
           // Hugo 24.11. (13:11): die Textspalte ist durchsichtig über der weissen Wand – für die Welle ist sie darum weiss
           // (sonst zieht die Welle Schwarz in die Spalte)
           if (p.sd) { cctx.fillStyle = '#fff'; cctx.fillRect((p.sd.left - sr.left) * sc, (p.sd.top - sr.top) * sc, p.sd.width * sc, p.sd.height * sc); }
@@ -954,7 +960,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, 1); c.uniform1f(U.uDA, dockAmt);
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, 1); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl);
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1004,9 +1010,9 @@
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
-      var dockAmt = 1;
-      function dock(amt) {
-        dockAmt = amt == null ? 1 : amt; killT0 = 0;
+      var dockAmt = 1, dockFl = 1;
+      function dock(amt, fl) {
+        dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; killT0 = 0;
         var cs = slides[current()]; if (!cs) return;
         if (desk) deskCanvas();
         compSig = '';
@@ -1030,7 +1036,7 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
+        if (dockFl > 0) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen (beim Schliessen ohne)
         if (!raf) req();
       }
       // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
@@ -1322,7 +1328,7 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      setTimeout(function () { ripple.dock(CONFIG.closeDock); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
+      setTimeout(function () { ripple.dock(CONFIG.closeDock, 0); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       if (rv.raf) cancelAnimationFrame(rv.raf); rv.raf = 0;
@@ -1376,7 +1382,7 @@
         if (s.dv.k <= 1.0001) { s.dv.px = x - (r.left + r.width / 2); s.dv.py = y - (r.top + r.height / 2); }
       }
       if (!s.dv) return;
-      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDock : easeOutCss;
+      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : easeOutCss;
       s.dive = true; if (d.raf) cancelAnimationFrame(d.raf);
       function f(now) {
         var t = clamp((now - t0) / ms, 0, 1);
@@ -1521,6 +1527,7 @@
       else {
         var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2, tb0 = 0;
         if (ripple && !reduce && Math.abs(C - F) <= 0.02) { ripple.burst(tx, ty, CONFIG.revealSp); tb0 = performance.now(); }   // Flares schon beim Tippen
+        if (!reduce && Math.abs(C - F) <= 0.02) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); }   // Bild taucht gleich mit ein
         setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, reduce ? 0 : 200);
       }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
     }
@@ -2050,7 +2057,7 @@
     sunHome();
     if (!introOn) dsunWall();   // ohne Einflug (Bewegung reduzieren): weisse Wand gleich bereit
 
-    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null, infoDive = null;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null, infoDive = null, tapDive = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -2144,30 +2151,32 @@
             map: function (lx, ly) { return map3(lx, ly, 0); }, map3: map3 };
         }
         tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')' + t3;
-        // Hugo 24.11. (14:03/14:11): Warp wie beim Sprung ins Spiel (Wild Rift): kurz Anlauf (staucht sich, zieht minimal
-        // zurück), dann reisst es ihn nach oben – je schneller, desto mehr wird er in die Länge gezogen, kippt nach hinten,
-        // zieht eine Spur aus Farbstreifen hinter sich (Rot/Blau getrennt) und wird heller; oben schnappt er ein und blitzt kurz.
+        // Hugo 24.11. (14:27): der Titel wird wie ein Stoff nach oben gezogen – das Ganze gleitet weich hoch, die Buchstaben
+        // hängen nach: die Mitte zieht zuerst, nach aussen hin hängen sie mehr nach und werden dabei von oben her in die
+        // Länge gezogen (wie Stoff, der gespannt wird), oben holen sie auf und legen sich glatt
         if (tClone.animate && !reduce) {
           tClone.style.transition = 'opacity .5s ease';
-          var fr = [], NF = 60, vmax = 1e-6, vs = [];
-          for (var fi = 0; fi <= NF; fi++) { var ft = fi / NF; vs[fi] = Math.abs(suckF(Math.min(1, ft + 0.015)) - suckF(Math.max(0, ft - 0.015))); vmax = Math.max(vmax, vs[fi]); }
-          for (fi = 0; fi <= NF; fi++) {
-            // Tempo geglättet (Mittel über die Nachbarn), damit Streckung, Kippen und Farbspur weich an- und abschwellen
-            var tt = fi / NF, pp = suckF(tt), va = 0, vc = 0;
-            for (var fj = Math.max(0, fi - 3); fj <= Math.min(NF, fi + 3); fj++) { va += vs[fj]; vc++; }
-            var vn = fi === NF || fi === 0 ? 0 : Math.pow(va / vc / vmax, 1.1);
-            // Hugo 24.11. (14:22): gerader und viel stärker gestreckt – wie ein sichtbarer Teleport (Lichtstrich)
-            var sp = 1 + (sc - 1) * pp, st = 1 + 3.4 * vn, sq = 1 / Math.pow(st, 0.6), dip = 1;
-            var flash = tt > 0.84 ? Math.sin(Math.PI * Math.min(1, (tt - 0.84) / 0.16)) : 0;
-            var ch = 8 * vn, tr = 34 * vn;
-            fr.push({
-              transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(900px) rotateX(' + (-6 * vn).toFixed(2) + 'deg) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
-              filter: 'blur(' + (0.8 * vn).toFixed(2) + 'px) brightness(' + (1 + 0.8 * vn + 0.5 * flash).toFixed(3) + ')',
-              textShadow: vn > 0.02 ? '0 ' + ch.toFixed(1) + 'px 0 rgba(255,50,90,' + (0.45 * vn).toFixed(3) + '), 0 ' + (-ch).toFixed(1) + 'px 0 rgba(40,190,255,' + (0.45 * vn).toFixed(3) + '), 0 ' + tr.toFixed(1) + 'px ' + (4 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.4 * vn).toFixed(3) + '), 0 ' + (2 * tr).toFixed(1) + 'px ' + (9 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.25 * vn).toFixed(3) + '), 0 ' + (3.2 * tr).toFixed(1) + 'px ' + (16 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.12 * vn).toFixed(3) + ')' : 'none',
-              offset: tt
-            });
+          var fr = [], NF = 60;
+          for (var fi = 0; fi <= NF; fi++) {
+            var tt = fi / NF, pp = suckF(tt), sp = 1 + (sc - 1) * pp;
+            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) scale(' + sp.toFixed(4) + ')', offset: tt });
           }
           try { tClone.animate(fr, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
+          if (!tClone.children.length) {
+            var txt0 = tClone.textContent; tClone.textContent = '';
+            for (var ci = 0; ci < txt0.length; ci++) { var sp0 = document.createElement('span'); sp0.className = 'hp-tl'; sp0.textContent = txt0[ci]; if (txt0[ci] === ' ') sp0.innerHTML = '&nbsp;'; tClone.appendChild(sp0); }
+          }
+          var Ls = tClone.querySelectorAll('.hp-tl'), nL = Ls.length, hL = tClone.getBoundingClientRect().height || 100;
+          [].forEach.call(Ls, function (Lz, li) {
+            var cpos = nL > 1 ? li / (nL - 1) - 0.5 : 0, dl = 0.01 + 0.06 * Math.pow(Math.abs(cpos) * 2, 1.4), lf = [];
+            for (var fj = 0; fj <= NF; fj++) {
+              var tj = fj / NF, lag = Math.max(0, suckF(tj) - suckF(Math.max(0, tj - dl))), spj = 1 + (sc - 1) * suckF(tj);
+              var oy = -dy * lag / spj, stY = 1 + 3.5 * lag, kx = cpos * lag * 40;
+              lf.push({ transform: 'translateY(' + oy.toFixed(1) + 'px) skewX(' + kx.toFixed(2) + 'deg) scaleY(' + stY.toFixed(4) + ')', offset: tj });
+            }
+            Lz.style.display = 'inline-block'; Lz.style.transformOrigin = '50% 0';
+            try { Lz.animate(lf, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
+          });
         }
         clearTimeout(sunT);
         if (sun && glassT) sun.title(glassT);   // Hugo 24.11. (13:36): Horizont gleich setzen – die Sonne ist sofort sichtbar
@@ -2185,7 +2194,7 @@
       clearTimeout(ipT); ip.a = null; ip.v = 0; applyPanel();
       if (brand) brand.classList.remove('hp-on-white');
       var tp = infoFrom || { x: W / 2, y: H / 2 }; infoFrom = null;
-      infoDive = s; dive(s, tp.x, tp.y, true);
+      if (tapDive !== s) dive(s, tp.x, tp.y, true); tapDive = null; infoDive = s;
       if (wasOpen) { revealStop(true); if (brand) brand.classList.add('hp-on-white'); }
       else reveal(tp.x, tp.y, sun ? [info, sun.glow] : [info], function (rad, lx, ly) {
         // Schriftzug wird dunkel, sobald die Welle ihn überquert hat
@@ -2195,6 +2204,19 @@
         }
       }, tp.t);
       if (reduce && brand) brand.classList.add('hp-on-white');
+      // Hugo 24.11. (14:27): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) von hinten rechts nach vorn an seinen
+      // Platz – erst weit weg, hell und mit Lichtspur, dann bremst er hart ab
+      if (infoScroll.animate && !reduce && !wasOpen) {
+        var shA = '22px -8px 8px rgba(255,255,255,.75), 46px -17px 16px rgba(255,255,255,.45), 80px -30px 26px rgba(255,255,255,.22)', shB = '0 0 0 rgba(255,255,255,0), 0 0 0 rgba(255,255,255,0), 0 0 0 rgba(255,255,255,0)';
+        try {
+          infoScroll.animate([
+            { transform: 'perspective(900px) translate3d(42vw,-16vh,-2200px)', opacity: 0, filter: 'blur(5px) brightness(2.4)', textShadow: shA, offset: 0 },
+            { opacity: 1, offset: 0.1 },
+            { transform: 'perspective(900px) translate3d(2vw,-0.6vh,-60px)', filter: 'blur(1px) brightness(1.3)', textShadow: shA, offset: 0.55 },
+            { transform: 'perspective(900px) translate3d(0,0,0)', opacity: 1, filter: 'blur(0px) brightness(1)', textShadow: shB, offset: 1 }
+          ], { duration: CONFIG.textWarp, delay: 120, easing: 'cubic-bezier(.12,.75,.2,1)', fill: 'backwards' });
+        } catch (er) {}
+      }
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
