@@ -784,6 +784,9 @@
         '    vec3 cD = al > 1e-4 ? col * (alD / al) : vec3(0.0);',   // Hugo 24.11. (15:16): über der Sonne nur das verschobene Foto der Welle zeigen (sonst stand am Rand ein dunkler Rahmen)
         '    col = mix(cR, cD, uFade); al = mix(aR, alD, uFade);',
         '  }',
+        // Hugo 24.11. (16:23): beim Schimmer (ohne Rand-Leuchten) läuft der Effekt zu den Bildschirmrändern hin weich aus –
+        // am iPhone blieb sonst oben unter der Statusleiste ein heller Strich stehen
+        '  if (uRim < 0.5) { float tE = smoothstep(0.0, 14.0, min(min(fc.y, uRes.y - fc.y), min(fc.x, uRes.x - fc.x))); col *= tE; al *= tE; }',
         '  gl_FragColor = vec4(col, al);',
         '}'].join('\n');
       var VS = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
