@@ -378,13 +378,17 @@
         // Hugo 24.11.: Andock-Flares mit eigener Richtung – jede Stelle der Front neigt ihre Flares anders (langsam
         // wanderndes Feld); so laufen sie schräg, kreuzen sich und fliessen weiter ineinander, statt alle zur Mitte zu zeigen
         '    float lean = (n2(dn * 1.7 + vec2(fs + 3.0, uT * 0.07)) - 0.5) * 2.6;',
-        '    float ra = dockW ? min(xo, 4.0) * (0.36 * lean + 0.06 * sin(uT * 0.6 + fs)) : xo * 0.22 * sin(uT * 0.6 + fs);',
+        // Hugo 24.11.: magnetisches Spiel ohne Mittelpunkt – eine Flare biegt weg von der stärkeren Nachbarin (die
+        // stärkere drückt die schwächere zur Seite, sie verschmelzen und laufen in neuer Richtung weiter); je weiter
+        // ins Bild, desto mehr drehen sie seitlich ab, so sammeln sie sich nie in einem Punkt in der Mitte
+        '    vec2 dnL = vec2(dn.x * 0.97 + dn.y * 0.25, -dn.x * 0.25 + dn.y * 0.97), dnR = vec2(dn.x * 0.97 - dn.y * 0.25, dn.x * 0.25 + dn.y * 0.97);',
+        '    float push = dockW ? n2(dnR * 3.06 + vec2(fs, uT * 0.3)) - n2(dnL * 3.06 + vec2(fs, uT * 0.3)) : 0.0;',
+        '    float ra = dockW ? min(xo, 6.0) * (0.3 * lean - 0.9 * push + 0.06 * sin(uT * 0.6 + fs)) : xo * 0.22 * sin(uT * 0.6 + fs);',
         '    vec2 cs = vec2(dn.x * cos(ra) - dn.y * sin(ra), dn.x * sin(ra) + dn.y * cos(ra)) * 3.4;',   // mehr Flares rundherum (vorher 2.2)
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
         '    float fl = dockW ? pow(n2(cs * 0.9 + vec2(fs, uT * 0.3)), 6.5) * 2.9 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
-        '    float ln = 0.5 + (dockW ? min(fl, 1.0) * 0.8 : fl) * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Andocken: Stärke macht hell, nicht länger
-        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
-        '      * (dockW ? 1.0 - smoothstep(min(uRes.x, uRes.y) * 0.2, min(uRes.x, uRes.y) * 0.38, sd) : 1.0);',   // Hugo 24.11.: keine Anziehung zur Mitte – Andock-Flares verglimmen davor
+        '    float ln = 0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
+        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd);',
         '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
