@@ -1977,7 +1977,7 @@
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
           if (ripple && ripple.dock) ripple.dock();
           html.classList.remove('hp-ldpre');   // Logo und About blenden ein
-          fitTitles(); root.classList.remove('hp-run');     // Hugo 24.11.: Titel erscheint mit dem Schlag, gleich in der richtigen Grösse und Lage
+          fitTitles(); if (desk) renderDesk(); root.classList.remove('hp-run');   // Computer: Titel gleich in der richtigen Grösse (sonst kurz 100 px)     // Hugo 24.11.: Titel erscheint mit dem Schlag, gleich in der richtigen Grösse und Lage
           root.classList.add('hp-dock-hit'); setTimeout(function () { root.classList.remove('hp-dock-hit'); }, 800);
         }
       };
