@@ -76,7 +76,8 @@
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms), dann blendet alles aus
     titleSuck:  1200,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
-    closeRipple: 1      // Hugo 24.11.: beim Schliessen löst der Strahl eine Fingerwelle auf der Seite aus (Tempo 1 = wie der Finger)
+    revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
+    closeDock:  0.45    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
 
   var css = [
@@ -388,7 +389,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uDA; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -589,12 +590,12 @@
         // Hugo 24.11. (10:13): die Fingerwelle wischt den Andock-Effekt entlang ihres Weges weg (Fingerwellen kommen in der
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
-        '    float kD = dockW ? (1.0 - wipe) * uKeep : 1.0;',
+        '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',
         '    float env = exp(-x * x) * smoothstep(0.0, dockW ? 0.03 : 0.35, age) * kD;',
         '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 2.0);',   // Andocken: kräftiger
+        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 2.0 ? ' + CONFIG.revealWarp.toFixed(2) + ' : uB[k].w > 0.0 ? 1.0 : 2.0);',   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - r); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
@@ -694,7 +695,7 @@
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
-        '    float kE = (1.0 - wipe) * uKeep; faD *= kE; eacc *= kE; fI *= kE;',   // weggewischt bzw. nach dem ersten Wischen ganz aus
+        '    float kE = (1.0 - wipe) * uKeep * uDA; faD *= kE; eacc *= kE; fI *= kE;',   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 + min(fI, 1.2) * 0.9) * fade * kE;',
@@ -779,7 +780,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uDA', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -948,7 +949,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, 1);
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, 1); c.uniform1f(U.uDA, dockAmt);
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -998,7 +999,9 @@
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
-      function dock() {
+      var dockAmt = 1;
+      function dock(amt) {
+        dockAmt = amt == null ? 1 : amt; killT0 = 0;
         var cs = slides[current()]; if (!cs) return;
         if (desk) deskCanvas();
         compSig = '';
@@ -1313,8 +1316,7 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      // Hugo 24.11. (14:05): eine echte Fingerwelle, ausgelöst, sobald die Seite unter dem Licht wieder erscheint
-      setTimeout(function () { ripple.burst((stage.clientWidth || W) * 0.5, (stage.clientHeight || H) * 0.55, CONFIG.closeRipple); }, CONFIG.closeBeam);
+      setTimeout(function () { ripple.dock(CONFIG.closeDock); }, CONFIG.closeBeam);   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       if (rv.raf) cancelAnimationFrame(rv.raf); rv.raf = 0;
@@ -2138,9 +2140,10 @@
           for (var fi = 0; fi <= NF; fi++) { var ft = fi / NF; vs[fi] = Math.abs(suckF(Math.min(1, ft + 0.015)) - suckF(Math.max(0, ft - 0.015))); vmax = Math.max(vmax, vs[fi]); }
           for (fi = 0; fi <= NF; fi++) {
             var pp = suckF(fi / NF), vn = fi === NF || fi === 0 ? 0 : vs[fi] / vmax;
-            var sp = 1 + (sc - 1) * pp, dip = 1 - 0.16 * Math.sin(Math.PI * Math.min(1, pp)), st = 1 + 0.5 * vn, sq = 1 / Math.sqrt(st);
-            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(700px) rotateX(' + (-24 * vn).toFixed(2) + 'deg) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
-              filter: 'blur(' + (1.3 * vn).toFixed(2) + 'px)', offset: fi / NF });
+            // Hugo 24.11. (14:08): stärker, wie über die Welle nach hinten gezogen (kippt weit nach hinten und weicht in die Tiefe)
+            var sp = 1 + (sc - 1) * pp, dip = 1 - 0.3 * Math.sin(Math.PI * Math.min(1, pp)), st = 1 + 1.0 * vn, sq = 1 / Math.sqrt(st);
+            fr.push({ transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(600px) rotateX(' + (-58 * vn).toFixed(2) + 'deg) translateZ(' + (-220 * vn).toFixed(1) + 'px) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
+              filter: 'blur(' + (2.2 * vn).toFixed(2) + 'px)', offset: fi / NF });
           }
           try { tClone.animate(fr, { duration: CONFIG.titleSuck, easing: 'linear' }); } catch (er) {}
         }
@@ -2183,10 +2186,10 @@
       clearTimeout(ipT);
       ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; revealStop(true); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
       clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, closeMs - CONFIG.deskSunFade * 0.5);
-      // Hugo 24.11. (13:50): der Titel fliegt im selben Takt zurück, in dem die Sonne ausblendet (vorher 1.5 s mit langsamem
-      // Anlauf – er hing oben, während die Seite schon da war, und sprang am Ende)
+      // Hugo 24.11. (14:09): kein Zurückfliegen – der Titel verschwindet im Licht des Strahls und steht danach schon
+      // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
-      if (tClone) { tClone.style.transition = 'transform ' + (CONFIG.deskSunFade / 1000) + 's cubic-bezier(.45,0,.2,1) ' + ((closeMs - CONFIG.deskSunFade) / 1000) + 's, opacity .5s ease'; tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
+      if (tClone) { tClone.style.transition = 'opacity ' + ((reduce ? 0 : CONFIG.closeBeam) / 1000) + 's ease'; tClone.style.opacity = '0'; }
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
@@ -2194,7 +2197,7 @@
         if (root.classList.contains('is-info')) return;
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
-      }, closeMs + 30);
+      }, reduce ? 0 : CONFIG.closeBeam);
     }
     infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
     infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
