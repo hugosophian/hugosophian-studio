@@ -677,9 +677,10 @@
         '    vec3 lit = base * (1.0 + L * 1.3 * dk) + (gc - L) * (0.32 + 0.45 * lum) + gc * 0.24 * dk + vec3(1.0, 0.8, 0.5) * fa * 0.4 * dk;',
         // Andock-Flares sichtbar auch auf Hellem: weissgoldenes Licht, das Helles leicht golden färbt und Dunkles aufhellt
         '    float fdv = clamp(faD, 0.0, 1.2);',
-        '    lit = mix(lit, lit * vec3(1.0, 0.9, 0.68), fdv * 0.45 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.3 + 0.5 * dk);',
+        // Hugo 24.11. (9:01): auf hellen Flächen (Hand, Haut) färbt das Licht mehr und hellt weniger auf – Zeichnung bleibt
+        '    lit = mix(lit, lit * vec3(1.0, 0.88, 0.64), fdv * 0.6 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.08 + 0.72 * dk * dk + 0.2 * dk);',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
-        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.75) + eacc * (0.28 + 0.55 * dk);',   // färbt mehr, hellt weniger auf (nicht weiss)      // Andock-Licht: färbt auch Weiss golden
+        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * (0.75 + 0.15 * lum)) + eacc * (0.1 + 0.73 * dk);',   // färbt mehr, hellt weniger auf (nicht weiss)      // Andock-Licht: färbt auch Weiss golden
         // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
