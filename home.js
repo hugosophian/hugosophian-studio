@@ -67,7 +67,8 @@
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
     deskSunIdle: 1000,  // ms ohne Mausbewegung
-    deskSunFade: 900    // ms Aus- und Einblenden
+    deskSunFade: 900,   // ms Aus- und Einblenden
+    deskSunRes:  0.5    // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
   };
 
   var css = [
@@ -1631,7 +1632,8 @@
       // der Rest des Lichts reicht in CSS-Pixeln. G = { bx, by, bw, bh (CSS-Pixel), PW, PH (Bildpunkte) }
       var G = null, srcT = null;
       function size() {
-        var w = Math.max(1, Math.round(wall.clientWidth * SUN.res)), h = Math.max(1, Math.round(wall.clientHeight * SUN.res));
+        var rs = SUN.res * (desk ? CONFIG.deskSunRes : 1);   // Computer: halbe Auflösung (die ganze Bildschirmfläche ruckelte beim Übergang)
+        var w = Math.max(1, Math.round(wall.clientWidth * rs)), h = Math.max(1, Math.round(wall.clientHeight * rs));
         if (w !== cw || h !== chh) {
           cw = wall.width = glow.width = w; chh = wall.height = glow.height = h;
 
@@ -1778,10 +1780,13 @@
         var x0 = Math.max(0, Math.round((r.left - rect.left) * sx)), w = Math.min(cw - x0, Math.max(1, Math.round(r.width * sx)));
         var y = Math.round(chh - (r.top + r.height * 0.5 - rect.top) * sx);
         if (w < 1 || y < 0 || y >= chh) return;
-        if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
-        c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
-        var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
-        var v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
+        var v = 0;
+        if (!sunBtn) {   // Computer: ohne Auslesen (hält die Grafikkarte an, Ruckler beim Übergang); der pulsierende Strahl reicht
+          if (!px || px.length < w * 4) px = new Uint8Array(w * 4);
+          c.readPixels(cw + x0, y, w, 1, c.RGBA, c.UNSIGNED_BYTE, px);
+          var m = 0; for (var i = 0; i < w; i++) m = Math.max(m, px[i * 4]);
+          v = Math.min(1, m / 255 / (SUN.textLight[0] * SUN.textAmt));
+        }
         // CTA (Hugo 22.11.): Schatten folgt vor allem dem pulsierenden Strahl auf dem Button, andere Strahlen nur schwach
         v = Math.max(v * 0.08, heroNow);
         btnL += (v - btnL) * 0.35;
