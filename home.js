@@ -398,7 +398,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uRim; uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -704,7 +704,7 @@
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
-        '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
+        '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA * uRim; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 + min(fI, 1.2) * 0.9) * fade * kE;',
@@ -794,7 +794,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRim', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -973,7 +973,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now));   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now)); c.uniform1f(U.uRim, dockRim);   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1020,13 +1020,13 @@
         // Hugo 24.11.: die Maus zieht am Computer immer eine Welle wie der Finger am Handy (Text liegt darüber, bleibt ruhig)
         if (!desk || busy() || root.classList.contains('is-info') || dsunOn) return;   // bei der Sonne keine neuen Wellen (die laufende läuft zu Ende)
         var now = performance.now(), wv = waves[waves.length - 1];
-        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
+        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { noEdge = false; if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
-      var dockAmt = 1, dockFl = 1;
-      function dock(amt, fl, clr) {
-        dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; killT0 = 0;
+      var dockAmt = 1, dockFl = 1, dockRim = 1;
+      function dock(amt, fl, clr, rim) {
+        dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; dockRim = rim == null ? 1 : rim; killT0 = 0;
         // Hugo 24.11. (14:35): beim Schliessen die alten Wellen (Tippen, Sonnenwelle) weg – sie lagen unter dem Licht und
         // wischten das Leuchten des Rands noch bis zu 6.5 s weg (darum kam es verzögert, wenn man früh schloss)
         if (fl === 0 || clr) waves = [];
@@ -1070,8 +1070,26 @@
       // Rand), hier über der Sonne als Farbe auf Weiss; die Tippwelle selbst bleibt darunter (kein Ring)
       // Hugo 24.11. (15:54): statt den Rand aufleuchten zu lassen, läuft der Schimmer als Bewegung von der Lichtquelle
       // (Tippstelle bzw. Maus) bis an den Rand, wie eine Fingerwelle mit Flares – ohne Leuchten am Rand
-      cv.shimmer = function (x, y) { waves = []; edgeT0 = 0; killT0 = 0; shimOn = true; cv.burst(x, y, CONFIG.revealSp); };
-      function edgeOffV(now) { return lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
+      // Hugo 24.11. (16:00): wie die Welle eines Fingers – eine kurze, leicht gewundene Bahn (organische Form statt Kreis),
+      // Punkt für Punkt nacheinander gezogen, im Tempo der Fingerwelle
+      // close (Hugo 24.11., 16:01): dieselbe organische Fingerwelle auf der zurückkommenden Seite, ohne Rand-Leuchten
+      // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
+      // kein Leuchten am Rand
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.closeDock, CONFIG.closeFlares, true, 0); };
+      cv.closeWave = function (x, y) { lightOff(); cv.shimmer(x, y, true); noEdge = true; };
+      cv.shimmer = function (x, y, plain) {
+        waves = []; edgeT0 = 0; killT0 = 0; shimOn = !plain; noEdge = false;
+        var cr = refRect(), now = performance.now(), pts = [], a = Math.random() * 6.2832, L = Math.min(cr.width, cr.height) * 0.16, N = 9, px = x - cr.left, py = y - cr.top;
+        for (var i = 0; i < N; i++) {
+          var u = i / (N - 1); a += (Math.random() - 0.5) * 0.9;
+          px += Math.cos(a) * L / N; py += Math.sin(a) * L / N;
+          pts.push({ x: px + (Math.random() - 0.5) * 6, y: py + (Math.random() - 0.5) * 6, t: now + u * 260, m: 0.7 + 0.6 * Math.random() });
+        }
+        waves.push({ t0: now, pts: pts });
+        if (!raf) req();
+      };
+      var noEdge = false;   // close-Welle: kein Nachleuchten am Rand (Hugo 24.11., 16:01)
+      function edgeOffV(now) { return noEdge ? 1 : lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { tintV = v; if (!v) shimOn = false; if (!raf) req(); };
       // Hugo 24.11. (15:12): weicher – das Foto in der Welle blendet über die Dauer des Übergangs aus (vorher auf einen Schlag),
       // und die Welle liegt über dem Licht der Blendung (sonst verschwand sie abrupt im Weiss)
@@ -1097,6 +1115,7 @@
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
         var t = e.touches[0];
+        noEdge = false;
         if (pendingOff) lightOff();
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
         if (edgeT0 && !killT0) killT0 = performance.now();
@@ -1365,7 +1384,7 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      setTimeout(function () { ripple.dock(CONFIG.closeDock, CONFIG.closeFlares, true); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
+      setTimeout(function () { ripple.flareShimmer(false); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (15:12): Flares wieder an, Rand schwach   // Hugo 24.11. (14:29): nur der Rand leuchtet leicht auf   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       clearTimeout(shimT);
@@ -1384,7 +1403,7 @@
       // Hugo 24.11. (14:59): wie beim close – ein Sonnenstrahl schwingt aufs Display und blendet (Lichtebene liegt sofort über
       // allem), darunter blendet die Sonne ein
       if (sun) sun.blind(true);
-      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.shimmer(shX, shY); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
+      clearTimeout(shimT); if (ripple && ripple.shimmer) shimT = setTimeout(function () { if (dsunOn || root.classList.contains('is-info')) ripple.flareShimmer(true); }, (CONFIG.closeHold || 0) + CONFIG.deskSunFade);
       els.forEach(function (e) { if (sun && e === sun.glow) return; try { e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CONFIG.deskSunFade, delay: (CONFIG.closeHold || 0), easing: 'ease', fill: 'backwards' }); } catch (er) {} });
       if (onPass) rv.raf = setTimeout(function () { onPass(1e6, 0, 0); }, CONFIG.deskSunFade * 0.5);
     }
@@ -1548,7 +1567,7 @@
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
       else {
         var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2, tb0 = 0;
-        if (!reduce && Math.abs(C - F) <= 0.02) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); }   // Bild taucht gleich mit ein
+        if (!reduce && Math.abs(C - F) <= 0.02) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); if (ripple && ripple.dropTap) ripple.dropTap(); }   // Bild taucht gleich mit ein; Hugo 24.11. (16:02): kein Kreis beim Tippen
         setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, reduce ? 0 : 200);
       }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
     }
