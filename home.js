@@ -2064,7 +2064,7 @@
     sunHome();
     if (!introOn) dsunWall();   // ohne Einflug (Bewegung reduzieren): weisse Wand gleich bereit
 
-    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null, infoDive = null, tapDive = null;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null, infoDive = null, tapDive = null, titleHy = false;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -2107,7 +2107,20 @@
       if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + (CONFIG.imgBase / (1 - 0.97 * iz.v)).toFixed(4) + ')'; }
     }
     var hyT = 0;
-    function hyperText(el, tail, d0x, maxT) {
+    // Buchstabe aus Licht: von hinten rechts, in Flugrichtung gestreckt; bunt (Regenbogen) oder perlmuttweiss (iri), am Ende
+    // in seiner Farbe
+    function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
+    function lightFrames(u, iri) {
+      var fin = getComputedStyle(u).color, hue = Math.floor(Math.random() * 360);
+      var c0 = iri ? 'hsl(' + hue + ',70%,94%)' : 'hsl(' + hue + ',100%,62%)', c1 = iri ? 'hsl(' + ((hue + 70) % 360) + ',55%,90%)' : 'hsl(' + ((hue + 50) % 360) + ',100%,58%)';
+      return [
+        { transform: tf(90, -36, -650, 4), opacity: 0, color: c0, offset: 0 },
+        { opacity: 1, offset: 0.12 },
+        { transform: tf(8, -3, -40, 2.2), opacity: 1, color: c1, offset: 0.55 },
+        { transform: tf(0, 0, 0, 1), opacity: 1, color: fin, offset: 1 }
+      ];
+    }
+    function hyperText(el, tail, d0x, maxT, iri) {
       if (el === infoText) clearTimeout(hyT);
       if (!el || !el.animate || reduce) return;
       var html0 = el.innerHTML, nodes = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nd;
@@ -2127,28 +2140,24 @@
         });
         t.parentNode.replaceChild(frag, t);
       });
-      if (tail) units.push(tail);
       el.style.perspective = '700px'; el.style.perspectiveOrigin = '100% 0';
       var N = units.length, total = Math.min(maxT || 1700, 400 + N * 3.2), each = 700, d0 = d0x == null ? 280 : d0x;
-      function tf(x, y, z, k) { return 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotate(-22deg) scaleX(' + k + ') rotate(22deg)'; }
       // Hugo 24.11. (14:44): die Buchstaben bestehen erst aus Licht – bunt (Regenbogen) – und werden beim Ankommen zu ihrer
       // Farbe (schwarz); sie kommen in zufälliger Reihenfolge
       var ord = units.map(function (u, i) { return i; });
       for (var oi = ord.length - 1; oi > 0; oi--) { var oj = Math.floor(Math.random() * (oi + 1)), ot = ord[oi]; ord[oi] = ord[oj]; ord[oj] = ot; }
       units.forEach(function (u, i) {
         try {
-          var fin = getComputedStyle(u).color, hue = Math.floor(Math.random() * 360);
-          u.animate([
-            { transform: tf(90, -36, -650, 4), opacity: 0, color: 'hsl(' + hue + ',100%,62%)', offset: 0 },
-            { opacity: 1, offset: 0.12 },
-            { transform: tf(8, -3, -40, 2.2), opacity: 1, color: 'hsl(' + ((hue + 50) % 360) + ',100%,58%)', offset: 0.55 },
-            { transform: tf(0, 0, 0, 1), opacity: 1, color: fin, offset: 1 }
-          ], { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
+          u.animate(lightFrames(u, iri), { duration: each, delay: d0 + total * ord[i] / Math.max(1, N - 1), easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' });
         } catch (er) {}
       });
+      // «Galerie öffnen» kommt als Letztes, perlmuttweiss (Hugo 24.11., 14:47)
+      if (tail) { try { tail.animate(lightFrames(tail, true), { duration: each, delay: d0 + total + 120, easing: 'cubic-bezier(.1,.8,.2,1)', fill: 'backwards' }); } catch (er) {} }
       // danach wieder der ursprüngliche Text (markierbar, leicht)
-      var tm = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, d0 + total + each + 80);
+      var endT = d0 + total + (tail ? 120 : 0);
+      var tm = setTimeout(function () { if (tail && tail.getAnimations) tail.getAnimations().forEach(function (a) { a.cancel(); }); if (el.parentNode) { el.innerHTML = html0; el.style.perspective = ''; } }, endT + each + 80);
       if (el === infoText) hyT = tm;
+      return endT;
     }
     function openInfo() {
       if (desk || busy() || Math.abs(C - F) > 0.02) return;
@@ -2204,7 +2213,7 @@
         // Hugo 24.11. (14:43): der Titel fliegt nicht mehr hoch, er steht gleich oben und kommt wie der Text Buchstabe für
         // Buchstabe aus der Lichtgeschwindigkeit; das Original unten bleibt und wird von der Sonne zugedeckt
         tClone.style.transition = 'opacity .5s ease';
-        if (!reduce) hyperText(tClone, null, 180, 320);
+        titleHy = !reduce;   // kommt nach dem Text (unten)
         clearTimeout(sunT);
         if (sun && glassT) sun.title(glassT);   // Hugo 24.11. (13:36): Horizont gleich setzen – die Sonne ist sofort sichtbar
       }
@@ -2233,7 +2242,10 @@
       if (reduce && brand) brand.classList.add('hp-on-white');
       // Hugo 24.11. (14:27/14:34): der Text kommt wie aus der Lichtgeschwindigkeit (Star Wars) – Buchstabe für Buchstabe
       // nacheinander, jeder von hinten rechts mit Lichtschweif (in Flugrichtung gestreckt), bremst hart ab und steht
-      if (!wasOpen) hyperText(infoText, infoOpen, 520);   // nach dem Titel
+      // Hugo 24.11. (14:47): erst der Text (bunt), dann Titel und «Galerie öffnen» als Letzte, perlmuttweiss
+      var tEnd = !wasOpen ? hyperText(infoText, infoOpen, 300) : 0;
+      if (titleHy && tClone) { if (tEnd) hyperText(tClone, null, Math.max(300, tEnd - 250), 320, true); }
+      titleHy = false;
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
       if (s.href) { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
