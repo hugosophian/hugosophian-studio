@@ -222,7 +222,17 @@
     };
   }
   var easeDock = bezier(0.72, 0, 0.11, 1);
-  var easeDive = bezier(0.3, 0, 0.15, 1);   // Eintauchen: zieht sofort an (Hugo 24.11., 14:27: früher)
+  // Hugo 24.11. (18:35): Eintauchen mit Schwung – eine Feder: nimmt Fahrt auf, schiesst leicht über das Ziel hinaus und
+  // federt zurück (z = Dämpfung: 0.7 ≈ 5 % über das Ziel, 1 = ohne Nachfedern); endet genau auf 1
+  function springEase(z, w) {
+    var wd = w * Math.sqrt(Math.max(1e-4, 1 - z * z));
+    function x(t) { return z >= 0.999 ? 1 - Math.exp(-w * t) * (1 + w * t) : 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + z / Math.sqrt(1 - z * z) * Math.sin(wd * t)); }
+    var e1 = 1 - x(1);
+    return function (t) { return x(t) + e1 * t * t * t; };
+  }
+  var easeDive = springEase(0.7, 10);      // Öffnen
+  var easeDiveOut = springEase(0.75, 11);  // Schliessen (Handy: Bild hat Reserve, ein Hauch unter 1 ist unsichtbar)
+  var easeDiveOutD = springEase(1, 9);     // Schliessen am Computer: ohne Nachfedern (sonst sähe man den Bildrand)
   // Ladeanimation (Hugo 24.11.): wie easeDock, nur das Abbremsen läuft schneller ab (Zeit ab der Mitte weich gerafft,
   // Tempo bleibt stetig)
   function easeDockF(t, ez, b) { var w = t <= 0.45 ? t : t + (b == null ? 1.2 : b) * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
@@ -1347,7 +1357,6 @@
     }
     // Eintauchen (Hugo 24.11., 13:50): das Bild zoomt zur Stelle von Maus bzw. Finger hin, während die Welle die Sonne
     // aufdeckt; zurück zoomt es im Takt des Ausblendens heraus. Die Stelle bleibt dabei stehen.
-    var easeOutCss = bezier(0.25, 0.1, 0.25, 1);
     function dive(s, x, y, on) {
       if (!s || !s.media || reduce) return;
       var m = s.media, base = desk ? 1 : CONFIG.imgBase;
@@ -1357,7 +1366,7 @@
         if (s.dv.k <= 1.0001) { s.dv.px = x - (r.left + r.width / 2); s.dv.py = y - (r.top + r.height / 2); }
       }
       if (!s.dv) return;
-      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : easeOutCss;
+      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDive : desk ? easeDiveOutD : easeDiveOut;
       s.dive = true; if (d.raf) cancelAnimationFrame(d.raf);
       function f(now) {
         var t = clamp((now - t0) / ms, 0, 1);
