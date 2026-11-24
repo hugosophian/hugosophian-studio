@@ -346,7 +346,7 @@
         'float flPull(float pa, float sd) {',
         '  float id = floor(pa + 0.5), dl = pa - id;',
         '  float k = 1.0 - 4.0 * dl * dl;',   // läuft zur Grenze hin sauber auf 0 aus (keine Nahtlinien)
-        '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.16) * k * k;',
+        '  return smoothstep(0.78, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.16) * k * k;',
         '}',
         // Hugo 24.11. (Video 8:21): Kollision statt Kreuzen. Für einen Faden wird geprüft, ob er auf dem Weg vom Ursprung
         // bis hier einen Faden der anderen Schar überquert hat. War jener stärker, endet er dort (der Stärkere nimmt ihn mit),
@@ -361,8 +361,8 @@
         '    float iy = k0 + float(k);',
         '    if (iy >= hi) break;',
         '    float hy = h2(vec2(iy, Y.w * 1.7));',
-        '    if (hy < 0.7) continue;',
-        '    float hry = h2(vec2(iy + 11.0, Y.w)), sty = smoothstep(0.7, 1.0, hy);',
+        '    if (hy < 0.78) continue;',
+        '    float hry = h2(vec2(iy + 11.0, Y.w)), sty = smoothstep(0.78, 1.0, hy);',
         '    float sfy = -smy + 2.0 * smy * (0.4 + 0.9 * hry * (0.5 + 0.5 * sty)) * (1.0 - exp(-et * 1.3));',
         '    if (sy > sfy + 0.1) continue;',   // der andere ist dort noch gar nicht angekommen
         '    float dd = abs(Y.x - iy) / max(Y.z, 1e-4);',
@@ -395,8 +395,8 @@
         '  for (int n = -1; n <= 1; n++) {',
         '    float id = id0 + float(n);',
         '    float hs = h2(vec2(id, sd * 1.7)), hr = h2(vec2(id + 11.0, sd));',
-        '    if (hs < 0.7) continue;',
-        '    float str = smoothstep(0.7, 1.0, hs);',
+        '    if (hs < 0.78) continue;',
+        '    float str = smoothstep(0.78, 1.0, hs);',
         '    float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
         '    float sd2 = abs(ps - id) / gl;',
         '    float swd = mn * (0.009 + 0.007 * str) * (1.2 - 0.35 * u), sw2 = swd * 1.45;',
