@@ -75,11 +75,12 @@
     revealFlares: 1.9,  // Hugo 24.11. (14:16): Flares an der Sonnenwelle deutlicher
     diveZoom:   1.3,    // Hugo 24.11. (13:50): das Bild zoomt beim Übergang hinein, als würde man eintauchen (Mario: viel stärker)
     diveMs:     1500,   // Dauer des Eintauchens (Kurve wie Marios About); zurück im Takt des Ausblendens
-    closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms), dann blendet alles aus
+    closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
+    closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
     titleSuck:  1400,   // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
     revealRing: 2.2,    // Hugo 24.11. (14:00): Breite der Sonnenwelle (mal normale Wellenbreite)
     revealWarp: 1.7,    // wie stark die Sonnenwelle das Bild verzieht (mal Fingerwelle)
-    closeDock:  0.55    // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
+    closeDock:  0.8     // Hugo 24.11. (14:08): beim Schliessen löst der Strahl das Andocken aus (rundherum), hier schwächer (Anteil)
   };
 
   var css = [
@@ -1307,8 +1308,9 @@
     // und die Seite ist wieder da. Handy: dieselbe Welle beim Antippen (About), «close» blendet aus.
     var sunBtn = null, dsunOn = false, dsunLive = false, dsunT = 0, dsunEnd = 0, dsunX = -1, dsunY = -1, dOval = null, dIn = false, dSide = null, dDive = null;
     root.style.setProperty('--hp-dsun-fade', (CONFIG.deskSunFade / 1000) + 's');
-    root.style.setProperty('--hp-dsun-beam', (reduce ? 0 : CONFIG.closeBeam / 1000) + 's');
-    var closeMs = (reduce ? 0 : CONFIG.closeBeam) + CONFIG.deskSunFade;   // Schliessen: Strahl, dann Ausblenden
+    var closeHold = reduce ? 0 : CONFIG.closeHold;
+    root.style.setProperty('--hp-dsun-beam', (closeHold / 1000) + 's');
+    var closeMs = closeHold + CONFIG.deskSunFade;   // Schliessen: Strahl, Ausblenden beginnt schon im Licht
     var dLayer = document.createElement('div'); dLayer.className = 'hp-dsun-layer'; dLayer.setAttribute('aria-hidden', 'true');
     var dText = document.createElement('div'); dText.className = 'hp-dsun-text';
     root.appendChild(dLayer); root.appendChild(dText);
@@ -1320,14 +1322,13 @@
     // Schliessen (Hugo 24.11., 14:00): wo der Strahl auftrifft (Bildmitte), bleibt eine Welle mit Schimmer auf der Seite
     function closeRipple() {
       if (!ripple || reduce) return;
-      // Hugo 24.11. (14:16): erst, wenn die Seite wieder halb zu sehen ist – vorher lag der Aufprall noch unter dem Licht
-      setTimeout(function () { ripple.dock(CONFIG.closeDock); }, CONFIG.closeBeam + CONFIG.deskSunFade * 0.4);   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
+      setTimeout(function () { ripple.dock(CONFIG.closeDock); }, CONFIG.closeBeam * 0.6);   // Hugo 24.11. (14:23): sobald der Strahl darüber geht   // Hugo 24.11. (14:22): später – das Aufleuchten klingt in ~0.5 s ab und lag sonst noch unter dem Licht   // Hugo 24.11. (14:08): rundherum wie beim Andocken, schwächer
     }
     function revealStop(clear) {
       if (rv.raf) cancelAnimationFrame(rv.raf); rv.raf = 0;
       if (clear) { rv.els.forEach(function (e) { setMask(e, ''); }); rv.els = []; }
     }
-    function reveal(x, y, els, onPass) {
+    function reveal(x, y, els, onPass, tb) {
       revealStop(true);
       rv.els = els;
       if (!ripple || reduce) return;
@@ -1348,8 +1349,9 @@
         return L.join(', ');
       }
       els.forEach(function (e) { setMask(e, m(0, 0.5, 0)); });
-      ripple.burst(x, y, CONFIG.revealSp);
-      var t0 = performance.now();
+      // Hugo 24.11. (14:22): am Handy startet die Welle (mit den Flares) schon beim Tippen (tb), die Sonne folgt ihr
+      var t0 = tb && performance.now() - tb < 1000 ? tb : performance.now();
+      if (t0 !== tb) ripple.burst(x, y, CONFIG.revealSp);
       function tick(now) {
         var z = (now - t0) / 1000, w = mx * Math.min(0.019 + 0.02 * z, 0.062) * CONFIG.revealRing;
         var rf = 0.15 * mx * CONFIG.revealSp * z - (1 - smoothstep(0, 0.12, z)) * mx * 0.035;
@@ -1467,7 +1469,7 @@
       if (!dsunOn) return;
       dsunOn = false; dOval = null;
       revealStop(false);   // Maske bleibt, wo sie ist, und blendet mit aus
-      if (dDive) { var dd0 = dDive; setTimeout(function () { if (dDive !== dd0) dive(dd0, 0, 0, false); }, reduce ? 0 : CONFIG.closeBeam); dDive = null; }   // nicht herauszoomen, wenn die Sonne inzwischen wieder auf demselben Bild ist
+      if (dDive) { var dd0 = dDive; setTimeout(function () { if (dDive !== dd0) dive(dd0, 0, 0, false); }, closeHold); dDive = null; }   // nicht herauszoomen, wenn die Sonne inzwischen wieder auf demselben Bild ist
       root.classList.remove('hp-dsun');
       if (sun) { sun.light(false); sun.blind(); }
       closeRipple();
@@ -1516,7 +1518,11 @@
       var wasMoved = moved;
       down = null;
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
-      else { var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2; setTimeout(function () { infoFrom = { x: tx, y: ty }; openInfo(); }, reduce ? 0 : 200); }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
+      else {
+        var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2, tb0 = 0;
+        if (ripple && !reduce && Math.abs(C - F) <= 0.02) { ripple.burst(tx, ty, CONFIG.revealSp); tb0 = performance.now(); }   // Flares schon beim Tippen
+        setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, reduce ? 0 : 200);
+      }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
     }
     window.addEventListener('pointerup', function (e) { release(e, false); });
     window.addEventListener('pointercancel', function (e) { release(e, true); });
@@ -2150,13 +2156,14 @@
             var tt = fi / NF, pp = suckF(tt), va = 0, vc = 0;
             for (var fj = Math.max(0, fi - 3); fj <= Math.min(NF, fi + 3); fj++) { va += vs[fj]; vc++; }
             var vn = fi === NF || fi === 0 ? 0 : Math.pow(va / vc / vmax, 1.1);
-            var sp = 1 + (sc - 1) * pp, st = 1 + 1.1 * vn, sq = 1 / Math.sqrt(st), dip = 1 - 0.08 * Math.sin(Math.PI * Math.min(1, pp));
+            // Hugo 24.11. (14:22): gerader und viel stärker gestreckt – wie ein sichtbarer Teleport (Lichtstrich)
+            var sp = 1 + (sc - 1) * pp, st = 1 + 3.4 * vn, sq = 1 / Math.pow(st, 0.6), dip = 1;
             var flash = tt > 0.84 ? Math.sin(Math.PI * Math.min(1, (tt - 0.84) / 0.16)) : 0;
-            var ch = 6 * vn, tr = 18 * vn;
+            var ch = 8 * vn, tr = 34 * vn;
             fr.push({
-              transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(900px) rotateX(' + (-26 * vn).toFixed(2) + 'deg) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
-              filter: 'blur(' + (1.1 * vn).toFixed(2) + 'px) brightness(' + (1 + 0.35 * vn + 0.4 * flash).toFixed(3) + ')',
-              textShadow: vn > 0.02 ? '0 ' + ch.toFixed(1) + 'px 0 rgba(255,50,90,' + (0.45 * vn).toFixed(3) + '), 0 ' + (-ch).toFixed(1) + 'px 0 rgba(40,190,255,' + (0.45 * vn).toFixed(3) + '), 0 ' + tr.toFixed(1) + 'px ' + (4 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.3 * vn).toFixed(3) + '), 0 ' + (2 * tr).toFixed(1) + 'px ' + (9 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.15 * vn).toFixed(3) + ')' : 'none',
+              transform: 'translate3d(' + (dx * pp).toFixed(1) + 'px,' + (dy * pp).toFixed(1) + 'px,0) perspective(900px) rotateX(' + (-6 * vn).toFixed(2) + 'deg) scale(' + (sp * dip * sq).toFixed(4) + ',' + (sp * dip * st).toFixed(4) + ')',
+              filter: 'blur(' + (0.8 * vn).toFixed(2) + 'px) brightness(' + (1 + 0.8 * vn + 0.5 * flash).toFixed(3) + ')',
+              textShadow: vn > 0.02 ? '0 ' + ch.toFixed(1) + 'px 0 rgba(255,50,90,' + (0.45 * vn).toFixed(3) + '), 0 ' + (-ch).toFixed(1) + 'px 0 rgba(40,190,255,' + (0.45 * vn).toFixed(3) + '), 0 ' + tr.toFixed(1) + 'px ' + (4 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.4 * vn).toFixed(3) + '), 0 ' + (2 * tr).toFixed(1) + 'px ' + (9 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.25 * vn).toFixed(3) + '), 0 ' + (3.2 * tr).toFixed(1) + 'px ' + (16 * vn).toFixed(1) + 'px rgba(255,255,255,' + (0.12 * vn).toFixed(3) + ')' : 'none',
               offset: tt
             });
           }
@@ -2186,7 +2193,7 @@
           var bx = brand.offsetLeft + brand.offsetWidth / 2, by = brand.offsetTop + Math.min(brand.offsetHeight, 120) / 2;
           if (Math.hypot(bx - lx, by - ly) < rad) brand.classList.add('hp-on-white');
         }
-      });
+      }, tp.t);
       if (reduce && brand) brand.classList.add('hp-on-white');
       root.classList.add('is-info'); setDialog(info, true);
       mbPop(true);
@@ -2197,16 +2204,16 @@
       root.classList.remove('is-info'); setDialog(info, false);
       mbPop(false);
       revealStop(false);   // Maske bleibt stehen und blendet mit aus
-      if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, reduce ? 0 : CONFIG.closeBeam); infoDive = null; }
+      if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, closeHold); infoDive = null; }
       clearTimeout(ipT);
       ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; revealStop(true); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
       clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, closeMs - CONFIG.deskSunFade * 0.5);
       // Hugo 24.11. (14:09): kein Zurückfliegen – der Titel verschwindet im Licht des Strahls und steht danach schon
       // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
-      if (tClone) { tClone.style.transition = 'opacity ' + ((reduce ? 0 : CONFIG.closeBeam) / 1000) + 's ease'; tClone.style.opacity = '0'; }
+      if (tClone) { tClone.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; tClone.style.opacity = '0'; }
       // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
-      infoScroll.style.transition = 'opacity ' + ((reduce ? 0 : CONFIG.closeBeam) / 1000) + 's ease'; infoScroll.style.opacity = '0';
+      infoScroll.style.transition = 'opacity ' + (closeHold / 1000) + 's ease'; infoScroll.style.opacity = '0';
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
@@ -2214,7 +2221,7 @@
         if (root.classList.contains('is-info')) return;
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
-      }, reduce ? 0 : CONFIG.closeBeam);
+      }, closeHold);
     }
     infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
     infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
