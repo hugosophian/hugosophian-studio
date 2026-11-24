@@ -70,7 +70,11 @@
     deskSunFade: 900,   // ms Aus- und Einblenden
     deskSunRes:  0.5,   // Auflösung der Sonne am Computer (Anteil der CSS-Pixel; Strahlen sind weich)
     deskSunOval: 60,    // px Rand der ovalen Zone um den Text: Maus ausserhalb → alles zurück (Hugo 24.11., 13:36)
-    revealSp:   6       // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 6-mal schneller)
+    revealSp:   6,      // Tempo der Welle, die die Sonne aufdeckt (wie die Fingerwelle, hier 6-mal schneller)
+    diveZoom:   1.3,    // Hugo 24.11. (13:50): das Bild zoomt beim Übergang hinein, als würde man eintauchen (Mario: viel stärker)
+    diveMs:     1500,   // Dauer des Eintauchens (Kurve wie Marios About); zurück im Takt des Ausblendens
+    closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms), dann blendet alles aus
+    titleSuck:  1200    // Hugo 24.11. (13:53): Titel wird beim Öffnen wie von einem Sog nach oben gezogen (ms)
   };
 
   var css = [
@@ -165,7 +169,7 @@
        über der Seite und wird von einer Welle ab Maus bzw. Finger nach aussen aufgedeckt (Maske im Takt der Welle, wie das
        Wegwischen der Ladeanimation). Darunter läuft alles weiter (Welle, Verzerrung), bis die Welle es zugedeckt hat.
        Zurück: die Ebene blendet aus. */
-    '[data-hp] .hp-dsun-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; visibility: hidden; opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s linear var(--hp-dsun-fade, .9s); }',
+    '[data-hp] .hp-dsun-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; visibility: hidden; opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease var(--hp-dsun-beam, .4s), visibility 0s linear calc(var(--hp-dsun-fade, .9s) + var(--hp-dsun-beam, .4s)); }',
     '[data-hp].hp-dsun .hp-dsun-layer { visibility: visible; opacity: 1; transition: none; }',
     '[data-hp] .hp-dsun-layer > .hp-sun-back { transform: none; }',
     // Computer: der Text liegt als Kopie genau über dem Original, bleibt also stehen, während die Sonne kommt
@@ -173,12 +177,12 @@
     '[data-hp].hp-dsun-live .hp-dsun-text { display: block; }',
     '[data-hp] .hp-dsun-text .hp-info-go { pointer-events: auto; }',
     '[data-hp].is-desk.hp-dsun-live > .hp-sun-light { visibility: visible; transform: none; }',
-    '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp].is-desk > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease var(--hp-dsun-beam, .4s); }',
     '[data-hp].is-desk.hp-dsun > .hp-sun-light { opacity: 1; transition: none; }',
     // Handy: das About kommt mit derselben Welle, «close» blendet es aus
-    '[data-hp]:not(.is-desk) .hp-info { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease, visibility 0s linear var(--hp-dsun-fade, .9s); }',
+    '[data-hp]:not(.is-desk) .hp-info { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease var(--hp-dsun-beam, .4s), visibility 0s linear calc(var(--hp-dsun-fade, .9s) + var(--hp-dsun-beam, .4s)); }',
     '[data-hp].is-info:not(.is-desk) .hp-info { opacity: 1; transition: visibility 0s; }',
-    '[data-hp]:not(.is-desk) > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease; }',
+    '[data-hp]:not(.is-desk) > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease var(--hp-dsun-beam, .4s); }',
     '[data-hp].is-info:not(.is-desk) > .hp-sun-light { opacity: 1; transition: none; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
@@ -219,6 +223,21 @@
   function easeDockF(t, ez, b) { var w = t <= 0.45 ? t : t + (b == null ? 1.2 : b) * (t - 0.45) * (t - 0.45) / 1.1; return (ez || easeDock)(Math.min(1, w)); }
   var easeDockM = bezier(0.66, 0, 0.09, 1);   // Hugo 24.11.: zieht am Anfang mehr an   // Hugo 24.11.: Handy – in der Mitte schneller (Ende und Magnet-Einsatz gleich)
   var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve
+  // Sog (Hugo 24.11., 13:53): erst ein Hauch Bewegung, dann zieht es immer stärker, rastet oben ein und federt kaum nach
+  var suckEase = (function () {
+    function f(t) {
+      var e = 0.8;
+      if (t < e) { var u = t / e; return 0.1 * (1 - (1 - u) * (1 - u)) + 0.9 * u * u * u * u; }
+      var v = (t - e) / (1 - e); return 1 + 0.035 * Math.sin(Math.PI * v) * (1 - v);
+    }
+    try {
+      if (window.CSS && CSS.supports('transition-timing-function', 'linear(0, 1)')) {
+        var pts = []; for (var i = 0; i <= 60; i++) pts.push(f(i / 60).toFixed(4));
+        return 'linear(' + pts.join(', ') + ')';
+      }
+    } catch (e) {}
+    return 'cubic-bezier(.8, 0, .25, 1)';
+  })();
 
   function init(root) {
     if (root.__hp) return;
@@ -1114,7 +1133,7 @@
         s.el.style.zIndex = r > 0 ? 3 : 2;
         s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
         s.el.style.clipPath = '';
-        if (s.media) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
+        if (s.media && !s.dive) { s.media.style.transformOrigin = '50% 50%'; s.media.style.transform = 'scale(' + z.toFixed(4) + ')'; }
         if (s.title) s.title.style.transform = 'translate3d(0,' + (-y).toFixed(2) + 'px,0)';
       }
     }
@@ -1270,8 +1289,10 @@
     // Computer: ist ein Bereich offen und die Maus ruht 1 s, deckt eine Welle ab der Maus die Sonne nach aussen auf. Der
     // Text bleibt stehen (Kopie darüber). Um den Text liegt eine ovale Zone: verlässt die Maus sie, blendet die Sonne aus
     // und die Seite ist wieder da. Handy: dieselbe Welle beim Antippen (About), «close» blendet aus.
-    var sunBtn = null, dsunOn = false, dsunLive = false, dsunT = 0, dsunEnd = 0, dsunX = -1, dsunY = -1, dOval = null, dIn = false, dSide = null;
+    var sunBtn = null, dsunOn = false, dsunLive = false, dsunT = 0, dsunEnd = 0, dsunX = -1, dsunY = -1, dOval = null, dIn = false, dSide = null, dDive = null;
     root.style.setProperty('--hp-dsun-fade', (CONFIG.deskSunFade / 1000) + 's');
+    root.style.setProperty('--hp-dsun-beam', (reduce ? 0 : CONFIG.closeBeam / 1000) + 's');
+    var closeMs = (reduce ? 0 : CONFIG.closeBeam) + CONFIG.deskSunFade;   // Schliessen: Strahl, dann Ausblenden
     var dLayer = document.createElement('div'); dLayer.className = 'hp-dsun-layer'; dLayer.setAttribute('aria-hidden', 'true');
     var dText = document.createElement('div'); dText.className = 'hp-dsun-text';
     root.appendChild(dLayer); root.appendChild(dText);
@@ -1307,6 +1328,31 @@
       rv.raf = requestAnimationFrame(tick);
     }
 
+    // Eintauchen (Hugo 24.11., 13:50): das Bild zoomt zur Stelle von Maus bzw. Finger hin, während die Welle die Sonne
+    // aufdeckt; zurück zoomt es im Takt des Ausblendens heraus. Die Stelle bleibt dabei stehen.
+    var easeOutCss = bezier(0.25, 0.1, 0.25, 1);
+    function dive(s, x, y, on) {
+      if (!s || !s.media || reduce) return;
+      var m = s.media, base = desk ? 1 : CONFIG.imgBase;
+      if (on) {
+        var r = m.getBoundingClientRect();
+        if (!s.dv) s.dv = { k: 1, raf: 0 };
+        if (s.dv.k <= 1.0001) { s.dv.px = x - (r.left + r.width / 2); s.dv.py = y - (r.top + r.height / 2); }
+      }
+      if (!s.dv) return;
+      var d = s.dv, from = d.k, to = on ? CONFIG.diveZoom : 1, t0 = performance.now(), ms = on ? CONFIG.diveMs : CONFIG.deskSunFade, ez = on ? easeDock : easeOutCss;
+      s.dive = true; if (d.raf) cancelAnimationFrame(d.raf);
+      function f(now) {
+        var t = clamp((now - t0) / ms, 0, 1);
+        d.k = from + (to - from) * ez(t);
+        m.style.transformOrigin = '50% 50%';
+        m.style.transform = 'translate(' + d.px.toFixed(1) + 'px,' + d.py.toFixed(1) + 'px) scale(' + d.k.toFixed(4) + ') translate(' + (-d.px).toFixed(1) + 'px,' + (-d.py).toFixed(1) + 'px) scale(' + base + ')';
+        if (t < 1) { d.raf = requestAnimationFrame(f); return; }
+        d.raf = 0;
+        if (!on) { s.dive = false; s.dv = null; m.style.transform = desk ? '' : 'scale(' + base + ')'; }
+      }
+      d.raf = requestAnimationFrame(f);
+    }
     function inHov(x, y) {
       if (hov < 0) return false;
       var r = slides[hov].el.getBoundingClientRect();
@@ -1339,7 +1385,9 @@
       if (dsunOn || !sun || !desk || busy() || hov < 0 || !inHov(dsunX, dsunY)) return;
       var s = slides[hov];
       if (s.o < 0.98) { dsunArm(); return; }   // Spalte geht noch auf
+      var wasLive = dsunLive;   // Sonne blendet noch aus: nicht von vorn aufdecken, sondern einfach wieder da
       dsunOn = dsunLive = true; clearTimeout(dsunEnd);
+      if (dSide) { dSide.style.visibility = ''; dSide = null; }
       sunHome();
       // Text als Kopie genau über das Original legen
       var rr = root.getBoundingClientRect(), r = s.sideIn.getBoundingClientRect();
@@ -1377,15 +1425,17 @@
       root.classList.add('hp-dsun-live', 'hp-dsun');
       sun.start();
       sun.light(true, reduce ? 0 : 800);
-      reveal(dsunX, dsunY, [dLayer, sun.glow]);
+      if (wasLive) revealStop(true); else reveal(dsunX, dsunY, [dLayer, sun.glow]);
+      dDive = s; dive(s, dsunX, dsunY, true);
     }
     function dsunStop() {
       clearTimeout(dsunT);
       if (!dsunOn) return;
       dsunOn = false; dOval = null;
       revealStop(false);   // Maske bleibt, wo sie ist, und blendet mit aus
+      if (dDive) { var dd0 = dDive; setTimeout(function () { dive(dd0, 0, 0, false); }, reduce ? 0 : CONFIG.closeBeam); dDive = null; }
       root.classList.remove('hp-dsun');
-      if (sun) sun.light(false);
+      if (sun) { sun.light(false); sun.blind(); }
       clearTimeout(dsunEnd);
       dsunEnd = setTimeout(function () {
         if (dsunOn) return;
@@ -1394,7 +1444,7 @@
         dText.innerHTML = ''; sunBtn = null;
         if (dSide) { dSide.style.visibility = ''; dSide = null; }
         if (sun) { sun.noGlow(null); sun.glow.style.clipPath = ''; }
-      }, Math.max(CONFIG.deskSunFade, 1250));   // Strahlen verblassen in 1.2 s
+      }, closeMs + 50);
     }
     root.addEventListener('click', function (e) {
       if (!desk || busy()) return;
@@ -1549,7 +1599,7 @@
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform vec2 uRes; uniform float uOffX; uniform float uMode; uniform vec2 uOrig; uniform float uScale; uniform vec4 uMB; uniform float uLodB; uniform float uHor; uniform float uOn; uniform vec3 uHero; uniform float uTime; uniform vec2 uSrc; uniform vec2 uRays; uniform vec2 uDrift; uniform vec2 uEdge;',
         'uniform float uReach; uniform float uStrength; uniform float uAmb; uniform vec3 uShade; uniform vec3 uShadeLow; uniform vec3 uLit; uniform vec3 uBase;',
-        'uniform vec3 uTextLight; uniform float uTextAmt; uniform float uWallGlow; uniform vec4 uNoG; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
+        'uniform vec3 uTextLight; uniform float uTextAmt; uniform float uWallGlow; uniform vec4 uNoG; uniform vec4 uBl; uniform sampler2D uOcc; uniform float uOccOn; uniform float uOccLen; uniform float uOccAmt; uniform vec2 uExt; uniform float uRefr;',
         'uniform float uShadowW; uniform float uTrailAmt; uniform vec3 uTrail[' + NT + '];',
         'float h1(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }',
         'float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h1(i), h1(i + 1.0), f); }',
@@ -1659,6 +1709,24 @@
         '    col = mix(uBase, col, wf);',
         '    if (uWallGlow > 0.5 && !inG) col = 1.0 - (1.0 - col) * (1.0 - clamp(gl, 0.0, 1.0));',
         '  } else col = gl;',
+        // Schliessen (Hugo 24.11., 13:51): ein breiter Sonnenstrahl schwingt aufs Display und blendet. Ganz wenig Regenbogen
+        // an seinen Rändern, die Sonnenoberfläche schimmert leicht im Licht, schwache Linsenreflexe auf der Achse Sonne → Mitte.
+        // uBl = (Blendung, Winkel des Strahls, Breite, Stärke)
+        '  if (uBl.x > 0.0 || uBl.w > 0.0) {',
+        '    float bd = (ang - uBl.y) / uBl.z, bb = exp(-bd * bd);',
+        '    float beamB = bb * (0.75 + 0.25 * exp(-max(dist - 0.3, 0.0)));',
+        '    vec3 rbw = 0.5 + 0.5 * cos(6.2832 * (bd * 0.22 + vec3(0.0, 0.33, 0.67)));',
+        '    float edgeB = bb * (1.0 - exp(-bd * bd * 3.0));',
+        '    vec2 ax = 0.5 * uRes - S; vec3 ghc = vec3(0.0);',
+        '    for (int i = 0; i < 3; i++) {',
+        '      float k = 0.75 + 0.5 * float(i); float R = uRes.y * (0.045 + 0.035 * float(i));',
+        '      float rr = length(fc - (S + ax * k)) / R;',
+        '      ghc += (0.55 + 0.45 * cos(6.2832 * (rr * 0.7 + float(i) * 0.2 + vec3(0.0, 0.33, 0.67)))) * exp(-pow((rr - 1.0) * 3.5, 2.0)) * 0.05;',
+        '    }',
+        '    float B = clamp(uBl.x * (0.9 + 0.1 * fil * 3.0) + uBl.w * beamB * 0.9, 0.0, 1.0);',
+        '    col = mix(col, vec3(1.0, 0.975, 0.92), B);',
+        '    col += ((rbw - 0.5) * edgeB * 0.09 + ghc) * uBl.w * (1.0 - 0.6 * uBl.x);',
+        '  }',
         '  col += (h2(fc + fract(t)) - 0.5) / 255.0;',
         '  gl_FragColor = vec4(col, 1.0);',
         '}'].join('\n');
@@ -1671,7 +1739,7 @@
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var loc = c.getAttribLocation(pr, 'aPos'); c.enableVertexAttribArray(loc); c.vertexAttribPointer(loc, 2, c.FLOAT, false, 0, 0);
       var U = {}; ['uRes', 'uOffX', 'uMode', 'uOn', 'uHero', 'uOrig', 'uScale', 'uMB', 'uLodB', 'uHor', 'uTime', 'uSrc', 'uRays', 'uDrift', 'uEdge', 'uReach', 'uStrength', 'uAmb', 'uShade', 'uShadeLow', 'uLit',
-        'uBase', 'uTextLight', 'uTextAmt', 'uWallGlow', 'uNoG', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
+        'uBase', 'uTextLight', 'uTextAmt', 'uWallGlow', 'uNoG', 'uBl', 'uOcc', 'uOccOn', 'uOccLen', 'uOccAmt', 'uExt', 'uRefr', 'uShadowW', 'uTrailAmt', 'uTrail'].forEach(function (k) { U[k] = c.getUniformLocation(pr, k); });
       c.uniform2fv(U.uSrc, SUN.src); c.uniform2fv(U.uRays, SUN.rays); c.uniform2fv(U.uDrift, SUN.drift); c.uniform2fv(U.uEdge, SUN.edge);
       c.uniform1f(U.uReach, SUN.reach); c.uniform1f(U.uStrength, SUN.strength); c.uniform1f(U.uAmb, SUN.ambient);
       c.uniform3fv(U.uShade, SUN.shade); c.uniform3fv(U.uShadeLow, SUN.shadeLow); c.uniform3fv(U.uLit, SUN.lit); c.uniform3fv(U.uBase, SUN.base || [1, 1, 1]);
@@ -1825,6 +1893,14 @@
         }
         c.uniform3f(U.uHero, ha, hw, hero); heroNow = hero;
         c.uniform1f(U.uWallGlow, desk ? 1 : 0);
+        if (blT0) {
+          var bt = (now - blT0) / 1000, sw = Math.min(1, bt / (CONFIG.closeBeam / 1000 + 0.05)), x1 = sw - 1;
+          var bo = 1 + 2.4 * x1 * x1 * x1 + 1.4 * x1 * x1;   // mit Schwung, leicht über das Ziel hinaus
+          var Sx2 = SUN.src[0] * rect.width, Sy2 = SUN.src[1] * rect.height;
+          var angC = Math.atan2(rect.width * 0.5 - Sx2, rect.height * 0.5 - Sy2);
+          var amt = smoothstep(0.05, CONFIG.closeBeam / 1000 + 0.1, bt) * 0.92 - smoothstep(CONFIG.closeBeam / 1000 + 0.15, CONFIG.closeBeam / 1000 + 0.9, bt) * 0.3;
+          c.uniform4f(U.uBl, Math.max(0, amt), angC + 0.8 * (1 - bo), 0.05 + 0.3 * (1 - Math.pow(1 - sw, 3)), 1 - Math.pow(1 - Math.min(1, bt / 0.3), 3));
+        } else c.uniform4f(U.uBl, 0, 0, 1, 0);
         if (noG) c.uniform4f(U.uNoG, (noG.left - rect.left) * sx, chh - (noG.bottom - rect.top) * sx, (noG.right - rect.left) * sx, chh - (noG.top - rect.top) * sx);
         else c.uniform4f(U.uNoG, -1, -1, -1, -1);
         c.uniform2f(U.uRes, cw, chh); c.uniform1f(U.uTime, tm); c.uniform3fv(U.uTrail, tbuf); c.uniform1f(U.uOccOn, G ? occ.on : 0);
@@ -1836,7 +1912,7 @@
         lx.drawImage(gcv, cw, H - chh, cw, chh, 0, 0, cw, chh);
       }
       // «Werkstatt öffnen»: Licht an seiner Stelle messen, Schatten nur wenn ein Strahl ihn trifft
-      var px = null, btnL = 0, pf = 0, heroNow = 0, noG = null;
+      var px = null, btnL = 0, pf = 0, heroNow = 0, noG = null, blT0 = 0;
       function probe(rect, sx) {
         var hb = sunBtn || infoOpen;
         if (mode !== 'info' || ++pf % 5 || !hb.offsetWidth) return;
@@ -1899,7 +1975,8 @@
           occ.want = 0; start();
         },
         noGlow: function (r) { noG = r; },   // Computer: Feld (CSS-Pixel), in dem die Lichtebene darüber das Licht übernimmt
-        light: function (on, lead) { if (on && !lightOn.want) lightOn.t0 = performance.now() - (lead || 0); lightOn.want = !!on; start(); },   // lead: so viele ms ist das Einstrahlen schon weiter
+        light: function (on, lead) { if (on && !lightOn.want) lightOn.t0 = performance.now() - (lead || 0); if (on) blT0 = 0; lightOn.want = !!on; start(); },
+        blind: function () { if (!reduce) { blT0 = performance.now(); start(); } },   // Schliessen: Strahl mit Schwung, Blendung   // lead: so viele ms ist das Einstrahlen schon weiter
         // Laden: Boden (Sonnenoberfläche) beginnt knapp unter dem Schriftzug
         horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); },
         // Lichtbild der Schrift (zweite Hälfte der Rechenleinwand): Quelle und Ausschnitt für drawImage
@@ -1932,7 +2009,7 @@
     sunHome();
     if (!introOn) dsunWall();   // ohne Einflug (Bewegung reduzieren): weisse Wand gleich bereit
 
-    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null;
+    var tClone = null, tOrig = null, infoT = 0, sunT = 0, sunL = 0, glassT = null, ipT = 0, brandT = 0, infoFrom = null, infoDive = null;
     // Bild beim About, genau wie Mario am Handy (main.js, Home.hide / Home.show):
     //   Öffnen:    Bild bleibt stehen und zoomt hinein (Shader-Wert scaleImage 0 → 2 in 1 s, Kurve .72,0,.11,1),
     //              die weisse Seite schiebt sich von rechts darüber (1.5 s, .6,0,.1,1).
@@ -2013,6 +2090,7 @@
         var dx = left - (cr.left - rr.left) - sc * minX;
         var dy = top - (cr.top - rr.top) - sc * minY;
         tClone.style.transformOrigin = '0 0';
+        tClone.style.transition = 'transform ' + (CONFIG.titleSuck / 1000) + 's ' + suckEase + ', opacity .5s ease';   // Hugo 24.11. (13:53): wie ein Sog nach oben
         root.style.setProperty('--hp-info-top', (top + (maxY - minY) * sc + H * 0.035).toFixed(0) + 'px');
         tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
         if (map0) {
@@ -2036,10 +2114,13 @@
       // Finger nach aussen aufgedeckt, darunter läuft die Fingerwelle weiter. «close» blendet aus.
       if (infoSlide) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; infoSlide = null; root.classList.remove('hp-info-anim'); }
       infoClosing = false;
+      var wasOpen = ip.v < 1;   // schliesst noch: nicht von vorn aufdecken
       clearTimeout(ipT); ip.a = null; ip.v = 0; applyPanel();
       if (brand) brand.classList.remove('hp-on-white');
       var tp = infoFrom || { x: W / 2, y: H / 2 }; infoFrom = null;
-      reveal(tp.x, tp.y, sun ? [info, sun.glow] : [info], function (rad, lx, ly) {
+      infoDive = s; dive(s, tp.x, tp.y, true);
+      if (wasOpen) { revealStop(true); if (brand) brand.classList.add('hp-on-white'); }
+      else reveal(tp.x, tp.y, sun ? [info, sun.glow] : [info], function (rad, lx, ly) {
         // Schriftzug wird dunkel, sobald die Welle ihn überquert hat
         if (brand && !brand.classList.contains('hp-on-white')) {
           var bx = brand.offsetLeft + brand.offsetWidth / 2, by = brand.offsetTop + Math.min(brand.offsetHeight, 120) / 2;
@@ -2056,17 +2137,20 @@
       root.classList.remove('is-info'); setDialog(info, false);
       mbPop(false);
       revealStop(false);   // Maske bleibt stehen und blendet mit aus
+      if (infoDive) { var id0 = infoDive; setTimeout(function () { if (!root.classList.contains('is-info')) dive(id0, 0, 0, false); }, reduce ? 0 : CONFIG.closeBeam); infoDive = null; }
       clearTimeout(ipT);
-      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; revealStop(true); ip.v = 1; applyPanel(); kick(); }, CONFIG.deskSunFade + 50);
-      clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, CONFIG.deskSunFade * 0.5);
-      if (tClone) { tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
-      clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); }
+      ipT = setTimeout(function () { if (root.classList.contains('is-info')) return; revealStop(true); ip.v = 1; applyPanel(); kick(); }, closeMs + 50);
+      clearTimeout(brandT); brandT = setTimeout(function () { if (brand && !root.classList.contains('is-info')) brand.classList.remove('hp-on-white'); }, closeMs - CONFIG.deskSunFade * 0.5);
+      // Hugo 24.11. (13:50): der Titel fliegt im selben Takt zurück, in dem die Sonne ausblendet (vorher 1.5 s mit langsamem
+      // Anlauf – er hing oben, während die Seite schon da war, und sprang am Ende)
+      if (tClone) { tClone.style.transition = 'transform ' + (CONFIG.deskSunFade / 1000) + 's cubic-bezier(.45,0,.2,1) ' + ((closeMs - CONFIG.deskSunFade) / 1000) + 's, opacity .5s ease'; tClone.style.transform = 'translate3d(0,0,0)'; tClone.classList.remove('hp-3d', 'hp-glass'); }
+      clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       clearTimeout(infoT);
       infoT = setTimeout(function () {
         if (root.classList.contains('is-info')) return;
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
-      }, CONFIG.infoMs + 50);
+      }, closeMs + 30);
     }
     infoClose.addEventListener('click', function (e) { e.preventDefault(); closeInfo(); });
     infoClose.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInfo(); } });
