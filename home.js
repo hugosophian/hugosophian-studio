@@ -1277,7 +1277,7 @@
       root.classList.add('hp-dsun-live', 'hp-dsun');
       sun.start();
       clearTimeout(dsunL);
-      dsunL = setTimeout(function () { if (dsunOn) sun.light(true); }, reduce ? 0 : CONFIG.infoMs * 0.4);   // wie am Handy: erster Strahl kurz nach dem Start
+      sun.light(true);   // Hugo 24.11.: Strahlen kommen schon während des Ausblendens (vorher erst nach 0.6 s)
     }
     function dsunStop() {
       clearTimeout(dsunT);
