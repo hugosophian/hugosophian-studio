@@ -615,7 +615,7 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(3.6, 5.6, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
-        '    float flash = uSoft > 0.5 ? smoothstep(0.0, 0.7, et) * (0.55 + 0.9 * exp(-et * 0.9)) : 1.9 * uImp * exp(-et * 3.2) + 0.75 * exp(-et * 0.3);',   // Hugo 24.11. (18:02): Schimmer – weich anschwellen statt Aufprall   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float flash = uSoft > 0.5 ? smoothstep(0.0, 0.8, et) * 0.75 * exp(-et * 0.3) : 1.9 * uImp * exp(-et * 3.2) + 0.75 * exp(-et * 0.3);',   // Hugo 24.11. (18:02/18:04): Schimmer – nur das Nachleuchten der Ladeanimation (ohne Aufleuchten), weich eingeblendet   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
