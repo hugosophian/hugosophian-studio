@@ -319,13 +319,37 @@
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
         // Abstand zum Bahnabschnitt a–b, Wellenfront dort minus gelaufene Strecke (mit weicher Einblendung neuer Punkte)
-        // Hugo 24.11. (Skizze): Flare-Fäden als Stromlinien – Höhenlinien einer weichen Stromfunktion. Sie entspringen dem Rand,
-        // laufen in weichen S-Kurven nach innen, drehen dabei seitlich ab (Wirbel, kein gemeinsamer Punkt in der Mitte),
-        // bündeln sich und gleiten ineinander, ohne sich je zu kreuzen; die Bewegung läuft wie eine Welle die Fäden entlang
-        'float sPsi(vec2 p, vec2 res, float t, float sw) {',
-        '  float mn = min(res.x, res.y); vec2 c = p - res * 0.5; float r = length(c) / mn, a = atan(c.y, c.x);',
-        '  vec2 q = p / mn;',
-        '  return a * (9.0 / 6.2832) + sw * r * 3.2 + 0.9 * n2(q * 2.0 + vec2(t * 0.07, -t * 0.05)) + 0.45 * n2(q * 4.2 + vec2(-t * 0.1, r * 2.5 - t * 0.45));',
+        // Hugo 24.11.: Flare-Fäden als Stromlinien einer weichen, fast geraden Strömung (kein Winkel um die Mitte → kein Wirbelpunkt).
+        // Zwei Scharen schiessen von gegenüberliegenden Seiten über die Mitte bis auf die Gegenseite, gleiten ineinander,
+        // werden unterwegs schwächer und nehmen die Randfarbe ihres Ursprungs mit; die Welle läuft weich die Fäden entlang
+        'float flPsi(vec2 fc, vec2 res, float t, vec2 d, float sw, float sd) {',
+        '  float mn = min(res.x, res.y); vec2 q = fc / mn, c = (fc - res * 0.5) / mn; float s = dot(c, d);',
+        '  return dot(c, vec2(-d.y, d.x)) * 4.5 + sw * s * s * 1.1 + 0.9 * n2(q * 1.8 + vec2(t * 0.07, -t * 0.05) + sd) + 0.45 * n2(q * 4.0 + vec2(-t * 0.1, s * 2.5 - t * 0.45));',
+        '}',
+        'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, float sw, out vec3 tint) {',
+        '  tint = vec3(0.0);',
+        '  float mn = min(res.x, res.y); vec2 d = vec2(cos(an), sin(an)), c = (fc - res * 0.5) / mn;',
+        '  float ps = flPsi(fc, res, t, d, sw, sd);',
+        '  vec2 gp = vec2(flPsi(fc + vec2(1.5, 0.0), res, t, d, sw, sd) - ps, flPsi(fc + vec2(0.0, 1.5), res, t, d, sw, sd) - ps) / 1.5;',
+        '  float gl = max(length(gp), 1e-4), id = floor(ps + 0.5);',
+        '  float hs = h2(vec2(id, sd * 1.7)), hr = h2(vec2(id + 11.0, sd));',
+        '  if (hs < 0.5) return 0.0;',
+        '  float str = smoothstep(0.5, 1.0, hs);',
+        '  float s = dot(c, d), smx = 0.5 * (abs(d.x) * res.x + abs(d.y) * res.y) / mn;',
+        '  float u = clamp((s + smx) / (2.0 * smx), 0.0, 1.0);',                                   // 0 = Ursprung, 1 = Gegenseite
+        '  float sf = -smx + 2.0 * smx * (0.4 + 0.9 * hr * (0.5 + 0.5 * str)) * (1.0 - exp(-et * 1.3));',   // Spitze: schnell, dann langsamer
+        '  float sd2 = abs(ps - id) / gl;',
+        '  float swd = mn * (0.005 + 0.008 * str) * (1.35 - 0.65 * u);',
+        '  float core = exp(-sd2 * sd2 / (swd * swd)) + 0.35 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
+        '  float along = smoothstep(0.0, 0.015, ee / mn) * (1.0 - smoothstep(sf - 0.3, sf, s));',
+        '  float life = smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.6, 6.2, et));',
+        '  float weak = mix(1.0, 0.28, smoothstep(0.05, 1.0, u));',
+        '  float flick = 0.8 + 0.2 * n2(vec2(s * 6.0 - t * 1.5, id * 3.0));',
+        '  float sv = core * along * life * flick * weak * (0.45 + 0.75 * str);',
+        '  vec2 o = c - d * (s + smx); o = normalize(o * mn + vec2(0.001));',                  // Ursprung am Rand
+        '  vec3 oc = 0.5 + 0.5 * cos(6.2832 * (atan(o.y, o.x) / 6.2832 * 2.0 + t * 0.06 + vec3(0.0, 0.33, 0.67)));',
+        '  tint = mix(oc, vec3(1.0, 0.82, 0.55), 0.35) * sv * (1.0 - smoothstep(0.0, 0.75, u));',   // trägt die Ursprungsfarbe mit
+        '  return sv;',
         '}',
         'float segF(vec2 fc, vec4 a, vec4 b, float mx, float sp, out vec2 dv, out float d) {',
         '  vec2 ab = b.xy - a.xy; float l2 = dot(ab, ab);',
@@ -468,32 +492,17 @@
         '    float efm = smoothstep(0.35, 0.85, n2(fc / mx * 2.6 + vec2(uT * 0.05, 3.0)));',
         '    eacc += vec3(1.0, 0.86, 0.62) * efa * (0.6 + 0.5 * efm) * 0.35; fI = efa * 0.3;',   // die Flares kommen jetzt v. a. von den Wellen
         '    eacc *= fade;',
-        // Flare-Fäden (Stromlinien): nur einige Linien leuchten, jede mit eigener Stärke und Reichweite; sie schiessen
-        // schnell aus dem Rand, werden langsamer; am Rand in den Randfarben, weiter innen weissgolden; alles weich
+        // Flare-Fäden: zwei Scharen aus gegenüberliegenden Seiten, kreuzen weich die Mitte, vermischen sich und verglimmen
         '    {',
-        '      float mnS = min(uRes.x, uRes.y), sw = mod(uSeed, 2.0) < 1.0 ? 1.0 : -1.0;',
-        '      float ps = sPsi(fc, uRes, uT, sw);',
-        '      vec2 gp = vec2(sPsi(fc + vec2(1.5, 0.0), uRes, uT, sw) - ps, sPsi(fc + vec2(0.0, 1.5), uRes, uT, sw) - ps);',
-        '      gp = (gp - 9.0 * floor(gp / 9.0 + 0.5)) / 1.5;',   // Naht des Winkels überbrücken
-        '      float gl = max(length(gp), 1e-4), id = floor(ps + 0.5), id9 = mod(id, 9.0);',
-        '      float hs = h2(vec2(id9, uSeed * 1.7)), hr = h2(vec2(id9 + 11.0, uSeed));',
-        '      if (hs > 0.35) {',
-        '        float str = smoothstep(0.35, 1.0, hs);',
-        '        float reach = mnS * (0.22 + 0.3 * hr * hr) * (1.0 - exp(-et * 1.6));',
-        '        float ee = max(e, 0.0), tt = ee / max(reach, 1.0);',
-        '        float sd2 = abs(ps - id) / gl;',
-        '        float swd = mnS * (0.005 + 0.008 * str) * (0.8 + 0.9 * tt * (1.0 - tt) * 2.0) * (1.0 - 0.5 * smoothstep(0.75, 1.0, tt));',
-        '        float core = exp(-sd2 * sd2 / (swd * swd)) + 0.35 * exp(-sd2 * sd2 / (swd * swd * 8.0));',
-        '        float along = smoothstep(0.0, mnS * 0.03, ee) * (1.0 - smoothstep(0.65, 1.0, tt));',
-        '        float life = smoothstep(0.0, 0.12, et) * (1.0 - smoothstep(3.4, 6.0, et));',
-        // Hugo 24.11.: keine Mitte – um den Bildmittelpunkt verglimmen die Fäden weich (kein Wirbelpunkt)
-        '        life *= smoothstep(0.16, 0.34, length(fc - uRes * 0.5) / mnS);',
-        '        float flick = 0.8 + 0.2 * n2(vec2(ee * 0.02 - uT * 1.5, id * 3.0));',
-        '        float sv = core * along * life * flick * (0.45 + 0.75 * str);',
-        '        float sb = 1.0 - smoothstep(0.03, 0.3, tt);',
-        '        faD += sv * (1.0 - 0.7 * sb) * 1.3;',
-        '        eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6;',
-        '      }',
+        '      float mnS = min(uRes.x, uRes.y), sw = mod(uSeed, 2.0) < 1.0 ? 1.0 : -1.0, ee = max(e, 0.0);',
+        '      float a0 = 6.2832 * h2(vec2(uSeed, 4.1));',
+        '      vec3 tA, tB;',
+        '      float vA = flFam(fc, uRes, uT, et, ee, uSeed, a0, sw, tA);',
+        '      float vB = flFam(fc, uRes, uT * 1.07 + 5.0, et, ee, uSeed + 7.3, a0 + 3.1416 + 0.7 * sw, -sw, tB);',
+        '      float sv = vA + vB; sv = sv / (1.0 + 0.45 * sv);',   // wo sie sich treffen: weich verschmelzen statt aufaddieren
+        '      float sb = 1.0 - smoothstep(0.03, 0.3, ee / mnS);',
+        '      faD += sv * (1.0 - 0.7 * sb) * 1.3;',
+        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + tB) * 0.45 * (1.0 - sb);',
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
