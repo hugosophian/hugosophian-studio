@@ -398,11 +398,12 @@
         '    vec2 fd = vec2(cos(fa1.z), sin(fa1.z)); vec2 fp = fc - fa1.xy;',
         '    float fu = dot(fp, fd), fv2 = dot(fp, vec2(-fd.y, fd.x));',
         '    if (fu < -fa2.y * 4.0 || fu > fa2.x * 1.8) continue;',
-        '    float fcv = fv2 - fa1.w * max(fu, 0.0) * max(fu, 0.0);',
+        '    float fcv = fv2 - fa1.w * max(fu, 0.0) * max(fu, 0.0) - sin(fu * 0.025 - uT * 1.1 + float(i) * 2.3) * fa2.y * 1.2 * clamp(fu / fa2.x, 0.0, 1.0);',   // weich gewunden
         '    float fuw = clamp(fu / fa2.x, 0.0, 1.6);',
         '    float fwd = fa2.y * (1.0 + 0.7 * fuw) * (1.0 - 0.45 * smoothstep(0.6, 1.3, fuw));',
         '    float fl2 = 0.8 + 0.2 * n2(vec2(fu * 0.04 - uT * 1.4, float(i) * 7.0));',
-        '    faD += exp(-fcv * fcv / (fwd * fwd)) * exp(-pow(max(fu, 0.0) / fa2.x, 1.6)) * smoothstep(-fa2.y * 2.0, fa2.y * 0.6, fu) * fa2.z * fl2;',
+        '    float fcore = exp(-fcv * fcv / (fwd * fwd)), fglow = exp(-fcv * fcv / (fwd * fwd * 6.0)) * 0.35;',   // Kern + weicher Schein, so fliessen sie ineinander
+        '    faD += (fcore + fglow) * exp(-pow(max(fu, 0.0) / fa2.x, 1.5)) * smoothstep(-fa2.y * 2.5, fa2.y * 0.8, fu) * fa2.z * fl2;',
         '  }',
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
@@ -652,24 +653,28 @@
           f.tx = f.x + Math.cos(ang) * tl - Math.sin(ang) * f.b * tl; f.ty = f.y + Math.sin(ang) * tl + Math.cos(ang) * f.b * tl;
         });
         DF.forEach(function (f, i) {
-          // Wind: langsames Schwenken und Biegen
-          var ta = Math.sin(et * 0.55 + f.ph) * 0.3, tb = f.b0 * (1 + 0.35 * Math.sin(et * 0.8 + f.ph * 1.3));
-          var fa = (ta - f.a) * 3.0 - f.va * 2.4, fb = (tb - f.b) * 3.0 - f.vb * 2.4;
+          // weich und schwebend (Hugo 24.11.): sanfte Federn, wenig Dämpfung, langsames Schwenken
+          var ta = Math.sin(et * 0.4 + f.ph) * 0.35, tb = f.b0 * (1 + 0.4 * Math.sin(et * 0.6 + f.ph * 1.3));
+          var fa = (ta - f.a) * 1.1 - f.va * 0.9, fb = (tb - f.b) * 1.1 - f.vb * 0.9;
           DF.forEach(function (g, j) {
             if (i === j) return;
-            var dx = f.tx - g.tx, dy = f.ty - g.ty, d = Math.hypot(dx, dy), R = mn * 0.28;
+            var dx = g.tx - f.tx, dy = g.ty - f.ty, d = Math.hypot(dx, dy), R = mn * 0.34;
             if (d > R) return;
-            var push = (1 - d / R) * (g.s / (f.s + g.s)) * 2;   // je stärker der andere, desto mehr werde ich weggedrückt
-            var ang = f.base + f.a, cr = Math.cos(ang) * dy - Math.sin(ang) * dx;   // auf welcher Seite liegt der andere
-            var sg = cr > 0 ? -1 : 1;
-            fa += sg * push * 9.0; fb += sg * push * 7.0;
+            var near = 1 - d / R, ws = g.s / (f.s + g.s);
+            var ang = f.base + f.a, cr = Math.cos(ang) * dy - Math.sin(ang) * dx, sg = cr > 0 ? 1 : -1;
+            // wie zwei Galaxien: sie ziehen sich an und fliessen ineinander …
+            fa += sg * near * 1.6 * ws;
+            // … tauschen Schwung aus (die stärkere gibt der schwächeren ihren Drall) …
+            fa += (g.va - f.va) * near * 2.2 * ws; fb += (g.vb - f.vb) * near * 1.8 * ws;
+            // … und ziehen sich gegenseitig zu Schweifen, die umeinander kreisen
+            fb += sg * near * near * 2.4 * ws;
           });
           f.va += fa * dt; f.a += f.va * dt; f.vb += fb * dt; f.b += f.vb * dt;
-          f.a = Math.max(-1.1, Math.min(1.1, f.a)); f.b = Math.max(-0.9, Math.min(0.9, f.b));
+          f.a = Math.max(-1.2, Math.min(1.2, f.a)); f.b = Math.max(-1.1, Math.min(1.1, f.b));
           f.p += Math.sin(et * 0.3 + f.ph) * 0.004 * dt;   // gleitet langsam am Rand entlang
           var life = f.s * Math.min(1, et / 0.06) * Math.exp(-et * 0.35) * (1 - Math.max(0, Math.min(1, (et - 3.4) / 1.8)));
           df1[i * 4] = f.x - sr.left; df1[i * 4 + 1] = f.y - sr.top; df1[i * 4 + 2] = f.base + f.a; df1[i * 4 + 3] = f.b / Math.max(1, f.L);
-          df2[i * 4] = f.L; df2[i * 4 + 1] = mn * (0.012 + 0.012 * f.s); df2[i * 4 + 2] = life * 1.6; df2[i * 4 + 3] = 0;
+          df2[i * 4] = f.L; df2[i * 4 + 1] = mn * (0.014 + 0.014 * f.s); df2[i * 4 + 2] = life * 2.0; df2[i * 4 + 3] = 0;   // klar, mit weichem Schein
         });
       }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
