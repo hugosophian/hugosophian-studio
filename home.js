@@ -116,6 +116,9 @@
     '[data-hp] .hp-go-sh * { color: inherit !important; text-shadow: none !important; }',
     '[data-hp] .hp-info-sun { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-scroll { display: flex; flex-direction: column; gap: 2.2vh; flex: 0 0 auto; }',
+    // Hugo 24.11. (14:56, Video): langer Text lief beim Scrollen unter dem Titel und unter «close» durch und war doppelt lesbar –
+    // der Text blendet jetzt oben unter dem Titel und unten über dem Knopf weich aus
+    '[data-hp]:not(.is-desk) .hp-info-panel { -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--hp-info-top, 30vh) - 2.5vh), #000 calc(var(--hp-info-top, 30vh) + 0.5vh), #000 calc(100% - 5vh - 6.5rem - env(safe-area-inset-bottom, 0px)), transparent calc(100% - 5vh - 4rem - env(safe-area-inset-bottom, 0px))); mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--hp-info-top, 30vh) - 2.5vh), #000 calc(var(--hp-info-top, 30vh) + 0.5vh), #000 calc(100% - 5vh - 6.5rem - env(safe-area-inset-bottom, 0px)), transparent calc(100% - 5vh - 4rem - env(safe-area-inset-bottom, 0px))); }',
     /* „Galerie öffnen“ im Stil von „Alle Projekte ↓“ der Library (gleiche Webflow-Klassen), Pfeil nach rechts */
     /* Schrift erbt „Alle Projekte“ in der Library vom Eltern-Element lib-top, darum hier dieselben Werte (live gemessen) */
     '[data-hp] .hp-info-go { color: inherit; text-decoration: none; align-self: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; display: flex; align-items: center; gap: .5em; font-family: "Oswald Studio", sans-serif; font-size: .8rem; font-weight: 500; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; }',
