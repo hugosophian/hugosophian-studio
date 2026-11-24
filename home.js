@@ -74,7 +74,6 @@
     diveMs:     1600,   // Dauer des Eintauchens (startet am Handy schon beim Tippen, zieht gleich an); zurück im Takt des Ausblendens
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
-    shimRim:    0.4,    // Hugo 24.11. (17:50): bunter Rand beim Schimmer (Öffnen/Schliessen) leicht sichtbar (Anteil vom Rand der Ladeanimation)
     shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
   };
 
@@ -984,7 +983,7 @@
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       var dockAmt = 1, dockFl = 1, dockRim = 1;
-      function dock(amt, fl, clr, rim) {
+      function dock(amt, fl, clr, rim, noWave) {
         dockAmt = amt == null ? 1 : amt; dockFl = fl == null ? dockAmt : fl; dockRim = rim == null ? 1 : rim; killT0 = 0;
         // Hugo 24.11. (14:35): beim Schliessen die alten Wellen (Tippen, Sonnenwelle) weg – sie lagen unter dem Licht und
         // wischten das Leuchten des Rands noch bis zu 6.5 s weg (darum kam es verzögert, wenn man früh schloss)
@@ -1012,9 +1011,8 @@
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
         }
-        // Hugo 24.11. (16:41): der Schimmer (ohne Rand-Leuchten) startet ausserhalb des Bildschirms und fährt nur nach innen –
-        // vorher lief er knapp am Rand entlang, wie gegen einen unsichtbaren Rahmen; die Ladeanimation bleibt unverändert
-        if (dockFl > 0) { if (dockRim >= 1) ring(0, 6, 0.2); else ring(0, Math.min(r.width, r.height) * 0.08, 0.3); }   // Hugo 23.11.: nur eine Explosion nach innen
+        // Hugo 24.11. (17:58): der Schimmer (noWave) zeigt nur das Licht des Aufpralls – ohne die Welle, die das Bild verzieht
+        if (dockFl > 0 && !noWave) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) req();
       }
       // Hugo 24.11.: Reihenfolge im Takt – der Effekt läuft immer nach step() (siehe kick). Hat er sich in diesem Takt
@@ -1037,7 +1035,7 @@
       // Hugo 24.11. (16:02): Öffnen und Schliessen – nur der Schimmer mit Solar Flares (wie nach dem close), kein Kreis,
       // kein Leuchten am Rand
       // Hugo 24.11. (16:15): ohne Rand-Leuchten (am iPhone sah man oben eine Lichtlinie)
-      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, CONFIG.shimRim); noEdge = true; };   // Hugo 24.11. (16:09): der Aufprall der Ladeanimation, halb so stark
+      cv.flareShimmer = function (over) { if (!over) lightOff(); else shimOn = true; dock(CONFIG.shimAmt, CONFIG.shimAmt, true, 1, true); noEdge = true; };   // Hugo 24.11. (16:09/17:58): das Licht der Ladeanimation (bunter Rand, Aufprall, Flare-Fäden) halb so stark, ohne Andocken und Verziehen
       var noEdge = false;   // close-Welle: kein Nachleuchten am Rand (Hugo 24.11., 16:01)
       function edgeOffV(now) { return noEdge ? 1 : lightMode && !pendingOff ? smoothstep(0, 0.25, (now - lightT0) / 1000) : 0; }
       cv.tint = function (v) { if (!v) shimOn = false; if (!raf) req(); };
