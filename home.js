@@ -644,7 +644,12 @@
         '  }',
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0;',
         '  if (uHas > 0.5) {',
-        '    vec2 sp = fc + off;',
+        // Hugo 24.11.: zum Bildschirmrand hin wird die Verschiebung nach aussen weich begrenzt (nie über die Kante) –
+        // sonst Spiegelmuster/ausgefranste Kanten am Rand. Nach innen bleibt sie unverändert.
+        '    vec2 dE = max(min(fc, uRes - fc), 0.0), sgE = sign(fc - uRes * 0.5 + 0.001);',
+        '    vec2 aO = max(off * sgE, 0.0);',   // Anteil nach aussen
+        '    vec2 offE = off - sgE * (aO - aO * dE / (dE + aO + 1e-3));',
+        '    vec2 sp = fc + offE;',
         '    vec2 u = (sp - uRect.xy) / uRect.zw;',
         // Hugo 24.11.: Leinwand = ganzer Bildschirm – was die Welle über den Rand hinaus holt, wird gespiegelt statt
         // ausgeblendet (sonst ausgefranste Kanten mit dem unverzerrten Bild darunter)
