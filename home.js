@@ -984,7 +984,7 @@
             // Hugo 24.11.: am Computer gleich snappig wie am Handy – dieselbe Kurve und dasselbe Tempo; die Bilder bremsen
             // weiter weg ab (84 % wie am Handy) und warten aufeinander, dann zieht der Magnet alle gemeinsam an
             var xM = clamp((P - 0.25 - 0.02 * j) / 0.61, 0, 1), xL = clamp((P - 0.25 - 0.02 * (n - 1)) / 0.61, 0, 1);
-            E = 0.81 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.19 * Math.pow(clamp((xL - 0.615) / 0.25, 0, 1), 6.2);   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
+            E = 0.81 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.19 * Math.pow(clamp((xL - 0.64) / 0.25, 0, 1), 6.2);   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
