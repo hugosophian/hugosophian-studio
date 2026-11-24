@@ -301,6 +301,7 @@
     // WebGL nachgezeichnet und an der Welle verschoben), um die Welle schimmert ein feiner Regenbogen.
     // Erreicht sie den Bildschirmrand, leuchten die Farben dort leicht auf, laufen am Rand weiter und erlöschen.
     // Ausserhalb der Wellen ist die Leinwand durchsichtig, man sieht das normale Bild.
+    var NDF = 7;   // Andock-Flares (Objekte)
     var ripple = (function () {
       if (reduce) return null;
       var cv = document.createElement('canvas'), c = null;
@@ -311,7 +312,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed;',
+        'uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform vec4 uDF[' + NDF + ']; uniform vec4 uDF2[' + NDF + '];',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -380,7 +381,7 @@
         '    float fl = dockW ? pow(n2(cs * 0.9 + vec2(fs, uT * 0.3)), 6.5) * 2.9 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
         '    float ln = 0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)));',   // Hugo 23.11.: kleinere Flares an der Welle
         '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? 0.06 : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd);',
-        '    if (dockW) faD = max(faD, fv); else fa = max(fa, fv);',   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
+        '    if (!dockW) fa = max(fa, fv);',   // Andock-Flares: eigene Objekte (siehe unten)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
         '  ph = rs > 0.0001 ? ph / rs : 0.0;',
         '  vec3 rb = rs > 0.0001 ? rbA / rs : vec3(0.5);',
@@ -389,6 +390,19 @@
         // bei der Fingerwelle) und das Andocken lässt weiche Solar Flares aus dem Rand schiessen. Die Flares bewegen sich
         // langsam und organisch; kommen sich zwei nahe, weichen sie einander wie Magnete aus (berechnet in draw()).
         '  vec3 eacc = vec3(0.0); float fI = 0.0;',
+        // Andock-Flares als einzelne Objekte (Hugo 24.11.): jede hat Fuss, Richtung, Biegung, Länge, Breite, Stärke;
+        // gebogene Zunge entlang einer Parabel. Richtung/Biegung kommen aus der Simulation in JS (Stärkere drängen Schwächere weg).
+        '  for (int i = 0; i < ' + NDF + '; i++) {',
+        '    vec4 fa1 = uDF[i]; vec4 fa2 = uDF2[i]; if (fa2.z <= 0.001) continue;',
+        '    vec2 fd = vec2(cos(fa1.z), sin(fa1.z)); vec2 fp = fc - fa1.xy;',
+        '    float fu = dot(fp, fd), fv2 = dot(fp, vec2(-fd.y, fd.x));',
+        '    if (fu < -fa2.y * 4.0 || fu > fa2.x * 1.8) continue;',
+        '    float fcv = fv2 - fa1.w * max(fu, 0.0) * max(fu, 0.0);',
+        '    float fuw = clamp(fu / fa2.x, 0.0, 1.6);',
+        '    float fwd = fa2.y * (1.0 + 0.7 * fuw) * (1.0 - 0.45 * smoothstep(0.6, 1.3, fuw));',
+        '    float fl2 = 0.8 + 0.2 * n2(vec2(fu * 0.04 - uT * 1.4, float(i) * 7.0));',
+        '    faD += exp(-fcv * fcv / (fwd * fwd)) * exp(-pow(max(fu, 0.0) / fa2.x, 1.6)) * smoothstep(-fa2.y * 2.0, fa2.y * 0.6, fu) * fa2.z * fl2;',
+        '  }',
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(3.6, 5.6, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
@@ -483,7 +497,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uDF', 'uDF2', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -520,7 +534,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, dockPath = null, DF = [], dfLast = 0, df1 = new Float32Array(NDF * 4), df2 = new Float32Array(NDF * 4), gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : 2;
@@ -597,10 +611,66 @@
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
+        if (et >= 0 && dockPath) dfStep(et, sr); else df2.fill(0);
+        c.uniform4fv(U.uDF, df1); c.uniform4fv(U.uDF2, df2);
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         if (waves.length || edgeT0) { c.drawArrays(c.TRIANGLE_STRIP, 0, 4); raf = requestAnimationFrame(draw); }
       }
       function ok() { return !desk && !root.classList.contains('is-info'); }
+      // Andock-Flares (Hugo 24.11.): einzelne Flares mit Stärke. Jede steht auf der Andock-Welle (läuft mit ihr nach innen),
+      // zeigt nach innen, schwenkt und biegt sich wie eine Flamme im Wind. Kommen sich zwei nahe, drängt die stärkere die
+      // schwächere weg – die schwächere biegt aus und dreht ab, die stärkere spürt kaum etwas. Danach schwingen sie zurück.
+      function dfInit() {
+        DF = []; dfLast = 0;
+        var strong = Math.random() < 0.5 ? 1 : 2;
+        for (var i = 0; i < NDF; i++) {
+          var big = i < strong, side = Math.random() < 0.5 ? -1 : 1;
+          DF.push({ p: (i + 0.15 + 0.7 * Math.random()) / NDF, s: big ? 0.9 + 0.1 * Math.random() : 0.3 + 0.35 * Math.random(),
+            a: (Math.random() - 0.5) * 0.6, va: 0, b: side * (0.25 + 0.3 * Math.random()), vb: 0, b0: 0, ph: Math.random() * 100 });
+          DF[i].b0 = DF[i].b;
+        }
+      }
+      function pathAt(p) {   // Punkt und Reichweite auf der geschlossenen Andock-Bahn, p in 0..1
+        var P = dockPath.pts, L = dockPath.len, d = ((p % 1) + 1) % 1 * L[L.length - 1];
+        for (var i = 1; i < P.length; i++) if (L[i] >= d) {
+          var t = (d - L[i - 1]) / Math.max(1e-3, L[i] - L[i - 1]);
+          return { x: P[i - 1].x + (P[i].x - P[i - 1].x) * t, y: P[i - 1].y + (P[i].y - P[i - 1].y) * t, m: P[i - 1].m + (P[i].m - P[i - 1].m) * t };
+        }
+        return P[0];
+      }
+      function dfStep(et, sr) {
+        if (!DF.length) dfInit();
+        var dt = dfLast ? Math.min(0.05, et - dfLast) : 0.016; dfLast = et;
+        var mn = dockPath.mn, cx = dockPath.cx, cy = dockPath.cy, trv = 1 - Math.exp(-et * 2.6);
+        var Lmax = mn * 0.42, tips = [];
+        DF.forEach(function (f, i) {
+          var q = pathAt(f.p), nx = cx - q.x, ny = cy - q.y, nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+          f.x = q.x + nx * mn * dockPath.reach * q.m * trv; f.y = q.y + ny * mn * dockPath.reach * q.m * trv;
+          f.base = Math.atan2(ny, nx); f.L = Lmax * (0.35 + 0.65 * f.s) * (0.25 + 0.75 * Math.min(1, et / 0.5));
+          var ang = f.base + f.a, tl = f.L * 0.75;
+          f.tx = f.x + Math.cos(ang) * tl - Math.sin(ang) * f.b * tl; f.ty = f.y + Math.sin(ang) * tl + Math.cos(ang) * f.b * tl;
+        });
+        DF.forEach(function (f, i) {
+          // Wind: langsames Schwenken und Biegen
+          var ta = Math.sin(et * 0.55 + f.ph) * 0.3, tb = f.b0 * (1 + 0.35 * Math.sin(et * 0.8 + f.ph * 1.3));
+          var fa = (ta - f.a) * 3.0 - f.va * 2.4, fb = (tb - f.b) * 3.0 - f.vb * 2.4;
+          DF.forEach(function (g, j) {
+            if (i === j) return;
+            var dx = f.tx - g.tx, dy = f.ty - g.ty, d = Math.hypot(dx, dy), R = mn * 0.28;
+            if (d > R) return;
+            var push = (1 - d / R) * (g.s / (f.s + g.s)) * 2;   // je stärker der andere, desto mehr werde ich weggedrückt
+            var ang = f.base + f.a, cr = Math.cos(ang) * dy - Math.sin(ang) * dx;   // auf welcher Seite liegt der andere
+            var sg = cr > 0 ? -1 : 1;
+            fa += sg * push * 9.0; fb += sg * push * 7.0;
+          });
+          f.va += fa * dt; f.a += f.va * dt; f.vb += fb * dt; f.b += f.vb * dt;
+          f.a = Math.max(-1.1, Math.min(1.1, f.a)); f.b = Math.max(-0.9, Math.min(0.9, f.b));
+          f.p += Math.sin(et * 0.3 + f.ph) * 0.004 * dt;   // gleitet langsam am Rand entlang
+          var life = f.s * Math.min(1, et / 0.06) * Math.exp(-et * 0.35) * (1 - Math.max(0, Math.min(1, (et - 3.4) / 1.8)));
+          df1[i * 4] = f.x - sr.left; df1[i * 4 + 1] = f.y - sr.top; df1[i * 4 + 2] = f.base + f.a; df1[i * 4 + 3] = f.b / Math.max(1, f.L);
+          df2[i * 4] = f.L; df2[i * 4 + 1] = mn * (0.012 + 0.012 * f.s); df2[i * 4 + 2] = life * 1.6; df2[i * 4 + 3] = 0;
+        });
+      }
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
       function dock() {
         var cs = slides[current()]; if (!cs) return;
@@ -625,6 +695,8 @@
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
+          var Lc = [0]; for (var q = 1; q < pts.length; q++) Lc.push(Lc[q - 1] + Math.hypot(pts[q].x - pts[q - 1].x, pts[q].y - pts[q - 1].y));
+          dockPath = { pts: pts, len: Lc, mn: Math.min(w2, h2), reach: reach, cx: r.left + w2 / 2, cy: r.top + h2 / 2 }; DF = [];
         }
         ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) raf = requestAnimationFrame(draw);
