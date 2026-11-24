@@ -932,8 +932,9 @@
           k = j;
           ax = W / 2 + (j - (n - 1) / 2) * (aw + g) - aw / 2;
           bx = j * W / n; by = 0; bw = W / n; bh = H;
-          E = easeDock(clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1));
-          minE = Math.min(minE, E);   // Hugo 24.11.: Karten-Einflug am Computer wie bisher, nur das Andocken leuchtet
+          var xD = clamp((P - 0.25 - 0.02 * j) / 0.69, 0, 1);
+          E = LD ? easeMagnet(xD) : easeDock(xD);   // Hugo 24.11.: auch am Computer magnetisch einrasten
+          minE = Math.min(minE, E);
         } else {
           var r = rel(j);
           aw = W * (LC ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LC ? CONFIG.ldStripH : CONFIG.stripH);
@@ -964,6 +965,11 @@
         // beim Aufgehen kommt das Bild zum Vorschein
         // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
         if (LD && !desk && rel(j) === 0 && E > 0.978) LD.dock();   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
+        // Hugo 24.11.: Lichtschein am Rand, während die Karten aufgehen, auch am Computer (dort ohne weisse Karten)
+        if (LD && desk) {
+          var rimD = 1 - smoothstep(0.6, 1, E);
+          s.el.style.boxShadow = rimD > 0.01 ? '0 0 ' + (5 + 12 * rimD).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rimD).toFixed(3) + ')' : '';
+        }
         if (s.gold) {
           var gv = 1 - smoothstep(0.07 + 0.02 * k, 0.15 + 0.02 * k, P), rim = 1 - smoothstep(0.6, 1, E);   // Hugo 24.11.: Weiss nur kurz – die Bilder sind schon da, bevor die Karten herangezogen werden
           s.gold.style.opacity = gv.toFixed(3);
