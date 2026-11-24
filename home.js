@@ -785,7 +785,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, lockS = null, gImg = null, slowEma = 16, lastT = 0, slowN = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : (desk ? 1.5 : 2);   // Computer: ganze Bildschirmfläche, darum etwas gröber starten
@@ -794,6 +794,8 @@
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
         // dem Finger und wird erst festgelegt, wenn der Finger ein Stück weiter ist; ist die Bahn voll, wird sie
         // ausgedünnt statt angehalten, so geht auch ein langer Zug bis zum Schluss mit
+        // Hugo 24.11.: Punkte relativ zur Leinwand (zum Bild) – beim Wischen fährt die Welle mit ihrem Bild mit
+        var cr = cv.getBoundingClientRect(); x -= cr.left; y -= cr.top;
         var now = performance.now(), pts = wv.pts, last = pts[pts.length - 1];
         if (!last) { pts.push({ x: x, y: y, t: now }); wv.sp = 14; }
         else {
@@ -815,7 +817,8 @@
         raf = 0;
         waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
         // immer im gerade gezeigten Bild (auch nach dem Wischen): Leinwand dorthin, dessen Foto als Textur
-        var cs = desk ? null : slides[current()];
+        if (!waves.length && !edgeT0) lockS = null;
+        var cs = desk ? null : (lockS || slides[current()]);   // Hugo 24.11.: bleibt im Bild, in dem der Effekt begann
         if (desk) deskCanvas();
         if (cs) { if (cs.img !== gImg) { gImg = cs.img; } var md0 = cs.media; if (md0 && cv.previousSibling !== md0) md0.parentNode.insertBefore(cv, md0.nextSibling); }
         if (!cv.parentNode) stage.appendChild(cv);
@@ -844,10 +847,10 @@
           var cx = 0, cy = 0, rr = 0, np = wv ? wv.pts.length : 0;
           for (var j0 = 0; j0 < np; j0++) { cx += wv.pts[j0].x; cy += wv.pts[j0].y; }
           if (np) { cx /= np; cy /= np; for (j0 = 0; j0 < np; j0++) rr = Math.max(rr, Math.hypot(wv.pts[j0].x - cx, wv.pts[j0].y - cy)); }
-          bnd[k * 4] = cx - sr.left; bnd[k * 4 + 1] = cy - sr.top; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = (wv && wv.sp2) || 1;   // < 0: Andock-Welle (Reichweite)   // Tempo der Welle (Andocken: schneller)
+          bnd[k * 4] = cx; bnd[k * 4 + 1] = cy; bnd[k * 4 + 2] = rr; bnd[k * 4 + 3] = (wv && wv.sp2) || 1;   // < 0: Andock-Welle (Reichweite)   // Tempo der Welle (Andocken: schneller)
           for (var j = 0; j < PW; j++) {
             var i = k * PW + j, q = wv && wv.pts[j];
-            if (q) { buf[i * 4] = q.x - sr.left; buf[i * 4 + 1] = q.y - sr.top; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.m || 1; }
+            if (q) { buf[i * 4] = q.x; buf[i * 4 + 1] = q.y; buf[i * 4 + 2] = (now - q.t) / 1000; buf[i * 4 + 3] = q.m || 1; }
             else buf[i * 4 + 3] = 0;
           }
         }
@@ -891,7 +894,7 @@
         var cs = slides[current()]; if (!cs) return;
         if (desk) { deskCanvas(); compSig = ''; }
         else {
-          gImg = cs.img; texFor(gImg);
+          gImg = cs.img; texFor(gImg); lockS = cs;
           var md = cs.media; if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
         }
         edgeT0 = performance.now(); edgeSeed = Math.floor(Math.random() * 97);
@@ -909,7 +912,7 @@
             var ex = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), ey = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
             var k = 1 - 0.03 * (1 + Math.sin(th * 3 + ph1)) - 0.02 * (1 + Math.sin(th * 5 + ph2)) - Math.pow(Math.random(), 2) * 0.03;
             var x = w2 / 2 + ex * (w2 / 2 + inset) * k, y = h2 / 2 + ey * (h2 / 2 + inset) * k;
-            pts.push({ x: r.left + x, y: r.top + y, t: now - Math.random() * 220, m: 0.15 + 1.1 * Math.pow(Math.random(), 1.6) });   // nicht so tief, dass sich die Seiten in der Mitte treffen
+            pts.push({ x: x, y: y, t: now - Math.random() * 220, m: 0.15 + 1.1 * Math.pow(Math.random(), 1.6) });   // nicht so tief, dass sich die Seiten in der Mitte treffen
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
           waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
@@ -922,6 +925,9 @@
       stage.addEventListener('touchstart', function (e) {
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
         var t = e.touches[0], cs = slides[current()], im = (cs && cs.img) || imgAt(t.clientX, t.clientY);
+        // Hugo 24.11.: Berührung in einem anderen Bild – was im alten (schon weggewischten) Bild lief, endet dort
+        if (lockS && lockS !== cs) { waves = []; edgeT0 = 0; killT0 = 0; }
+        lockS = cs;
         if (im !== gImg) { gImg = im; texFor(gImg); }
         var md = cs ? cs.media : (gImg && gImg.closest('.hp-media'));
         if (md && cv.previousSibling !== md) md.parentNode.insertBefore(cv, md.nextSibling);
