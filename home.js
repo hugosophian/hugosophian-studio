@@ -298,7 +298,7 @@
       }
     })();
     var hov = -1, deskMoving = false;
-    var introOn = !reduce, introT0 = 0, introP = 0, LD = null;
+    var introOn = !reduce, introT0 = 0, introP = 0, LD = null, introHit = false;
     function wrap(x) { return ((x % n) + n) % n; }
     function rel(j) { var d = wrap(j - F); return d > n / 2 ? d - n : d; }
     function current() { return wrap(Math.round(F)); }
@@ -993,7 +993,7 @@
         // Ladeanimation (Hugo 23.11.): weisse Vierecke mit leuchtendem Rand, wie Türen, durch die Licht fällt;
         // beim Aufgehen kommt das Bild zum Vorschein
         // erst wenn das Bild sichtbar angedockt ist (Rand am Bildschirmrand), leuchtet der Rand auf
-        if (LD && !desk && rel(j) === 0 && E > 0.978) LD.dock();   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
+        if (LD && !desk && rel(j) === 0 && E > 0.978) { LD.dock(); introHit = true; }   // einen Hauch vor dem Kontakt: Knall und Aufprall gleichzeitig
         // Hugo 24.11.: Lichtschein am Rand, während die Karten aufgehen, auch am Computer (dort ohne weisse Karten)
         if (LD && desk) {
           // Hugo 24.11. (10:10): halb so stark, bleibt bis kurz vor dem Ziel sichtbar und wird dabei kleiner; verschwindet erst beim Andocken
@@ -1008,7 +1008,7 @@
           s.el.style.boxShadow = rim > 0.01 ? '0 0 ' + (5 + 12 * rim).toFixed(1) + 'px 0 rgba(255,250,238,' + (0.5 * rim).toFixed(3) + ')' : '';
         }
       }
-      if (LD && desk && minE > 0.978) LD.dock();   // Computer: Knall, sobald auch die äussersten Karten einrasten
+      if (LD && desk && minE > 0.978) { LD.dock(); introHit = true; }   // Computer: Knall, sobald auch die äussersten Karten einrasten
     }
 
     // Handy: durchgehender Streifen, Bild zoomt nach Tempo (wie Mario). Ohne Bewegungsunschärfe (Hugo 23.11.)
@@ -1066,7 +1066,8 @@
         if (!introT0) introT0 = now;
         introP = clamp((now - introT0) / CONFIG.introMs, 0, 1);
 
-        if (introP >= ((LD && !desk && CONFIG.ldCards) ? 0.87 : 1)) endIntro(); else more = true;   // Handy: Heranzoomen ist bei 0.85 fertig
+        // Hugo 24.11.: der Einflug endet im Moment des Andockens – Bild steht sofort an seinem Platz, der Titel bewegt sich nicht mehr
+        if (introHit || introP >= ((LD && !desk && CONFIG.ldCards) ? 0.87 : 1)) endIntro(); else more = true;   // Handy: Heranzoomen ist bei 0.85 fertig
       } else if (desk) {
         deskMoving = false;
         var k = CONFIG.deskStiff, c = 2 * Math.sqrt(k) * CONFIG.deskDamp;
