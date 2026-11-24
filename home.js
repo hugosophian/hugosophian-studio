@@ -51,8 +51,9 @@
     introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
     vtDelay:    0,      // nach „zum Studio“: Animation so viel später (ms); 0 = sofort, die alte Seite ist dann schon weg (Hugo 17:12)
-    stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
-    stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
+    stripW:     0.105,  // Säule: Breite (Anteil Bildschirm) – Hugo 24.11.: näher (vorher 0.07)
+    stripH:     0.128,  // Säule: Höhe pro Bild (Anteil Bildschirm) – vorher 0.085
+    ldCards:    false,  // Hugo 24.11.: false = Handy-Einflug wie am Computer (Bilder gleich sichtbar), true = weisse Karten mit Magnet
     ldStripW:   0.038,  // Ladeanimation (Hugo 23.11.): Karten starten weiter weg, also kleiner
     ldStripH:   0.046,
     // Desktop
@@ -922,7 +923,7 @@
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild
     function renderIntro() {
-      var P = introP, minE = 1;
+      var P = introP, minE = 1, LC = LD && CONFIG.ldCards;   // LC: weisse Karten mit Magnet (Handy)
       for (var j = 0; j < n; j++) {
         var s = slides[j], ax, ay, aw, ah, bx, by, bw, bh, k, E;
         if (desk) {
@@ -935,24 +936,24 @@
           minE = Math.min(minE, E);   // Hugo 24.11.: Karten-Einflug am Computer wie bisher, nur das Andocken leuchtet
         } else {
           var r = rel(j);
-          aw = W * (LD ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LD ? CONFIG.ldStripH : CONFIG.stripH);
+          aw = W * (LC ? CONFIG.ldStripW : CONFIG.stripW); ah = H * (LC ? CONFIG.ldStripH : CONFIG.stripH);
           k = r + Math.floor(n / 2);
           ax = (W - aw) / 2;
           bx = 0; by = r * H; bw = W; bh = H;
           // Ladeanimation (Hugo 23.11.): versetzt – die mittlere Karte führt, die äusseren hängen unterwegs etwas nach
           // und holen bis zum Einrasten wieder auf
-          var x0i = LD ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
-          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LD ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
-          E = LD ? easeMagnet(xj) : easeDock(xin);
-          ay = H / 2 + r * (ah + (LD ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
+          var x0i = LC ? 0.17 : 0.25;   // Ladeanimation: die kleine Säule steht kürzer (mehr Spannung)
+          var xin = clamp((P - x0i) / (1 - x0i), 0, 1), xj = LC ? clamp(xin - 0.085 * Math.abs(r) * Math.sin(Math.PI * xin), 0, 1) : xin;
+          E = LC ? easeMagnet(xj) : easeDock(xin);
+          ay = H / 2 + r * (ah + (LC ? 0 : 4));   // Ladeanimation: Abstand siehe gapY
         }
-        var ap = (LD && !desk) ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
+        var ap = (LC && !desk) ? easeOut(clamp((P - 0.025 * k) / 0.14, 0, 1)) : easeOut(clamp((P - 0.035 * k) / 0.2, 0, 1));
         var hA = ah * ap;
         var cy = desk ? H / 2 : ay;
         ay = cy - hA / 2;
         // Ladeanimation: der Abstand zwischen den Karten wächst mit ihnen mit und schliesst sich erst beim Einrasten
         var gapY = 0;
-        if (LD && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
+        if (LC && !desk) gapY = rel(j) * 2.5 * (lerp(hA, bh, E) / ah) * (1 - magnetPull(xj));
         rect(s, lerp(ax, bx, E), lerp(ay, by, E) + gapY, lerp(aw, bw, E), lerp(hA, bh, E));
         s.el.style.transform = 'none';
         s.el.style.zIndex = desk ? 2 : (rel(j) === 0 ? 3 : Math.abs(rel(j)) === 1 ? 2 : 1);   // äussere Karten liegen hinter inneren   // äussere Karten liegen hinter inneren
@@ -1892,7 +1893,7 @@
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
       if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
-      if (!desk) slides.forEach(function (s) {
+      if (!desk && CONFIG.ldCards) slides.forEach(function (s) {
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');
         if (s.media && s.media.nextSibling) s.el.insertBefore(g, s.media.nextSibling); else s.el.appendChild(g);
         s.gold = g;
