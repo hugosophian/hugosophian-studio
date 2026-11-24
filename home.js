@@ -348,9 +348,38 @@
         '  float k = 1.0 - 4.0 * dl * dl;',   // läuft zur Grenze hin sauber auf 0 aus (keine Nahtlinien)
         '  return smoothstep(0.7, 1.0, h2(vec2(id, sd * 1.7))) * dl * exp(-dl * dl / 0.16) * k * k;',
         '}',
+        // Hugo 24.11. (Video 8:21): Kollision statt Kreuzen. Für einen Faden wird geprüft, ob er auf dem Weg vom Ursprung
+        // bis hier einen Faden der anderen Schar überquert hat. War jener stärker, endet er dort (der Stärkere nimmt ihn mit),
+        // nur seine Spitze wird seitlich weggepeitscht und verglimmt. War jener schwächer, leuchtet er danach kräftiger weiter.
+        // Y = (psi der anderen Schar hier, psi am eigenen Ursprung, |grad psi|, Seed); D = (Richtung der anderen Schar, Zeit)
+        'void flX(float str, vec4 Y, vec3 D, vec2 c, float et, vec2 fc, vec2 dx, float sn, out float dp, out float bo) {',
+        '  dp = 0.0; bo = 0.0;',
+        '  if (Y.w < -0.5) return;',
+        '  float lo = min(Y.x, Y.y), hi = max(Y.x, Y.y), k0 = floor(lo) + 1.0;',
+        '  float smy = 0.5 * (abs(D.x) * uRes.x + abs(D.y) * uRes.y) / min(uRes.x, uRes.y), sy = dot(c, D.xy);',
+        '  for (int k = 0; k < 8; k++) {',
+        '    float iy = k0 + float(k);',
+        '    if (iy >= hi) break;',
+        '    float hy = h2(vec2(iy, Y.w * 1.7));',
+        '    if (hy < 0.7) continue;',
+        '    float hry = h2(vec2(iy + 11.0, Y.w)), sty = smoothstep(0.7, 1.0, hy);',
+        '    float sfy = -smy + 2.0 * smy * (0.4 + 0.9 * hry * (0.5 + 0.5 * sty)) * (1.0 - exp(-et * 1.3));',
+        '    if (sy > sfy + 0.1) continue;',   // der andere ist dort noch gar nicht angekommen
+        '    float dd = abs(Y.x - iy) / max(Y.z, 1e-4);',
+        '    vec2 cp = fc - dx * dd / max(sn, 0.3);',   // wo der Zusammenstoss war – nur sichtbare Zusammenstösse im Bild zählen
+        '    float mg = min(uRes.x, uRes.y) * (0.04 + 0.13 * (1.0 - exp(-et * 1.8)));',
+        '    if (cp.x < mg || cp.y < mg || cp.x > uRes.x - mg || cp.y > uRes.y - mg) continue;',
+        '    if (sty > str + 0.04) dp = max(dp, dd); else bo = 1.0;',
+        '  }',
+        '}',
+        'vec2 flO(vec2 fc, vec2 d) {',
+        '  float mn = min(uRes.x, uRes.y); vec2 c = (fc - uRes * 0.5) / mn;',
+        '  float s = dot(c, d), smx = 0.5 * (abs(d.x) * uRes.x + abs(d.y) * uRes.y) / mn;',
+        '  return fc - d * (s + smx) * mn;',
+        '}',
         // Hugo 24.11.: jeder Pixel prüft den eigenen und die beiden Nachbar-Fäden – sonst wird der Lichtsaum an der Grenze
         // zwischen zwei Fäden hart abgeschnitten (sichtbarer Rand neben den Flares)
-        'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, out vec3 tint) {',
+        'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, vec4 Y1, vec3 D1, float n1, vec4 Y2, vec3 D2, float n2s, out vec3 tint) {',
         '  tint = vec3(0.0);',
         '  float mn = min(res.x, res.y); vec2 d = vec2(cos(an), sin(an)), c = (fc - res * 0.5) / mn;',
         '  float ps = P.x; vec2 gp = vec2(P.y - ps, P.z - ps) / 1.5;',
@@ -381,7 +410,17 @@
         '    }',
         '    fib *= 0.75 + 0.35 * sin(s * 8.0 - t * 2.0 + id * 1.7);',
         '    float flick = 0.8 + 0.2 * n2(vec2(s * 6.0 - t * 1.5, id * 3.0));',
-        '    sv += (0.6 * thin + 0.6 * fib) * (1.0 - smoothstep(sf - 0.3, sf, s)) * flick * (0.5 + 0.55 * str);',
+        '    float dp1, bo1, dp2, bo2; flX(str, Y1, D1, c, et, fc, d, n1, dp1, bo1); flX(str, Y2, D2, c, et, fc, d, n2s, dp2, bo2);',
+        '    float dp = max(dp1, dp2), sn = dp1 > dp2 ? n1 : n2s, keep = 1.0, tip = 0.0;',
+        '    if (dp > 0.0) {',
+        '      float ds = dp / mn / max(sn, 0.3);',                                  // Weg seit dem Zusammenstoss
+        '      keep = exp(-(dp / mn) / 0.025);',                                      // geht weich im Stärkeren auf
+        '      float tsh = (0.12 + ds * 2.2) * (hr > 0.5 ? 1.0 : -1.0);',            // Spitze peitscht seitlich weg
+        '      float td = (ps - id - tsh) / gl;',
+        '      tip = smoothstep(sf - 0.18, sf - 0.05, s) * exp(-ds / 0.2) * exp(-td * td / (swd * swd * 1.4)) * 0.9;',
+        '    }',
+        '    float boo = 1.0 + 0.4 * max(bo1, bo2);',                                 // der Stärkere nimmt den Schwung mit
+        '    sv += ((0.6 * thin + 0.6 * fib) * keep * boo + tip) * (1.0 - smoothstep(sf - 0.3, sf, s)) * flick * (0.5 + 0.55 * str);',
         '  }',
         '  sv *= base;',
         '  vec2 o = c - d * (s + smx); o = normalize(o * mn + vec2(0.001));',                  // Ursprung am Rand
@@ -542,13 +581,19 @@
         '      float att = 3.0 * smoothstep(0.2, 1.2, et);',   // Anziehung wächst, sobald sie unterwegs sind
         '      vec3 QA = PA + att * vec3(flPull(PB.x, sB), flPull(PB.y, sB), flPull(PB.z, sB));',
         '      vec3 QB = PB + att * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
-        '      float vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, tA);',
-        '      float vB = flFam(fc, uRes, tB0, et, ee, sB, a0 + 3.1416 + 0.35 * sw, QB, tB);',
+        '      float vA = 0.0, vB = 0.0;',
         '      vec3 tC; float sC = uSeed + 13.1, tC0 = uT * 0.93 + 9.0, aC = a0 + 1.5708 * sw + 0.3;',
         '      vec2 dC = vec2(cos(aC), sin(aC));',
         '      vec3 PC = vec3(flPsi(fc, uRes, tC0, dC, sw, sC), flPsi(fc + o1, uRes, tC0, dC, sw, sC), flPsi(fc + o2, uRes, tC0, dC, sw, sC));',
         '      PC += att * 0.8 * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
-        '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, tC);',
+        '      float aB = a0 + 3.1416 + 0.35 * sw, nAC = abs(sin(aC - a0)), nBC = abs(sin(aC - aB));',
+        '      float gA = length(vec2(QA.y - QA.x, QA.z - QA.x)) / 1.5, gB = length(vec2(QB.y - QB.x, QB.z - QB.x)) / 1.5, gC = length(vec2(PC.y - PC.x, PC.z - PC.x)) / 1.5;',
+        '      vec2 oA = flO(fc, dA), oB = flO(fc, dB), oC = flO(fc, dC);',
+        '      vec4 off4 = vec4(0.0, 0.0, 1.0, -1.0); vec3 off3 = vec3(1.0, 0.0, 0.0);',
+        '      vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, vec4(PC.x, flPsi(oA, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nAC, off4, off3, 1.0, tA);',
+        '      vB = flFam(fc, uRes, tB0, et, ee, sB, aB, QB, vec4(PC.x, flPsi(oB, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nBC, off4, off3, 1.0, tB);',
+        '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, vec4(QA.x, flPsi(oC, uRes, uT, dA, sw, sA), gA, sA), vec3(dA, 0.0), nAC,',
+        '                                 vec4(QB.x, flPsi(oC, uRes, tB0, dB, -sw, sB), gB, sB), vec3(dB, 0.0), nBC, tC);',
         '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1));',   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
         '      float wfc = 0.04 + 0.13 * (1.0 - exp(-et * 1.8)), dw = (ee / mnS - wfc) / 0.07;',
         '      float sb = max(1.0 - smoothstep(0.03, 0.3, ee / mnS), 0.85 * exp(-dw * dw));',
