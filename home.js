@@ -2092,6 +2092,7 @@
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
+      infoScroll.style.transition = 'none'; infoScroll.style.opacity = '';
       // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben rechts neben
       // „Hugo Sophian Studio“ fahren. Der Text steht ebenfalls rechts davon, unter dem Schriftzug bleibt es leer.
       var rr = root.getBoundingClientRect();
@@ -2199,6 +2200,8 @@
       // unten auf der Seite (das Original kommt mit der Seite unter dem ausblendenden Licht zum Vorschein)
       if (tClone && tClone.getAnimations) tClone.getAnimations().forEach(function (an) { if (an.effect && an.effect.getKeyframes && an.effect.getKeyframes().length > 2) an.cancel(); });
       if (tClone) { tClone.style.transition = 'opacity ' + ((reduce ? 0 : CONFIG.closeBeam) / 1000) + 's ease'; tClone.style.opacity = '0'; }
+      // Hugo 24.11. (14:12): auch der Text verschwindet im Licht des Strahls (sonst schien er beim Ausblenden noch durch)
+      infoScroll.style.transition = 'opacity ' + ((reduce ? 0 : CONFIG.closeBeam) / 1000) + 's ease'; infoScroll.style.opacity = '0';
       clearTimeout(sunT); clearTimeout(sunL); if (sun) { sun.title(null); sun.light(false); sun.blind(); }
       closeRipple();
       clearTimeout(infoT);
