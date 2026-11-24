@@ -392,12 +392,12 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(2.6, 4.4, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
-        '    float flash = 2.3 * exp(-et * 3.2) + 0.5 * exp(-et * 0.45);',   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float flash = 1.5 * exp(-et * 3.2) + 0.5 * exp(-et * 0.45);',   // Hugo 24.11.: weniger weiss   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
         '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
-        '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.25 + 0.4 * egm);',
+        '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.15 + 0.3 * egm);',   // satter bunt
         // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
         '    float bw = 0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0));',
@@ -464,7 +464,7 @@
         '    float fdv = clamp(faD, 0.0, 1.2);',
         '    lit = mix(lit, lit * vec3(1.0, 0.9, 0.68), fdv * 0.45 * lum) + vec3(1.0, 0.93, 0.8) * fdv * (0.18 + 0.42 * dk);',
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
-        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.6) + eacc * (0.45 + 0.7 * dk);',   // auf Dunklem deutlicher      // Andock-Licht: färbt auch Weiss golden
+        '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * 0.75) + eacc * (0.28 + 0.55 * dk);',   // färbt mehr, hellt weniger auf (nicht weiss)      // Andock-Licht: färbt auch Weiss golden
         // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         '    col = lit * cov; al = cov;',
