@@ -385,7 +385,7 @@
         '}',
         // Hugo 24.11.: jeder Pixel prüft den eigenen und die beiden Nachbar-Fäden – sonst wird der Lichtsaum an der Grenze
         // zwischen zwei Fäden hart abgeschnitten (sichtbarer Rand neben den Flares)
-        'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, vec4 Y1, vec3 D1, float n1, vec4 Y2, vec3 D2, float n2s, out vec3 tint) {',
+        'float flFam(vec2 fc, vec2 res, float t, float et, float ee, float sd, float an, vec3 P, float rp, vec4 Y1, vec3 D1, float n1, vec4 Y2, vec3 D2, float n2s, out vec3 tint) {',
         '  tint = vec3(0.0);',
         '  float mn = min(res.x, res.y); vec2 d = vec2(cos(an), sin(an)), c = (fc - res * 0.5) / mn;',
         '  float ps = P.x; vec2 gp = vec2(P.y - ps, P.z - ps) / 1.5;',
@@ -425,12 +425,16 @@
         '    float dp = f1 ? dp1 : dp2, pw = f1 ? pw1 : pw2, sn = f1 ? n1 : n2s, keep = min(kp1, kp2), tip = 0.0;',
         '    if (dp > 0.0) {',
         '      float ds = dp / mn / max(sn, 0.3);',                                  // Weg seit dem Zusammenstoss
-        '      float tsh = (0.12 + ds * 2.2) * (hr > 0.5 ? 1.0 : -1.0);',            // Spitze peitscht seitlich weg
-        '      float td = (ps - id - tsh) / gl;',
-        '      tip = smoothstep(sf - 0.18, sf - 0.05, s) * exp(-ds / 0.2) * exp(-td * td / (swd * swd * 1.4)) * 0.9 * pw;',
+        // Hugo 24.11. (8:32/8:40): das abgeworfene Stück ist nicht mehr magnetisch (ungezogenes psi) – es rollt sich als
+        // Korona-Bogen ein und verglimmt mit weichem Schweif ins Nichts; prallt nirgends mehr an
+        '      float L = max(sf - s + ds, 0.01);',                                    // Länge seit dem Zusammenstoss
+        '      float sg = hr > 0.5 ? 1.0 : -1.0, cur = sg * (0.06 + 7.0 * ds * ds);',   // Bogen: biegt zur Spitze hin stärker ab
+        '      float td = (rp - id - cur) / gl;',
+        '      float tail = smoothstep(0.0, 0.7 * L, ds);',                           // Schweif läuft zum Ursprung hin ins Nichts
+        '      tip = tail * (1.0 - smoothstep(sf - 0.06, sf + 0.02, s)) * exp(-L / 0.32) * exp(-td * td / (swd * swd * 1.8)) * 0.85 * pw;',
         '    }',
         '    float boo = 1.0 + 0.4 * max(bo1, bo2);',                                 // der Stärkere nimmt den Schwung mit
-        '    sv += ((0.6 * thin + 0.6 * fib) * keep * boo + tip) * (1.0 - smoothstep(sf - 0.3, sf, s)) * flick * (0.5 + 0.55 * str);',
+        '    sv += ((0.6 * thin + 0.6 * fib) * keep * boo * (1.0 - smoothstep(sf - 0.3, sf, s)) + tip) * flick * (0.5 + 0.55 * str);',
         '  }',
         '  sv *= base;',
         '  vec2 o = c - d * (s + smx); o = normalize(o * mn + vec2(0.001));',                  // Ursprung am Rand
@@ -595,14 +599,15 @@
         '      vec3 tC; float sC = uSeed + 13.1, tC0 = uT * 0.93 + 9.0, aC = a0 + 1.5708 * sw + 0.3;',
         '      vec2 dC = vec2(cos(aC), sin(aC));',
         '      vec3 PC = vec3(flPsi(fc, uRes, tC0, dC, sw, sC), flPsi(fc + o1, uRes, tC0, dC, sw, sC), flPsi(fc + o2, uRes, tC0, dC, sw, sC));',
+        '      float PC0 = PC.x;',
         '      PC += att * 0.8 * vec3(flPull(PA.x, sA), flPull(PA.y, sA), flPull(PA.z, sA));',
         '      float aB = a0 + 3.1416 + 0.35 * sw, nAC = abs(sin(aC - a0)), nBC = abs(sin(aC - aB));',
         '      float gA = length(vec2(QA.y - QA.x, QA.z - QA.x)) / 1.5, gB = length(vec2(QB.y - QB.x, QB.z - QB.x)) / 1.5, gC = length(vec2(PC.y - PC.x, PC.z - PC.x)) / 1.5;',
         '      vec2 oA = flO(fc, dA), oB = flO(fc, dB), oC = flO(fc, dC);',
         '      vec4 off4 = vec4(0.0, 0.0, 1.0, -1.0); vec3 off3 = vec3(1.0, 0.0, 0.0);',
-        '      vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, vec4(PC.x, flPsi(oA, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nAC, off4, off3, 1.0, tA);',
-        '      vB = flFam(fc, uRes, tB0, et, ee, sB, aB, QB, vec4(PC.x, flPsi(oB, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nBC, off4, off3, 1.0, tB);',
-        '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, vec4(QA.x, flPsi(oC, uRes, uT, dA, sw, sA), gA, sA), vec3(dA, 0.0), nAC,',
+        '      vA = flFam(fc, uRes, uT, et, ee, sA, a0, QA, PA.x, vec4(PC.x, flPsi(oA, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nAC, off4, off3, 1.0, tA);',
+        '      vB = flFam(fc, uRes, tB0, et, ee, sB, aB, QB, PB.x, vec4(PC.x, flPsi(oB, uRes, tC0, dC, sw, sC), gC, sC), vec3(dC, 0.0), nBC, off4, off3, 1.0, tB);',
+        '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, PC0, vec4(QA.x, flPsi(oC, uRes, uT, dA, sw, sA), gA, sA), vec3(dA, 0.0), nAC,',
         '                                 vec4(QB.x, flPsi(oC, uRes, tB0, dB, -sw, sB), gB, sB), vec3(dB, 0.0), nBC, tC);',
         '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1));',   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
         '      float wfc = 0.04 + 0.13 * (1.0 - exp(-et * 1.8)), dw = (ee / mnS - wfc) / 0.07;',
