@@ -737,7 +737,9 @@
         '    bool fW = uB[k].w > 0.0;',
         '    float gk = fW ? clamp(sm, 0.05, 1.35) : 1.0, gA = fW ? mix(0.2, 1.2, gk) : 1.0;',
         '    float wk = fW ? mx * min(0.006 + 0.032 * sa, 0.072) * mix(0.32, 1.35, gk) : w;',
-        '    float gD = fW ? mix(0.12, 1.25, gk * gk) : 1.0;',   // Verzerrung des Bildes: kleine Welle deutlich weniger als die stärkste
+        '    float gD = fW ? mix(0.12, 1.25, gk * gk) : 1.0;',
+        // Hugo 25.11. (18:10): die stärksten Wellen etwas kräftiger (Verzerrung +30 %, Licht +25 %), schwächere unverändert
+        '    float gS = fW ? smoothstep(0.75, 1.0, gk) : 0.0; gD *= 1.0 + 0.3 * gS; gA *= 1.0 + 0.25 * gS;',   // Verzerrung des Bildes: kleine Welle deutlich weniger als die stärkste
         '    float x = best / wk;',
         // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
         '    bool dockW = uB[k].w < 0.0;',
