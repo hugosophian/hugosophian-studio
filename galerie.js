@@ -738,12 +738,12 @@
       var L = t / CONFIG.needleMs;
       if (L < 1) {
         if (!NEEDLE_P) { NEEDLE_P = new Path2D(NEEDLE_D); CORE_P = new Path2D(CORE_D); }
-        var la = L < 0.06 ? L / 0.06 : Math.pow(1 - (L - 0.06) / 0.94, 2.2), W2 = VW * DPR, sx = W2 / 1000 * (1 + 0.06 * OUT3(L));
+        var la = L < 0.06 ? L / 0.06 : Math.pow(1 - (L - 0.06) / 0.94, 2.2), W2 = VW * DPR, sx = W2 / 1000 * (0.15 + 0.95 * OUT3(L));   // Hugo 10:01: schiesst aus der Mitte heraus und ist weg, bevor die Enden aussen ankommen
         var thick = 18 * DPR * (2.6 - 1.6 * OUT3(Math.min(1, L * 1.6))), sy = thick / 20;
         ctx.globalCompositeOperation = 'screen';
         // Schein (wie .hp-crt-streak)
         ctx.globalAlpha = la * 0.85;
-        ctx.setTransform(1, 0, 0, 0.06 * (1 + 0.8 * (1 - L)), cx, cy);
+        ctx.setTransform(0.15 + 0.95 * OUT3(L), 0, 0, 0.06 * (1 + 0.8 * (1 - L)), cx, cy);
         g = ctx.createRadialGradient(0, 0, 0, 0, 0, W2 * 0.8);
         g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(.18, 'rgba(225,205,255,.5)'); g.addColorStop(.45, 'rgba(140,200,255,.14)'); g.addColorStop(.7, 'rgba(0,0,0,0)');
         ctx.fillStyle = g; ctx.fillRect(-W2 * 0.8, -W2 * 0.8, W2 * 1.6, W2 * 1.6);
