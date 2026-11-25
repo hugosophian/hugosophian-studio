@@ -69,6 +69,7 @@
     shakeMs:    380,
     maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
     follow:     0.38,
+    homeEase:   0.075,  // Hugo 10:33: Zurückgleiten auf 100 % nach Tippen neben ein Bild (Anteil pro Bild bei 60 fps, kleiner = weicher)
     // Hugo 25.11. (08:26): Zoom, um an hintere Bilder heranzugehen und wieder heraus. Zwei Finger (Handy), Trackpad-Pinch
     // oder Ctrl + Mausrad (Computer), Tasten + und −. Vordere Bilder wachsen schneller als hintere (Tiefe zoomt mit).
     zoomMin:    0.45,   // ganz heraus
@@ -659,12 +660,12 @@
       } else if (mode === 'idle') {
         if (!drag) inertia(dtf);
         // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
-        var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
+        var k = 1 - Math.pow(1 - (glide ? CONFIG.homeEase : CONFIG.follow), dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
         var km = 1 - Math.pow(1 - CONFIG.mouseEase, dtf), kf = 1 - Math.pow(1 - CONFIG.focusEase, dtf);
         if (Z > 1.01 || tZ > 1.01) { var fd = focusDepth(); if (fd != null) tdF = fd; }
         var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3 || Math.abs(tmo.x - mo.x) > .03 || Math.abs(tmo.y - mo.y) > .03;
         if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * kf; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
-        else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; }
+        else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; glide = false; }
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
       } else if (dirty) {   // Vorschau offen: nur neu malen, wenn sich etwas ändert (Karte aus-/eingeblendet)
@@ -903,11 +904,12 @@
           if (!pinch && mode === 'idle') {
             var g0 = pinchGeo(); pinch = { d0: g0.d, r0: zr, x: g0.x, y: g0.y };
             down = null; drag = null; root.classList.remove('is-dragging'); vel.x = vel.y = 0;
-            tgt.x = cam.x; tgt.y = cam.y; tZ = Z;
+            tgt.x = cam.x; tgt.y = cam.y; tZ = Z; glide = false;
           }
           return;
         }
       }
+      if (glide) { glide = false; tZ = Z; zr = Math.log(Z); tgt.x = cam.x; tgt.y = cam.y; }   // neues Antippen/Ziehen fängt das Zurückgleiten dort auf, wo es gerade ist
       down = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse', lx: e.clientX, ly: e.clientY, t: performance.now(), moved: false };
       vel.x = vel.y = 0;
       tgt.x = cam.x; tgt.y = cam.y;   // fängt die Fläche dort, wo man sie sieht
@@ -988,7 +990,13 @@
       redraw();
     });
     wheel.addEventListener('focusout', function () { focusSlot = null; redraw(); });
-    function tap(x, y) { var sl = slotAt(x, y); if (sl) openPreview(sl); }
+    // Hugo 10:33: neben ein Bild tippen → Zoom gleitet weich zurück auf die normale Entfernung (100 %), um die Bildschirmmitte
+    var glide = false;
+    function tap(x, y) {
+      var sl = slotAt(x, y);
+      if (sl) { openPreview(sl); return; }
+      if (Math.abs(zr) > 0.01 || Math.abs(tZ - 1) > 0.01) { var o = cv.getBoundingClientRect(); zoomRaw(o.left + VW / 2, o.top + VH / 2, 0); glide = true; kick(); }
+    }
 
     // Trackpad und Mausrad: Fläche verschieben
     root.addEventListener('wheel', function (e) {
