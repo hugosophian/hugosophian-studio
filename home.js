@@ -203,15 +203,14 @@
     /* Hugo 12:21: Scroll-Leiste links vom Text, schillernd wie die Horizont-Linie der Fernseher-Animation (gleiche Farben,
        feine Spitzen oben und unten, weicher Schein). Nur sichtbar, wenn der Text länger ist als sein Bereich; beim Scrollen kräftiger. */
     '[data-hp] .hp-sbar-wrap { position: absolute; inset: 0; pointer-events: none; z-index: 3; }',
-    '[data-hp] .hp-sbar { position: absolute; width: 2px; border-radius: 2px; background: rgba(0,0,0,.07); opacity: 0; transition: opacity .5s ease; pointer-events: none; }',
-    '[data-hp] .hp-sbar.is-on { opacity: .7; }',
+    /* Hugo 12:36: schlicht wie bei Apple – schmale Pille mit runden Enden, ohne Schiene, ohne Schein, ohne ausblendende Spitzen;
+       der Griff stösst oben und unten genau an das Ende des Bereichs. Farben wie die Horizont-Linie, wandern nur mit dem Scrollen. */
+    '[data-hp] .hp-sbar { position: absolute; width: 3px; opacity: 0; transition: opacity .4s ease; pointer-events: none; }',
+    '[data-hp] .hp-sbar.is-on { opacity: .75; }',
     '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
-    '[data-hp] .hp-sbar i { position: absolute; left: -1.5px; width: 5px; top: 0; border-radius: 5px; will-change: transform;',
+    '[data-hp] .hp-sbar i { position: absolute; left: 0; width: 3px; top: 0; border-radius: 3px; will-change: transform;',
     '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #a9c4ff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
-    '  background-size: 100% 260%; background-repeat: repeat-y; }',   /* Hugo 12:28: Farben wandern nur mit dem Scrollen (Lage aus der Scroll-Position, makeSbar), keine Zeit-Animation */
-    '[data-hp] .hp-sbar i {',
-    '  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);',
-    '  filter: drop-shadow(0 0 3px rgba(173,140,255,.85)) drop-shadow(0 0 9px rgba(148,208,255,.6)); }',
+    '  background-size: 100% 100%; background-repeat: repeat-y; }',   /* Hugo 12:36: alle Farben auf einmal im Griff sichtbar */
     /* Hugo 12:26: ohne weissen Kern und ohne Weiss im Verlauf */
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
@@ -2928,7 +2927,7 @@
           if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
           var tl = Math.max(36, h * ch / sh), p = Math.max(0, Math.min(1, st / (sh - ch)));
           th.style.height = tl.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((h - tl) * p).toFixed(1) + 'px,0)';
-          var tile = tl * 2.6; th.style.backgroundPosition = '0 ' + (-((st * 0.45) % tile)).toFixed(1) + 'px';
+          var tile = tl; th.style.backgroundPosition = '0 ' + (-((st * 0.45) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
