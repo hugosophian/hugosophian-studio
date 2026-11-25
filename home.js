@@ -207,13 +207,13 @@
     '[data-hp] .hp-sbar.is-on { opacity: .7; }',
     '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
     '[data-hp] .hp-sbar i { position: absolute; left: -1.5px; width: 5px; top: 0; border-radius: 5px; will-change: transform;',
-    '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #ffffff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
+    '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #a9c4ff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
     '  background-size: 100% 260%; animation: hpSbarIri 2.4s linear infinite; animation-play-state: paused; }',
     '[data-hp] .hp-sbar.is-active i { animation-play-state: running; }',   /* Hugo 12:24: Farben wandern nur beim Scrollen */
     '[data-hp] .hp-sbar i {',
     '  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);',
     '  filter: drop-shadow(0 0 3px rgba(173,140,255,.85)) drop-shadow(0 0 9px rgba(148,208,255,.6)); }',
-    '[data-hp] .hp-sbar i::after { content: ""; position: absolute; left: 1.5px; width: 2px; top: 30%; bottom: 30%; border-radius: 2px; background: #fff; opacity: .9; }',
+    /* Hugo 12:26: ohne weissen Kern und ohne Weiss im Verlauf */
     '@keyframes hpSbarIri { from { background-position: 0 0; } to { background-position: 0 -260%; } }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-sbar i { animation: none; } }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
