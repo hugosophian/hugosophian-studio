@@ -50,7 +50,9 @@
     // Einflug
     introMs:    3000,   // Dauer (Aufziehen wie Mario: 2.25 s mit Kurve 0.72, 0, 0.11, 1)
     introWait:  1500,   // höchstens so lange auf die Bilder warten (ms)
-    vtDelay:    0,      // nach „zum Studio“: Animation so viel später (ms); 0 = sofort, die alte Seite ist dann schon weg (Hugo 17:12)
+    // Hugo 25.11. (09:24): «zum Studio» soll immer die ganze Ladeanimation zeigen. Die alte Seite gleitet 0.8 s weg und
+    // verdeckte so den Anfang der Animation → sie startet erst, wenn die alte Seite weg ist (vorher 0)
+    vtDelay:    780,    // nach „zum Studio“: Animation so viel später (ms)
     stripW:     0.07,   // Säule: Breite (Anteil Bildschirm)
     stripH:     0.085,  // Säule: Höhe pro Bild (Anteil Bildschirm)
     ldCards:    true,   // Hugo 24.11.: true = weisse Karten mit Magnet (Handy), false = Einflug wie am Computer
