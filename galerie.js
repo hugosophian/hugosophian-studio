@@ -26,6 +26,11 @@
     // Hugo 25.11. (07:00): Bilder ohne weissen Rahmen (die Vorschau geht weiterhin weiss aus dem Bild auf) und näher zusammen
     size:      { desktop: [0.5, 0.85], mobile: [0.48, 0.78] },   // Kartengrösse: Anteil der Grösse aus dem Designer (lib-img 30vh / 46vw)
     cell:      { desktop: 1.4, mobile: 1.32 },   // Hugo 25.11. (07:03): wieder etwas mehr Abstand (vorher 1.18 / 1.12)   // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
+    // Hugo 25.11. (07:44): breite Bilder etwas kleiner, schmale (hochkant) etwas grösser – alle haben im Designer die
+    // gleiche Höhe, darum wirken breite riesig und schmale winzig. Grösse × (Breite/Höhe) hoch −aspectEven,
+    // begrenzt auf aspectRange. 0 = wie vorher. Beispiel 0.35: 3:2 quer → 87 %, 16:9 → 82 %, 2:3 hoch → 115 %, 9:16 → 122 %.
+    aspectEven:  0.35,
+    aspectRange: [0.8, 1.25],
     jitter:    0.5,     // wie weit eine Karte von ihrem Rasterplatz abweicht (Anteil vom Raster)
     holes:     0.08,    // Anteil leerer Rasterplätze
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
@@ -287,6 +292,10 @@
         p.el.style.transform = t;
       });
     }
+    function aspectF(p) {
+      var ar = p.w && p.h ? p.w / p.h : 1;
+      return clamp(Math.pow(ar, -CONFIG.aspectEven), CONFIG.aspectRange[0], CONFIG.aspectRange[1]);
+    }
     function order(n, R) {
       // Projekte in gemischter Reihenfolge, nie zweimal dasselbe direkt nebeneinander (wenn möglich)
       var out = [], bag = [];
@@ -310,7 +319,7 @@
       if (!projects.length) return;
       var sz = mob ? CONFIG.size.mobile : CONFIG.size.desktop;
       var avgW = 0, maxD = 0;
-      projects.forEach(function (p) { avgW += p.w; maxD = Math.max(maxD, Math.hypot(p.w, p.h)); });
+      projects.forEach(function (p) { p.af = aspectF(p); avgW += p.w * p.af; maxD = Math.max(maxD, Math.hypot(p.w, p.h)); });
       avgW = avgW / projects.length * (sz[0] + sz[1]) / 2;
       var few = clamp((CONFIG.fewFrom - projects.length) / (CONFIG.fewFrom - 2), 0, 1);
       var cell = avgW * (mob ? CONFIG.cell.mobile : CONFIG.cell.desktop) * (1 + CONFIG.fewCell * few);
@@ -328,7 +337,7 @@
         var inRow = Math.min(cols, n - r * cols), rowOff = (cols - inRow) * cell / 2;   // letzte Reihe mittig
         for (var c = 0; c < inRow; c++) {
           var p = list[k++], el = p.el;
-          var s = sz[0] + R() * (sz[1] - sz[0]);
+          var s = (sz[0] + R() * (sz[1] - sz[0])) * p.af;
           var d = CONFIG.depth[0] + R() * (CONFIG.depth[1] - CONFIG.depth[0]);
           slots.push({
             p: p, el: el, a: el.querySelector('a.lib-card') || el.querySelector('a'), img: el.querySelector('img'),
