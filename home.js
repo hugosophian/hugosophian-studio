@@ -674,7 +674,7 @@
         // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
         '  float tr = sp > 0.0 ? z * mx * 0.15 * sp * mix(0.45, 1.3, clamp(mix(a.w, b.w, t), 0.0, 1.35)) : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Hugo 25.11. (08:26): ruhige Welle läuft weniger weit, kräftige weiter   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
         '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
-        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
+        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo;',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
@@ -841,6 +841,7 @@
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
         '    off += (nin * sin(wph) + vec2(-nin.y, nin.x) * 0.5 * cos(wph * 0.7 + 1.3)) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
         '  }',
+        '  off *= uGo; eacc *= uGo; faD *= uGo;',
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0, alD = 0.0;',
         '  if (uHas > 0.5) {',
         // Hugo 24.11.: zum Bildschirmrand hin wird die Verschiebung nach aussen weich begrenzt (nie über die Kante) –
@@ -870,7 +871,7 @@
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
         '  edge *= (1.0 - uEdgeOff) * uWE;',
-        '  fa *= uWF; halo *= uWL; ring *= uWL;',   // Hugo 25.11.: Licht der Fingerwelle zurückgenommen   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
+        '  fa *= uWF * uGo; halo *= uWL * uGo; ring *= uWL * uGo; edge *= uGo;',   // Hugo 25.11.: Licht der Fingerwelle zurückgenommen   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
         '  float glow = clamp(ring * 1.0 + edge * 1.9, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
@@ -913,7 +914,14 @@
         '    float ea = clamp(max(eacc.r, max(eacc.g, eacc.b)), 0.0, 1.0);',
         '    lit = lit * mix(vec3(1.0), eacc / max(ea, 0.001), ea * (0.75 + 0.15 * lum)) + eacc * (0.1 + 0.73 * dk);',   // färbt mehr, hellt weniger auf (nicht weiss)      // Andock-Licht: färbt auch Weiss golden
         // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
+        // Hugo 25.11. (16:58): alles verschmilzt – das Licht wird weich aufaddiert (nie hart ins Weiss abgeschnitten, sich
+        // kreuzende Lichter gehen ineinander über statt heller Streifen); Abdunkeln/Einfärben bleibt wie es war
+        '    vec3 dl = lit - base, hr = max(1.0 - base, vec3(0.02));',
+        '    lit = base + min(dl, 0.0) + hr * (1.0 - exp(-max(dl, 0.0) * 1.15 / hr));',
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
+        // eine deckende Fläche: das ganze Foto kommt aus der Leinwand (keine halbdurchsichtige Kopie über dem Original →
+        // keine dunklen Säume, keine Doppelkanten, kein Rauch, wo sich Wellen kreuzen)
+        '    cov = mix(cov, here, uCov);',
         '    col = lit * cov; al = cov;',
         '  } else {',
         '    col = col + gc * (1.0 - al * 0.4) + eacc;',
@@ -939,7 +947,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop', 'uCov', 'uGo'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -952,7 +960,7 @@
         if (cv.parentNode !== stage) stage.appendChild(cv);
         cv.style.zIndex = '4';
       }
-      var comp = document.createElement('canvas'), cctx = comp.getContext('2d'), compSig = '', compOk = false, compCrop = null;
+      var comp = document.createElement('canvas'), cctx = comp.getContext('2d'), compSig = '', compOk = false, compCrop = null, compFull = false;
       function srcOf(img) { return img && (img.currentSrc || img.src); }
       function loadAll() {
         slides.forEach(function (sl) {
@@ -983,7 +991,7 @@
           dk = dvS.dv.k; qx = mr.left + mr.width / 2 + dk * dvS.dv.px; qy = mr.top + mr.height / 2 + dk * dvS.dv.py;   // Zoom-Mittelpunkt
           compCrop = [(qx - sr.left) / sr.width * (1 - 1 / dk), (qy - sr.top) / sr.height * (1 - 1 / dk), 1 / dk, 1 / dk];
         } else compCrop = null;
-        var sc = desk ? 1 : Math.min(1.5, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var sc = desk ? 1 : Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
@@ -998,11 +1006,11 @@
         // Andocken die Nachbarkarte, die hinter dem Bild ein paar Pixel übersteht, im Effekt obenauf (Linie oben/unten)
         parts.sort(function (a, b) { return a.z - b.z || a.i - b.i; });
         if (sig === compSig) return compOk;
-        compSig = sig;
+        compSig = sig; compFull = sig.indexOf('|-') < 0;
         if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
         cctx.fillStyle = '#000'; cctx.fillRect(0, 0, cw2, ch2);
         parts.forEach(function (p) {
-          var srcI = p.e.sm || p.e.im, iw = p.e.sm ? p.e.sm.width : (p.e.im.naturalWidth || 1), ih = p.e.sm ? p.e.sm.height : (p.e.im.naturalHeight || 1), ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
+          var useSm = p.e.sm && weak, srcI = useSm ? p.e.sm : p.e.im, iw = useSm ? p.e.sm.width : (p.e.im.naturalWidth || 1), ih = useSm ? p.e.sm.height : (p.e.im.naturalHeight || 1), ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
           var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
           var op = objPos(p.im), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
           cctx.save();
@@ -1027,7 +1035,7 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0, covV = 0, covT = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
       var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
@@ -1117,6 +1125,16 @@
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
         c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uSoft, dockSoft); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uWL, CONFIG.waveLight); c.uniform1f(U.uWE, CONFIG.waveEdge); c.uniform1f(U.uWF, CONFIG.waveFlares); c.uniform1f(U.uEdgeOff, edgeOffV(now)); c.uniform1f(U.uRim, dockRim);   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
+        // Hugo 25.11. (16:58): eine Fläche – solange der Effekt läuft, deckt die Leinwand das Foto ganz (uCov). Zum Schluss
+        // klingt erst alles gemeinsam aus (uGo → das Bild steht still und klar), dann blendet die Fläche unmerklich zum Foto
+        var endT = 0;
+        waves.forEach(function (wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; endT = Math.max(endT, la + (wv.sp2 < 0 ? 5600 : 5000)); });
+        if (edgeT0) endT = Math.max(endT, edgeT0 + 6000);
+        var cdt = covT ? Math.min(100, now - covT) : 16; covT = now;
+        if (lightMode || !compFull || !(waves.length || edgeT0)) covV = 0;
+        else covV = now < endT ? Math.min(1, covV + cdt / 120) : Math.max(0, covV - cdt / 350);
+        c.uniform1f(U.uCov, covV); c.uniform1f(U.uGo, lightMode ? 1 : 1 - sm01(endT - 1400, endT, now));
+        if (!lightMode && endT && now >= endT && covV <= 0) { waves = []; edgeT0 = 0; killT0 = 0; }
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
         if (pendingOff && !on) lightOff();
