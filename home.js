@@ -1952,7 +1952,7 @@
     // Appelgren (Code nachgeschaut): jedes Wort steigt mit easeOutQuart 22 px auf und blendet ein, versetzt nach seiner
     // Reihenfolge; beim Verlassen easeInOutCubic aus und 28 px nach oben. Hier: beim Öffnen des About laufen die sichtbaren
     // Wörter zeitlich gestaffelt ein, beim Scrollen langer Texte kommen die Wörter unten genauso herein und gehen oben hinaus.
-    var lines = [], words = [], linesRaf = 0, linesOrig = '', wordsT0 = 0;
+    var lines = [], words = [], linesRaf = 0, linesOrig = '', wordsT0 = 0, infoZB = 0;
     function infoLines() {
       linesOrig = infoText.innerHTML; lines = []; words = [];
       [].forEach.call(infoText.querySelectorAll('p'), function (p) {
@@ -1970,6 +1970,12 @@
         W.y = t; W.h = W.el.offsetHeight || 20; W.k = k++; W.line = li; W.x = W.el.offsetLeft;
       });
       lines = words;
+      // Hugo 13:16: am Ende ragte Text über «Galerie öffnen» (die Zone war unter den Rand geschoben). Jetzt: läuft der Text über,
+      // bekommt er unten Luft in Höhe der Einblend-Zone – am Ende steht die letzte Zeile ganz sichtbar über der Zone, nichts springt.
+      infoText.style.paddingBottom = '';
+      var pcs = getComputedStyle(infoPanel), pTop = parseFloat(pcs.paddingTop) || 0, pBot = Math.min(infoPanel.clientHeight - (parseFloat(pcs.paddingBottom) || 0), infoFix.offsetTop - 12);
+      infoZB = 0;
+      if (infoPanel.scrollHeight > infoPanel.clientHeight + 2) { infoZB = Math.max(40, (pBot - pTop) * 0.35); infoText.style.paddingBottom = Math.round(infoZB) + 'px'; }
       // Reihenfolge fürs Einlaufen: nur die beim Öffnen sichtbaren Wörter zählen (r = 0 … 1)
       var H2 = infoPanel.clientHeight, vis = words.filter(function (W) { return W.y + W.h < H2; });
       var n = Math.max(1, vis.length - 1); vis.forEach(function (W, i) { W.r = i / n; });
@@ -1993,15 +1999,16 @@
       // Hugo 13:09: unten «tauschte» es plötzlich – die Zone wurde zum Ende hin schmaler (an den Rest gekoppelt), dadurch sprangen
       // Wörter auf voll. Jetzt bleibt die Zone gleich gross und gleitet zum Ende hin unter den Rand (shB), stetig. Breiter wie bei
       // Appelgren (Hereinkommen über ~45 % der Höhe, easeOutQuart): die Zeilen rollen wie eine Welle herein.
-      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.max(40, (botB - topB) * 0.45), shB = Math.max(0, zB + 70 - rem), more = false;
+      var zB = infoZB, more = false;
       words.forEach(function (W) {
         var y = W.y - st, tin = 1;
         // Hugo 13:01: oben normal ausblenden (ganze Zeile gleich), unten die Treppe – stufenlos nach der Lage im Satz (x),
         // so läuft eine weiche Welle durch die Zeichen wie bei perappelgren.de (dort: Wort-Reihenfolge über den ganzen Text)
-        var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
-        var sin = reduce ? 1 : eOQ(clamp((botB + shB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB, 0, 1));
+        // Hugo 13:16 (Appelgren Bild für Bild): beim Gehen steht die Zeile schräg – links früher weg, rechts später (~7 px Höhenunterschied)
+        var out = reduce ? 0 : eIOC(clamp((oS - y - 0.08 * (W.x || 0) * g) / zT, 0, 1));
+        var sin = (reduce || !zB) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB, 0, 1));
         var inn = Math.min(tin, sin);
-        var o = reduce ? Math.min(smooth(oE, oS, y), smooth(botB + shB, botB + shB - zB, y + W.h)) : inn * (1 - out);
+        var o = reduce ? Math.min(smooth(oE, oS, y), zB ? smooth(botB, botB - zB, y + W.h) : 1) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = o.toFixed(3);
@@ -2920,11 +2927,12 @@
       slides.forEach(function (s) {
         var sin = s.sideIn, box = sin && sin.querySelector('.hp-side-box'), t = box && box.querySelector('.hp-intro-text'); if (!t) return;
         if (s.sideOrig != null) t.innerHTML = s.sideOrig; else s.sideOrig = t.innerHTML;
-        s.sideWords = null; box.scrollTop = 0;
+        s.sideWords = null; box.scrollTop = 0; t.style.paddingBottom = ''; s.sideZB = 0;
         var over = box.scrollHeight > box.clientHeight + 2;
         sin.classList.toggle('is-scroll', over);
         if (!s.sbar) s.sbar = makeSbar(sin);
         if (!over) { s.sbar.hide(); return; }
+        s.sideZB = Math.max(40, box.clientHeight * 0.35); t.style.paddingBottom = Math.round(s.sideZB) + 'px';   // Luft am Ende (13:16)
         s.sbarSt = 0;
         var ps = t.querySelectorAll('p'); if (!ps.length) ps = [t];
         var ws = [];
@@ -2982,10 +2990,10 @@
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
       var oE = -4 + 34 * g, oS = 140 * g, zT = Math.max(4, oS - oE);   // Welle wie am Handy (12:56)
-      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.max(40, H2 * 0.45), shB = Math.max(0, zB + 70 - rem);   // wie am Handy (13:09)
+      var zB = s.sideZB || 0;
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y) / zT), inn = q((H2 + shB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB);
+        var out = q((oS - y - 0.08 * (W.x || 0) * g) / zT), inn = zB ? q((H2 - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB) : 1;
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
