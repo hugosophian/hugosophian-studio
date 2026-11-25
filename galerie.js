@@ -38,12 +38,16 @@
     tapSlop:    8,      // bis so viele px gilt es als Antippen
     edgeGuard:  24,     // iPhone: Wischen am Rand nicht als «Zurück» (px)
     // Laden und Urknall
-    dotMinMs:   280,    // Lichtpunkt steht mindestens so lange
+    // Hugo 25.11. (06:54): alles fliesst ineinander. Punkt lädt sich auf (solange die Seite lädt), fällt zusammen,
+    // kurzer Blitz, ein schillernder Ring rast als Druckwelle nach aussen – dahinter sofort Schwarz (kein Grau mehr).
+    dotMinMs:   0,      // keine Mindestzeit: der Punkt stand schon auf der Homepage
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
-    implodeMs:  150,    // Punkt fällt in sich zusammen
-    silenceMs:  70,     // Stille vor dem Knall
-    sphereMs:   260,    // Lichtkugel füllt den Bildschirm
-    fadeMs:     380,    // Licht blendet aus (Hugo 25.11.: 700 ms wirkte grau und matt)
+    chargeMs:   1400,   // so lange lädt sich der Punkt auf (heller, grösser, pulsiert schneller)
+    chargeGrow: 0.45,   // so viel grösser wird er dabei
+    implodeMs:  170,    // Punkt fällt in sich zusammen (wird dabei schneller)
+    silenceMs:  0,      // keine Pause: der Blitz setzt im Moment des Zusammenfalls ein
+    flashMs:    260,    // Blitz: kommt in 50 ms, klingt in dieser Zeit aus
+    ringMs:     720,    // Druckwelle: Ring bis über den Bildschirmrand
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
     spin:       70,     // Drehung beim Start (Grad, ±)
@@ -64,9 +68,11 @@
     '[data-lib] { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }',
     '[data-lib] .lib-stage { height: 100% !important; overflow: hidden; }',
     '[data-lib] .lib-wheel { position: absolute; inset: 0; z-index: 1; transition: opacity .65s ease, filter .65s ease; }',
-    '[data-lib] .gx-sphere { position: absolute; left: 50%; top: 50%; border-radius: 50%; z-index: 0; pointer-events: none; opacity: 0;',
-    // Hugo 25.11.: Knall mit schillerndem Rand (gleiche Farben wie die Nadel auf der Homepage)
-    '  background: radial-gradient(circle, #fff 0, #fff 50%, #ffd6f3 56%, #ff8fe0 59%, #b9a0ff 62%, #8fdcff 65%, #9cf7cf 67.5%, #fff09a 70%, rgba(255,240,160,0) 73%); transform: translate(-50%,-50%) scale(0); }',
+    // Knall: Blitz (weiches Licht aus der Mitte) und Druckwelle (schillernder Ring, gleiche Farben wie die Nadel)
+    '[data-lib] .gx-flash { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;',
+    '  background: radial-gradient(circle at 50% 50%, #fff 0, rgba(255,255,255,.9) 18%, rgba(240,225,255,.45) 45%, rgba(160,200,255,.12) 70%, rgba(0,0,0,0) 90%); }',
+    '[data-lib] .gx-ring { position: absolute; left: 0; top: 0; border-radius: 50%; z-index: 0; pointer-events: none; opacity: 0; will-change: transform, opacity;',
+    '  background: radial-gradient(circle closest-side, rgba(255,255,255,0) 72%, rgba(255,214,243,.5) 80%, #ff8fe0 84%, #b9a0ff 88%, #8fdcff 92%, #9cf7cf 95%, #fff09a 98%, rgba(255,240,160,0) 100%); }',
     '[data-lib] .lib-item { position: absolute; left: 0; top: 0; visibility: hidden; opacity: 0; will-change: transform; transform-origin: 50% 50%; backface-visibility: hidden; }',
     '[data-lib] .lib-item.is-vis { visibility: visible; }',
     '[data-lib] .lib-item.is-off { visibility: hidden; }',
@@ -172,9 +178,10 @@
     var mouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     root.classList.toggle('is-mouse', mouse);
 
-    var sphere = document.createElement('div'); sphere.className = 'gx-sphere'; sphere.setAttribute('aria-hidden', 'true');
+    var flash = document.createElement('div'); flash.className = 'gx-flash'; flash.setAttribute('aria-hidden', 'true');
+    var ring = document.createElement('div'); ring.className = 'gx-ring'; ring.setAttribute('aria-hidden', 'true');
     var wheel = document.createElement('div'); wheel.className = 'lib-wheel';
-    stage.appendChild(sphere); stage.appendChild(wheel);
+    stage.appendChild(flash); stage.appendChild(ring); stage.appendChild(wheel);
 
     // ---------- Projekte einlesen (nur aus dem eigenen Ordner) ----------
     var folder = root.getAttribute('data-lib-folder') || '';
@@ -212,7 +219,7 @@
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0;
     var cam = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
     var mode = 'load';            // load | bang | idle | gather | pv
-    var raf = 0, last = 0, bangAt = 0, gatherAt = 0, debris = [];
+    var raf = 0, last = 0, bangAt = 0, gatherAt = 0, debris = [], ringR = 0;
 
     // ---------- Masse und Anordnung ----------
     // Kartengrösse aus dem Designer (Karte mit weissem Rand, Bild mit fester Höhe, Breite nach Seitenverhältnis)
@@ -312,9 +319,13 @@
 
       if (mode === 'bang') {
         var tb = now - bangAt;
-        var sp = clamp(tb / CONFIG.sphereMs, 0, 1);
-        sphere.style.transform = 'translate(-50%,-50%) scale(' + easeOutCubic(sp).toFixed(4) + ')';
-        sphere.style.opacity = sp < 1 ? '1' : (1 - clamp((tb - CONFIG.sphereMs) / CONFIG.fadeMs, 0, 1)).toFixed(3);
+        // Blitz: in 50 ms da, klingt weich aus
+        var fo = tb < 50 ? tb / 50 : 1 - easeOutCubic(clamp((tb - 50) / CONFIG.flashMs, 0, 1));
+        flash.style.opacity = fo.toFixed(3);
+        // Druckwelle: schnell los, bremst nach aussen, wird dabei durchsichtig
+        var rq = clamp(tb / CONFIG.ringMs, 0, 1), re = easeOutCubic(rq);
+        ring.style.transform = 'translate3d(' + (cx - ringR).toFixed(1) + 'px,' + (cy - ringR).toFixed(1) + 'px,0) scale(' + (0.02 + 0.98 * re).toFixed(4) + ')';
+        ring.style.opacity = (rq < .06 ? rq / .06 : 1 - clamp((rq - .3) / .7, 0, 1)).toFixed(3);
         var sk = Math.max(0, 1 - tb / CONFIG.shakeMs) * CONFIG.shakePx;
         wheel.style.transform = sk ? 'translate3d(' + ((Math.random() - .5) * 2 * sk).toFixed(1) + 'px,' + ((Math.random() - .5) * 2 * sk).toFixed(1) + 'px,0)' : '';
         debris.forEach(function (d) {
@@ -333,8 +344,8 @@
           place(sl, cx + (f.x - cx) * e, cy + (f.y - cy) * e, sl.s0 / sl.s + (1 - sl.s0 / sl.s) * es, sl.rot * (1 - e));
         }
         if (tb > 300 && !root.classList.contains('is-in')) { root.classList.add('is-in'); mbShow(); }
-        if (done && tb > CONFIG.sphereMs + CONFIG.fadeMs) {
-          mode = 'idle'; wheel.style.transform = ''; sphere.style.opacity = '0';
+        if (done && tb > Math.max(CONFIG.ringMs, CONFIG.flashMs + 50)) {
+          mode = 'idle'; wheel.style.transform = ''; flash.style.opacity = '0'; ring.style.opacity = '0';
           debris.forEach(function (d) { d.el.remove(); }); debris = [];
         }
         more = true;
@@ -371,9 +382,8 @@
         slots.forEach(function (sl) { sl.el.classList.add('is-vis'); sl.el.style.opacity = '1'; var f = pos(sl); place(sl, f.x, f.y, 1, 0); });
         mode = 'idle'; root.classList.add('is-in'); mbShow(); return;
       }
-      var diag = Math.hypot(VW, VH) * 1.5;
-      sphere.style.width = sphere.style.height = diag + 'px';
-      sphere.style.left = VW / 2 + 'px'; sphere.style.top = VH / 2 + 'px';
+      ringR = Math.hypot(VW, VH) * 0.62;   // Ring endet knapp ausserhalb der Ecken
+      ring.style.width = ring.style.height = 2 * ringR + 'px';
       slots.forEach(function (sl) { sl.el.style.opacity = '0'; sl.el.classList.add('is-vis'); });
       // Trümmer: ein paar Bilder fliegen an der Kamera vorbei
       debris = [];
@@ -393,14 +403,17 @@
     }
     // Punkt fällt zusammen, Stille, dann Knall
     function implode(then) {
+      chargeStop();
       if (reduce || !dot) { then(); return; }
+      var k0 = dotScale || 1.25;
       dot.classList.add('is-go');
       var t0 = performance.now();
       (function f(now) {
         var t = (now - t0) / CONFIG.implodeMs;
-        if (t < 1) { dot.style.transform = 'scale(' + (1.25 - 1.17 * easeInCubic(t)).toFixed(3) + ')'; requestAnimationFrame(f); return; }
+        // kurz noch etwas grösser (holt Luft), dann immer schneller zusammen
+        if (t < 1) { var k = t < .18 ? k0 * (1 + .12 * Math.sin(t / .18 * Math.PI / 2)) : k0 * 1.12 * (1 - easeInCubic((t - .18) / .82)) + .04; dot.style.transform = 'scale(' + k.toFixed(3) + ')'; requestAnimationFrame(f); return; }
         dot.style.opacity = '0';
-        setTimeout(then, CONFIG.silenceMs);
+        if (CONFIG.silenceMs) setTimeout(then, CONFIG.silenceMs); else then();
       })(t0);
     }
 
@@ -605,7 +618,8 @@
       showDot();
       if (dot) { dot.style.animation = 'none'; dot.style.transform = 'scale(1.3)'; }
       select(); build();
-      setTimeout(function () { implode(bang); }, 120);
+      chargeStart(260);   // kurz aufladen, dann Knall
+      setTimeout(function () { implode(bang); }, 260);
     }
 
     // ---------- Vorschau (wie library.js) ----------
@@ -767,8 +781,27 @@
       location.href = href;
     });
 
+    // ---------- Punkt lädt sich auf, solange die Seite lädt ----------
+    // Pulsiert immer schneller und wird heller und grösser. Wird es knapp (waitMax), ist er ganz geladen.
+    var dotScale = 1, chRaf = 0;
+    function chargeStart(ms) {
+      if (!dot || reduce) return;
+      dot.classList.add('is-go');
+      dot.style.animation = 'gxHue 2.4s linear infinite';   // Farbspiel läuft weiter, das Pulsieren macht jetzt der Code
+      var c0 = performance.now(), ph = 0, lastC = c0, span = ms || CONFIG.chargeMs;
+      (function f(now) {
+        var c = easeOutCubic(clamp((now - c0) / span, 0, 1));
+        ph += (now - lastC) / 1000 * (0.9 + 2.6 * c) * Math.PI * 2; lastC = now;   // 0.9 → 3.5 Schläge pro Sekunde
+        dotScale = 1 + CONFIG.chargeGrow * c + (0.09 + 0.08 * c) * Math.sin(ph);
+        if (dot) dot.style.transform = 'scale(' + dotScale.toFixed(3) + ')';
+        chRaf = requestAnimationFrame(f);
+      })(c0);
+    }
+    function chargeStop() { if (chRaf) cancelAnimationFrame(chRaf); chRaf = 0; }
+
     // ---------- Start ----------
     var started = false, t0 = performance.now();
+    chargeStart();
     function start() {
       if (started) return;
       started = true;
