@@ -62,7 +62,7 @@
     flyDelay:   100,    // zufällige Verzögerung bis
     spin:       70,     // Drehung beim Start (Grad, ±)
     debris:     6,      // Bilder, die quer durchs Blickfeld an der Kamera vorbeifliegen und verblassen
-    menuDelay:  1000,   // Menü-Knopf kommt so lange nach dem Knall (ms; vorher 300)
+    menuDelay:  300,    // Menü-Knopf kommt so lange nach dem Knall (ms). Hugo 09:54: wieder wie vorher (1000 war zu spät)
     shakePx:    12,     // Erschütterung beim Knall
     shakeMs:    380,
     maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
@@ -667,9 +667,7 @@
     // Hugo 25.11. (09:50): der weisse Blitz war zu stark («kann Menschen stören»). Gleich wuchtig (gleiche Grösse und Zeit),
     // aber nur ein kleiner heller Kern, darum herum durchscheinende Regenbogen-Ringe in den Farben von Nadel und Punkt.
     // Vorher: [0,'#fff'],[.70,'#fff'],[.79,'#ffd6f3'],[.83,'#ff8fe0'],[.87,'#b9a0ff'],[.91,'#8fdcff'],[.94,'#9cf7cf'],[.97,'#fff09a'],[1,transparent]
-    var SPHERE_STOPS = [[0, 'rgba(255,255,255,.95)'], [.06, 'rgba(255,240,250,.9)'], [.16, 'rgba(255,79,216,.68)'], [.28, 'rgba(155,107,255,.66)'],
-      [.4, 'rgba(79,195,255,.64)'], [.5, 'rgba(79,240,176,.6)'], [.6, 'rgba(255,233,79,.62)'], [.7, 'rgba(255,155,79,.6)'],
-      [.8, 'rgba(255,79,216,.55)'], [.9, 'rgba(155,107,255,.35)'], [1, 'rgba(79,195,255,0)']];
+    // (09:50 Regenbogen-Ringe, verworfen 09:54: zu kreisförmig)
     var shk = [], fin = [];
     function bang() {
       if (dot) { dot.remove(); dot = null; }
@@ -686,7 +684,7 @@
       mode = 'bang'; bangFirst = true;
       clearTimeout(bangT);
       bangT = setTimeout(function () { root.classList.add('is-in'); }, 300);
-      setTimeout(mbShow, CONFIG.menuDelay);   // Hugo 09:52: Menü-Knopf etwas später (vorher mit der Schrift nach 0.3 s)
+      setTimeout(mbShow, CONFIG.menuDelay);
       kick();
     }
     function endBang() {
@@ -707,15 +705,41 @@
       if (Math.abs(window.innerWidth - VW) < 2 && Math.abs(window.innerHeight - VH) < 120) return;
       build(); bitmaps(); dirty = true; paintIdle(); kick();
     }
+    // Hugo 25.11. (09:54): nicht kreisförmig mit Ringen, sondern weiche Akzente wie bei Nadel und Punkt – bezaubernd.
+    // Ein weicher, nicht ganz weisser Lichtschein (kleiner heller Kern) und darüber schillernde Farbwolken (Pink, Blau,
+    // Mint, Gelb, Violett), die sich langsam drehen und mit dem Licht aufblühen, plus ein schillernder Streifen am
+    // Horizont wie die Nadel. Gleiche Zeiten wie vorher (sphereMs, fadeMs).
+    var GLOW = [[255, 106, 213], [148, 208, 255], [143, 247, 200], [255, 243, 138], [173, 140, 255]];
     function paintSphere(t) {
       var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
       if (t < CONFIG.sphereMs) { sc = OUT3(t / CONFIG.sphereMs); op = 1; }
       else { sc = 1; op = 1 - EASEOUT(clamp((t - CONFIG.sphereMs) / CONFIG.fadeMs, 0, 1)); }
       if (op <= 0 || sc <= 0) return;
-      var r = Math.max(1, R0 * sc), g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      SPHERE_STOPS.forEach(function (st) { g.addColorStop(st[0], st[1]); });
-      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = op; ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      var r = Math.max(1, R0 * sc), g, i;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = op;
+      // weicher Lichtschein
+      g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.05, 'rgba(255,250,255,.78)'); g.addColorStop(.16, 'rgba(244,236,255,.4)');
+      g.addColorStop(.36, 'rgba(225,215,255,.13)'); g.addColorStop(.65, 'rgba(225,215,255,.04)'); g.addColorStop(1, 'rgba(225,215,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+      // schillernde Farbwolken (screen: hellen auf, ohne weiss zu werden)
+      ctx.globalCompositeOperation = 'screen';
+      var rot = t / 1000 * 0.9, bloom = 0.35 + 0.65 * sc;
+      for (i = 0; i < GLOW.length; i++) {
+        var a = rot + i * Math.PI * 2 / GLOW.length + (i % 2 ? 0.35 : 0), d = r * (0.22 + 0.1 * (i % 3)) * bloom;
+        var bx = cx + Math.cos(a) * d, by = cy + Math.sin(a) * d * 0.8, br = r * (0.3 + 0.06 * (i % 2)), c = GLOW[i];
+        g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+        g.addColorStop(0, 'rgba(' + c + ',.78)'); g.addColorStop(.4, 'rgba(' + c + ',.4)'); g.addColorStop(1, 'rgba(' + c + ',0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+      }
+      // schillernder Streifen am Horizont (wie die Nadel), wird breiter und blasser
+      var sw = VW * DPR * (0.6 + 0.9 * sc), sh = Math.max(2, 26 * DPR * (1 - 0.5 * sc));
+      g = ctx.createLinearGradient(cx - sw / 2, 0, cx + sw / 2, 0);
+      [['0', 'rgba(255,106,213,0)'], ['.15', 'rgba(199,116,232,.35)'], ['.3', 'rgba(135,149,232,.45)'], ['.42', 'rgba(148,208,255,.6)'], ['.5', 'rgba(255,255,255,.75)'],
+       ['.58', 'rgba(148,208,255,.6)'], ['.7', 'rgba(143,247,200,.45)'], ['.85', 'rgba(255,184,107,.35)'], ['1', 'rgba(255,106,213,0)']].forEach(function (st) { g.addColorStop(+st[0], st[1]); });
+      ctx.globalAlpha = op * (1 - 0.6 * sc);
+      ctx.fillStyle = g; ctx.fillRect(cx - sw / 2, cy - sh / 2, sw, sh);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
     function paintBang(t) {
       clear(); SNAP = 0;
