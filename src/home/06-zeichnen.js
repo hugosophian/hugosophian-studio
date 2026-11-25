@@ -93,6 +93,25 @@
       }
     }
 
+    // Hugo 25.11. (19:28): Computer – das Foto wird von Hand wie «cover» in die Bildbreite (mw) gelegt, ragt aber rechts unter die
+    // (beim Auf- und Zugehen durchsichtige) Textspalte weiter, statt dort abgeschnitten zu sein. So gibt es während der Bewegung weder
+    // weisse noch graue Streifen zwischen den Bildern; ist die Spalte ganz offen, sieht alles genau aus wie vorher
+    function deskImg(s, mw, w) {
+      var im = s.img; if (!im) return;
+      var nw = im.naturalWidth, nh = im.naturalHeight; if (!nw || !nh) return;
+      if (!s.objP) { var op = (getComputedStyle(im).objectPosition || '50% 50%').split(' '); s.objP = [/%$/.test(op[0]) ? parseFloat(op[0]) / 100 : 0.5, /%$/.test(op[1] || op[0]) ? parseFloat(op[1] || op[0]) / 100 : 0.5]; }
+      var bh = s.el.offsetHeight || H, k = Math.max(mw / nw, bh / nh), dw = nw * k, dh = nh * k;
+      var ox = (mw - dw) * s.objP[0], oy = (bh - dh) * s.objP[1], st = im.style;
+      st.position = 'absolute'; st.maxWidth = 'none'; st.objectFit = 'fill';
+      st.width = dw.toFixed(2) + 'px'; st.height = dh.toFixed(2) + 'px'; st.left = ox.toFixed(2) + 'px'; st.top = oy.toFixed(2) + 'px';
+      s.media.style.overflow = 'visible'; s.el.style.background = 'var(--hp-side-bg, #fff)'; s.imgHand = true;   // wo das Foto nicht hinreicht: weiss wie die Spalte (nie grau oder schwarz)
+    }
+    function deskImgOff(s) {
+      if (!s.imgHand || !s.img) return; s.imgHand = false;
+      var st = s.img.style; st.position = st.maxWidth = st.objectFit = st.width = st.height = st.left = st.top = '';
+      if (s.media) s.media.style.overflow = '';
+      s.el.style.background = '';
+    }
     // Desktop: nebeneinander, das Bild unter der Maus schiebt die anderen weg
     function renderDesk() {
       var G = (CONFIG.deskOpen * n - 1) / (1 - CONFIG.deskOpen);
@@ -112,7 +131,7 @@
         var st = s.el.style;
         st.left = x.toFixed(2) + 'px'; st.width = w.toFixed(2) + 'px'; st.top = ''; st.height = '';
         st.transform = 'none'; st.zIndex = ''; st.clipPath = '';
-        if (s.media) s.media.style.width = mw.toFixed(2) + 'px';
+        if (s.media) { s.media.style.width = mw.toFixed(2) + 'px'; deskImg(s, mw, w); }
         if (s.title && maxTw > 0) {
           s.title.style.left = '0px'; s.title.style.width = iw.toFixed(2) + 'px';
           var tfs = (Math.round(iw * CONFIG.deskTitle * 100 / maxTw * 2) / 2).toFixed(1) + 'px';   // halbe Pixel: weniger Neu-Setzen der Schrift pro Bild

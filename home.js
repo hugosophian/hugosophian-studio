@@ -514,6 +514,7 @@
         var st = s.el.style;
         st.left = st.top = st.width = st.height = st.transform = st.clipPath = st.zIndex = '';
         if (s.media) { s.media.style.transform = ''; s.media.style.width = ''; }
+        deskImgOff(s);
         if (s.title) { s.title.style.transform = ''; s.title.style.left = ''; s.title.style.width = ''; }
         s.side.style.width = '';
       });
@@ -533,7 +534,7 @@
       cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
       try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) {}
       if (!c) return null;
-      var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
+      var NW = 4, PW = 16, NP = NW * PW;   // bis zu 4 Wellen mit je 16 Bahnpunkten (Hugo 25.11., 19:27: vorher 3 – eine 4. Welle warf die älteste auf einen Schlag hinaus)
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform float uRim; uniform float uSoft; uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform float uWL; uniform float uWE; uniform float uWF; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
@@ -1111,7 +1112,7 @@
           dk = dvS.dv.k; qx = mr.left + mr.width / 2 + dk * dvS.dv.px; qy = mr.top + mr.height / 2 + dk * dvS.dv.py;   // Zoom-Mittelpunkt
           compCrop = [(qx - sr.left) / sr.width * (1 - 1 / dk), (qy - sr.top) / sr.height * (1 - 1 / dk), 1 / dk, 1 / dk];
         } else compCrop = null;
-        var sc = desk ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var sc = desk ? 1 : Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
@@ -1158,7 +1159,7 @@
       var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), wgs = new Float32Array(NW), wgOne = new Float32Array(NW).fill(1), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0, covV = 0, covT = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
-      var dprCap = weak ? 1 : (desk ? 1.5 : 2);   // Hugo 25.11. (19:10): Computer schärfer (1.5, regelt bei Ruckeln selbst herunter)   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
+      var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 25.11. (19:27): Computer wieder 1 (1.5 liess das Wechseln von Bild zu Bild ruckeln); scharf bleibt es, weil die Fläche nur noch dort deckt, wo die Welle ist   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
@@ -1202,7 +1203,7 @@
         // Hugo 25.11. (19:10): eine Welle lebt ab ihrer letzten Bewegung (vorher ab ihrem Start – eine lange Mauswelle verschwand
         // nach 6.5 s auf einen Schlag, die Ecken sprangen zurück); jede klingt mit eigenem Wert weich aus (uWG)
         function lastAct(wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; return la; }
-        waves = waves.filter(function (wv) { return now - lastAct(wv) < LIFE * 1000; });
+        waves = waves.filter(function (wv) { return now - lastAct(wv) < LIFE * 1000 && !(wv.fade0 && now - wv.fade0 > 320); });
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
@@ -1226,7 +1227,7 @@
         for (var k = 0; k < NW; k++) {
           var wv = ord[k];
           ages[k] = wv ? (now - wv.t0) / 1000 : -1;
-          if (wv) { var laW = lastAct(wv), enW = laW + (wv.sp2 < 0 ? 5600 : 5000); wgs[k] = 1 - sm01(enW - 1400, enW, now); } else wgs[k] = 0;
+          if (wv) { var laW = lastAct(wv), enW = laW + (wv.sp2 < 0 ? 5600 : 5000); wgs[k] = (1 - sm01(enW - 1400, enW, now)) * (wv.fade0 ? 1 - sm01(wv.fade0, wv.fade0 + 300, now) : 1); } else wgs[k] = 0;
           // Farbe je nach Auslösung (Hugo 23.11.): Tippen → Ort, Ziehen → Richtung und Länge der Bahn
           if (wv && wv.pts.length) {
             var a0 = wv.pts[0], a1 = wv.pts[wv.pts.length - 1], dl = Math.hypot(a1.x - a0.x, a1.y - a0.y);
@@ -1314,6 +1315,13 @@
       function refRect() { return desk ? cv.getBoundingClientRect() : stage.getBoundingClientRect(); }
       function ok() { return !desk && !root.classList.contains('is-info'); }
       function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
+      // Hugo 25.11. (19:27, Video): beim Starten einer neuen Welle sprangen die Bilder zurück – war kein Platz mehr frei, wurde die
+      // älteste Welle sofort entfernt. Jetzt: sind alle Plätze belegt, klingt die älteste schon vorher in 0.3 s aus (eine neue
+      // Mauswelle beginnt erst nach 350 ms Pause), beim nächsten Start ist sie längst unsichtbar
+      function pushWave(wv) {
+        waves.push(wv); if (waves.length > NW) dropOld();
+        if (waves.length >= NW) for (var q = 0; q < waves.length - 1; q++) if (!(waves[q].sp2 < 0)) { if (!waves[q].fade0) waves[q].fade0 = performance.now(); break; }
+      }
       // Computer (Hugo 24.11.): die Maus zieht immer eine Welle wie der Finger am Handy und wischt den Andock-Effekt weg
       var mWave = 0, mAcc = 0, mLast = 0;
       var lmx = -1, lmy = -1;
@@ -1331,7 +1339,7 @@
         if (now - mLast > 350) mAcc = 0; mLast = now; mAcc += mdd;
         var mNew = !mWave || !wv || wv.sp2 < 0 || now - mWave > 350;
         if (mNew && mAcc < CONFIG.mouseMin) return;
-        if (mNew) { noEdge = false; if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
+        if (mNew) { noEdge = false; if (pendingOff) lightOff(); pushWave({ t0: now, pts: [] }); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
@@ -1362,7 +1370,7 @@
             pts.push({ x: x, y: y, t: now - Math.random() * 220, m: 0.15 + 1.1 * Math.pow(Math.random(), 1.6) });   // nicht so tief, dass sich die Seiten in der Mitte treffen
           }
           pts.push({ x: pts[0].x, y: pts[0].y, t: pts[0].t, m: pts[0].m });   // Bahn schliessen
-          waves.push({ t0: now, pts: pts, sp2: -reach }); if (waves.length > NW) waves.shift();
+          pushWave({ t0: now, pts: pts, sp2: -reach });
         }
         if (dockFl > 0) ring(0, 6, 0.2);   // Hugo 23.11.: nur eine Explosion nach innen
         if (!raf) req();
@@ -1409,7 +1417,7 @@
       function startWave(x, y, t) {
         noEdge = false;
         if (pendingOff) lightOff();
-        waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
+        pushWave({ t0: performance.now(), pts: [] });
         if (edgeT0 && !killT0) killT0 = performance.now();
         add(x, y);
         // Hugo 25.11. (17:03): das erste Tempo vom Aufsetzen an messen – sonst galten die ersten 6 px als in einem Augenblick
@@ -1530,6 +1538,25 @@
       }
     }
 
+    // Hugo 25.11. (19:28): Computer – das Foto wird von Hand wie «cover» in die Bildbreite (mw) gelegt, ragt aber rechts unter die
+    // (beim Auf- und Zugehen durchsichtige) Textspalte weiter, statt dort abgeschnitten zu sein. So gibt es während der Bewegung weder
+    // weisse noch graue Streifen zwischen den Bildern; ist die Spalte ganz offen, sieht alles genau aus wie vorher
+    function deskImg(s, mw, w) {
+      var im = s.img; if (!im) return;
+      var nw = im.naturalWidth, nh = im.naturalHeight; if (!nw || !nh) return;
+      if (!s.objP) { var op = (getComputedStyle(im).objectPosition || '50% 50%').split(' '); s.objP = [/%$/.test(op[0]) ? parseFloat(op[0]) / 100 : 0.5, /%$/.test(op[1] || op[0]) ? parseFloat(op[1] || op[0]) / 100 : 0.5]; }
+      var bh = s.el.offsetHeight || H, k = Math.max(mw / nw, bh / nh), dw = nw * k, dh = nh * k;
+      var ox = (mw - dw) * s.objP[0], oy = (bh - dh) * s.objP[1], st = im.style;
+      st.position = 'absolute'; st.maxWidth = 'none'; st.objectFit = 'fill';
+      st.width = dw.toFixed(2) + 'px'; st.height = dh.toFixed(2) + 'px'; st.left = ox.toFixed(2) + 'px'; st.top = oy.toFixed(2) + 'px';
+      s.media.style.overflow = 'visible'; s.el.style.background = 'var(--hp-side-bg, #fff)'; s.imgHand = true;   // wo das Foto nicht hinreicht: weiss wie die Spalte (nie grau oder schwarz)
+    }
+    function deskImgOff(s) {
+      if (!s.imgHand || !s.img) return; s.imgHand = false;
+      var st = s.img.style; st.position = st.maxWidth = st.objectFit = st.width = st.height = st.left = st.top = '';
+      if (s.media) s.media.style.overflow = '';
+      s.el.style.background = '';
+    }
     // Desktop: nebeneinander, das Bild unter der Maus schiebt die anderen weg
     function renderDesk() {
       var G = (CONFIG.deskOpen * n - 1) / (1 - CONFIG.deskOpen);
@@ -1549,7 +1576,7 @@
         var st = s.el.style;
         st.left = x.toFixed(2) + 'px'; st.width = w.toFixed(2) + 'px'; st.top = ''; st.height = '';
         st.transform = 'none'; st.zIndex = ''; st.clipPath = '';
-        if (s.media) s.media.style.width = mw.toFixed(2) + 'px';
+        if (s.media) { s.media.style.width = mw.toFixed(2) + 'px'; deskImg(s, mw, w); }
         if (s.title && maxTw > 0) {
           s.title.style.left = '0px'; s.title.style.width = iw.toFixed(2) + 'px';
           var tfs = (Math.round(iw * CONFIG.deskTitle * 100 / maxTw * 2) / 2).toFixed(1) + 'px';   // halbe Pixel: weniger Neu-Setzen der Schrift pro Bild

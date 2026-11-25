@@ -67,6 +67,7 @@
         var st = s.el.style;
         st.left = st.top = st.width = st.height = st.transform = st.clipPath = st.zIndex = '';
         if (s.media) { s.media.style.transform = ''; s.media.style.width = ''; }
+        deskImgOff(s);
         if (s.title) { s.title.style.transform = ''; s.title.style.left = ''; s.title.style.width = ''; }
         s.side.style.width = '';
       });
