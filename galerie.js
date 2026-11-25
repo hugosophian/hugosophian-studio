@@ -73,7 +73,10 @@
     zoomKey:    1.35,   // Schritt pro Tastendruck
     // Hugo 25.11. (08:32): beim Reinzoomen Tiefenunschärfe – das angezoomte Bild bleibt scharf, die anderen werden je nach
     // Abstand ihrer Parallax-Ebene unscharf (wie bei einer Kamera). 0 = aus, grösser = schneller unscharf.
-    dof:        2.4,   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
+    dof:        2.4,
+    // Hugo 25.11. (08:36): am Computer löst schon die Maus den Parallax leicht aus (Bildmitte = ruhig, am Rand am meisten)
+    mouseParallax: 26,  // px: so weit verschieben sich vorderste und hinterste Bilder gegeneinander (je Richtung)
+    mouseEase:  0.07,   // Weichheit (Anteil pro Bild bei 60 fps)   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
     // Sortierung
     gatherMs:   560,    // alle Bilder fallen zurück in den Punkt
     // Vorschau (wie library.js)
@@ -299,7 +302,8 @@
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
     var cam = { x: 0, y: 0 }, tgt = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
     var Z = 1, tZ = 1;   // Zoom gezeigt / Ziel
-    var dF = 1, tdF = 1;  // Tiefe, auf die scharf gestellt ist (gezeigt / Ziel)   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
+    var dF = 1, tdF = 1;  // Tiefe, auf die scharf gestellt ist (gezeigt / Ziel)
+    var mo = { x: 0, y: 0 }, tmo = { x: 0, y: 0 };   // Maus-Parallax (gezeigt / Ziel)   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
     var drawOrder = [], focusSlot = null;
     var mode = 'load';            // load | bang | idle | gather | pv
     var raf = 0, last = 0, gatherAt = 0, bangT = 0;
@@ -438,7 +442,8 @@
     function zf(sl) { return Z === 1 ? 1 : Math.pow(Z, sl.d); }
     function pos(sl) {
       var z = zf(sl);
-      return { x: VW / 2 + (sl.x + cam.x * sl.d) * z, y: VH / 2 + (sl.y + cam.y * sl.d) * z };
+      var md = (sl.d - 0.93) * 2.2;   // vorne gegen die Maus, hinten mit ihr
+      return { x: VW / 2 + (sl.x + cam.x * sl.d) * z + mo.x * md, y: VH / 2 + (sl.y + cam.y * sl.d) * z + mo.y * md };
     }
     // Zoomen um einen Punkt (Finger-Mitte, Maus): der Punkt bleibt unter dem Finger stehen
     function zoomAt(px, py, nz) {
@@ -584,8 +589,10 @@
         if (!drag) inertia(dtf);
         // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
         var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
-        var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3;
-        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * k * 0.6; } else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; }
+        var km = 1 - Math.pow(1 - CONFIG.mouseEase, dtf);
+        var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3 || Math.abs(tmo.x - mo.x) > .03 || Math.abs(tmo.y - mo.y) > .03;
+        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * k * 0.6; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
+        else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; }
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
       } else if (dirty) {   // Vorschau offen: nur neu malen, wenn sich etwas ändert (Karte aus-/eingeblendet)
@@ -852,6 +859,17 @@
       tgt.x = clamp(tgt.x - e.deltaX * k / tZ, BX0 - 60, BX1 + 60); tgt.y = clamp(tgt.y - e.deltaY * k / tZ, BY0 - 60, BY1 + 60);
       kick();
     }, { passive: false });
+
+    // Maus-Parallax (nur Computer)
+    if (mouse) {
+      root.addEventListener('mousemove', function (e) {
+        var mp = CONFIG.mouseParallax;
+        tmo.x = -((e.clientX / window.innerWidth) - 0.5) * 2 * mp;
+        tmo.y = -((e.clientY / window.innerHeight) - 0.5) * 2 * mp * 0.7;
+        if (mode === 'idle') kick();
+      });
+      root.addEventListener('mouseleave', function () { tmo.x = tmo.y = 0; if (mode === 'idle') kick(); });
+    }
 
     // Safari am Mac: Trackpad-Pinch kommt als «gesture» (nur Computer; am iPhone zoomen die zwei Finger oben)
     if (mouse) {
