@@ -1417,8 +1417,10 @@
       var z = CONFIG.imgBase / (1 - 0.5 * p);
       for (var j = 0; j < n; j++) {
         var s = slides[j], r = rel(j);
-        if (r <= -1 || r >= 1) { setVis(s, false); continue; }
-        var y = r * H;
+        // Hugo 25.11. (18:13): oben am iPhone eine feine helle Linie – das Bild rastet nie ganz genau ein (C nähert sich nur an),
+        // vom vorherigen Bild blieb darum ein Bruchteil eines Pixels sichtbar (ein Geräte-Pixel hell). Unter 1 px = unsichtbar
+        if (r <= -1 + 1 / H || r >= 1 - 1 / H) { setVis(s, false); continue; }
+        var y = Math.abs(r) * H < 0.75 ? 0 : r * H;   // fast eingerastet: genau auf 0 (kein Spalt am Rand)
         setVis(s, true);
         s.el.style.zIndex = r > 0 ? 3 : 2;
         s.el.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
