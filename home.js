@@ -2919,7 +2919,7 @@
     function makeSbar(host) {
       var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
       var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
-      var actT = 0, last = { }, bounceEnd = null;
+      var actT = 0, last = { };
       return {
         el: bar,
         set: function (x, y, h, st, sh, ch, active) {
@@ -2930,12 +2930,7 @@
           // weich auslaufend) und bleibt am Rand; beim Loslassen federt er mit dem Gummiband zurück in seine Grösse.
           var ov = st < 0 ? -st : (st > mx ? st - mx : 0), len = tl * (1 - 0.4 * (1 - Math.exp(-ov / 90)));
           th.style.height = len.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + (st > mx ? h - len : (h - tl) * p).toFixed(1) + 'px,0)';
-          if (ov > 2) bounceEnd = st > mx ? 'bottom' : 'top';
-          else if (bounceEnd && ov === 0 && !reduce && th.animate) {   // beim Zurückfedern ganz leicht über die Grösse hinaus und zurück
-            th.style.transformOrigin = '50% ' + (bounceEnd === 'bottom' ? '100%' : '0');
-            try { th.animate([{ scale: '1 1' }, { scale: '1 1.07' }, { scale: '1 0.985' }, { scale: '1 1' }], { duration: 420, easing: 'ease-out' }); } catch (er) {}
-            bounceEnd = null;
-          }
+          // Hugo 12:55: Eindampfen perfekt, ohne Nachfedern (Gummiband bringt ihn von selbst zurück)
           var tile = len; th.style.backgroundPosition = '0 ' + (-((st * 1.1 + (st > mx ? 1 : -1) * ov * 2.4) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
