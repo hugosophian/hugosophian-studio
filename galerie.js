@@ -308,15 +308,16 @@
         }
       }
       cam.x = 0; cam.y = 0;
-      // Hugo 25.11. (07:16): ziehen bis das äusserste Bild genau am Bildschirmrand steht, erst dann der Dämpfer.
+      // Hugo 25.11. (07:16/07:18): ziehen bis das äusserste Bild die Bildschirmmitte erreicht, erst dann der Dämpfer.
       // Pro Bild: bei welcher Kameralage erreicht seine Kante den Rand (mit seiner Tiefe d)? Die äussersten zählen.
       BX0 = Infinity; BX1 = -Infinity; BY0 = Infinity; BY1 = -Infinity;
       slots.forEach(function (sl) {
         var hw = sl.w * sl.s / 2, hh = sl.h * sl.s / 2;
-        BX1 = Math.max(BX1, (-VW / 2 - (sl.x - hw)) / sl.d);   // linke Kante am linken Rand (nach rechts gezogen)
-        BX0 = Math.min(BX0, (VW / 2 - (sl.x + hw)) / sl.d);    // rechte Kante am rechten Rand (nach links gezogen)
-        BY1 = Math.max(BY1, (-VH / 2 - (sl.y - hh)) / sl.d);
-        BY0 = Math.min(BY0, (VH / 2 - (sl.y + hh)) / sl.d);
+        // Hugo 25.11. (07:18): bis die äusserste Bildkante die Bildschirmmitte erreicht (halb ins Schwarze), sonst wirkt es eng
+        BX1 = Math.max(BX1, -(sl.x - hw) / sl.d);   // linke Kante in der Mitte (nach rechts gezogen)
+        BX0 = Math.min(BX0, -(sl.x + hw) / sl.d);   // rechte Kante in der Mitte (nach links gezogen)
+        BY1 = Math.max(BY1, -(sl.y - hh) / sl.d);
+        BY0 = Math.min(BY0, -(sl.y + hh) / sl.d);
       });
       if (!slots.length) { BX0 = BX1 = BY0 = BY1 = 0; }
       // Breiter als der Bildschirm: nach rechts bis die linke Kante am linken Rand steht (und umgekehrt).
