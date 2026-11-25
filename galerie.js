@@ -23,7 +23,7 @@
     // Fläche
     // Hugo 25.11. (07:00): Bilder ohne weissen Rahmen (die Vorschau geht weiterhin weiss aus dem Bild auf) und näher zusammen
     size:      { desktop: [0.5, 0.85], mobile: [0.48, 0.78] },   // Kartengrösse: Anteil der Grösse aus dem Designer (lib-img 30vh / 46vw)
-    cell:      { desktop: 1.18, mobile: 1.12 },   // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
+    cell:      { desktop: 1.4, mobile: 1.32 },   // Hugo 25.11. (07:03): wieder etwas mehr Abstand (vorher 1.18 / 1.12)   // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
     jitter:    0.5,     // wie weit eine Karte von ihrem Rasterplatz abweicht (Anteil vom Raster)
     holes:     0.08,    // Anteil leerer Rasterplätze
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
