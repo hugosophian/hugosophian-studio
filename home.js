@@ -93,7 +93,7 @@
     waveTopDesk:  8.0,  // Computer: bei diesem Tempo die Extra-Stärke ganz
     waveBoostDesk: 0.2, // Computer: so viel stärker als die bisherige Grenze (0.2 = +20 % Stärke)
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
-    ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
+    ldRim:      0.5,    // Ladeanimation: Rand-Leuchten beim Andocken (Hugo 16:16: Perlmutt minimal sichtbarer, vorher 0.35)
     ldFlares:   0.6,    // Ladeanimation: Flares beim Andocken (Hugo 15:59: wieder an – ungleichmässig, macht auch die Wellen ungleich; vorher 0)
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
@@ -726,12 +726,15 @@
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
         '    off += dir * (-x * env * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
-        '    float r = env * amp * gA; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
+        // Hugo 16:19 (Video 16:14): beim Andocken lag ein milchiger Schleier über dem ganzen Foto – das Licht der Andock-Welle
+        // leuchtet jetzt nur am Rand voll, innen nur noch 25 % (die Verschiebung = das Wabbern bleibt ganz)
+        '    float lk = dockW ? 0.25 + 0.75 * exp(-max(e, 0.0) / (mx * 0.07)) : 1.0;',
+        '    float r = env * amp * gA * lk; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
         '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
-        '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on * gA);',
+        '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on * gA * lk);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
@@ -762,7 +765,7 @@
         '  if (uEdgeT >= 0.0) {',
         '    float et = uEdgeT;',
         '    float fade = 1.0 - smoothstep(3.6, 5.6, et);',   // Hugo 23.11.: kurzer Höhepunkt, dann klärt sich das Bild
-        '    float flash = uSoft > 0.5 ? smoothstep(0.0, 0.8, et) * 0.75 * exp(-et * 0.3) : 1.9 * uImp * exp(-et * 3.2) + 0.75 * exp(-et * 0.3);',   // Hugo 24.11. (18:19): Schimmer = Ladeanimation ohne den Aufprall – das Nachleuchten blendet weich ein   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
+        '    float flash = uSoft > 0.5 ? smoothstep(0.0, 0.8, et) * 0.75 * exp(-et * 0.3) : 1.7 * uImp * exp(-et * 6.5) + 0.85 * exp(-et * 0.42);',   // Hugo 16:19: Aufprall kurz (~0.15 s), Saum klingt in ~2.5 s aus   // Hugo 24.11. (18:19): Schimmer = Ladeanimation ohne den Aufprall – das Nachleuchten blendet weich ein   // uImp: Computer minimal schwächerer Aufprall (Hugo 24.11.)   // Hugo 24.11.: Aufleuchten etwas höher, Nachleuchten mehr   // Hugo 23.11.: Andocken wieder wichtiger – kräftiger Schlag   // Hugo 23.11.: grosse bunte Welle beim Andocken
         '    float band = exp(-max(e, 0.0) * max(e, 0.0) / 560.0);',
         '    vec2 ca = normalize(fc - uRes * 0.5 + vec2(0.001)); float ang = atan(ca.y, ca.x) / 6.2832;',
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
@@ -770,13 +773,14 @@
         '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.15 + 0.3 * egm);',   // satter bunt
         // Hugo 15:59 (Vorschlag 2 «Sonne mit Perlmutt-Rand»): der bunte Saum wird Hirsch-Perlmutt – wandert weich durch Eis-Cyan,
         // Periwinkel, Flieder, Rosé, Champagner, Eis-Cyan hell; ein Hauch Sonne bleibt darin. Der warme Kern (Flares, faD) bleibt golden.
-        '    float ept = fract(ang * 2.0 + uT * 0.06 + egm * 0.35) * 6.0;',
+        '    float ept = fract(ang * 2.0 + uT * 0.12 + egm * 0.35) * 6.0;',   // 16:19: Schimmer wandert langsam um den Rand
         '    vec3 epl = mix(vec3(0.588, 0.863, 0.961), vec3(0.890, 0.918, 0.973), smoothstep(0.0, 1.0, ept));',
         '    epl = mix(epl, vec3(0.765, 0.698, 0.980), smoothstep(1.0, 2.0, ept));',
         '    epl = mix(epl, vec3(0.949, 0.867, 0.890), smoothstep(2.0, 3.0, ept));',
         '    epl = mix(epl, vec3(0.984, 0.953, 0.871), smoothstep(3.0, 4.0, ept));',
         '    epl = mix(epl, vec3(0.855, 0.949, 0.973), smoothstep(4.0, 5.0, ept));',
         '    epl = mix(epl, vec3(0.588, 0.863, 0.961), smoothstep(5.0, 6.0, ept));',
+        '    epl = clamp(mix(vec3(dot(epl, vec3(0.333))), epl, 1.45), 0.0, 1.0);',   // 16:19: Perlmutt am Rand minimal sichtbarer
         '    ecol = mix(epl, vec3(1.0, 0.86, 0.6), 0.1 + 0.12 * egm);',
         // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
@@ -791,9 +795,9 @@
         '    float eln = 0.5 + efl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, uSeed)));',
         '    float exo = max(e, 0.0) / (mx * 0.024);',
         '    float egr = smoothstep(0.05, 0.7, et) * (1.0 - smoothstep(4.0, 6.2, et));',
-        '    float efa = efl * exp(-exo * exo / eln) * egr;',
+        '    float efa = efl * exp(-exo * exo / eln) * egr * (0.25 + 0.95 * smoothstep(0.35, 0.95, patch));',   // 16:19: Zungen dort, wo der Saum am stärksten ist
         '    float efm = smoothstep(0.35, 0.85, n2(fc / mx * 2.6 + vec2(uT * 0.05, 3.0)));',
-        '    eacc += vec3(1.0, 0.86, 0.62) * efa * (0.6 + 0.5 * efm) * 0.35; fI = efa * 0.3;',   // die Flares kommen jetzt v. a. von den Wellen
+        '    eacc += mix(vec3(1.0, 0.86, 0.62), epl, smoothstep(0.15, 0.9, exo * exo / eln)) * efa * (0.6 + 0.5 * efm) * 0.45; fI = efa * 0.3;',   // innen Sonne, Spitzen Perlmutt   // die Flares kommen jetzt v. a. von den Wellen
         '    eacc *= fade;',
         // Flare-Fäden: zwei Scharen aus gegenüberliegenden Seiten, kreuzen weich die Mitte, vermischen sich und verglimmen
         '    {',
@@ -822,20 +826,20 @@
         '      float vC = 0.75 * flFam(fc, uRes, tC0, et, ee, sC, aC, PC, PC0, vec4(QA.x, flPsi(oC, uRes, uT, dA, sw, sA), gA, sA), vec3(dA, 0.0), nAC,',
         '                                 vec4(QB.x, flPsi(oC, uRes, tB0, dB, -sw, sB), gB, sB), vec3(dB, 0.0), nBC, tC);',
         '      float kSo = 1.0 - uSoft; vB *= kSo; vC *= kSo;',   // Hugo 24.11. (18:22): Schimmer – nur eine Schar Flare-Fäden (sonst manchmal fünf auf einmal)
-        '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1));',   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
+        '      float sv = vA + vB + vC; sv = 1.1 * (1.0 - exp(-sv / 1.1)) * 0.25;',   // 16:19: Flare-Fäden nur noch ein Hauch (wirkten wie ein Kratzer)   // Hugo 24.11.: beim Verschmelzen heller Strang, keine weisse Fläche   // wo sie sich treffen: weich verschmelzen statt aufaddieren
         '      float wfc = 0.04 + 0.13 * (1.0 - exp(-et * 1.8)), dw = (ee / mnS - wfc) / 0.07;',
         '      float sb = max(1.0 - smoothstep(0.03, 0.3, ee / mnS), 0.85 * exp(-dw * dw));',
         '      faD += sv * (1.0 - 0.7 * sb) * 1.3;',
-        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + (tB + tC * 0.75) * kSo) * 0.6 * (1.0 - sb);',
+        '      eacc += mix(ecol, vec3(1.0, 0.82, 0.55), 0.3) * sv * sb * 0.6 + (tA + (tB + tC * 0.75) * kSo) * 0.15 * (1.0 - sb);',
         '    }',
         // Andocken bringt das Bild zum Wabbern (Hugo 23.11.): vom Rand laufen weiche Wellen nach innen, unter den Flares
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
         '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA * uRim; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
-        '    float wa = (exp(-max(e, 0.0) / (mx * 0.12)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 + min(fI, 1.2) * 0.9) * fade * kE;',
+        '    float wa = (exp(-max(e, 0.0) / (mx * 0.16)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 * (0.45 + 0.9 * smoothstep(0.3, 0.9, patch)) + min(fI, 1.2) * 1.1) * fade * kE;',   // 16:19: von den hellen Stellen aus, ungleich
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
-        '    off += (nin * sin(wph) + vec2(-nin.y, nin.x) * 0.5 * cos(wph * 0.7 + 1.3)) * wa * mx * 0.009 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',
+        '    off += (nin * sin(wph) + vec2(-nin.y, nin.x) * 0.5 * cos(wph * 0.7 + 1.3)) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
         '  }',
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0, alD = 0.0;',
         '  if (uHas > 0.5) {',
