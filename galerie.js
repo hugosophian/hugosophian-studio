@@ -804,7 +804,7 @@
     var s = document.createElement('style');
     s.textContent = css;
     document.head.appendChild(s);
-    document.documentElement.classList.add('lib-on');
+    document.documentElement.classList.add('lib-on', 'gx-ready');   // gx-ready: Ersatz-Punkt aus dem Seiten-Head aus, ab jetzt zeichnet dieser Code den Punkt
     showDot();
   }
   function boot() {
