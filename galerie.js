@@ -88,6 +88,10 @@
     /* Hugo 25.11. (07:10): Bereichsname gleich gross wie die Schrift der Sortierung (lib-top) */
     '[data-lib] .lib-bottom .ps-label { font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; }',
     '@media (max-width: 767px) { [data-lib] .lib-bottom .ps-label { font-size: 3.2vw !important; } }',
+    /* Hugo 25.11. (07:14): unsichtbare Klickfläche so gross wie der Menü-Knopf (Grösse misst der Code: --gx-hit-w / --gx-hit-h) */
+    '[data-lib] .lib-bottom .ps-label, [data-lib] .lib-sort { position: relative; }',
+    '[data-lib] .lib-bottom .ps-label { width: fit-content; }',   /* Klickfläche sitzt auf dem Wort, nicht auf der ganzen Zeile */
+    '[data-lib] .lib-bottom .ps-label::after, [data-lib] .lib-sort::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--gx-hit-w, 7rem)); height: max(100%, var(--gx-hit-h, 3rem)); transform: translate(-50%, -50%); }',
     '@media (hover: hover) and (pointer: fine) { [data-lib].is-in .lib-bottom .ps-label:hover { opacity: .6; } }',
     '[data-lib] .lib-bottom .ps-label:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; }',
     /* Schrift bleibt über weissen Karten lesbar */
@@ -828,6 +832,15 @@
       if (img) window.hsVT = { to: to, el: img, sel: '.pg-hero-media' };
       location.href = href;
     });
+
+    // Klickflächen so gross wie der Menü-Knopf (offsetWidth/-Height: ohne seine Verschiebung und Verkleinerung)
+    function hitSize() {
+      var b = document.querySelector('.menu-toggle-wrap [data-menu-open]') || document.querySelector('.menu-toggle-wrap .is-menu');
+      if (!b || !b.offsetWidth) return;
+      root.style.setProperty('--gx-hit-w', b.offsetWidth + 'px');
+      root.style.setProperty('--gx-hit-h', b.offsetHeight + 'px');
+    }
+    hitSize(); window.addEventListener('resize', hitSize); window.addEventListener('load', hitSize);
 
     // ---------- Bereichsname = Zurück ----------
     // Wie der Pfeil im Browser: zurück zur vorherigen Seite (meist die Homepage, sie kommt aus dem Speicher).
