@@ -65,6 +65,7 @@
     deskStiff:  150,    // Feder beim Aufschieben
     deskDamp:   0.6,    // kleiner = mehr Nachwippen
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
+    goDelay:    200,    // Hugo 11:00: «Galerie öffnen» schreibt sich minimal später ein (ms, zusätzlich)
     infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
     // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
@@ -1265,7 +1266,7 @@
         s.sideIn.style.width = SW.toFixed(2) + 'px';
         var sop = clamp((s.o - 0.45) / 0.4, 0, 1);
         s.sideIn.style.opacity = sop.toFixed(3);
-        if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goIn(s.sideLink, 60); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
+        if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goIn(s.sideLink, 60 + CONFIG.goDelay); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
         setVis(s, true);
         x += w;
       }
@@ -2370,7 +2371,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45));
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
@@ -2454,7 +2455,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45));
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
