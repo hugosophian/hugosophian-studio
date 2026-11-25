@@ -166,7 +166,7 @@
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
     '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: .6rem 0; margin-top: -.6rem; pointer-events: none; }',
     /* Hugo 11:34 (Video perappelgren.de): Zeile für Zeile – jede Zeile blendet zum Rand hin selbst aus, beim Scrollen bleiben
-       untere Zeilen leicht zurück (Zeilenabstand öffnet sich kurz). Code: infoLines / linesTick */
+       untere Zeilen leicht zurück Code: infoLines / linesTick */
     '[data-hp] .hp-info-panel .hp-line { display: block; will-change: transform, opacity; }',
     '[data-hp] .hp-info-btns > * { pointer-events: auto; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
@@ -1938,18 +1938,23 @@
       if (!lines.length || !root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = infoBtns.classList.contains('is-stuck') ? infoBtns.offsetTop - st + parseFloat(getComputedStyle(infoBtns).paddingTop) : H2 - (parseFloat(cs.paddingBottom) || 0);
-      var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.14, more = false;
+      var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.16, more = false;
+      // Hugo 11:36 (perappelgren.de im Code nachgeschaut): Wörter blenden beim Verlassen mit easeInOutCubic aus und gleiten dabei
+      // bis 28 px nach oben, beim Hereinkommen mit easeOutQuart ein und steigen 22 px auf. Hier Zeile für Zeile, gemessen an der
+      // Lage der Zeile im sichtbaren Bereich (oben ab dem Textanfang, unten ab dem Knopf).
       lines.forEach(function (L) {
-        if (L.s === null) L.s = st;
-        var yv = L.y - st, k = reduce ? 1 : clamp(0.32 - 0.22 * (yv / H2), 0.1, 0.32);   // weiter unten = mehr Nachlauf
-        L.s += (st - L.s) * k; if (Math.abs(st - L.s) < 0.1) L.s = st; else more = true;
-        var off = clamp(st - L.s, -40, 40), y = yv + off, lh = L.el.offsetHeight || 20;
-        var o = Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + lh));   // oben: über dem Textanfang zum Kopf hin ausblenden
-        L.el.style.transform = off ? 'translate3d(0,' + off.toFixed(2) + 'px,0)' : '';
+        var lh = L.el.offsetHeight || 20, y = L.y - st;
+        var out = reduce ? 0 : eIOC(clamp((topB - y) / zT, 0, 1));
+        var inn = reduce ? 1 : eOQ(clamp((botB - 24 - (y + lh)) / zB, 0, 1));   // 24 px Luft: die Zeile rutscht beim Hereinkommen 22 px tiefer, nie unter den Knopf
+        var o = reduce ? Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + lh)) : inn * (1 - out);
+        var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
+        L.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         L.el.style.opacity = o.toFixed(3);
       });
       if (more) linesRaf = requestAnimationFrame(linesTick);
     }
+    function eOQ(t) { return 1 - Math.pow(1 - t, 4); }
+    function eIOC(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
     function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
     function linesKick() { if (!linesRaf) linesRaf = requestAnimationFrame(linesTick); }
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
