@@ -67,6 +67,8 @@
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
     deskTextFrom: 0.25, // Computer: Text der Spalte blendet ein, sobald sie so weit offen ist …
     deskTextSpan: 0.25, // … und ist nach diesem Stück ganz da
+    warmDelay:  1300,   // Computer: Galerie erst so lange nach dem Aufgehen der Spalte vorladen (ms), dann in einer ruhigen Lücke
+    goScrollDelay: 280, // Hugo 11:09: beim Hineinscrollen schreibt sich der Knopf so viel später ein (ms)
     goDelay:    0,      // zusätzliche Verzögerung (ms). Hugo 11:06: zeitlich wieder wie ursprünglich, dafür erst wenn sichtbar (vorher 200, 350)
     infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
@@ -297,9 +299,10 @@
     var goIO = ('IntersectionObserver' in window) ? new IntersectionObserver(function (es) {
       es.forEach(function (e) {
         var a = e.target; if (!e.isIntersecting || !a.classList.contains('hp-go-wait')) return;
-        goIn(a, Math.max(0, (a.__goT || 0) - performance.now()));
+        var rest = (a.__goT || 0) - performance.now();
+        goIn(a, rest > 0 ? rest : CONFIG.goScrollDelay);   // Hugo 11:09: kommt er erst beim Scrollen ins Bild, kurz danach
       });
-    }, { threshold: 0.6 }) : null;
+    }, { threshold: 1 }) : null;   // ganz im Bild
     function goArm(a, wait) {
       if (!a) return;
       if (reduce || !goIO || !a.animate) { a.classList.remove('hp-go-wait'); return; }
@@ -1514,7 +1517,7 @@
       if (CRT.paths.indexOf(to) < 0 || warmed[to]) return;
       warmed[to] = true;
       try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; document.head.appendChild(l); } catch (er) {}
-      fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (t) {
+      fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (t) { idle(function () {   // Lesen ebenfalls in einer ruhigen Lücke
         var x = new DOMParser().parseFromString(t, 'text/html');
         [].forEach.call(x.querySelectorAll('script[src*="galerie"]'), function (sc) { fetch(sc.src, { mode: 'no-cors' }).catch(function () {}); });
         // Audit 25.11.: nur die Bilder dieses Bereichs (die Seite enthält auch die der anderen, galerie.js blendet sie aus)
@@ -1530,7 +1533,7 @@
           if (im.getAttribute('srcset')) p.srcset = im.getAttribute('srcset');
           p.src = im.getAttribute('src');
         });
-      }).catch(function () {});
+      }); }).catch(function () {});
     }
     function go(href) {
       if (!href) return;
@@ -1552,11 +1555,16 @@
     }
 
     // ---------- Desktop: Maus ----------
+    var warmT = 0;
+    function idle(fn) { if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 1200 }); else setTimeout(fn, 60); }
     function setHov(i) {
       if (i === hov) return;
       dsunStop();
       hov = i;
-      if (i >= 0 && slides[i]) warmGallery(slides[i].href);
+      // Hugo 11:08: kurzes Ruckeln beim Aufgehen am Computer – das Vorladen der Galerie (Seite holen, lesen, bis 40 Bilder)
+      // lief genau während Spalte und Text aufgingen. Jetzt erst, wenn die Spalte offen ist und der Browser Luft hat.
+      clearTimeout(warmT);
+      if (i >= 0 && slides[i]) { var wh = slides[i].href; warmT = setTimeout(function () { idle(function () { if (hov >= 0 && slides[hov] && slides[hov].href === wh) warmGallery(wh); }); }, CONFIG.warmDelay); }
       slides.forEach(function (s, j) {
         s.el.classList.toggle('is-open', j === i);
         if (s.sideLink) s.sideLink.tabIndex = j === i ? 0 : -1;
