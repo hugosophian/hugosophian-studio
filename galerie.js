@@ -270,6 +270,17 @@
       }
     });
     [].forEach.call(root.querySelectorAll('[role="list"],[role="listitem"]'), function (e) { e.removeAttribute('role'); });
+    // Audit 25.11.: Bilder, die erst nach dem Knall fertig laden (langsames Netz, über waitMax), wurden nie gezeigt.
+    // Jetzt wird die Karte gemalt, sobald ihr Bild da ist.
+    all.forEach(function (p) {
+      p.img.addEventListener('load', function () {
+        for (var i = 0; i < slots.length; i++) if (slots[i].p === p) {
+          var sl = slots[i];
+          if (!sl.bmp) { bitmap(sl); if (mode === 'idle' || mode === 'pv') redraw(); }
+          return;
+        }
+      });
+    });
 
     var projects = all.slice();   // aktuelle Auswahl (Sortierung)
     // Zufall pro Laden bzw. Umsortieren. Beim Drehen des Handys bleibt die Anordnung (gleicher Wert, nur neu eingepasst).
@@ -355,7 +366,7 @@
       // alte Kopien weg, Originale zurücksetzen
       clones.forEach(function (c) { c.remove(); }); clones = [];
       all.forEach(function (p) { p.used = false; });
-      slots = []; drawOrder = []; focusSlot = null;
+      slots = []; drawOrder = []; focusSlot = null; resizePending = false;
       sizeCanvas();
       if (!projects.length) return;
       var sz = mob ? CONFIG.size.mobile : CONFIG.size.desktop;
@@ -556,6 +567,20 @@
     function endBang() {
       debrisEls = [];
       mode = 'idle'; dirty = true; paintIdle();
+      settle();
+    }
+    // Audit 25.11.: was während Explosion oder Vorschau verlangt wurde, jetzt nachholen
+    //  – Umsortieren mitten in der Explosion: erst fertig fliegen lassen, dann zurück in den Punkt (vorher sprangen die Karten)
+    //  – Handy gedreht: neu einpassen (vorher blieb die Fläche im alten Format, verzerrt und halb leer)
+    var filterPending = false, resizePending = false;
+    function settle() {
+      if (mode !== 'idle') return;
+      if (filterPending) { filterPending = false; applyFilter(); return; }
+      if (resizePending) { resizePending = false; refit(); }
+    }
+    function refit() {
+      if (Math.abs(window.innerWidth - VW) < 2 && Math.abs(window.innerHeight - VH) < 120) return;
+      build(); bitmaps(); dirty = true; paintIdle(); kick();
     }
     function paintSphere(t) {
       var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
@@ -846,6 +871,7 @@
     function select() { projects = all.filter(function (p) { return !current || p.cats.indexOf(current) > -1; }); }
     function applyFilter() {
       if (mode === 'load' || mode === 'gather') return;
+      if (mode === 'bang' || mode === 'pv') { filterPending = true; return; }
       vel.x = vel.y = 0; drag = null; down = null;
       if (reduce) { select(); layoutSeed = newSeed(); build(); bitmaps(); bang(); return; }
       // alle sichtbaren Karten fallen zurück in den Punkt
@@ -971,6 +997,7 @@
         if (pvAnim) { pvAnim.cancel(); pvAnim = null; }
         root.classList.remove('is-pv');
         pvState = ''; mode = 'idle';
+        settle();
       }
       if (!sl || !target) { finish(); return; }
       pvPanel.scrollTop = 0;
@@ -1066,9 +1093,9 @@
     window.addEventListener('resize', function () {
       clearTimeout(rT);
       rT = setTimeout(function () {
-        if (!started || mode !== 'idle' || Math.abs(window.innerWidth - VW) < 2 && Math.abs(window.innerHeight - VH) < 120) return;
-        build(); bitmaps();
-        redraw();
+        if (!started) return;
+        if (mode !== 'idle') { resizePending = true; return; }   // nach Explosion / Vorschau nachholen (settle)
+        refit();
       }, 120);
     });
     window.addEventListener('pageshow', function (e) {
