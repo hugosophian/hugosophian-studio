@@ -36,7 +36,11 @@
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
     // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
     fewFrom:   7, fewCell: 0.3, fewHoles: 0.25, fewJitter: 0.3,
-    depth:     [0.62, 1.24],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne. Hugo 25.11.: hinten halb so schnell wie vorne
+    depth:     [0.62, 1.24],
+    // Hugo 25.11. (07:47): Nachbarn dürfen nicht auf derselben Ebene liegen, sonst wirkt der Parallax flach.
+    // Die Tiefen kommen aus depthLevels festen Ebenen, etwa gleich oft benutzt. Karten näher als depthNear × Raster
+    // bekommen möglichst weit auseinanderliegende Ebenen. depthJitter: kleine Abweichung innerhalb der Ebene.
+    depthLevels: 7, depthNear: 2, depthJitter: 0.2,   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne. Hugo 25.11.: hinten halb so schnell wie vorne
     randomLayout: true, // Hugo 25.11. (07:41): bei jedem Laden und jedem Umsortieren eine neue zufällige Anordnung (false = immer gleich, aus seed)
     seed:      7,       // nur bei randomLayout: false – anderer Wert = andere feste Anordnung
     // Ziehen
@@ -292,6 +296,43 @@
         p.el.style.transform = t;
       });
     }
+    // Tiefen so verteilen, dass nahe Karten klar verschiedene Ebenen haben (Hugo 07:47, Video 07:46: Garten, Person,
+    // Schuh und Velo glitten gleich schnell wie ein einziges Bild). Erst grob in zufälliger Reihenfolge, dann in
+    // mehreren Durchgängen nachbessern: jede Karte auf die Ebene, die am wenigsten mit ihren Nachbarn kollidiert.
+    // Strafe pro Nachbar: je näher und je ähnlicher die Ebene, desto grösser. Dazu leichter Zug zu gleich vielen Karten pro Ebene.
+    function spreadDepth(R, cell) {
+      var L = Math.max(2, CONFIG.depthLevels), D0 = CONFIG.depth[0], D1 = CONFIG.depth[1], near = cell * CONFIG.depthNear;
+      var used = [], fair = slots.length / L, i, j;
+      for (i = 0; i < L; i++) used.push(0);
+      var seq = slots.slice();
+      for (i = seq.length - 1; i > 0; i--) { j = Math.floor(R() * (i + 1)); var t = seq[i]; seq[i] = seq[j]; seq[j] = t; }
+      function penalty(sl, lv, list) {
+        var pen = 0;
+        for (var q = 0; q < list.length; q++) {
+          var o = list[q]; if (o === sl || o.lv < 0) continue;
+          var dx = o.x - sl.x, dy = o.y - sl.y, dd = Math.sqrt(dx * dx + dy * dy);
+          if (dd < near) { var w = 1 - dd / near, df = Math.abs(o.lv - lv); pen += w * w / (1 + df * df * 1.5); }
+        }
+        return pen + 0.15 * Math.max(0, used[lv] - fair + 1);
+      }
+      function pick(sl, off) {
+        var best = sl.lv >= 0 ? sl.lv : 0, bp = Infinity;
+        for (var k = 0; k < L; k++) { var lv = (k + off) % L, pen = penalty(sl, lv, slots); if (pen < bp - 1e-9) { bp = pen; best = lv; } }
+        return best;
+      }
+      slots.forEach(function (sl) { sl.lv = -1; });
+      seq.forEach(function (sl) { sl.lv = pick(sl, Math.floor(R() * L)); used[sl.lv]++; });
+      for (var pass = 0; pass < 8; pass++) {
+        var changed = 0;
+        seq.forEach(function (sl) {
+          var cur = sl.lv; used[cur]--;
+          var nb = pick(sl, 0); sl.lv = nb; used[nb]++;
+          if (nb !== cur) changed++;
+        });
+        if (!changed) break;
+      }
+      slots.forEach(function (sl) { sl.d = D0 + (D1 - D0) * clamp((sl.lv + (R() - .5) * CONFIG.depthJitter) / (L - 1), 0, 1); });
+    }
     function aspectF(p) {
       var ar = p.w && p.h ? p.w / p.h : 1;
       return clamp(Math.pow(ar, -CONFIG.aspectEven), CONFIG.aspectRange[0], CONFIG.aspectRange[1]);
@@ -351,6 +392,7 @@
           });
         }
       }
+      spreadDepth(R, cell);
       cam.x = cam.y = tgt.x = tgt.y = 0;
       drawOrder = slots.slice().sort(function (a, b) { return a.d - b.d; });   // hinten zuerst, vorne zuletzt
       // Hugo 25.11. (07:16/07:18): ziehen bis das äusserste Bild die Bildschirmmitte erreicht, erst dann der Dämpfer.
