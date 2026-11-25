@@ -194,9 +194,12 @@
     /* Hugo 11:27: in Safari am Computer war der Text riesig (die Webflow-Variable für die Textgrösse kam dort mit dem Handy-Wert 5vw an)
        und lief aus der Spalte. Am Computer fest die Computer-Werte; ist ein Text trotzdem zu lang, verkleinert ihn der Code (fitSides). */
     '[data-hp].is-desk .hp-side-in .hp-intro-text { font-size: var(--hp-side-fs, 1.25rem) !important; line-height: var(--hp-side-lh, 1.5rem) !important; }',
-    '[data-hp] .hp-side-in.is-scroll { justify-content: flex-start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; pointer-events: auto; padding-top: calc(6vh + 4rem); padding-bottom: calc(7vh + 4rem);',
-    '  -webkit-mask-image: linear-gradient(to bottom, transparent 6vh, #000 calc(6vh + 4rem), #000 calc(100% - 7vh - 4rem), transparent calc(100% - 7vh)); mask-image: linear-gradient(to bottom, transparent 6vh, #000 calc(6vh + 4rem), #000 calc(100% - 7vh - 4rem), transparent calc(100% - 7vh)); }',
-    '[data-hp] .hp-side-in.is-scroll::-webkit-scrollbar { display: none; }',
+    /* Hugo 12:19: fester Textbereich statt kleinerer Schrift. Der Text steht in einem Kasten (höchstens 58 % der Höhe); ist er
+       länger, scrollt er darin mit dem Wort-Effekt wie im Handy-About (sideWords). Schrift bleibt immer 1.25rem. */
+    '[data-hp] .hp-side-box { position: relative; flex: 0 1 auto; max-height: 58vh; overflow: hidden; }',
+    '[data-hp] .hp-side-in.is-scroll .hp-side-box { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; pointer-events: auto; }',
+    '[data-hp] .hp-side-in.is-scroll .hp-side-box::-webkit-scrollbar { display: none; }',
+    '[data-hp] .hp-side-box .hp-w { display: inline-block; will-change: transform, opacity; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -367,7 +370,8 @@
       var sin = document.createElement('div'); sin.className = 'hp-side-in';
       var txt = inText ? inText.cloneNode(false) : document.createElement('div');
       txt.removeAttribute('id'); txt.innerHTML = s.intro;
-      sin.appendChild(txt);
+      var sbox = document.createElement('div'); sbox.className = 'hp-side-box'; sbox.appendChild(txt);
+      sin.appendChild(sbox);
       if (s.href) {
         // Link zur Galerie im Stil von „Alle Projekte ↓“ (wie im About am Handy), Pfeil nach rechts
         var a = document.createElement('a'); a.className = 'lib-sort hp-info-go';
@@ -1866,7 +1870,7 @@
     var wheelT = 0;
     root.addEventListener('wheel', function (e) {
       if (root.classList.contains('is-info') && e.target.closest && e.target.closest('.hp-info-panel')) return;   // About-Text scrollt selbst
-      if (desk && e.target.closest && e.target.closest('.hp-side-in.is-scroll')) return;   // zu langer Spaltentext scrollt selbst (Hugo 11:27)
+      if (desk && e.target.closest && e.target.closest('.hp-side-in.is-scroll .hp-side-box')) return;   // zu langer Spaltentext scrollt selbst (Hugo 11:27)
       e.preventDefault();
       if (desk || busy()) return;
       titleQuick();
@@ -2867,20 +2871,45 @@
     root.classList.add('is-ready');
     startIntro();
     if (!introOn) mbShow();
-    // Text der Spalten muss ganz hineinpassen (Computer): sonst Schrift schrittweise kleiner, höchstens bis 0.8rem
+    // Hugo 12:19: Text der Spalten in einem festen Bereich (Computer), Schrift bleibt gleich. Passt er nicht hinein, scrollt er
+    // im Bereich (Mausrad/Trackpad) mit dem Wort-Effekt wie im Handy-About: beim Öffnen steht er normal da, beim Scrollen
+    // gehen die Wörter oben hinaus (aufsteigen, ausblenden), unten kommen sie herein, solange noch Text darunter liegt.
     function fitSides() {
       if (!desk) return;
       slides.forEach(function (s) {
-        var sin = s.sideIn, t = sin && sin.querySelector('.hp-intro-text'); if (!t) return;
-        sin.style.removeProperty('--hp-side-fs'); sin.style.removeProperty('--hp-side-lh');
-        var cs = getComputedStyle(sin), avail = sin.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-        if (!(avail > 0)) return;
-        var gap = parseFloat(cs.rowGap) || 0;
-        function need() { var h = 0, k = sin.children; for (var i = 0; i < k.length; i++) h += k[i].offsetHeight; return h + gap * Math.max(0, k.length - 1); }
-        var rem = parseFloat(getComputedStyle(html).fontSize) || 16, fs = 1.25;
-        sin.classList.remove('is-scroll');
-        while (need() > avail && fs > 0.8) { fs = Math.round((fs - 0.05) * 100) / 100; sin.style.setProperty('--hp-side-fs', fs + 'rem'); sin.style.setProperty('--hp-side-lh', (fs * 1.2) + 'rem'); }
-        if (need() > avail) sin.classList.add('is-scroll');   // immer noch zu lang: Spalte scrollt (Mausrad), oben und unten weich ausgeblendet
+        var sin = s.sideIn, box = sin && sin.querySelector('.hp-side-box'), t = box && box.querySelector('.hp-intro-text'); if (!t) return;
+        if (s.sideOrig != null) t.innerHTML = s.sideOrig; else s.sideOrig = t.innerHTML;
+        s.sideWords = null; box.scrollTop = 0;
+        var over = box.scrollHeight > box.clientHeight + 2;
+        sin.classList.toggle('is-scroll', over);
+        if (!over) return;
+        var ps = t.querySelectorAll('p'); if (!ps.length) ps = [t];
+        var ws = [];
+        [].forEach.call(ps, function (p) {
+          var list = (p.textContent || '').split(/\s+/).filter(Boolean); if (!list.length) return;
+          p.innerHTML = '';
+          list.forEach(function (w, i) { var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp); if (i < list.length - 1) p.appendChild(document.createTextNode(' ')); ws.push({ el: sp }); });
+        });
+        var top = null, k = 0, br = box.getBoundingClientRect();
+        ws.forEach(function (W) { var r = W.el.getBoundingClientRect(), y = r.top - br.top; if (top === null || Math.abs(y - top) > 2) { top = y; k = 0; } W.y = y; W.h = r.height || 20; W.k = k++; });
+        s.sideWords = ws;
+        if (!box.hpWords) { box.hpWords = true; box.addEventListener('scroll', function () { if (!box.hpRaf) box.hpRaf = requestAnimationFrame(function () { box.hpRaf = 0; sideWords(s, box); }); }, { passive: true }); }
+        sideWords(s, box);
+      });
+    }
+    function sideWords(s, box) {
+      var ws = s.sideWords; if (!ws) return;
+      var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
+      var oE = -4 + 20 * g, oS = 70 * g, zT = Math.max(4, oS - oE);
+      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.16, rem);
+      ws.forEach(function (W) {
+        var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - (y + W.h) - 5 * W.k) / zB);
+        if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
+        out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
+        var ty = 22 * (1 - inn) - 28 * out;
+        W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
+        W.el.style.opacity = (inn * (1 - out)).toFixed(3);
       });
     }
     var fitSidesT = 0;
