@@ -168,7 +168,7 @@
     '[data-hp] .hp-info-fix { position: absolute; left: 0; right: 0; bottom: calc(5vh + 4.4rem + env(safe-area-inset-bottom, 0px)); z-index: 2; padding: 0 5vw 0 var(--hp-info-left, 5vw); pointer-events: none; color: var(--hp-info-fg, #000); }',
     /* Hugo 11:34 (Video perappelgren.de): Zeile für Zeile – jede Zeile blendet zum Rand hin selbst aus, beim Scrollen bleiben
        untere Zeilen leicht zurück Code: infoLines / linesTick */
-    '[data-hp] .hp-info-panel .hp-line { display: block; will-change: transform, opacity; }',
+    '[data-hp] .hp-info-panel .hp-w { display: inline-block; will-change: transform, opacity; opacity: 0; }',
     '[data-hp] .hp-info-fix .hp-info-btns > * { pointer-events: auto; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
@@ -1920,38 +1920,52 @@
     // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
     function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
     infoPanel.addEventListener('scroll', stuckCheck, { passive: true });
-    // ---------- About-Text Zeile für Zeile (Hugo 11:34, wie perappelgren.de) ----------
-    var lines = [], linesRaf = 0, linesOrig = '';
+    // ---------- About-Text Wort für Wort wie perappelgren.de (Hugo 11:40) ----------
+    // Appelgren (Code nachgeschaut): jedes Wort steigt mit easeOutQuart 22 px auf und blendet ein, versetzt nach seiner
+    // Reihenfolge; beim Verlassen easeInOutCubic aus und 28 px nach oben. Hier: beim Öffnen des About laufen die sichtbaren
+    // Wörter zeitlich gestaffelt ein, beim Scrollen langer Texte kommen die Wörter unten genauso herein und gehen oben hinaus.
+    var lines = [], words = [], linesRaf = 0, linesOrig = '', wordsT0 = 0;
     function infoLines() {
-      linesOrig = infoText.innerHTML; lines = [];
+      linesOrig = infoText.innerHTML; lines = []; words = [];
       [].forEach.call(infoText.querySelectorAll('p'), function (p) {
-        var words = (p.textContent || '').split(/\s+/).filter(Boolean); if (!words.length) return;
+        var ws = (p.textContent || '').split(/\s+/).filter(Boolean); if (!ws.length) return;
         p.innerHTML = '';
-        var ws = words.map(function (w, i) { var sp = document.createElement('span'); sp.textContent = w + (i < words.length - 1 ? ' ' : ''); p.appendChild(sp); return sp; });
-        var groups = [], top = null;
-        ws.forEach(function (sp) { var t = sp.offsetTop; if (top === null || Math.abs(t - top) > 2) { groups.push([]); top = t; } groups[groups.length - 1].push(sp.textContent); });
-        p.innerHTML = '';
-        groups.forEach(function (g) { var l = document.createElement('span'); l.className = 'hp-line'; l.textContent = g.join(''); p.appendChild(l); lines.push({ el: l, s: null }); });
+        ws.forEach(function (w, i) {
+          var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp);
+          if (i < ws.length - 1) p.appendChild(document.createTextNode(' '));
+          words.push({ el: sp });
+        });
       });
-      lines.forEach(function (L) { L.y = L.el.offsetTop; });
+      var top = null, li = -1, k = 0;
+      words.forEach(function (W) {
+        var t = W.el.offsetTop; if (top === null || Math.abs(t - top) > 2) { top = t; li++; k = 0; }
+        W.y = t; W.h = W.el.offsetHeight || 20; W.k = k++; W.line = li;
+      });
+      lines = words;
+      // Reihenfolge fürs Einlaufen: nur die beim Öffnen sichtbaren Wörter zählen (r = 0 … 1)
+      var H2 = infoPanel.clientHeight, vis = words.filter(function (W) { return W.y + W.h < H2; });
+      var n = Math.max(1, vis.length - 1); vis.forEach(function (W, i) { W.r = i / n; });
+      wordsT0 = performance.now() + Math.round(CONFIG.infoMs * 0.3);
     }
     function linesTick() {
       linesRaf = 0;
-      if (!lines.length || !root.classList.contains('is-info')) return;
+      if (!words.length || !root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);   // unten: über dem festen Knopf
       var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.16, more = false;
-      // Hugo 11:36 (perappelgren.de im Code nachgeschaut): Wörter blenden beim Verlassen mit easeInOutCubic aus und gleiten dabei
-      // bis 28 px nach oben, beim Hereinkommen mit easeOutQuart ein und steigen 22 px auf. Hier Zeile für Zeile, gemessen an der
-      // Lage der Zeile im sichtbaren Bereich (oben ab dem Textanfang, unten ab dem Knopf).
-      lines.forEach(function (L) {
-        var lh = L.el.offsetHeight || 20, y = L.y - st;
+      var el = performance.now() - wordsT0;
+      words.forEach(function (W) {
+        var y = W.y - st;
+        // zeitlich beim Öffnen: 700 ms pro Wort, Start über 650 ms gestaffelt
+        var tin = 1;
+        if (W.r != null && !reduce) { tin = eOQ(clamp((el - 650 * W.r) / 700, 0, 1)); if (tin < 1) more = true; }
         var out = reduce ? 0 : eIOC(clamp((topB - y) / zT, 0, 1));
-        var inn = reduce ? 1 : eOQ(clamp((botB - 24 - (y + lh)) / zB, 0, 1));   // 24 px Luft: die Zeile rutscht beim Hereinkommen 22 px tiefer, nie unter den Knopf
-        var o = reduce ? Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + lh)) : inn * (1 - out);
+        var sin = reduce ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 14 * W.k) / zB, 0, 1));   // in der Zeile leicht von links nach rechts versetzt
+        var inn = Math.min(tin, sin);
+        var o = reduce ? Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
-        L.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
-        L.el.style.opacity = o.toFixed(3);
+        W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
+        W.el.style.opacity = o.toFixed(3);
       });
       if (more) linesRaf = requestAnimationFrame(linesTick);
     }
@@ -1960,7 +1974,7 @@
     function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
     function linesKick() { if (!linesRaf) linesRaf = requestAnimationFrame(linesTick); }
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
-    window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); linesKick(); } });
+    window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); wordsT0 = 0; linesKick(); } });
     window.addEventListener('resize', stuckCheck);
     info.appendChild(infoPanel); info.appendChild(infoFix); root.appendChild(info);
     setDialog(info, false);
