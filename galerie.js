@@ -69,6 +69,8 @@
     shakeMs:    380,
     maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
     follow:     0.38,
+    peek:       0.25,    // Hugo 10:39: so viel (Anteil der Bildbreite) ragen die äussersten Bilder beim Start über den Rand (0 = aus)
+    peekMax:    1.5,    // höchstens so stark wird die Fläche dafür auseinandergezogen
     homeEase:   0.075,  // Hugo 10:33: Zurückgleiten auf 100 % nach Tippen neben ein Bild (Anteil pro Bild bei 60 fps, kleiner = weicher)
     // Hugo 25.11. (08:26): Zoom, um an hintere Bilder heranzugehen und wieder heraus. Zwei Finger (Handy), Trackpad-Pinch
     // oder Ctrl + Mausrad (Computer), Tasten + und −. Vordere Bilder wachsen schneller als hintere (Tiefe zoomt mit).
@@ -455,6 +457,22 @@
           });
         }
       }
+      // Hugo 25.11. (10:39): die äussersten Bilder ragen beim Start etwas über den Bildschirmrand hinaus, damit man aufs
+      // Ziehen kommt (Handy und Computer). Reicht die Fläche nicht so weit, wird sie gleichmässig etwas auseinandergezogen
+      // (nur grösser, nie kleiner), getrennt für links/rechts und oben/unten.
+      if (CONFIG.peek > 0 && slots.length > 4) {   // sehr wenige Bilder (z. B. Singer mit 2): bleiben ganz sichtbar
+        var spread = function (ax, half) {
+          var f = 1;
+          [-1, 1].forEach(function (side) {
+            var best = null, bestE = -1e9;
+            slots.forEach(function (sl) { var v = sl[ax] * side, h = (ax === 'x' ? sl.w : sl.h) * sl.s / 2; if (v + h > bestE) { bestE = v + h; best = { v: v, h: h }; } });
+            if (best && best.v > 1) f = Math.max(f, (half + CONFIG.peek * best.h * 2 - best.h) / best.v);   // so weit, dass peek × Bildbreite draussen liegt
+          });
+          f = Math.min(f, CONFIG.peekMax);
+          if (f > 1) slots.forEach(function (sl) { sl[ax] *= f; });
+        };
+        spread('x', VW / 2); spread('y', VH / 2);
+      }
       spreadDepth(R, cell);
       cam.x = cam.y = tgt.x = tgt.y = 0; Z = tZ = 1; zr = 0; dF = tdF = 1;
       drawOrder = slots.slice().sort(function (a, b) { return a.d - b.d; });   // hinten zuerst, vorne zuletzt
@@ -487,6 +505,7 @@
     // weiches Einrasten bei 100 %: um den Punkt herum wird der Zoom gebremst (die Kurve ist dort flacher), aber nie angehalten
     function snapMap(r) { var B = CONFIG.snapWidth; return r - CONFIG.snapPull * B * Math.tanh(r / B); }
     function zoomRaw(px, py, nr) {
+      glide = false;   // neues Zoomen übernimmt sofort
       var lo = Math.log(CONFIG.zoomMin), hi = Math.log(CONFIG.zoomMax);
       zr = clamp(nr, lo - 0.02, hi + 0.02);
       var nz = clamp(Math.exp(snapMap(zr)), CONFIG.zoomMin, CONFIG.zoomMax);
@@ -660,11 +679,13 @@
       } else if (mode === 'idle') {
         if (!drag) inertia(dtf);
         // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
-        var k = 1 - Math.pow(1 - (glide ? CONFIG.homeEase : CONFIG.follow), dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
+        var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
+        // Hugo 10:38 (Video): nur der Zoom gleitet langsam zurück, Ziehen bleibt normal (vorher war beides gebremst)
+        var kz = glide ? 1 - Math.pow(1 - CONFIG.homeEase, dtf) : k;
         var km = 1 - Math.pow(1 - CONFIG.mouseEase, dtf), kf = 1 - Math.pow(1 - CONFIG.focusEase, dtf);
         if (Z > 1.01 || tZ > 1.01) { var fd = focusDepth(); if (fd != null) tdF = fd; }
         var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3 || Math.abs(tmo.x - mo.x) > .03 || Math.abs(tmo.y - mo.y) > .03;
-        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * kf; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
+        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * kz; if (glide && Math.abs(tZ - Z) < 1e-3) glide = false; dF += (tdF - dF) * kf; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
         else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; glide = false; }
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
@@ -909,7 +930,6 @@
           return;
         }
       }
-      if (glide) { glide = false; tZ = Z; zr = Math.log(Z); tgt.x = cam.x; tgt.y = cam.y; }   // neues Antippen/Ziehen fängt das Zurückgleiten dort auf, wo es gerade ist
       down = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse', lx: e.clientX, ly: e.clientY, t: performance.now(), moved: false };
       vel.x = vel.y = 0;
       tgt.x = cam.x; tgt.y = cam.y;   // fängt die Fläche dort, wo man sie sieht
