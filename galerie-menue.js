@@ -1,13 +1,15 @@
-/* GALERIE-MENÜ · Projektseiten (Creator, Singer, Model) · hugosophian.studio
+/* GALERIE-MENÜ + STUDIO · alle Seiten ausser der Homepage · hugosophian.studio
+   Hugo 25.11. (09:34): «studio» im Menü schaltet die Seite ebenfalls ab wie ein Röhren-TV, der Punkt geht kurz und knapp
+   aus, dann die Homepage mit ihrer Ladeanimation.
    Hugo 25.11. (08:55): Im Menü einer Projektseite steht statt «zurück» jetzt «zur galerie». Antippen schaltet die Seite ab
    wie ein alter Röhrenfernseher – genau wie der Weg Homepage → Galerie (home.js, crtOff) – und die Galerie öffnet mit
    Lichtpunkt und Knall. Alchemist-Projekte bleiben wie sie sind. Geladen vom Website-Skript «GalerieMenue». */
 (function () {
   var MAP = [['/creator-projects/', '/creator'], ['/singer-projects/', '/singer'], ['/model/', '/model-2027']];
   var hit = MAP.filter(function (r) { return location.pathname.indexOf(r[0]) === 0; })[0];
-  if (!hit || window.__gxMenu) return;
+  if ((location.pathname.replace(/\/$/, '') || '/') === '/' || window.__gxMenu) return;
   window.__gxMenu = true;
-  var GAL = hit[1];
+  var GAL = hit ? hit[1] : '';
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var CRT = { squashMs: 220, lineMs: 440 };   // gleiche Werte wie home.js
     var NEEDLE_D = 'M0 10 C 260 9.7, 400 8.6, 455 5.2 C 478 1.2, 522 1.2, 545 5.2 C 600 8.6, 740 9.7, 1000 10 C 740 10.3, 600 11.4, 545 14.8 C 522 18.8, 478 18.8, 455 14.8 C 400 11.4, 260 10.3, 0 10 Z';
@@ -60,8 +62,8 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) crtReset(); });
     function crtOff(done) {
       if (crtFx) return;
-      if (!document.getElementById('hp-crt-css')) {
-        var st = document.createElement('style'); st.id = 'hp-crt-css'; st.textContent = crtCss; document.head.appendChild(st);
+      if (!document.getElementById('hp-crt-css-m')) {
+        var st = document.createElement('style'); st.id = 'hp-crt-css-m'; st.textContent = crtCss; document.head.appendChild(st);
       }
       var R = document.documentElement, b = document.body, A = CRT.squashMs, L = CRT.lineMs;
       crtFx = document.createElement('div'); crtFx.className = 'hp-crt'; crtFx.setAttribute('aria-hidden', 'true');
@@ -119,9 +121,36 @@
       if (reduce) { leave(); return; }
       crtOff(leave);
     }
+    // «studio»: kurz abschalten, Punkt geht aus, dann Homepage (mit Ladeanimation). Fängt den Klick vor den anderen
+    // Übergängen ab (MenueWeich, SeitenuebergaengeStil), darum auf window in der Capture-Phase.
+    function homeLink(a) {
+      if (!a || !a.closest('[data-menu-panel], .menu-panel')) return false;
+      try { var u = new URL(a.getAttribute('href'), location.href); return u.origin === location.origin && (u.pathname.replace(/\/$/, '') || '/') === '/'; } catch (er) { return false; }
+    }
+    var homing = false;
+    window.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!homeLink(a) || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (homing) return; homing = true;
+      var leave = function () { if (leave.done) return; leave.done = true; window.hsVT = { to: '/', type: 'crt' }; location.href = '/'; };
+      document.documentElement.classList.remove('menu-open');
+      if (reduce) { leave(); return; }
+      crtOff(function () {
+        var d = crtFx && crtFx.children[3];
+        if (!d || !d.animate) { leave(); return; }
+        d.classList.remove('is-hold');
+        var an = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.55)', opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+        an.onfinish = leave; setTimeout(leave, 400);
+      });
+    }, true);
+    window.addEventListener('pageshow', function (e) { if (e.persisted) homing = false; });
     function setup() {
       var panel = document.querySelector('[data-menu-panel]');
       if (!panel) return false;
+      // MenueWeich lässt Links mit target in Ruhe (es läuft vor diesem Code) → Studio-Links markieren
+      [].forEach.call(panel.querySelectorAll('a[href]'), function (x) { if (homeLink(x)) x.setAttribute('target', '_self'); });
+      if (!GAL) return true;
       var a = [].filter.call(panel.querySelectorAll('a[href]'), function (x) {
         try { return (new URL(x.getAttribute('href'), location.href).pathname.replace(/\/$/, '')) === GAL; } catch (er) { return false; }
       })[0];
