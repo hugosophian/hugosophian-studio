@@ -57,7 +57,7 @@
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
-    needleMs:   420,    // Hugo 09:57: Linie wie beim Fernseher, leuchtet beim Knall kurz auf
+    needleMs:   240,    // Hugo 09:57: Linie wie beim Fernseher, leuchtet beim Knall kurz auf. Hugo 10:00 (Video): schneller weg (vorher 420)
     fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
@@ -738,7 +738,7 @@
       var L = t / CONFIG.needleMs;
       if (L < 1) {
         if (!NEEDLE_P) { NEEDLE_P = new Path2D(NEEDLE_D); CORE_P = new Path2D(CORE_D); }
-        var la = L < 0.06 ? L / 0.06 : 1 - EASEOUT((L - 0.06) / 0.94), W2 = VW * DPR, sx = W2 / 1000 * (1 + 0.06 * OUT3(L));
+        var la = L < 0.06 ? L / 0.06 : Math.pow(1 - (L - 0.06) / 0.94, 2.2), W2 = VW * DPR, sx = W2 / 1000 * (1 + 0.06 * OUT3(L));
         var thick = 18 * DPR * (2.6 - 1.6 * OUT3(Math.min(1, L * 1.6))), sy = thick / 20;
         ctx.globalCompositeOperation = 'screen';
         // Schein (wie .hp-crt-streak)
