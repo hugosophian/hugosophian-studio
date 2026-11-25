@@ -735,7 +735,11 @@
         // (gleich weit, aber weicher): vorher wurde das Foto in der Wellenmitte fast 8-fach zusammengedrückt, das sah aus wie eine Linie
         // Hugo 25.11. (17:15): kein dunkler Streifen in der Welle – vorher zog die eine Hälfte der Welle das Foto nach innen, die andere
         // nach aussen (hell–dunkel–hell auf glatten Flächen). Jetzt schiebt die ganze Welle in eine Richtung: ein einziges weiches Band
-        '    off += dir * (-0.5 * exp(-xd * xd) * envT * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
+        // Hugo 25.11. (17:34): beim Andocken lag die Bahn oben ein Stück im Bild – auf ihren beiden Seiten zeigte die Richtung
+        // entgegengesetzt, das gab eine feine Linie zwischen Farbsaum und Flares. Andocken schiebt jetzt immer zur Bildmitte hin
+        // (eine durchgehende Richtung, keine Kante an der Bahn)
+        '    vec2 dirW = dockW ? normalize(uRes * 0.5 - fc + 0.001) : dir; float sdK = dockW ? 1.0 : smoothstep(0.0, wk, sd);',
+        '    off += dirW * (-0.5 * exp(-xd * xd) * envT * amp * sdK) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         // Hugo 16:19 (Video 16:14): beim Andocken lag ein milchiger Schleier über dem ganzen Foto – das Licht der Andock-Welle
         // leuchtet jetzt nur am Rand voll, innen nur noch 25 % (die Verschiebung = das Wabbern bleibt ganz)
         '    float lk = dockW ? 0.25 + 0.75 * exp(-max(e, 0.0) / (mx * 0.07)) : 1.0;',
