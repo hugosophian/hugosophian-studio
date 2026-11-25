@@ -365,7 +365,7 @@
       if (reduce || !a || !a.animate) return;
       [].forEach.call(a.querySelectorAll('.lib-sort-label .hp-ch, .lib-sort-arrow'), function (c, i) {
         if (c.closest('.hp-go-sh')) return;
-        var bl = desk ? [] : [{ filter: 'blur(4px)' }, { filter: 'blur(0px)' }];   // Hugo 11:17: am Computer ohne Unschärfe (Ruckeln)
+        var bl = [];   // Hugo 11:17: am Computer ohne Unschärfe (Ruckeln) · Hugo 25.11. (18:19, Video): auch am Handy – die Unschärfe auf jedem Buchstaben liess das Öffnen von About ruckeln (Bilder fielen aus, sobald «Galerie öffnen» sich einschrieb)
         try { c.animate([{ opacity: 0, transform: 'translateY(.35em)', filter: bl[0] ? bl[0].filter : 'none' }, { opacity: 1, transform: 'translateY(0)', filter: bl[1] ? bl[1].filter : 'none' }],
           { duration: 420, delay: base + i * 18, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }); } catch (er) {}
         // Hugo 15:47: jeder Buchstabe schimmert beim Einschreiben kurz in Hirsch-Perlmutt und setzt sich dann in seiner Farbe
@@ -2526,9 +2526,13 @@
     }
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
-      infoFix.style.transform = infoPanel.style.transform;   // fester Knopf fährt mit der Seite
-      infoSbW.style.transform = infoPanel.style.transform;
-      infoBg.style.transform = infoPanel.style.transform || 'none';
+      // Hugo 25.11. (18:19, Video): nach «close» blitzte kurz die weisse Seite mit «Galerie öffnen» auf – geschlossen setzte der
+      // weisse Grund sich auf «none» (= offen) und der Knopf auf seine Grundlage, bis 1.5 s später das ganze About unsichtbar wurde.
+      // Geschlossen liegen jetzt alle Ebenen ausdrücklich rechts ausserhalb
+      var tOut = infoPanel.style.transform || 'translate3d(100%,0,0)';
+      infoFix.style.transform = tOut;   // fester Knopf fährt mit der Seite
+      infoSbW.style.transform = tOut;
+      infoBg.style.transform = tOut;
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
       // ohne Sonne (Mario): Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       else if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
