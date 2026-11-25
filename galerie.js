@@ -57,7 +57,7 @@
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
-    needleMs:   240,    // Hugo 09:57: Linie wie beim Fernseher, leuchtet beim Knall kurz auf. Hugo 10:00 (Video): schneller weg (vorher 420)
+    needleMs:   520,    // Hugo 09:57: Linie wie beim Fernseher. Hugo 10:03: darf etwas länger bleiben, blendet von der Mitte nach aussen aus
     fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
@@ -710,7 +710,24 @@
     // Ein weicher, nicht ganz weisser Lichtschein (kleiner heller Kern) und darüber schillernde Farbwolken (Pink, Blau,
     // Mint, Gelb, Violett), die sich langsam drehen und mit dem Licht aufblühen, plus ein schillernder Streifen am
     // Horizont wie die Nadel. Gleiche Zeiten wie vorher (sphereMs, fadeMs).
-    var NEEDLE_P = null, CORE_P = null, NEEDLE_G = null;
+    var NEEDLE_S = null, NEEDLE_T = null;
+    // Nadel wie beim Fernseher (home.js crtOff), einmal in Bildschirmbreite gemalt, mit Leuchten
+    function needleStrip(W2) {
+      if (NEEDLE_S && NEEDLE_S.width === Math.round(W2)) return NEEDLE_S;
+      var c = document.createElement('canvas'), H = Math.round(90 * DPR); c.width = Math.round(W2); c.height = H;
+      var x = c.getContext('2d'), sx = c.width / 1000, sy = 36 * DPR / 20;
+      x.setTransform(sx, 0, 0, sy, 0, H / 2 - 10 * sy);
+      var ng = x.createLinearGradient(0, 0, 1000, 0);
+      [[0, '#ff6ad5'], [.12, '#c774e8'], [.22, '#ad8cff'], [.32, '#8795e8'], [.42, '#94d0ff'], [.5, '#ffffff'], [.58, '#94d0ff'], [.68, '#8ff7c8'], [.78, '#fff38a'], [.88, '#ffb86b'], [1, '#ff6ad5']]
+        .forEach(function (q) { ng.addColorStop(q[0], q[1]); });
+      x.shadowColor = 'rgba(190,170,255,.75)'; x.shadowBlur = 16 * DPR; x.fillStyle = ng; x.fill(new Path2D(NEEDLE_D));
+      x.shadowColor = 'rgba(255,255,255,.9)'; x.shadowBlur = 4 * DPR; x.fillStyle = '#fff'; x.fill(new Path2D(CORE_D));
+      NEEDLE_S = c; return c;
+    }
+    function needleTmp(ns) {
+      if (!NEEDLE_T || NEEDLE_T.width !== ns.width || NEEDLE_T.height !== ns.height) { NEEDLE_T = document.createElement('canvas'); NEEDLE_T.width = ns.width; NEEDLE_T.height = ns.height; }
+      return NEEDLE_T;
+    }
     var GLOW = [[255, 106, 213], [148, 208, 255], [143, 247, 200], [255, 243, 138], [173, 140, 255]];
     function paintSphere(t) {
       var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
@@ -734,33 +751,34 @@
         g.addColorStop(0, 'rgba(' + c + ',.78)'); g.addColorStop(.4, 'rgba(' + c + ',.4)'); g.addColorStop(1, 'rgba(' + c + ',0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
       }
-      // Hugo 09:57: die Linie genau wie beim Fernseher (gleiche Nadel-Form und Farben, Schein drumherum), nur kurz aufleuchten
+      // Hugo 09:57: die Linie genau wie beim Fernseher (gleiche Nadel-Form und Farben, Schein drumherum).
+      // Hugo 10:03: beim Knall steht sie ganz da (die Spitzen sieht man kurz, das wirkt stärker), dann blendet sie
+      // von der Mitte nach aussen aus – die Spitzen gehen zuletzt.
       var L = t / CONFIG.needleMs;
       if (L < 1) {
-        if (!NEEDLE_P) { NEEDLE_P = new Path2D(NEEDLE_D); CORE_P = new Path2D(CORE_D); }
-        var la = L < 0.06 ? L / 0.06 : Math.pow(1 - (L - 0.06) / 0.94, 2.2), W2 = VW * DPR, sx = W2 / 1000 * (0.15 + 0.95 * OUT3(L));   // Hugo 10:01: schiesst aus der Mitte heraus und ist weg, bevor die Enden aussen ankommen
-        var thick = 18 * DPR * (2.6 - 1.6 * OUT3(Math.min(1, L * 1.6))), sy = thick / 20;
+        var W2 = VW * DPR, la = L < 0.05 ? L / 0.05 : 1, wx = 1 + 0.05 * OUT3(L);
+        var hole = Math.pow(clamp((L - 0.06) / 0.94, 0, 1), 0.85) * 1.15;   // ausgeblendeter Bereich, wächst von der Mitte nach aussen
         ctx.globalCompositeOperation = 'screen';
         // Schein (wie .hp-crt-streak)
-        ctx.globalAlpha = la * 0.85;
-        ctx.setTransform(0.15 + 0.95 * OUT3(L), 0, 0, 0.06 * (1 + 0.8 * (1 - L)), cx, cy);
+        ctx.globalAlpha = la * 0.85 * Math.pow(1 - L, 1.6);
+        ctx.setTransform(wx, 0, 0, 0.06 * (1 + 0.8 * (1 - L)), cx, cy);
         g = ctx.createRadialGradient(0, 0, 0, 0, 0, W2 * 0.8);
         g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(.18, 'rgba(225,205,255,.5)'); g.addColorStop(.45, 'rgba(140,200,255,.14)'); g.addColorStop(.7, 'rgba(0,0,0,0)');
         ctx.fillStyle = g; ctx.fillRect(-W2 * 0.8, -W2 * 0.8, W2 * 1.6, W2 * 1.6);
-        // Nadel
-        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = la;
-        ctx.setTransform(sx, 0, 0, sy, cx - 500 * sx, cy - 10 * sy);
-        if (!NEEDLE_G) {
-          NEEDLE_G = ctx.createLinearGradient(0, 0, 1000, 0);
-          [[0, '#ff6ad5'], [.12, '#c774e8'], [.22, '#ad8cff'], [.32, '#8795e8'], [.42, '#94d0ff'], [.5, '#ffffff'], [.58, '#94d0ff'], [.68, '#8ff7c8'], [.78, '#fff38a'], [.88, '#ffb86b'], [1, '#ff6ad5']]
-            .forEach(function (st) { NEEDLE_G.addColorStop(st[0], st[1]); });
-        }
-        ctx.shadowColor = 'rgba(190,170,255,.75)'; ctx.shadowBlur = 16 * DPR;
-        ctx.fillStyle = NEEDLE_G; ctx.fill(NEEDLE_P);
-        ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 4 * DPR;
-        ctx.fillStyle = '#fff'; ctx.fill(CORE_P);
-        ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // Nadel: einmal vorbereitet (mit Leuchten), pro Bild die Mitte herausgeschnitten
+        var ns = needleStrip(W2), nt = needleTmp(ns), nc = nt.getContext('2d');
+        nc.globalCompositeOperation = 'copy'; nc.drawImage(ns, 0, 0);
+        if (hole > 0) {
+          var hg = nc.createLinearGradient(0, 0, ns.width, 0), a0 = hole * 0.5, a1 = (hole + 0.35) * 0.5, st = [];
+          st.push([0.5 - a1, 0], [0.5 - a0, 1], [0.5 + a0, 1], [0.5 + a1, 0]);
+          st.forEach(function (q) { hg.addColorStop(clamp(q[0], 0, 1), 'rgba(0,0,0,' + q[1] + ')'); });
+          nc.globalCompositeOperation = 'destination-out'; nc.fillStyle = hg; nc.fillRect(0, 0, ns.width, ns.height);
+        }
+        nc.globalCompositeOperation = 'source-over';
+        var th = ns.height * (1.3 - 0.7 * OUT3(Math.min(1, L * 1.6)));   // dick aufleuchten, dann dünner
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = la;
+        ctx.drawImage(nt, cx - W2 * wx / 2, cy - th / 2, W2 * wx, th);
       }
       ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
