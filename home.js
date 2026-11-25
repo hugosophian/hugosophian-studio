@@ -129,7 +129,7 @@
     '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
     /* Text im About scrollt (Finger, Mausrad); unten Platz, damit er über den Close-Knopf hinaus geschoben werden kann */
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
-    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 7.4rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 7.4rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: transparent; color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
     '[data-hp] .hp-sun-light { z-index: 8; mix-blend-mode: screen; visibility: hidden; }',
     '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
@@ -159,6 +159,8 @@
     /* grössere Tippfläche, ohne dass sich das Aussehen ändert */
     '[data-hp] .hp-info-go { position: relative; touch-action: manipulation; }',
     '[data-hp] .hp-info-go::after { content: ""; position: absolute; inset: -14px -16px; }',
+    /* Hugo 14:07: weisser Grund als eigene Ebene hinter dem Feld (fährt mit), damit das Feld selbst eine feste Maske tragen kann */
+    '[data-hp] .hp-info-bg { position: absolute; inset: 0; background: var(--hp-info-bg, #fff); transform: translate3d(100%,0,0); pointer-events: none; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
     /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
@@ -1944,6 +1946,7 @@
     infoScroll.appendChild(infoText);
     var infoFix = document.createElement('div'); infoFix.className = 'hp-info-fix'; infoFix.appendChild(infoBtns);
     var infoSbW = document.createElement('div'), infoSb = null, infoSbSt = 0; infoSbW.className = 'hp-sbar-wrap';
+    var infoBg = document.createElement('div'); infoBg.className = 'hp-info-bg';
     infoPanel.appendChild(infoScroll);
     // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
     function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
@@ -1966,11 +1969,12 @@
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);
       var rem = Math.max(0, pn.scrollHeight - H2 - st);
-      var fT = reduce ? 0 : Math.min(Math.max(0, st), 44), fB = Math.min(rem, 40);   // Hugo 14:00: oben weiter unter dem Titel ausblenden
-      // Maske auf dem Textinhalt (nicht auf dem Feld – sonst würde auch dessen weisser Grund durchsichtig); Lage in Inhalt-Koordinaten
-      var d = st - infoScroll.offsetTop, L = function (v) { return (v + d).toFixed(1) + 'px'; };
-      var m = 'linear-gradient(to bottom, transparent ' + L(topB - 2) + ', #000 ' + L(topB + fT) + ', #000 ' + L(botB - fB) + ', ' + (rem > 0 ? 'transparent ' + L(botB + 1) : '#000 100%') + ')';
-      if (infoScroll.style.webkitMaskImage !== m) { infoScroll.style.webkitMaskImage = m; infoScroll.style.maskImage = m; }
+      var fT = reduce ? 0 : Math.min(Math.max(0, st), 52), fB = Math.min(rem, 52);   // Hugo 14:00: oben weiter unter dem Titel; 14:07 weicher (52 px)
+      // Hugo 14:07 (Video): bei schnellem Schwung lag Text kurz über dem Titel bzw. dem Knopf – die Maske sass auf dem mitlaufenden
+      // Inhalt und wurde nur einmal pro Bild nachgeführt. Jetzt sitzt sie fest auf dem Feld (sein weisser Grund ist eine eigene Ebene),
+      // der Rand bleibt also auch im Schwung genau stehen. Verlauf weicher (mehrere Stufen, smoothstep).
+      var m = 'linear-gradient(to bottom, transparent 0, transparent ' + (topB - 2).toFixed(1) + 'px, ' + softStops(topB - 2, topB + fT, false) + ', ' + (rem > 0 ? softStops(botB - fB, botB + 1, true) + ', transparent 100%' : '#000 100%') + ')';
+      if (pn.style.webkitMaskImage !== m) { pn.style.webkitMaskImage = m; pn.style.maskImage = m; }
       if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
     }
     // ---------- Appelgren 1:1 auf ein festes Textfeld übertragen (Hugo 13:36) ----------
@@ -2012,7 +2016,7 @@
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
     window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); wordsT0 = 0; linesKick(); } });
     window.addEventListener('resize', stuckCheck);
-    info.appendChild(infoPanel); info.appendChild(infoSbW); info.appendChild(infoFix); infoSb = makeSbar(infoSbW); root.appendChild(info);
+    info.appendChild(infoBg); info.appendChild(infoPanel); info.appendChild(infoSbW); info.appendChild(infoFix); infoSb = makeSbar(infoSbW); root.appendChild(info);
     setDialog(info, false);
 
     // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
@@ -2339,7 +2343,7 @@
     if (sun) {
       info.insertBefore(sun.back, infoPanel); root.appendChild(sun.glow);   // Lichtebene über Text UND Titel
       root.classList.add('hp-info-sunlit');
-      infoPanel.style.background = 'transparent';
+      infoPanel.style.background = 'transparent'; infoBg.style.display = 'none';
     }
     // Wand mit Strahlen: am Handy im About, am Computer in der Bühne (für die Sonne nach 1 s Ruhe, Hugo 24.11.)
     function sunHome() {
@@ -2404,6 +2408,7 @@
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       infoFix.style.transform = infoPanel.style.transform;   // fester Knopf fährt mit der Seite
       infoSbW.style.transform = infoPanel.style.transform;
+      infoBg.style.transform = infoPanel.style.transform || 'none';
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
       // ohne Sonne (Mario): Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       else if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
@@ -2962,10 +2967,17 @@
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
       };
     }
+    // weicher Masken-Verlauf: 7 Stufen nach smoothstep zwischen a und b (px); down = von sichtbar zu unsichtbar
+    function softStops(a, b, down) {
+      if (b - a < 0.5) return (down ? 'transparent ' : '#000 ') + b.toFixed(1) + 'px';
+      var out = [];
+      for (var k = 0; k <= 6; k++) { var t = k / 6, e = t * t * (3 - 2 * t), al = down ? 1 - e : e; out.push('rgba(0,0,0,' + al.toFixed(3) + ') ' + (a + (b - a) * t).toFixed(1) + 'px'); }
+      return out.join(', ');
+    }
     function sideWords(s, box) {   // Hugo 13:54: nur noch ins Weiss ausblenden (Maske), keine Wort-Bewegung
       var st = box.scrollTop, H2 = box.clientHeight, rem = Math.max(0, box.scrollHeight - H2 - st);
-      var fT = Math.min(Math.max(0, st), 44), fB = Math.min(rem, 40);   // 14:00: oben länger
-      var m = 'linear-gradient(to bottom, ' + (fT > 0 ? 'transparent 0, ' : '') + '#000 ' + fT.toFixed(1) + 'px, #000 ' + (H2 - fB).toFixed(1) + 'px, ' + (rem > 0 ? 'transparent 100%' : '#000 100%') + ')';
+      var fT = Math.min(Math.max(0, st), 52), fB = Math.min(rem, 52);   // 14:00: oben länger, 14:07 weicher
+      var m = 'linear-gradient(to bottom, ' + (fT > 0 ? softStops(0, fT, false) : '#000 0') + ', ' + (rem > 0 ? softStops(H2 - fB, H2, true) : '#000 100%') + ')';
       if (box.style.webkitMaskImage !== m) { box.style.webkitMaskImage = m; box.style.maskImage = m; }
       if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
     }
