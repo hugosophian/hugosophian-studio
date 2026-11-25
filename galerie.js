@@ -29,7 +29,7 @@
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
     // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
     fewFrom:   7, fewCell: 0.3, fewHoles: 0.25, fewJitter: 0.3,
-    depth:     [0.72, 1.28],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne (Hugo 25.11.: doppelt so stark, vorher 0.86–1.14)
+    depth:     [0.62, 1.24],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne. Hugo 25.11.: hinten halb so schnell wie vorne
     seed:      7,       // anderer Wert = andere Anordnung
     // Ziehen
     speedTouch: 1.0,    // Fingerweg mal
@@ -45,11 +45,11 @@
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
-    fadeMs:     380,    // Licht blendet aus
+    fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
     spin:       70,     // Drehung beim Start (Grad, ±)
-    debris:     5,      // Bilder, die an der Kamera vorbeifliegen
+    debris:     6,      // Bilder, die quer durchs Blickfeld an der Kamera vorbeifliegen und verblassen
     shakePx:    12,     // Erschütterung beim Knall
     shakeMs:    380,
     // Sortierung
@@ -378,31 +378,24 @@
         if (off) { sl.el.classList.remove('is-off'); }   // fliegt durchs Bild, auch wenn es am Ende ausserhalb liegt
         sl.el.animate([
           { transform: tfOf(sl, cx, cy, s0, sl.rot), opacity: 0 },
-          { opacity: 1, offset: .08 },
+          { opacity: 1, offset: .02 },   // gleich sichtbar: man sieht sie aus der Quelle schiessen
           { transform: tfOf(sl, f.x, f.y, 1, 0), opacity: 1 }
         ], { duration: sl.dur, delay: sl.dl, easing: EXPO, fill: 'backwards' });
         longest = Math.max(longest, sl.dur + sl.dl);
       });
-      // Trümmer: ein paar Bilder fliegen gross an der Kamera vorbei
-      var Rr = rng(Date.now() & 4095), m = Math.min(VW, VH);
-      for (i = 0; i < Math.min(CONFIG.debris, Math.max(2, projects.length * 2)); i++) {
-        var p = projects[i % projects.length];
-        var src = p.img.currentSrc || p.img.src; if (!src) continue;
-        var ar = p.img.naturalWidth ? p.img.naturalWidth / p.img.naturalHeight : .8;
-        var w = m * (.22 + Rr() * .16), h = w / ar, ang = Rr() * Math.PI * 2, dur = 520 + Rr() * 260, rot = (Rr() - .5) * 120;
-        var el = document.createElement('div');
-        el.className = 'lib-fly'; el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.zIndex = '15';
-        var im = document.createElement('img'); im.src = src; im.alt = ''; el.appendChild(im);
-        root.appendChild(el);
-        var x0 = cx - w / 2, y0 = cy - h / 2, tx = Math.cos(ang) * VW * 1.1, ty = Math.sin(ang) * VH * 1.1;
-        var an = el.animate([
-          { transform: 'translate3d(' + x0 + 'px,' + y0 + 'px,0) rotate(0deg) scale(.05)', opacity: 0 },
-          { opacity: 1, offset: .08 },
+      // Trümmer: ein paar Bilder fliegen gross quer durchs Blickfeld an der Kamera vorbei und verblassen
+      //  (schon in prepare() gebaut und entpackt, sonst sind sie am iPhone im Flug noch leer)
+      debrisEls.forEach(function (d) {
+        d.el.style.visibility = '';
+        var an = d.el.animate([
+          { transform: 'translate3d(' + d.x0 + 'px,' + d.y0 + 'px,0) rotate(0deg) scale(.05)', opacity: 0 },
+          { opacity: 1, offset: .06 },
           { opacity: 1, offset: .45 },
-          { transform: 'translate3d(' + (x0 + tx) + 'px,' + (y0 + ty) + 'px,0) rotate(' + rot + 'deg) scale(2.65)', opacity: 0 }
-        ], { duration: dur, easing: 'cubic-bezier(.33,1,.68,1)', fill: 'forwards' });
-        an.onfinish = (function (e) { return function () { e.remove(); }; })(el);
-      }
+          { transform: 'translate3d(' + (d.x0 + d.tx) + 'px,' + (d.y0 + d.ty) + 'px,0) rotate(' + d.rot + 'deg) scale(2.65)', opacity: 0 }
+        ], { duration: d.dur, delay: d.dl, easing: 'cubic-bezier(.33,1,.68,1)', fill: 'both' });
+        an.onfinish = (function (e) { return function () { e.remove(); }; })(d.el);
+      });
+      debrisEls = [];
       clearTimeout(bangT);
       setTimeout(function () { root.classList.add('is-in'); mbShow(); }, 300);
       bangT = setTimeout(function () {
@@ -411,10 +404,33 @@
       }, Math.max(longest, CONFIG.sphereMs + CONFIG.fadeMs) + 40);
     }
     // Vor dem Knall: alle Karten (auch die Kopien) entpacken, damit im Moment des Knalls nichts einfriert
+    var debrisEls = [];
+    function makeDebris() {
+      debrisEls.forEach(function (d) { d.el.remove(); }); debrisEls = [];
+      if (reduce || !projects.length) return;
+      var VWn = window.innerWidth, VHn = window.innerHeight, cx = VWn / 2, cy = VHn / 2, m = Math.min(VWn, VHn);
+      var Rr = rng(Date.now() & 4095), n = Math.min(CONFIG.debris, Math.max(2, projects.length * 2));
+      for (var i = 0; i < n; i++) {
+        var p = projects[i % projects.length];
+        var src = p.img.currentSrc || p.img.src; if (!src) continue;
+        var ar = p.img.naturalWidth ? p.img.naturalWidth / p.img.naturalHeight : .8;
+        var w = m * (.22 + Rr() * .16), h = w / ar;
+        // Richtungen gleichmässig verteilt, damit sie quer durchs ganze Bild gehen
+        var ang = (i + Rr() * .7) / n * Math.PI * 2;
+        var el = document.createElement('div');
+        el.className = 'lib-fly'; el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.zIndex = '15'; el.style.visibility = 'hidden';
+        var im = document.createElement('img'); im.src = src; im.alt = ''; el.appendChild(im);
+        root.appendChild(el);
+        debrisEls.push({ el: el, img: im, x0: cx - w / 2, y0: cy - h / 2, tx: Math.cos(ang) * VWn * 1.15, ty: Math.sin(ang) * VHn * 1.15,
+          rot: (Rr() - .5) * 120, dur: 560 + Rr() * 300, dl: Rr() * 60 });
+      }
+    }
     function prepare(then) {
       var done = false;
       function go() { if (!done) { done = true; then(); } }
-      Promise.all(slots.map(function (sl) { return sl.img && sl.img.decode ? sl.img.decode().catch(function () {}) : null; })).then(go);
+      makeDebris();
+      var imgs = slots.map(function (sl) { return sl.img; }).concat(debrisEls.map(function (d) { return d.img; }));
+      Promise.all(imgs.map(function (im) { return im && im.decode ? im.decode().catch(function () {}) : null; })).then(go);
       setTimeout(go, reduce ? 0 : CONFIG.decodeMax);
     }
 
