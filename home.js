@@ -208,14 +208,11 @@
     '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
     '[data-hp] .hp-sbar i { position: absolute; left: -1.5px; width: 5px; top: 0; border-radius: 5px; will-change: transform;',
     '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #a9c4ff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
-    '  background-size: 100% 260%; animation: hpSbarIri 2.4s linear infinite; animation-play-state: paused; }',
-    '[data-hp] .hp-sbar.is-active i { animation-play-state: running; }',   /* Hugo 12:24: Farben wandern nur beim Scrollen */
+    '  background-size: 100% 260%; background-repeat: repeat-y; }',   /* Hugo 12:28: Farben wandern nur mit dem Scrollen (Lage aus der Scroll-Position, makeSbar), keine Zeit-Animation */
     '[data-hp] .hp-sbar i {',
     '  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);',
     '  filter: drop-shadow(0 0 3px rgba(173,140,255,.85)) drop-shadow(0 0 9px rgba(148,208,255,.6)); }',
     /* Hugo 12:26: ohne weissen Kern und ohne Weiss im Verlauf */
-    '@keyframes hpSbarIri { from { background-position: 0 0; } to { background-position: 0 -260%; } }',
-    '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-sbar i { animation: none; } }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -2931,6 +2928,7 @@
           if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
           var tl = Math.max(36, h * ch / sh), p = Math.max(0, Math.min(1, st / (sh - ch)));
           th.style.height = tl.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((h - tl) * p).toFixed(1) + 'px,0)';
+          var tile = tl * 2.6; th.style.backgroundPosition = '0 ' + (-((st * 0.45) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
