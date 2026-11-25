@@ -58,6 +58,7 @@
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
     hint:       'Zoom & dr\u00fcck auf die Bilder',   // Hugo 10:22: Hinweis ganz hinten, steht still ('' = keiner)
+    hintZoom:   'Dr\u00fcck ins Schwarze',   // Hugo 10:48: so lange gezoomt ist, schreibt sich der Hinweis Buchstabe für Buchstabe hierzu um
     needleMs:   680,    // Hugo 09:57: Linie wie beim Fernseher. Hugo 10:03: blendet ab dem Knall von der Mitte nach aussen aus. Hugo 10:07: minimal länger (vorher 520)
     fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
@@ -141,6 +142,11 @@
     '  font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; opacity: 0; transition: opacity 1.2s ease .5s; }',
     '@media (max-width: 767px) { [data-lib] .gx-hint { font-size: 3.2vw !important; } }',
     '[data-lib].is-in .gx-hint { opacity: .6; }',
+    '[data-lib] .gx-hint { min-height: 1.5em; }',
+    '[data-lib] .gx-hint-l { position: absolute; left: 0; top: 0; width: 100%; text-align: center; padding-left: .12em; box-sizing: border-box; }',
+    '[data-lib] .gx-hint-l > span { display: inline-block; white-space: pre; transition: opacity .42s ease, filter .42s ease, transform .42s cubic-bezier(.22,1,.36,1); }',
+    '[data-lib] .gx-hint-l.is-out > span { opacity: 0; filter: blur(4px); transform: translateY(-.35em); }',
+    '[data-lib] .gx-hint-l.is-pre > span { opacity: 0; filter: blur(4px); transform: translateY(.35em); transition: none; }',
     /* Hugo 25.11. (07:14): unsichtbare Klickfläche so gross wie der Menü-Knopf (Grösse misst der Code: --gx-hit-w / --gx-hit-h) */
     '[data-lib] .lib-bottom .ps-label, [data-lib] .lib-sort { position: relative; }',
     '[data-lib] .lib-bottom .ps-label { width: fit-content; }',   /* Klickfläche sitzt auf dem Wort, nicht auf der ganzen Zeile */
@@ -264,12 +270,30 @@
     var ctx = cv.getContext('2d');
     var wheel = document.createElement('div'); wheel.className = 'lib-wheel';
     // Hinweis ganz hinten: vor der Zeichenfläche ins Dokument, damit die Bilder darüber liegen
-    var hint = null;
+    var hint = null, hintNow = '';
+    // Hinweis als einzelne Buchstaben, damit er sich Buchstabe für Buchstabe umschreiben kann (Hugo 10:48)
+    function hintLayer(txt, pre) {
+      var l = document.createElement('div'); l.className = 'gx-hint-l' + (pre ? ' is-pre' : '');
+      for (var i = 0; i < txt.length; i++) { var c = document.createElement('span'); c.textContent = txt.charAt(i); l.appendChild(c); }
+      return l;
+    }
+    function setHint(txt) {
+      if (!hint || !txt || txt === hintNow) return;
+      hintNow = txt;
+      var olds = [].slice.call(hint.querySelectorAll('.gx-hint-l:not(.is-out)'));
+      olds.forEach(function (o) {
+        [].forEach.call(o.children, function (c, i) { c.style.transitionDelay = (i * 14) + 'ms'; });
+        o.classList.add('is-out'); setTimeout(function () { o.remove(); }, 420 + o.children.length * 14 + 60);
+      });
+      var nl = hintLayer(txt, true); hint.appendChild(nl);
+      [].forEach.call(nl.children, function (c, i) { c.style.transitionDelay = (120 + i * 18) + 'ms'; });
+      void nl.offsetWidth; nl.classList.remove('is-pre');
+    }
     if (CONFIG.hint) {
       var hintSrc = root.querySelector('.lib-bottom .ps-label');
       hint = document.createElement('div'); hint.setAttribute('aria-hidden', 'true');
       hint.className = (hintSrc ? hintSrc.className + ' ' : '') + 'gx-hint';
-      hint.textContent = CONFIG.hint;
+      hint.appendChild(hintLayer(CONFIG.hint, false)); hintNow = CONFIG.hint;
       if (hintSrc) hint.style.fontFamily = getComputedStyle(hintSrc).fontFamily;
       stage.appendChild(hint);
     }
@@ -687,6 +711,7 @@
         var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3 || Math.abs(tmo.x - mo.x) > .03 || Math.abs(tmo.y - mo.y) > .03;
         if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * kz; if (glide && Math.abs(tZ - Z) < 1e-3) glide = false; dF += (tdF - dF) * kf; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
         else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; glide = false; }
+        if (hint && CONFIG.hintZoom) setHint(Math.abs(tZ - 1) > 0.04 ? CONFIG.hintZoom : CONFIG.hint);   // gezoomt: «Drück ins Schwarze»
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
       } else if (dirty) {   // Vorschau offen: nur neu malen, wenn sich etwas ändert (Karte aus-/eingeblendet)
