@@ -130,7 +130,11 @@
     '[data-lib] .lib-bottom .ps-label { font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; }',
     '@media (max-width: 767px) { [data-lib] .lib-bottom .ps-label { font-size: 3.2vw !important; } }',
     /* Hugo 25.11. (10:22): Hinweis ganz hinten (hinter den Bildern), gleiche Schrift wie Bereichsname und Filter, steht still */
-    '[data-lib] .gx-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; white-space: nowrap; pointer-events: none; color: #fff;',
+    /* Hugo 10:30: am Handy nicht mittig (Webflow-Klasse des Bereichsnamens gab Breite/Ausrichtung mit) → alles fest: so breit wie die
+       Zeichenfläche (setzt der Code), Text mittig; padding-left gleicht den Buchstabenabstand nach dem letzten Zeichen aus */
+    '[data-lib] .gx-hint { position: absolute !important; left: 0 !important; right: auto !important; bottom: auto !important; top: 50%; width: 100%; max-width: none !important;',
+    '  transform: translateY(-50%) !important; margin: 0 !important; padding: 0 0 0 .12em !important; text-align: center !important; display: block !important; float: none !important;',
+    '  white-space: nowrap; pointer-events: none; color: #fff;',
     '  font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; opacity: 0; transition: opacity 1.2s ease .5s; }',
     '@media (max-width: 767px) { [data-lib] .gx-hint { font-size: 3.2vw !important; } }',
     '[data-lib].is-in .gx-hint { opacity: .6; }',
@@ -276,6 +280,7 @@
       var w = Math.round(VW * DPR), h = Math.round(VH * DPR);
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
+      if (hint) { hint.style.width = VW + 'px'; hint.style.top = (VH / 2) + 'px'; }   // gleiche Mitte wie die Bilder
     }
 
     // ---------- Projekte einlesen (nur aus dem eigenen Ordner) ----------
