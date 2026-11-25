@@ -1308,7 +1308,9 @@
       var go = function () {
         if (go.done) return; go.done = true;
         html.classList.remove('hp-backin');
-        if (reduce || !root.animate) return;
+        var free = function () { backHold = false; dsunWall(); };
+        if (reduce || !root.animate) { free(); return; }
+        setTimeout(free, desk ? 80 + slides.length * 140 + 1100 : 1000);
         if (desk) slides.forEach(function (s, i) {
           s.el.animate([{ opacity: 0, translate: '-48px 0' }, { opacity: 1, translate: '0 0' }],
             { duration: 1000, delay: 80 + i * 140, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
@@ -1320,7 +1322,7 @@
       setTimeout(go, 1200);
     }
     function startIntro() {
-      if (backIn) { introOn = false; endIntro(); render(); backFade(); return; }   // zurück aus der Galerie: einblenden statt Ladeanimation
+      if (backIn) { introOn = false; backHold = true; endIntro(); render(); backFade(); return; }   // zurück aus der Galerie: einblenden statt Ladeanimation
       if (!introOn) { render(); return; }
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
@@ -1625,7 +1627,10 @@
       return dx * dx + dy * dy <= 1;
     }
     // Sonnenwand schon einmal zeichnen (Grösse steht, kein Ruckler beim ersten Mal)
-    function dsunWall() { if (sun && desk && !introOn && !dsunLive) { sunHome(); sun.start(); } }
+    // Hugo 25.11. (09:33): beim Einblenden aus der Galerie leuchtete diese weisse Wand zwischen den noch durchsichtigen
+    // Bildern auf → sie startet erst, wenn alle Bilder da sind (backHold)
+    var backHold = false;
+    function dsunWall() { if (sun && desk && !introOn && !dsunLive && !backHold) { sunHome(); sun.start(); } }
     var dsunRz = 0;
     window.addEventListener('resize', function () { clearTimeout(dsunRz); dsunRz = setTimeout(dsunWall, 120); });
     function dsunArm() {

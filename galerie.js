@@ -1353,8 +1353,9 @@
           var d = crtFx && crtFx.children[3], leave = function () { if (leave.done) return; leave.done = true; window.hsVT = { to: '/', type: 'crt' }; location.href = '/'; };
           if (!d || !d.animate) { leave(); return; }
           d.classList.remove('is-hold');
-          var a = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.9)', opacity: 1, offset: .3, easing: 'cubic-bezier(.5,0,.9,.5)' }, { transform: 'scale(0)', opacity: 0 }], { duration: 380, fill: 'forwards' });
-          a.onfinish = leave; setTimeout(leave, 600);
+          // Hugo 09:33: der Punkt springt nicht nochmal, er geht einfach aus – kurz und knapp
+          var a = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.55)', opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+          a.onfinish = leave; setTimeout(leave, 400);
         });
       };
       // Homepage im Voraus holen, damit sie schnell da ist
