@@ -1953,59 +1953,25 @@
     // Reihenfolge; beim Verlassen easeInOutCubic aus und 28 px nach oben. Hier: beim Öffnen des About laufen die sichtbaren
     // Wörter zeitlich gestaffelt ein, beim Scrollen langer Texte kommen die Wörter unten genauso herein und gehen oben hinaus.
     var lines = [], words = [], linesRaf = 0, linesOrig = '', wordsT0 = 0, infoZB = 0;
+    // Hugo 13:54: keine Wort-Animation mehr – der Text blendet oben und unten nur noch ins Weiss aus (Maske auf dem Feld).
+    // Oben erst, wenn gescrollt ist (Länge wächst mit den ersten 24 px), unten nur, solange darunter noch Text liegt.
+    // Frühere Fassung mit Appelgren-Wortbewegung: @72c1de8 (apChunks/apWord, unten noch vorhanden).
     function infoLines() {
       linesOrig = infoText.innerHTML; lines = []; words = [];
-      [].forEach.call(infoText.querySelectorAll('p'), function (p) {
-        var ws = (p.textContent || '').split(/\s+/).filter(Boolean); if (!ws.length) return;
-        p.innerHTML = '';
-        ws.forEach(function (w, i) {
-          var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp);
-          if (i < ws.length - 1) p.appendChild(document.createTextNode(' '));
-          words.push({ el: sp, p: p });
-        });
-      });
-      var top = null, li = -1, k = 0;
-      words.forEach(function (W) {
-        var t = W.el.offsetTop; if (top === null || Math.abs(t - top) > 2) { top = t; li++; k = 0; }
-        W.y = t; W.h = W.el.offsetHeight || 20; W.k = k++; W.line = li; W.x = W.el.offsetLeft;
-      });
-      lines = words;
-      // Hugo 13:16: am Ende ragte Text über «Galerie öffnen» (die Zone war unter den Rand geschoben). Jetzt: läuft der Text über,
-      // bekommt er unten Luft in Höhe der Einblend-Zone – am Ende steht die letzte Zeile ganz sichtbar über der Zone, nichts springt.
       infoText.style.paddingBottom = '';
-      var pcs = getComputedStyle(infoPanel), pTop = parseFloat(pcs.paddingTop) || 0, pBot = Math.min(infoPanel.clientHeight - (parseFloat(pcs.paddingBottom) || 0), infoFix.offsetTop - 12);
-      infoZB = 0;
-      if (infoPanel.scrollHeight > infoPanel.clientHeight + 2) { infoZB = Math.max(30, (pBot - pTop) * 0.165);   /* 13:49: ¼ kürzer */ infoText.style.paddingBottom = Math.round(infoZB + 30) + 'px'; }   // Hugo 13:45: Zone kleiner
-      apChunks(words, (pBot - pTop) * 0.39);
-      wordsT0 = performance.now() + Math.round(CONFIG.infoMs * 0.3);
     }
     function linesTick() {
       linesRaf = 0;
-      if (!words.length || !root.classList.contains('is-info')) return;
+      if (!root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
-      var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);   // unten: über dem festen Knopf
-      // Hugo 12:17: beim Öffnen steht der Text ganz normal da; erst beim Scrollen setzt der Effekt ein (g: 0 → 1 über die ersten 24 px)
-      // und der Übergang liegt etwas unter dem Titel: ab 70 px unter dem Textanfang ausblenden, 16 px darunter ganz weg
-      // (mit dem Aufsteigen um bis zu 28 px endet es knapp unter dem Titel, nicht darüber).
-      var g = reduce ? 1 : clamp(st / 24, 0, 1);
-      // Hugo 12:56 (Video perappelgren Bild für Bild gemessen): beim Verlassen/Hereinkommen öffnet sich der Zeilenabstand über
-      // etwa 4 Zeilen wellenförmig (bis ~5 px je Zeile) und Wörter weiter rechts in der Zeile sind später dran. Darum breitere Zonen
-      // (oben ~115 px, unten 18 %) und 9 px Versatz pro Wort in der Zeile – die Zeile läuft schräg wie eine Welle aus und ein.
-      var oE = topB - 4 + 20 * g, oS = topB + 45 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: halbiert (130 → 75), 13:49 nochmal halbiert (→ 45)
-      var tb = oE;
-      // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
-      // Hugo 13:09: unten «tauschte» es plötzlich – die Zone wurde zum Ende hin schmaler (an den Rest gekoppelt), dadurch sprangen
-      // Wörter auf voll. Jetzt bleibt die Zone gleich gross und gleitet zum Ende hin unter den Rand (shB), stetig. Breiter wie bei
-      // Appelgren (Hereinkommen über ~45 % der Höhe, easeOutQuart): die Zeilen rollen wie eine Welle herein.
-      var zB = infoZB, more = false;
-      words.forEach(function (W) {
-        var y = W.y - st, f = apWord(W, st, oS, zT, botB, zB, reduce, topB - 4 - 30 * (1 - g));
-        var o = reduce ? Math.min(smooth(oE, oS, y), zB ? smooth(botB, botB - zB, y + W.h) : 1) : f.o;
-        W.el.style.transform = (reduce || !f.ty) ? '' : 'translate3d(0,' + f.ty.toFixed(2) + 'px,0)';
-        W.el.style.opacity = o.toFixed(3);
-      });
+      var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);
+      var rem = Math.max(0, pn.scrollHeight - H2 - st);
+      var fT = reduce ? 0 : Math.min(Math.max(0, st), 28), fB = Math.min(rem, 40);
+      // Maske auf dem Textinhalt (nicht auf dem Feld – sonst würde auch dessen weisser Grund durchsichtig); Lage in Inhalt-Koordinaten
+      var d = st - infoScroll.offsetTop, L = function (v) { return (v + d).toFixed(1) + 'px'; };
+      var m = 'linear-gradient(to bottom, transparent ' + L(topB - fT - 1) + ', #000 ' + L(topB) + ', #000 ' + L(botB - fB) + ', ' + (rem > 0 ? 'transparent ' + L(botB + 1) : '#000 100%') + ')';
+      if (infoScroll.style.webkitMaskImage !== m) { infoScroll.style.webkitMaskImage = m; infoScroll.style.maskImage = m; }
       if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
-      if (more) linesRaf = requestAnimationFrame(linesTick);
     }
     // ---------- Appelgren 1:1 auf ein festes Textfeld übertragen (Hugo 13:36) ----------
     // Sein Code (perappelgren.de, About): o = (vh − top)/(vh + Höhe) für die ganze Sektion (Sektion = 900 px = Bildschirm, Text 352 px
@@ -2954,20 +2920,8 @@
         var over = box.scrollHeight > box.clientHeight + 2;
         sin.classList.toggle('is-scroll', over);
         if (!s.sbar) s.sbar = makeSbar(sin);
-        if (!over) { s.sbar.hide(); return; }
-        s.sideZB = Math.max(30, box.clientHeight * 0.165); t.style.paddingBottom = Math.round(s.sideZB + 30) + 'px';   // Luft am Ende (13:16), Zone kleiner (13:45)
+        if (!over) { s.sbar.hide(); box.style.webkitMaskImage = box.style.maskImage = ''; return; }
         s.sbarSt = 0;
-        var ps = t.querySelectorAll('p'); if (!ps.length) ps = [t];
-        var ws = [];
-        [].forEach.call(ps, function (p) {
-          var list = (p.textContent || '').split(/\s+/).filter(Boolean); if (!list.length) return;
-          p.innerHTML = '';
-          list.forEach(function (w, i) { var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp); if (i < list.length - 1) p.appendChild(document.createTextNode(' ')); ws.push({ el: sp, p: p }); });
-        });
-        var top = null, k = 0, br = box.getBoundingClientRect();
-        ws.forEach(function (W) { var r = W.el.getBoundingClientRect(), y = r.top - br.top; if (top === null || Math.abs(y - top) > 2) { top = y; k = 0; } W.y = y; W.h = r.height || 20; W.k = k++; W.x = r.left - br.left; });
-        apChunks(ws, box.clientHeight * 0.39);
-        s.sideWords = ws;
         if (!box.hpWords) { box.hpWords = true; box.addEventListener('scroll', function () { if (!box.hpRaf) box.hpRaf = requestAnimationFrame(function () { box.hpRaf = 0; sideWords(s, box); }); }, { passive: true }); }
         sideWords(s, box);
       });
@@ -3008,19 +2962,11 @@
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
       };
     }
-    function sideWords(s, box) {
-      var ws = s.sideWords; if (!ws) return;
-      var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
-      // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
-      // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
-      var oE = -4 + 34 * g, oS = 60 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: oben halbiert (140 → 90), 13:49 nochmal (→ 60)
-      var zB = s.sideZB || 0;
-      ws.forEach(function (W) {
-        var f = apWord(W, st, oS, zT, H2, zB, reduce, -4 - 30 * (1 - g));
-        if (reduce) { var yy = W.y - st; W.el.style.transform = ''; W.el.style.opacity = Math.min(clamp((yy - oE) / Math.max(1, oS - oE), 0, 1), zB ? clamp((H2 - yy - W.h) / zB, 0, 1) : 1).toFixed(3); return; }
-        W.el.style.transform = f.ty ? 'translate3d(0,' + f.ty.toFixed(2) + 'px,0)' : '';
-        W.el.style.opacity = f.o.toFixed(3);
-      });
+    function sideWords(s, box) {   // Hugo 13:54: nur noch ins Weiss ausblenden (Maske), keine Wort-Bewegung
+      var st = box.scrollTop, H2 = box.clientHeight, rem = Math.max(0, box.scrollHeight - H2 - st);
+      var fT = Math.min(Math.max(0, st), 28), fB = Math.min(rem, 40);
+      var m = 'linear-gradient(to bottom, ' + (fT > 0 ? 'transparent 0, ' : '') + '#000 ' + fT.toFixed(1) + 'px, #000 ' + (H2 - fB).toFixed(1) + 'px, ' + (rem > 0 ? 'transparent 100%' : '#000 100%') + ')';
+      if (box.style.webkitMaskImage !== m) { box.style.webkitMaskImage = m; box.style.maskImage = m; }
       if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
     }
     var fitSidesT = 0;
