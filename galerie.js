@@ -57,6 +57,7 @@
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
+    hint:       'Zoom & dr\u00fcck auf die Bilder',   // Hugo 10:22: Hinweis ganz hinten, steht still ('' = keiner)
     needleMs:   680,    // Hugo 09:57: Linie wie beim Fernseher. Hugo 10:03: blendet ab dem Knall von der Mitte nach aussen aus. Hugo 10:07: minimal länger (vorher 520)
     fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
@@ -128,6 +129,11 @@
     /* Hugo 25.11. (07:10): Bereichsname gleich gross wie die Schrift der Sortierung (lib-top) */
     '[data-lib] .lib-bottom .ps-label { font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; }',
     '@media (max-width: 767px) { [data-lib] .lib-bottom .ps-label { font-size: 3.2vw !important; } }',
+    /* Hugo 25.11. (10:22): Hinweis ganz hinten (hinter den Bildern), gleiche Schrift wie Bereichsname und Filter, steht still */
+    '[data-lib] .gx-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; white-space: nowrap; pointer-events: none; color: #fff;',
+    '  font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; opacity: 0; transition: opacity 1.2s ease .5s; }',
+    '@media (max-width: 767px) { [data-lib] .gx-hint { font-size: 3.2vw !important; } }',
+    '[data-lib].is-in .gx-hint { opacity: .6; }',
     /* Hugo 25.11. (07:14): unsichtbare Klickfläche so gross wie der Menü-Knopf (Grösse misst der Code: --gx-hit-w / --gx-hit-h) */
     '[data-lib] .lib-bottom .ps-label, [data-lib] .lib-sort { position: relative; }',
     '[data-lib] .lib-bottom .ps-label { width: fit-content; }',   /* Klickfläche sitzt auf dem Wort, nicht auf der ganzen Zeile */
@@ -250,6 +256,16 @@
     var cv = document.createElement('canvas'); cv.className = 'gx-canvas'; cv.setAttribute('aria-hidden', 'true');
     var ctx = cv.getContext('2d');
     var wheel = document.createElement('div'); wheel.className = 'lib-wheel';
+    // Hinweis ganz hinten: vor der Zeichenfläche ins Dokument, damit die Bilder darüber liegen
+    var hint = null;
+    if (CONFIG.hint) {
+      var hintSrc = root.querySelector('.lib-bottom .ps-label');
+      hint = document.createElement('div'); hint.setAttribute('aria-hidden', 'true');
+      hint.className = (hintSrc ? hintSrc.className + ' ' : '') + 'gx-hint';
+      hint.textContent = CONFIG.hint;
+      if (hintSrc) hint.style.fontFamily = getComputedStyle(hintSrc).fontFamily;
+      stage.appendChild(hint);
+    }
     stage.appendChild(cv); stage.appendChild(wheel);
     var DPR = 1;
     // Zeichenfläche in Gerätepixeln (iPhone 3×). Riesige Bildschirme werden begrenzt (höchstens ~9 Mio. Pixel).
