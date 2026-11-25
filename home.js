@@ -166,6 +166,10 @@
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
     '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 2.8rem 0 .6rem; margin-top: -2.8rem;',   /* Hugo 11:22: Weiss beginnt höher (vorher 1.4rem) */
     '  background: linear-gradient(to bottom, transparent, var(--hp-info-bg, #fff) 55%); box-shadow: 0 3rem 0 0 var(--hp-info-bg, #fff), 0 6rem 0 0 var(--hp-info-bg, #fff), 0 9rem 0 0 var(--hp-info-bg, #fff), 0 12rem 0 0 var(--hp-info-bg, #fff); }',   /* Streifen reicht bis unten: kein Text zwischen Knopf und Close */
+    /* Hugo 11:23: oben gleich – der Text läuft beim Scrollen unter einem weissen Band durch, das wie unten 2.8rem weich ausläuft.
+       Das Band liegt im Innenabstand oben (über dem Textanfang) und klebt dort; Titel und Schriftzug liegen darüber */
+    '[data-hp] .hp-info-scroll::before { content: ""; display: block; flex: 0 0 auto; position: sticky; top: calc(-1 * var(--hp-info-top, 30vh)); z-index: 2; pointer-events: none;',
+    '  height: var(--hp-info-top, 30vh); margin: calc(-1 * var(--hp-info-top, 30vh)) 0 -2.2vh; background: linear-gradient(to bottom, var(--hp-info-bg, #fff) calc(100% - 2.8rem), transparent); }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
