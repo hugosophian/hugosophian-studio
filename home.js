@@ -1975,7 +1975,7 @@
       infoText.style.paddingBottom = '';
       var pcs = getComputedStyle(infoPanel), pTop = parseFloat(pcs.paddingTop) || 0, pBot = Math.min(infoPanel.clientHeight - (parseFloat(pcs.paddingBottom) || 0), infoFix.offsetTop - 12);
       infoZB = 0;
-      if (infoPanel.scrollHeight > infoPanel.clientHeight + 2) { infoZB = Math.max(40, (pBot - pTop) * 0.22); infoText.style.paddingBottom = Math.round(infoZB + 30) + 'px'; }   // Hugo 13:45: Zone kleiner
+      if (infoPanel.scrollHeight > infoPanel.clientHeight + 2) { infoZB = Math.max(30, (pBot - pTop) * 0.165);   /* 13:49: ¼ kürzer */ infoText.style.paddingBottom = Math.round(infoZB + 30) + 'px'; }   // Hugo 13:45: Zone kleiner
       apChunks(words, (pBot - pTop) * 0.39);
       wordsT0 = performance.now() + Math.round(CONFIG.infoMs * 0.3);
     }
@@ -1991,7 +1991,7 @@
       // Hugo 12:56 (Video perappelgren Bild für Bild gemessen): beim Verlassen/Hereinkommen öffnet sich der Zeilenabstand über
       // etwa 4 Zeilen wellenförmig (bis ~5 px je Zeile) und Wörter weiter rechts in der Zeile sind später dran. Darum breitere Zonen
       // (oben ~115 px, unten 18 %) und 9 px Versatz pro Wort in der Zeile – die Zeile läuft schräg wie eine Welle aus und ein.
-      var oE = topB - 4 + 20 * g, oS = topB + 75 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: Ausblend-Rand oben halbiert (vorher 130)
+      var oE = topB - 4 + 20 * g, oS = topB + 45 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: halbiert (130 → 75), 13:49 nochmal halbiert (→ 45)
       var tb = oE;
       // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
       // Hugo 13:09: unten «tauschte» es plötzlich – die Zone wurde zum Ende hin schmaler (an den Rest gekoppelt), dadurch sprangen
@@ -2036,7 +2036,7 @@
       var i = eIOC(clamp((oS - pEx) / zT, 0, 1));
       var n = zB ? eOQ(clamp((botB - 24 - pIn) / zB, 0, 1)) : 1;
       var y = W.y - st;
-      var edge = (zB ? clamp((botB - (y + W.h)) / 26, 0, 1) : 1) * (topE == null ? 1 : clamp((y - topE) / 26, 0, 1));   // normal ins Weiss
+      var edge = (zB ? clamp((botB - (y + W.h)) / 20, 0, 1) : 1) * (topE == null ? 1 : clamp((y - topE) / 13, 0, 1));   // normal ins Weiss (13:49: oben 13, unten 20 px)
       return { o: n * (1 - i) * edge, ty: 22 * (1 - n) - 28 * i };
     }
     function eOQ(t) { return 1 - Math.pow(1 - t, 4); }
@@ -2955,7 +2955,7 @@
         sin.classList.toggle('is-scroll', over);
         if (!s.sbar) s.sbar = makeSbar(sin);
         if (!over) { s.sbar.hide(); return; }
-        s.sideZB = Math.max(40, box.clientHeight * 0.22); t.style.paddingBottom = Math.round(s.sideZB + 30) + 'px';   // Luft am Ende (13:16), Zone kleiner (13:45)
+        s.sideZB = Math.max(30, box.clientHeight * 0.165); t.style.paddingBottom = Math.round(s.sideZB + 30) + 'px';   // Luft am Ende (13:16), Zone kleiner (13:45)
         s.sbarSt = 0;
         var ps = t.querySelectorAll('p'); if (!ps.length) ps = [t];
         var ws = [];
@@ -3013,7 +3013,7 @@
       var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
-      var oE = -4 + 34 * g, oS = 90 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: oben halbiert (vorher 140)
+      var oE = -4 + 34 * g, oS = 60 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: oben halbiert (140 → 90), 13:49 nochmal (→ 60)
       var zB = s.sideZB || 0;
       ws.forEach(function (W) {
         var f = apWord(W, st, oS, zT, H2, zB, reduce, -4 - 30 * (1 - g));
