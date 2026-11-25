@@ -677,7 +677,11 @@
         // sp > 0: Fingerwelle (gleichmässig); sp < 0: Andock-Welle – schiesst schnell aus dem Rand und wird rasch langsamer,
         // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
         '  float tr = sp > 0.0 ? z * mx * 0.15 * sp * mix(0.45, 1.3, clamp(mix(a.w, b.w, t), 0.0, 1.35)) : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Hugo 25.11. (08:26): ruhige Welle läuft weniger weit, kräftige weiter   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
-        '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
+        // Hugo 25.11. (17:40): Andock-Bahn mit Vorzeichen (aussen negativ) – sonst hatte der Abstand genau auf der Bahn einen Knick, und wo
+        // die Bahn oben im Bild liegt, sah man ihre Ecken als feine gestufte Linie
+        '  vec2 nI = l2 > 0.01 ? vec2(-ab.y, ab.x) / sqrt(l2) : vec2(0.0, 1.0); nI *= dot(nI, uRes * 0.5 - a.xy) < 0.0 ? -1.0 : 1.0;',
+        '  float ds = sp < 0.0 ? dot(fc - a.xy, nI) : d;',   // Andocken: Abstand zur Linie des Abschnitts (überall stetig, innen positiv)
+        '  return ds - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo;',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
@@ -738,7 +742,7 @@
         // Hugo 25.11. (17:34): beim Andocken lag die Bahn oben ein Stück im Bild – auf ihren beiden Seiten zeigte die Richtung
         // entgegengesetzt, das gab eine feine Linie zwischen Farbsaum und Flares. Andocken schiebt jetzt immer zur Bildmitte hin
         // (eine durchgehende Richtung, keine Kante an der Bahn)
-        '    vec2 dirW = dockW ? normalize(uRes * 0.5 - fc + 0.001) : dir; float sdK = dockW ? 1.0 : smoothstep(0.0, wk, sd);',
+        '    vec2 dirW = dockW ? normalize(uRes * 0.5 - fc + 0.001) : dir; float sdK = dockW ? 1.0 : smoothstep(0.0, wk * 2.5, sd);',   // Hugo 25.11. (17:41): entlang der Fingerbahn sanfter (vorher wurde das Foto zur Bahn hin gestaucht – Linie, v. a. mit dem Andocken zusammen)
         '    off += dirW * (-0.5 * exp(-xd * xd) * envT * amp * sdK) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         // Hugo 16:19 (Video 16:14): beim Andocken lag ein milchiger Schleier über dem ganzen Foto – das Licht der Andock-Welle
         // leuchtet jetzt nur am Rand voll, innen nur noch 25 % (die Verschiebung = das Wabbern bleibt ganz)
@@ -746,12 +750,12 @@
         '    float r = env * amp * gA * lk; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
-        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
+        '    edge = max(edge, exp(-0.25 * (x + sqrt(x * x + 0.09)) * (x + sqrt(x * x + 0.09))) * exp(-0.5 * (sqrt(x * x + 0.09) - x) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on * gA * lk);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
-        '    float xo = max(x, 0.0);',
+        '    float xo = 0.5 * (x + sqrt(x * x + 0.09));',   // Hugo 25.11. (17:41): weicher Übergang an der Wellenfront (vorher Knick bei x = 0 → zarte Linie um die Welle)
         '    vec2 dn = dot(dir, dir) > 1e-5 ? normalize(dir) : vec2(1.0, 0.0);',
         // Hugo 24.11.: Andock-Flares mit eigener Richtung – jede Stelle der Front neigt ihre Flares anders (langsam
         // wanderndes Feld); so laufen sie schräg, kreuzen sich und fliessen weiter ineinander, statt alle zur Mitte zu zeigen
@@ -850,7 +854,7 @@
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
         '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA * uRim; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
-        '    vec2 nin = wxy / max(length(wxy), 1e-4);',
+        '    vec2 nin = normalize(uRes * 0.5 - fc + 0.001);',   // Hugo 25.11. (17:40): zur Bildmitte (stetig) – vorher kippte die Richtung auf der Diagonale aus jeder Ecke (feine schräge Linie oben rechts)
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.16)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 * (0.45 + 0.9 * smoothstep(0.3, 0.9, patch)) + min(fI, 1.2) * 1.1) * fade * kE;',   // 16:19: von den hellen Stellen aus, ungleich
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
         // Hugo 25.11. (17:27): wie bei der Fingerwelle keine Streifen mehr – das Wabbern (v. a. unter den Flares, wo es am stärksten
@@ -876,7 +880,7 @@
         '    u = 1.0 - abs(1.0 - abs(u));',
         '    float inside = 1.0;',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
-        '    vec2 ca = off * 0.08 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
+        '    vec2 ca = off * 0.04 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
         '    vec2 iuA = 1.0 - abs(1.0 - abs(iu + ca)), iuB = 1.0 - abs(1.0 - abs(iu - ca));',
         '    vec3 img = vec3(texture2D(uImg, iuA).r, texture2D(uImg, iu).g, texture2D(uImg, iuB).b);',
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
