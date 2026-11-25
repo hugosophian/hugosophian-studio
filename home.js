@@ -1966,10 +1966,10 @@
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);
       var rem = Math.max(0, pn.scrollHeight - H2 - st);
-      var fT = reduce ? 0 : Math.min(Math.max(0, st), 28), fB = Math.min(rem, 40);
+      var fT = reduce ? 0 : Math.min(Math.max(0, st), 44), fB = Math.min(rem, 40);   // Hugo 14:00: oben weiter unter dem Titel ausblenden
       // Maske auf dem Textinhalt (nicht auf dem Feld – sonst würde auch dessen weisser Grund durchsichtig); Lage in Inhalt-Koordinaten
       var d = st - infoScroll.offsetTop, L = function (v) { return (v + d).toFixed(1) + 'px'; };
-      var m = 'linear-gradient(to bottom, transparent ' + L(topB - fT - 1) + ', #000 ' + L(topB) + ', #000 ' + L(botB - fB) + ', ' + (rem > 0 ? 'transparent ' + L(botB + 1) : '#000 100%') + ')';
+      var m = 'linear-gradient(to bottom, transparent ' + L(topB - 2) + ', #000 ' + L(topB + fT) + ', #000 ' + L(botB - fB) + ', ' + (rem > 0 ? 'transparent ' + L(botB + 1) : '#000 100%') + ')';
       if (infoScroll.style.webkitMaskImage !== m) { infoScroll.style.webkitMaskImage = m; infoScroll.style.maskImage = m; }
       if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
     }
@@ -2964,7 +2964,7 @@
     }
     function sideWords(s, box) {   // Hugo 13:54: nur noch ins Weiss ausblenden (Maske), keine Wort-Bewegung
       var st = box.scrollTop, H2 = box.clientHeight, rem = Math.max(0, box.scrollHeight - H2 - st);
-      var fT = Math.min(Math.max(0, st), 28), fB = Math.min(rem, 40);
+      var fT = Math.min(Math.max(0, st), 44), fB = Math.min(rem, 40);   // 14:00: oben länger
       var m = 'linear-gradient(to bottom, ' + (fT > 0 ? 'transparent 0, ' : '') + '#000 ' + fT.toFixed(1) + 'px, #000 ' + (H2 - fB).toFixed(1) + 'px, ' + (rem > 0 ? 'transparent 100%' : '#000 100%') + ')';
       if (box.style.webkitMaskImage !== m) { box.style.webkitMaskImage = m; box.style.maskImage = m; }
       if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
