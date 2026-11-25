@@ -76,6 +76,11 @@
     waveSlow:   0.08,   // bis hier ruhigste Welle
     waveFast:   1.2,    // ab hier volle Stärke (wie bisher)
     waveCalm:   0.3,    // Stärke der ruhigsten Welle (1 = wie bisher)
+    // Hugo 25.11. (09:21): am Computer werden die Wellen erst später stark – auch etwas mehr Bewegung bleibt noch ruhig,
+    // die kräftigen setzen erst bei schneller Maus ein (Maus-Tempo ist höher als Finger-Tempo)
+    waveSlowDesk: 0.2,  // Computer: bis hier ruhigste Welle (px/ms)
+    waveFastDesk: 3.0,  // Computer: ab hier volle Stärke
+    waveCurveDesk: 1.8, // Computer: >1 = Stärke steigt erst spät steil an
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
     ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
     ldFlares:   0,      // Ladeanimation: Flares und Flare-Fäden beim Andocken
@@ -302,7 +307,7 @@
         // Link zur Galerie im Stil von „Alle Projekte ↓“ (wie im About am Handy), Pfeil nach rechts
         var a = document.createElement('a'); a.className = 'lib-sort hp-info-go';
         a.href = s.href; a.tabIndex = -1;
-        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Open gallery';
+        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Galerie öffnen';
         var ar = document.createElement('span'); ar.className = 'lib-sort-arrow'; ar.setAttribute('aria-hidden', 'true'); ar.textContent = '\u2192';
         a.appendChild(al); a.appendChild(ar);
         a.addEventListener('click', function (e) { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); go(s.href); } });
@@ -349,8 +354,6 @@
     // Hugo 24.11.: Start-Karte über den Link wählen – z. B. hugosophian.studio/?model oder /?creator (auch ?start=model
     // oder #model). Passt auf den CMS-Namen (mechanic, kunst, musik, persona) oder den Titel (Alchemist, Creator, Singer, Model).
     // Diese Karte fliegt in der Mitte ein und ist danach das erste Bild; ohne Angabe wie bisher die erste Karte.
-    // Hugo 25.11. (08:55): zurück aus der Galerie soll schnell gehen → ohne Lade- und Einflug-Animation direkt beim Bild
-    var retFast = false;
     (function () {
       var keys = [];
       try {
@@ -360,7 +363,7 @@
       } catch (e) {}
       if (location.hash.length > 1) keys.push(decodeURIComponent(location.hash.slice(1)));
       // Hugo 25.11.: zurück aus einer Galerie (Bereichsname unten links) → beim Bild dieses Bereichs starten
-      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); retFast = true; sessionStorage.removeItem('hp-return'); } } catch (e) {}
+      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); sessionStorage.removeItem('hp-return'); } } catch (e) {}
       function hpath(h) { try { return new URL(h, location.href).pathname.replace(/\/$/, '').toLowerCase(); } catch (e) { return ''; } }
       for (var q = 0; q < keys.length; q++) {
         var key = String(keys[q]).trim().toLowerCase();
@@ -918,7 +921,8 @@
           wv.v = wv.v == null ? v : wv.v * 0.65 + v * 0.35;
         }
         wv.px = x; wv.py = y; wv.pt = now;
-        var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0);
+        var sk = desk ? Math.pow(sm01(CONFIG.waveSlowDesk, CONFIG.waveFastDesk, wv.v || 0), CONFIG.waveCurveDesk) : sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0);
+        var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sk;
         if (wv.v != null && !wv.vk) { wv.vk = true; if (pts[0]) pts[0].m = mStr; }   // der erste Punkt kannte das Tempo noch nicht
         if (!last) { pts.push({ x: x, y: y, t: now, m: mStr }); wv.sp = 14; }
         else {
@@ -1291,9 +1295,32 @@
       mbShow();
       dsunWall();
     }
+    // ---------- Zurück aus der Galerie (Hugo 25.11., 09:21) ----------
+    // Die Galerie schaltet ab wie ein Röhren-TV, hier steht der Lichtpunkt sofort (Seiten-Head: html.hp-dotin::after).
+    // Er bleibt, bis die Bilder bereit sind, blitzt kurz auf und geht aus – dann kommen die Bilder wie bei der Ladeanimation.
+    var dotIn = false;
+    try { dotIn = html.classList.contains('hp-dotin') || !!sessionStorage.getItem('hp-dotin'); sessionStorage.removeItem('hp-dotin'); } catch (e) {}
+    var dotEl = null;
+    if (dotIn) {
+      dotEl = document.createElement('div'); dotEl.setAttribute('aria-hidden', 'true');
+      dotEl.style.cssText = 'position:fixed;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;z-index:2147483000;pointer-events:none;'
+        + 'box-shadow:0 0 6px 2px #fff,0 0 16px 5px rgba(255,110,220,.55),0 0 30px 10px rgba(120,210,255,.45),0 0 56px 18px rgba(255,230,120,.22);'
+        + 'animation:hpDotP 1.1s ease-in-out infinite,hpDotH 2.4s linear infinite';
+      html.appendChild(dotEl);
+      html.classList.remove('hp-dotin');
+    }
+    function dotOut(cb) {
+      if (!dotEl) { cb(); return; }
+      var d = dotEl; dotEl = null;
+      if (reduce || !d.animate) { d.remove(); cb(); return; }
+      d.style.animation = 'none';
+      var a = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(2.2)', opacity: 1, offset: .35, easing: 'cubic-bezier(.5,0,.9,.5)' }, { transform: 'scale(0)', opacity: 0 }], { duration: 420, fill: 'forwards' });
+      var fired = false, go = function () { if (fired) return; fired = true; d.remove(); cb(); };
+      a.onfinish = go; setTimeout(go, 700);
+    }
+    window.addEventListener('pageshow', function (e) { if (e.persisted && dotEl) { dotEl.remove(); dotEl = null; } });
     function startIntro() {
-      if (!introOn) { render(); return; }
-      if (retFast) { endIntro(); render(); return; }   // zurück aus der Galerie: sofort fertig beim Bild
+      if (!introOn) { dotOut(function () {}); render(); return; }
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
       var done = false;
@@ -1302,8 +1329,10 @@
         // Kommt man über „zum Studio“ (Seite gleitet nach oben weg), setzt die Animation leicht versetzt ein
         var d = document.documentElement.classList.contains('hs-vt-studio') ? CONFIG.vtDelay : 0;
         setTimeout(function () {
-          if (LD) LD.ready(function () { introT0 = 0; kick(); });   // Ladeanimation: erst wenn der Schriftzug lange genug leuchtete
-          else { introT0 = 0; kick(); }
+          dotOut(function () {   // zurück aus der Galerie: erst geht der Lichtpunkt aus
+            if (LD) LD.ready(function () { introT0 = 0; kick(); });   // Ladeanimation: erst wenn der Schriftzug lange genug leuchtete
+            else { introT0 = 0; kick(); }
+          });
         }, d);
       }
       Promise.all(imgs.map(function (im) {
@@ -1776,7 +1805,7 @@
     infoText.removeAttribute('id'); if (!inText) infoText.className = 'hp-intro-text';
     var infoBtns = document.createElement('div'); infoBtns.className = 'hp-info-btns';
     var infoOpen = document.createElement('a'); infoOpen.className = 'lib-sort hp-info-go';
-    var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Open gallery';
+    var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Galerie öffnen';
     var infoGoArrow = document.createElement('span'); infoGoArrow.className = 'lib-sort-arrow'; infoGoArrow.setAttribute('aria-hidden', 'true'); infoGoArrow.textContent = '\u2192';
     infoOpen.appendChild(infoGoLabel); infoOpen.appendChild(infoGoArrow);
     var infoGoSh = document.createElement('span'); infoGoSh.className = 'hp-go-sh'; infoGoSh.setAttribute('aria-hidden', 'true');
@@ -2576,7 +2605,7 @@
       clearTimeout(mbT);
       if (on) {
         b.textContent = mbClose;
-        b.setAttribute('aria-label', 'Close section');
+        b.setAttribute('aria-label', 'Bereich schliessen');
         if (!w.classList.contains('lib-mb')) { w.classList.add('mh-now', 'hp-mb-small'); void w.offsetWidth; w.classList.remove('mh-now'); }
         mbT = setTimeout(function () { w.classList.remove('hp-mb-small'); w.classList.add('lib-mb'); }, CONFIG.infoMs * 0.72);
       } else {
@@ -2584,7 +2613,7 @@
         mbT = setTimeout(function () {
           if (root.classList.contains('is-info')) return;
           b.textContent = mbOrig;
-          b.setAttribute('aria-label', 'Open menu');
+          b.setAttribute('aria-label', 'Menü öffnen');
         }, 700);
       }
     }
@@ -2631,7 +2660,7 @@
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
-      if (reduce || retFast) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer · zurück aus der Galerie: ohne
+      if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
       html.classList.add('hp-ldpre');
       if (!desk && CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten nur am Handy (am Computer wieder entfernt)
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');

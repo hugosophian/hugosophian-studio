@@ -1,5 +1,5 @@
 /* GALERIE-MENÜ · Projektseiten (Creator, Singer, Model) · hugosophian.studio
-   Hugo 25.11. (08:55): Im Menü einer Projektseite steht statt «zurück» jetzt «gallery». Antippen schaltet die Seite ab
+   Hugo 25.11. (08:55): Im Menü einer Projektseite steht statt «zurück» jetzt «zur galerie». Antippen schaltet die Seite ab
    wie ein alter Röhrenfernseher – genau wie der Weg Homepage → Galerie (home.js, crtOff) – und die Galerie öffnet mit
    Lichtpunkt und Knall. Alchemist-Projekte bleiben wie sie sind. Geladen vom Website-Skript «GalerieMenue». */
 (function () {
@@ -126,7 +126,7 @@
         try { return (new URL(x.getAttribute('href'), location.href).pathname.replace(/\/$/, '')) === GAL; } catch (er) { return false; }
       })[0];
       if (!a) return false;
-      a.textContent = 'gallery'; a.setAttribute('aria-label', 'Back to the gallery');
+      a.textContent = 'zur galerie'; a.setAttribute('aria-label', 'Zurück zur Galerie');
       a.setAttribute('target', '_self');   // der Menü-Übergang (MenueWeich) lässt Links mit target in Ruhe → hier eigener Ablauf
       a.addEventListener('click', go);
       var open = document.querySelector('[data-menu-open]');
