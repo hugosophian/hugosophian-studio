@@ -82,6 +82,9 @@
     // Hugo 25.11. (08:10): langsam wischen = schmale, ruhige Welle; schnell = kräftige. Jeder Punkt der Fingerbahn merkt
     // sich das Tempo dort, die Welle ist entlang der Bahn gemischt. Tempo in px pro ms (Finger/Maus):
     waveSlow:   0.12,   // bis hier ruhigste Welle (Hugo 17:03: vorher 0.08)
+    waveShort:  20,     // Handy: kurze Wischer – ab hier wächst die Kraft mit dem Weg (px) (Hugo 17:13)
+    waveLong:   280,    // Handy: ab diesem Weg (px) volle Kraft aus dem Tempo
+    waveShortK: 0.15,   // Handy: Anteil der Tempo-Kraft bei ganz kurzem Wischer
     waveCurve:  1.5,    // Handy: >1 = langsames Scrollen bleibt länger ruhig (Hugo 17:03)
     waveFast:   1.2,    // ab hier volle Stärke (wie bisher)
     waveCalm:   0.3,    // Stärke der ruhigsten Welle (1 = wie bisher)
@@ -1055,9 +1058,13 @@
         if (wv.px != null) {
           var dtm = Math.max(4, now - wv.pt), v = Math.hypot(x - wv.px, y - wv.py) / dtm;
           wv.v = wv.v == null ? v : wv.v * 0.65 + v * 0.35;
+          wv.dist = (wv.dist || 0) + Math.hypot(x - wv.px, y - wv.py);
         }
         wv.px = x; wv.py = y; wv.pt = now;
         var sk = desk ? Math.pow(sm01(CONFIG.waveSlowDesk, CONFIG.waveFastDesk, wv.v || 0), CONFIG.waveCurveDesk) : Math.pow(sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0), CONFIG.waveCurve);
+        // Hugo 25.11. (17:13): kurze Wischer am Handy (oft benutzt, schnell, aber kurz) machen nur eine kleine Welle –
+        // die Kraft aus dem Tempo wächst erst mit dem Weg des Fingers (ab waveShort bis waveLong px voll)
+        if (!desk) sk *= CONFIG.waveShortK + (1 - CONFIG.waveShortK) * sm01(CONFIG.waveShort, CONFIG.waveLong, wv.dist || 0);
         var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sk;
         if (desk) mStr += CONFIG.waveBoostDesk * sm01(CONFIG.waveFastDesk, CONFIG.waveTopDesk, wv.v || 0);   // ganz schnell: über die Grenze
         if (wv.v != null && !wv.vk) { wv.vk = true; if (pts[0]) pts[0].m = mStr; }   // der erste Punkt kannte das Tempo noch nicht
