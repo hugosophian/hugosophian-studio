@@ -962,6 +962,9 @@
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
       c.uniform1i(U.uImg, 0);
+      // Hugo 25.11. (17:19): beim ersten Start von Safari ruckelte der Aufprall (~0.2 s Stillstand, Video 17:18). Safari übersetzt
+      // das Effekt-Programm erst beim ersten Zeichnen – jetzt sofort beim Laden (schwarzer Bildschirm), einmal 1 × 1 Pixel
+      try { c.viewport(0, 0, 1, 1); c.uniform1f(U.uHas, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4); c.readPixels(0, 0, 1, 1, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array(4)); c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT); c.viewport(0, 0, cv.width, cv.height); } catch (er) {}
       var cache = {};   // Bilder für den Effekt (eigene Kopien mit CORS; klappt das nicht, gibt es nur den Regenbogen)
       // Computer: Leinwand über der ganzen Bühne (über den Bildern, unter Titeln und Textspalte)
       function sm01(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
@@ -976,9 +979,15 @@
           var src = srcOf(sl.img); if (!src || cache[src]) return;
           var e = cache[src] = { im: new Image(), ok: false };
           e.im.crossOrigin = 'anonymous'; e.im.onload = function () {
-            // verkleinerte Kopie (höchstens 1400 px): das Neuzeichnen beim Eintauchen und Zurückzoomen geht so viel schneller
-            try { var nw = e.im.naturalWidth, nh = e.im.naturalHeight, k = Math.min(1, 1400 / Math.max(nw, nh)); if (k < 1) { var sc0 = document.createElement('canvas'); sc0.width = Math.round(nw * k); sc0.height = Math.round(nh * k); sc0.getContext('2d').drawImage(e.im, 0, 0, sc0.width, sc0.height); e.sm = sc0; } } catch (er) {}
-            e.ok = true; compSig = '';
+            // verkleinerte, fertig entpackte Kopie: das Neuzeichnen beim Aufprall, Ziehen und Eintauchen geht so viel schneller.
+            // Hugo 25.11. (17:19): erst entpacken lassen (decode, nicht im Haupt-Thread) und in einer ruhigen Lücke kopieren –
+            // beim ersten Start musste Safari sonst genau beim Aufprall das ganze Foto entpacken (Stillstand)
+            function mk() {
+              try { var nw = e.im.naturalWidth, nh = e.im.naturalHeight, k = Math.min(1, (weak ? 1400 : 1800) / Math.max(nw, nh)); var sc0 = document.createElement('canvas'); sc0.width = Math.round(nw * k); sc0.height = Math.round(nh * k); sc0.getContext('2d').drawImage(e.im, 0, 0, sc0.width, sc0.height); e.sm = sc0; } catch (er) {}
+              e.ok = true; compSig = '';
+            }
+            var dp = e.im.decode ? e.im.decode() : null;
+            if (dp && dp.then) dp.then(function () { idle(mk); }, function () { idle(mk); }); else idle(mk);
           }; e.im.src = src;
         });
       }
@@ -1019,7 +1028,7 @@
         if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
         cctx.fillStyle = '#000'; cctx.fillRect(0, 0, cw2, ch2);
         parts.forEach(function (p) {
-          var useSm = p.e.sm && weak, srcI = useSm ? p.e.sm : p.e.im, iw = useSm ? p.e.sm.width : (p.e.im.naturalWidth || 1), ih = useSm ? p.e.sm.height : (p.e.im.naturalHeight || 1), ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
+          var useSm = !!p.e.sm, srcI = useSm ? p.e.sm : p.e.im, iw = useSm ? p.e.sm.width : (p.e.im.naturalWidth || 1), ih = useSm ? p.e.sm.height : (p.e.im.naturalHeight || 1), ra = p.ir.width / Math.max(1, p.ir.height), ia = iw / ih;
           var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
           var op = objPos(p.im), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
           cctx.save();
