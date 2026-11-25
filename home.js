@@ -698,7 +698,8 @@
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
-        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
+        // Hugo 25.11. (17:27): Andock-Welle mit weicherem Übergang zwischen den Abschnitten ihrer Bahn – sonst Knickfalten (feine Linien)
+        '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * (uB[k].w > 0.0 ? 0.5 : 1.6));',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
         '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0, sm = 0.0, sa = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
@@ -848,7 +849,9 @@
         '    vec2 nin = wxy / max(length(wxy), 1e-4);',
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.16)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 * (0.45 + 0.9 * smoothstep(0.3, 0.9, patch)) + min(fI, 1.2) * 1.1) * fade * kE;',   // 16:19: von den hellen Stellen aus, ungleich
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
-        '    off += (nin * sin(wph) + vec2(-nin.y, nin.x) * 0.5 * cos(wph * 0.7 + 1.3)) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
+        // Hugo 25.11. (17:27): wie bei der Fingerwelle keine Streifen mehr – das Wabbern (v. a. unter den Flares, wo es am stärksten
+        // ist) schob das Foto abwechselnd nach innen und aussen (hell–dunkel–hell). Jetzt nur noch in eine Richtung, weich an- und abschwellend
+        '    off += (nin * (0.5 + 0.5 * sin(wph)) + vec2(-nin.y, nin.x) * 0.25 * (0.5 + 0.5 * cos(wph * 0.7 + 1.3))) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
         '  }',
         '  off *= uGo; eacc *= uGo; faD *= uGo;',
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0, alD = 0.0;',
