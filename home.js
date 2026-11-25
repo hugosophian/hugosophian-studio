@@ -139,6 +139,7 @@
     /* Schrift erbt „Alle Projekte“ in der Library vom Eltern-Element lib-top, darum hier dieselben Werte (live gemessen) */
     '[data-hp] .hp-info-go { color: inherit; text-decoration: none; align-self: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; display: flex; align-items: center; gap: .5em; font-family: "Oswald Studio", sans-serif; font-size: .8rem; font-weight: 500; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; }',
     '[data-hp] .hp-info-go .lib-sort-label { font: inherit; letter-spacing: inherit; }',
+    '[data-hp] .hp-info-go .hp-ch { display: inline-block; white-space: pre; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { font-size: 1.1em; line-height: 1; font-weight: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-label, [data-hp] .hp-info-go .lib-sort-arrow { color: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { transition: transform .45s cubic-bezier(.3,1.7,.55,1); }',
@@ -191,7 +192,7 @@
     // Hugo 24.11.: am Computer schlägt das Bild etwas schwächer ein (2.5 % statt 4 %)
     '@keyframes hp-dock-hit-d { 0% { transform: scale(1); } 12% { transform: scale(1.025); } 38% { transform: scale(0.994); } 65% { transform: scale(1.003); } 100% { transform: scale(1); } }',
     '[data-hp].is-desk.hp-dock-hit .hp-slide .hp-img { animation-name: hp-dock-hit-d; }',
-    '[data-hp].is-desk.hp-dock-hit .hp-title { transition: none; }',   // Hugo 24.11.: Titel am Computer sofort mit dem Schlag da
+    // Hugo 25.11. (10:57): am Computer wie am Handy – Titel blendet zusammen mit dem Logo weich ein (vorher sofort mit dem Schlag da: zu früh)
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
     'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
@@ -277,6 +278,23 @@
     var stage = root.querySelector('.hp-stage');
     if (!stage) return;
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Hugo 25.11. (10:56): «Galerie öffnen» / «Werkstatt betreten» schreiben sich beim Erscheinen Buchstabe für Buchstabe
+    // ein, wie der Hinweis im Hintergrund der Galerie (von unten aus der Unschärfe, links nach rechts, Pfeil zuletzt)
+    function goSplit(label, txt) {
+      label.textContent = '';
+      for (var i = 0; i < txt.length; i++) {
+        var c = document.createElement('span'); c.className = 'hp-ch'; c.textContent = txt.charAt(i); label.appendChild(c);
+      }
+      var a = label.closest ? label.closest('a') : null; if (a) a.setAttribute('aria-label', txt);
+    }
+    function goIn(a, base) {
+      if (reduce || !a || !a.animate) return;
+      [].forEach.call(a.querySelectorAll('.lib-sort-label .hp-ch, .lib-sort-arrow'), function (c, i) {
+        if (c.closest('.hp-go-sh')) return;
+        try { c.animate([{ opacity: 0, filter: 'blur(4px)', transform: 'translateY(.35em)' }, { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0)' }],
+          { duration: 420, delay: base + i * 18, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }); } catch (er) {}
+      });
+    }
     var deskMQ = window.matchMedia('(min-width: ' + CONFIG.desk + 'px) and (hover: hover) and (pointer: fine)');
     var links = {};
     try { links = JSON.parse(root.getAttribute('data-hp-links') || '{}'); } catch (e) {}
@@ -312,9 +330,9 @@
         // Link zur Galerie im Stil von „Alle Projekte ↓“ (wie im About am Handy), Pfeil nach rechts
         var a = document.createElement('a'); a.className = 'lib-sort hp-info-go';
         a.href = s.href; a.tabIndex = -1;
-        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Galerie öffnen';
+        var al = document.createElement('span'); al.className = 'lib-sort-label';
         var ar = document.createElement('span'); ar.className = 'lib-sort-arrow'; ar.setAttribute('aria-hidden', 'true'); ar.textContent = '\u2192';
-        a.appendChild(al); a.appendChild(ar);
+        a.appendChild(al); a.appendChild(ar); goSplit(al, s.btn || 'Galerie öffnen');
         a.addEventListener('click', function (e) { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); go(s.href); } });
         sin.appendChild(a); s.sideLink = a;
       }
@@ -1245,7 +1263,9 @@
         }
         s.side.style.width = Math.max(0, sw).toFixed(2) + 'px';
         s.sideIn.style.width = SW.toFixed(2) + 'px';
-        s.sideIn.style.opacity = clamp((s.o - 0.45) / 0.4, 0, 1).toFixed(3);
+        var sop = clamp((s.o - 0.45) / 0.4, 0, 1);
+        s.sideIn.style.opacity = sop.toFixed(3);
+        if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goIn(s.sideLink, 60); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
         setVis(s, true);
         x += w;
       }
@@ -2350,7 +2370,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45));
       warmGallery(s.href);
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
@@ -2434,7 +2454,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45));
       warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
