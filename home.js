@@ -1961,7 +1961,7 @@
         ws.forEach(function (w, i) {
           var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp);
           if (i < ws.length - 1) p.appendChild(document.createTextNode(' '));
-          words.push({ el: sp });
+          words.push({ el: sp, p: p });
         });
       });
       var top = null, li = -1, k = 0;
@@ -1976,6 +1976,7 @@
       var pcs = getComputedStyle(infoPanel), pTop = parseFloat(pcs.paddingTop) || 0, pBot = Math.min(infoPanel.clientHeight - (parseFloat(pcs.paddingBottom) || 0), infoFix.offsetTop - 12);
       infoZB = 0;
       if (infoPanel.scrollHeight > infoPanel.clientHeight + 2) { infoZB = Math.max(40, (pBot - pTop) * 0.35); infoText.style.paddingBottom = Math.round(infoZB) + 'px'; }
+      apChunks(words, (pBot - pTop) * 0.39);
       // Reihenfolge fürs Einlaufen: nur die beim Öffnen sichtbaren Wörter zählen (r = 0 … 1)
       var H2 = infoPanel.clientHeight, vis = words.filter(function (W) { return W.y + W.h < H2; });
       var n = Math.max(1, vis.length - 1); vis.forEach(function (W, i) { W.r = i / n; });
@@ -2001,31 +2002,40 @@
       // Appelgren (Hereinkommen über ~45 % der Höhe, easeOutQuart): die Zeilen rollen wie eine Welle herein.
       var zB = infoZB, more = false;
       words.forEach(function (W) {
-        var y = W.y - st, tin = 1;
-        // Hugo 13:01: oben normal ausblenden (ganze Zeile gleich), unten die Treppe – stufenlos nach der Lage im Satz (x),
-        // so läuft eine weiche Welle durch die Zeichen wie bei perappelgren.de (dort: Wort-Reihenfolge über den ganzen Text)
-        // Hugo 13:16 (Appelgren Bild für Bild): beim Gehen steht die Zeile schräg – links früher weg, rechts später (~7 px Höhenunterschied)
-        var out = reduce ? 0 : eIOC(clamp((oS - y - 0.08 * (W.x || 0) * g) / zT, 0, 1));
-        var sin = (reduce || !zB) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB, 0, 1));
-        var inn = Math.min(tin, sin);
-        var o = reduce ? Math.min(smooth(oE, oS, y), zB ? smooth(botB, botB - zB, y + W.h) : 1) : inn * (1 - out);
-        var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
-        W.el.style.transform = reduce ? '' : roller(ty, out, inn);
-        W.el.style.transformOrigin = out > 0.001 ? '50% 100%' : '50% 0';
+        var y = W.y - st, f = apWord(W, st, oS, zT, botB, zB, reduce);
+        var o = reduce ? Math.min(smooth(oE, oS, y), zB ? smooth(botB, botB - zB, y + W.h) : 1) : f.o;
+        W.el.style.transform = (reduce || !f.ty) ? '' : 'translate3d(0,' + f.ty.toFixed(2) + 'px,0)';
         W.el.style.opacity = o.toFixed(3);
       });
       if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
       if (more) linesRaf = requestAnimationFrame(linesTick);
     }
-    // Hugo 13:31: wie über eine Walze gezogen – oben kippt das Wort über die Kante nach hinten weg (Unterkante bleibt, oben weg,
-    // bis 38°), unten kommt es unter der Walze hervor (Oberkante bleibt, bis 32°); dabei dehnt es sich mitten im Übergang ganz
-    // dezent in die Länge (bis +7 %). Perspektive 420 px.
-    function roller(ty, out, inn) {
-      var up = 1 - inn;
-      if (out < 0.001 && up < 0.001) return '';
-      var rx = out > 0.001 ? 38 * out : -32 * up, ph = out > 0.001 ? out : up;
-      var sy = 1 + 0.07 * Math.sin(Math.PI * ph);
-      return 'perspective(420px) translate3d(0,' + ty.toFixed(2) + 'px,0) rotateX(' + rx.toFixed(2) + 'deg) scale(1,' + sy.toFixed(4) + ')';
+    // ---------- Appelgren 1:1 auf ein festes Textfeld übertragen (Hugo 13:36) ----------
+    // Sein Code (perappelgren.de, About): o = (vh − top)/(vh + Höhe) für die ganze Sektion (Sektion = 900 px = Bildschirm, Text 352 px
+    // darin = .39 × Höhe, 67 Wörter). Alle Wörter teilen dasselbe o, jedes Wort r = Nummer/(Anzahl−1):
+    //   rein  n = easeOutQuart((o − (.06 + .14 r)) / .28),  raus i = easeInOutCubic((o − (.58 + .12 r)) / .16)
+    //   Deckkraft n·(1 − i), Lage lerp(22, 0, n) − lerp(0, 28, i) px. Keine Drehung, kein Strecken.
+    // In Bildschirm-Lage umgerechnet: der Textblock geht als Ganzes – die Reihenfolge (r) verteilt sich beim Gehen nur auf 61 % und
+    // beim Kommen auf 72 % der Blockhöhe. Darum gehen tiefere Zeilen etwas früher als ihre Lage sagt: der Block hebt sich, die Zeilen
+    // laufen leicht auseinander (das «Dehnen»), und in jeder Zeile ist links früher dran als rechts (die Welle durch die Buchstaben).
+    // Weil unser Text länger sein kann als sein Block, wird er in Blöcke von .39 × Feldhöhe geteilt (wie sein Textblock), jeder Block
+    // verhält sich wie seine ganze Sektion. Die Zonen oben und unten bleiben so, wie Hugo sie eingestellt hat.
+    function apChunks(ws, chunkH) {
+      var cur = null, list = [];
+      ws.forEach(function (W) {
+        if (!cur || (W.k === 0 && W.y - cur.t >= chunkH) || (W.p && cur.p && W.p !== cur.p)) { cur = { t: W.y, b: W.y + W.h, n: 0, p: W.p }; list.push(cur); }
+        W.cc = cur; W.ci = cur.n++; cur.b = Math.max(cur.b, W.y + W.h);
+      });
+      ws.forEach(function (W) { var c = W.cc; W.r = c.n > 1 ? W.ci / (c.n - 1) : 0; W.ct = c.t; W.cb = c.b; W.cH = Math.max(1, c.b - c.t); });
+    }
+    function apWord(W, st, oS, zT, botB, zB, red) {
+      if (red) return { o: 1, ty: 0 };
+      var pEx = (W.ct - st) + 0.61 * W.r * W.cH;            // Lage, nach der das Wort geht
+      var pIn = (W.cb - st) - 0.72 * (1 - W.r) * W.cH;      // Lage, nach der das Wort kommt
+      var i = eIOC(clamp((oS - pEx) / zT, 0, 1));
+      var n = zB ? eOQ(clamp((botB - 24 - pIn) / zB, 0, 1)) : 1;
+      var cap = zB ? clamp((botB - (W.y - st + W.h)) / 18, 0, 1) : 1;   // nie unter dem Rand sichtbar
+      return { o: n * (1 - i) * cap, ty: 22 * (1 - n) - 28 * i };
     }
     function eOQ(t) { return 1 - Math.pow(1 - t, 4); }
     function eIOC(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
@@ -2950,10 +2960,11 @@
         [].forEach.call(ps, function (p) {
           var list = (p.textContent || '').split(/\s+/).filter(Boolean); if (!list.length) return;
           p.innerHTML = '';
-          list.forEach(function (w, i) { var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp); if (i < list.length - 1) p.appendChild(document.createTextNode(' ')); ws.push({ el: sp }); });
+          list.forEach(function (w, i) { var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp); if (i < list.length - 1) p.appendChild(document.createTextNode(' ')); ws.push({ el: sp, p: p }); });
         });
         var top = null, k = 0, br = box.getBoundingClientRect();
         ws.forEach(function (W) { var r = W.el.getBoundingClientRect(), y = r.top - br.top; if (top === null || Math.abs(y - top) > 2) { top = y; k = 0; } W.y = y; W.h = r.height || 20; W.k = k++; W.x = r.left - br.left; });
+        apChunks(ws, box.clientHeight * 0.39);
         s.sideWords = ws;
         if (!box.hpWords) { box.hpWords = true; box.addEventListener('scroll', function () { if (!box.hpRaf) box.hpRaf = requestAnimationFrame(function () { box.hpRaf = 0; sideWords(s, box); }); }, { passive: true }); }
         sideWords(s, box);
@@ -3003,14 +3014,10 @@
       var oE = -4 + 34 * g, oS = 90 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: oben halbiert (vorher 140)
       var zB = s.sideZB || 0;
       ws.forEach(function (W) {
-        var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y - 0.08 * (W.x || 0) * g) / zT), inn = zB ? q((H2 - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB) : 1;
-        if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
-        out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
-        var ty = 22 * (1 - inn) - 28 * out;
-        W.el.style.transform = roller(ty, out, inn);
-        W.el.style.transformOrigin = out > 0.001 ? '50% 100%' : '50% 0';
-        W.el.style.opacity = (inn * (1 - out)).toFixed(3);
+        var f = apWord(W, st, oS, zT, H2, zB, reduce);
+        if (reduce) { var yy = W.y - st; W.el.style.transform = ''; W.el.style.opacity = Math.min(clamp((yy - oE) / Math.max(1, oS - oE), 0, 1), zB ? clamp((H2 - yy - W.h) / zB, 0, 1) : 1).toFixed(3); return; }
+        W.el.style.transform = f.ty ? 'translate3d(0,' + f.ty.toFixed(2) + 'px,0)' : '';
+        W.el.style.opacity = f.o.toFixed(3);
       });
       if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
     }
