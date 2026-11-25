@@ -2919,15 +2919,24 @@
     function makeSbar(host) {
       var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
       var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
-      var actT = 0, last = { };
+      var actT = 0, last = { }, bounceEnd = null;
       return {
         el: bar,
         set: function (x, y, h, st, sh, ch, active) {
           var on = sh > ch + 2 && h > 40; bar.classList.toggle('is-on', on); if (!on) return;
           if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
-          var tl = Math.max(36, h * ch / sh), p = Math.max(0, Math.min(1, st / (sh - ch)));
-          th.style.height = tl.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((h - tl) * p).toFixed(1) + 'px,0)';
-          var tile = tl; th.style.backgroundPosition = '0 ' + (-((st * 1.1) % tile)).toFixed(1) + 'px';
+          var tl = Math.max(36, h * ch / sh), mx = sh - ch, p = Math.max(0, Math.min(1, st / mx));
+          // Hugo 12:48: zieht man über Anfang oder Ende hinaus (Gummiband am iPhone), dampft der Griff dezent ein (höchstens 40 %,
+          // weich auslaufend) und bleibt am Rand; beim Loslassen federt er mit dem Gummiband zurück in seine Grösse.
+          var ov = st < 0 ? -st : (st > mx ? st - mx : 0), len = tl * (1 - 0.4 * (1 - Math.exp(-ov / 90)));
+          th.style.height = len.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + (st > mx ? h - len : (h - tl) * p).toFixed(1) + 'px,0)';
+          if (ov > 2) bounceEnd = st > mx ? 'bottom' : 'top';
+          else if (bounceEnd && ov === 0 && !reduce && th.animate) {   // beim Zurückfedern ganz leicht über die Grösse hinaus und zurück
+            th.style.transformOrigin = '50% ' + (bounceEnd === 'bottom' ? '100%' : '0');
+            try { th.animate([{ scale: '1 1' }, { scale: '1 1.07' }, { scale: '1 0.985' }, { scale: '1 1' }], { duration: 420, easing: 'ease-out' }); } catch (er) {}
+            bounceEnd = null;
+          }
+          var tile = len; th.style.backgroundPosition = '0 ' + (-((st * 1.1) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
