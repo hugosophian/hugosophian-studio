@@ -29,7 +29,7 @@
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
     // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
     fewFrom:   7, fewCell: 0.3, fewHoles: 0.25, fewJitter: 0.3,
-    depth:     [0.86, 1.14],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne
+    depth:     [0.72, 1.28],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne (Hugo 25.11.: doppelt so stark, vorher 0.86–1.14)
     seed:      7,       // anderer Wert = andere Anordnung
     // Ziehen
     speedTouch: 1.0,    // Fingerweg mal
