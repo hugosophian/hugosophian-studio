@@ -870,8 +870,14 @@
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
         // Hugo 15:47: Lichtkanten der Fingerwelle in Hirsch-Perlmutt (Eis-Cyan kräftig ↔ Flieder kräftig, weich wandernd, mit Hauch Rosé);
         // Andock-/Ladelicht (fa, faD, eacc) bleibt unverändert
-        '  vec3 prl = mix(vec3(0.588, 0.863, 0.961), vec3(0.765, 0.698, 0.98), 0.5 + 0.5 * sin(sv * 6.2832 + uT * 0.35 + gm * 2.0));',
-        '  prl = mix(prl, vec3(0.973, 0.745, 0.843), 0.18 * smoothstep(0.55, 0.9, gm));',
+        // Hugo 15:54: dazu die hellen Season-Töne (Periwinkel, Rosé, Champagner, Eis-Cyan hell), weich ineinander übergehend
+        '  float pt = fract(sv * 0.9 + uT * 0.05 + gm * 0.6) * 6.0;',
+        '  vec3 prl = mix(vec3(0.588, 0.863, 0.961), vec3(0.890, 0.918, 0.973), smoothstep(0.0, 1.0, pt));',
+        '  prl = mix(prl, vec3(0.765, 0.698, 0.980), smoothstep(1.0, 2.0, pt));',
+        '  prl = mix(prl, vec3(0.949, 0.867, 0.890), smoothstep(2.0, 3.0, pt));',
+        '  prl = mix(prl, vec3(0.984, 0.953, 0.871), smoothstep(3.0, 4.0, pt));',
+        '  prl = mix(prl, vec3(0.855, 0.949, 0.973), smoothstep(4.0, 5.0, pt));',
+        '  prl = mix(prl, vec3(0.588, 0.863, 0.961), smoothstep(5.0, 6.0, pt));',
         '  rim = mix(rim, prl, 0.8); vec3 sunH = mix(sun, prl * 0.9, 0.7);',
         '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sunH * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm) + vec3(1.0, 0.9, 0.72) * faD * 0.5;',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',
