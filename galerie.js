@@ -272,6 +272,7 @@
     // Hinweis ganz hinten: vor der Zeichenfläche ins Dokument, damit die Bilder darüber liegen
     var hint = null, hintNow = '';
     // Hinweis als einzelne Buchstaben, damit er sich Buchstabe für Buchstabe umschreiben kann (Hugo 10:48)
+    var GX_PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'];   // Hirsch-Perlmutt kräftig
     function hintLayer(txt, pre) {
       var l = document.createElement('div'); l.className = 'gx-hint-l' + (pre ? ' is-pre' : '');
       for (var i = 0; i < txt.length; i++) { var c = document.createElement('span'); c.textContent = txt.charAt(i); l.appendChild(c); }
@@ -288,6 +289,15 @@
       var nl = hintLayer(txt, true); hint.appendChild(nl);
       [].forEach.call(nl.children, function (c, i) { c.style.transitionDelay = (120 + i * 18) + 'ms'; });
       void nl.offsetWidth; nl.classList.remove('is-pre');
+      // Hugo 15:47: beim Umschreiben zieht ein Hirsch-Perlmutt-Schimmer durch die neuen Buchstaben
+      if (nl.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        var fin = getComputedStyle(hint).color;
+        [].forEach.call(nl.children, function (c, i) {
+          var pc = GX_PEARL[i % GX_PEARL.length];
+          try { c.animate([{ color: pc, textShadow: '0 0 .6em ' + pc }, { color: pc, textShadow: '0 0 .4em ' + pc, offset: 0.4 }, { color: fin, textShadow: '0 0 0 transparent' }],
+            { duration: 1000, delay: 120 + i * 18, easing: 'ease-out', fill: 'backwards' }); } catch (er) {}
+        });
+      }
     }
     if (CONFIG.hint) {
       var hintSrc = root.querySelector('.lib-bottom .ps-label');
@@ -796,7 +806,8 @@
       if (!NEEDLE_T || NEEDLE_T.width !== ns.width || NEEDLE_T.height !== ns.height) { NEEDLE_T = document.createElement('canvas'); NEEDLE_T.width = ns.width; NEEDLE_T.height = ns.height; }
       return NEEDLE_T;
     }
-    var GLOW = [[255, 106, 213], [148, 208, 255], [143, 247, 200], [255, 243, 138], [173, 140, 255]];
+    // Hugo 15:47: Farbwolken der Lichtkugel in Hirsch-Perlmutt (milchig: Eis-Cyan, Flieder, Rosé, Champagner, Mint). Vorher: Pink, Blau, Mint, Gelb, Violett
+    var GLOW = [[150, 220, 245], [195, 178, 250], [248, 190, 215], [250, 228, 180], [165, 232, 215]];
     function paintSphere(t) {
       var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
       if (t < CONFIG.sphereMs) { sc = OUT3(t / CONFIG.sphereMs); op = 1; }
@@ -806,8 +817,8 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = op;
       // weicher Lichtschein
       g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.05, 'rgba(255,250,255,.78)'); g.addColorStop(.16, 'rgba(244,236,255,.4)');
-      g.addColorStop(.36, 'rgba(225,215,255,.13)'); g.addColorStop(.65, 'rgba(225,215,255,.04)'); g.addColorStop(1, 'rgba(225,215,255,0)');
+      g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.05, 'rgba(250,252,255,.78)'); g.addColorStop(.16, 'rgba(236,239,247,.4)');   // Perlweiss
+      g.addColorStop(.36, 'rgba(218,234,248,.13)'); g.addColorStop(.65, 'rgba(227,225,244,.04)'); g.addColorStop(1, 'rgba(227,225,244,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
       // schillernde Farbwolken (screen: hellen auf, ohne weiss zu werden)
       ctx.globalCompositeOperation = 'screen';

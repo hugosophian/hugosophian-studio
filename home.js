@@ -331,6 +331,7 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Hugo 25.11. (10:56): «Galerie öffnen» / «Werkstatt betreten» schreiben sich beim Erscheinen Buchstabe für Buchstabe
     // ein, wie der Hinweis im Hintergrund der Galerie (von unten aus der Unschärfe, links nach rechts, Pfeil zuletzt)
+    var HP_PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'];   // Hirsch-Perlmutt kräftig (Webflow-Sammlung «Hirsch-Perlmutt»)
     function goSplit(label, txt) {
       label.textContent = '';
       for (var i = 0; i < txt.length; i++) {
@@ -361,6 +362,10 @@
         var bl = desk ? [] : [{ filter: 'blur(4px)' }, { filter: 'blur(0px)' }];   // Hugo 11:17: am Computer ohne Unschärfe (Ruckeln)
         try { c.animate([{ opacity: 0, transform: 'translateY(.35em)', filter: bl[0] ? bl[0].filter : 'none' }, { opacity: 1, transform: 'translateY(0)', filter: bl[1] ? bl[1].filter : 'none' }],
           { duration: 420, delay: base + i * 18, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }); } catch (er) {}
+        // Hugo 15:47: jeder Buchstabe schimmert beim Einschreiben kurz in Hirsch-Perlmutt und setzt sich dann in seiner Farbe
+        try { var fin = getComputedStyle(c).color, pc = HP_PEARL[i % HP_PEARL.length];
+          c.animate([{ color: pc, textShadow: '0 0 .5em ' + pc }, { color: pc, textShadow: '0 0 .35em ' + pc, offset: 0.35 }, { color: fin, textShadow: '0 0 0 transparent' }],
+            { duration: 900, delay: base + i * 18, easing: 'ease-out', fill: 'backwards' }); } catch (er) {}
       });
     }
     var deskMQ = window.matchMedia('(min-width: ' + CONFIG.desk + 'px) and (hover: hover) and (pointer: fine)');
@@ -863,7 +868,12 @@
         // Hugo 23.11.: am Rand goldenes Licht wie die Sonnenstrahlen, das sich weich mit dem Regenbogen mischt
         '  float gm = smoothstep(0.25, 0.75, n2(q * 0.7 + vec2(uT * 0.05, -uT * 0.04) + 9.0));',
         '  vec3 rim = mix(rb, vec3(1.0, 0.8, 0.48), 0.2 + 0.4 * gm);',
-        '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sun * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm) + vec3(1.0, 0.9, 0.72) * faD * 0.5;',
+        // Hugo 15:47: Lichtkanten der Fingerwelle in Hirsch-Perlmutt (Eis-Cyan kräftig ↔ Flieder kräftig, weich wandernd, mit Hauch Rosé);
+        // Andock-/Ladelicht (fa, faD, eacc) bleibt unverändert
+        '  vec3 prl = mix(vec3(0.588, 0.863, 0.961), vec3(0.765, 0.698, 0.98), 0.5 + 0.5 * sin(sv * 6.2832 + uT * 0.35 + gm * 2.0));',
+        '  prl = mix(prl, vec3(0.973, 0.745, 0.843), 0.18 * smoothstep(0.55, 0.9, gm));',
+        '  rim = mix(rim, prl, 0.8); vec3 sunH = mix(sun, prl * 0.9, 0.7);',
+        '  vec3 gc = mix(rim, vec3(1.0), 0.1) * glow + sunH * halo * 0.5 + vec3(1.0, 0.86, 0.62) * fa * (0.6 + 0.5 * fm) + vec3(1.0, 0.9, 0.72) * faD * 0.5;',
         '  gc += (h2(fc * 1.37) - 0.5) / 255.0;',
         // Hugo 24.11. (16:41): kein Ausblenden am Rand mehr (sah aus wie ein unsichtbarer Rahmen); der helle Strich oben am
         // iPhone kam von der Schimmerwelle, die knapp am Rand lag – sie startet jetzt ausserhalb des Bildschirms (siehe dock)
