@@ -1405,7 +1405,7 @@
         [].forEach.call(x.querySelectorAll('script[src*="galerie"]'), function (sc) { fetch(sc.src, { mode: 'no-cors' }).catch(function () {}); });
         [].slice.call(x.querySelectorAll('[data-lib] img.lib-img'), 0, 40).forEach(function (im) {
           var p = new Image();
-          if (im.getAttribute('sizes')) p.sizes = im.getAttribute('sizes');
+          p.sizes = '(max-width: 767px) 60vw, 30vw';   // gleiche Bildgrösse wie in galerie.js (SIZES), damit der Speicher trifft
           if (im.getAttribute('srcset')) p.srcset = im.getAttribute('srcset');
           p.src = im.getAttribute('src');
         });

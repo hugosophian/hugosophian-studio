@@ -61,6 +61,7 @@
   };
 
   var EASE = 'cubic-bezier(.7,0,.2,1)';
+  var SIZES = '(max-width: 767px) 60vw, 30vw';
   var css = [
     'html.lib-on, html.lib-on body { height: 100%; overflow: hidden; overscroll-behavior: none; background-color: #000; }',
     '[data-lib] { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }',
@@ -84,6 +85,9 @@
     '[data-lib] .lib-bottom { pointer-events: none; }',
     /* Hugo 25.11.: Bereichsname unten (z. B. CREATOR) = Zurück wie der Pfeil im Browser */
     '[data-lib].is-in .lib-bottom .ps-label { pointer-events: auto; cursor: pointer; transition: opacity .25s ease; -webkit-tap-highlight-color: transparent; }',
+    /* Hugo 25.11. (07:10): Bereichsname gleich gross wie die Schrift der Sortierung (lib-top) */
+    '[data-lib] .lib-bottom .ps-label { font-size: .8rem !important; font-weight: 500 !important; letter-spacing: .12em !important; line-height: 1.5 !important; text-transform: uppercase !important; }',
+    '@media (max-width: 767px) { [data-lib] .lib-bottom .ps-label { font-size: 3.2vw !important; } }',
     '@media (hover: hover) and (pointer: fine) { [data-lib].is-in .lib-bottom .ps-label:hover { opacity: .6; } }',
     '[data-lib] .lib-bottom .ps-label:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; }',
     /* Schrift bleibt über weissen Karten lesbar */
@@ -104,6 +108,11 @@
     '[data-lib] .lib-top.is-open .lib-sort-arrow { transform: rotate(180deg); }',
     '[data-lib] .lib-sort-list { opacity: 0; visibility: hidden; filter: blur(6px); transform: translateY(-.4em); transition: opacity .3s ease, filter .3s ease, transform .3s ease, visibility 0s linear .3s; }',
     '[data-lib] .lib-top.is-open .lib-sort-list { opacity: 1; visibility: visible; filter: none; transform: none; transition-delay: 0s; }',
+    /* Hugo 25.11. (07:10): offene Sortierung auf einem weissen Feld, das weich einblendet (Schrift über den Bildern lesbar) */
+    '[data-lib] .lib-top { transition: opacity .6s ease, color .35s ease; }',
+    '[data-lib] .lib-top::before { content: ""; position: absolute; left: -1.1em; right: -1.4em; top: -.8em; bottom: -1em; background: #fff; z-index: -1; opacity: 0; transform: scale(.96); transform-origin: 0 0; transition: opacity .35s ease, transform .45s cubic-bezier(.22,1,.36,1); pointer-events: none; }',
+    '[data-lib] .lib-top.is-open { mix-blend-mode: normal !important; color: #000 !important; }',
+    '[data-lib] .lib-top.is-open::before { opacity: 1; transform: none; }',
     '[data-lib] .lib-sort-item { cursor: pointer; }',
     '[data-lib] .lib-sort-item.is-empty { display: none; }',
     /* Vorschau (wie library.js) */
@@ -208,7 +217,13 @@
     all.forEach(function (p) {
       wheel.appendChild(p.el);
       if (p.a) p.a.setAttribute('draggable', 'false');
-      if (p.img) { p.img.setAttribute('draggable', 'false'); if (p.img.loading === 'lazy') p.img.loading = 'eager'; }
+      if (p.img) {
+        p.img.setAttribute('draggable', 'false');
+        // Hugo 25.11. (07:09): nur so gross laden, wie die Bilder hier gezeigt werden (vorher volle Bildschirmbreite).
+        // Weniger Pixel = weniger Arbeit für den Grafikchip beim Knall und beim Ziehen. Gleicher Wert in home.js (Vorladen).
+        if (p.img.srcset) p.img.sizes = SIZES;   // greift sicher nur, wenn der Seiten-Head es schon vor dem Laden gesetzt hat (dort steht es auch)
+        if (p.img.loading === 'lazy') p.img.loading = 'eager';
+      }
     });
     [].forEach.call(root.querySelectorAll('[role="list"],[role="listitem"]'), function (e) { e.removeAttribute('role'); });
 
@@ -304,10 +319,8 @@
     }
     function place(sl, x, y, scale, rot) {
       sl.el.style.transform = tfOf(sl, x, y, scale, rot);
-      // ausserhalb des Bildschirms nicht zeichnen
-      var hw = sl.w * sl.s * scale / 2 + 2, hh = sl.h * sl.s * scale / 2 + 2;
-      var off = x + hw < 0 || x - hw > VW || y + hh < 0 || y - hh > VH;
-      if (off !== sl.off) { sl.off = off; sl.el.classList.toggle('is-off', off); }
+      // Hugo 25.11. (07:09, Ziehen stottert): Karten ausserhalb des Bildschirms werden NICHT mehr versteckt. Jedes
+      // Verstecken/Zeigen warf ihr Bild vom Grafikchip und lud es neu (50–130 ms Stillstand). Ausserhalb wird ohnehin nichts gezeichnet.
     }
 
     // ---------- Schleife ----------
@@ -355,6 +368,7 @@
         mode = 'idle'; root.classList.add('is-in'); mbShow(); return;
       }
       mode = 'bang';
+      sphere.style.opacity = '0';
       var cx = VW / 2, cy = VH / 2, longest = 0;
       // Lichtkugel: füllt den Bildschirm, blendet aus
       var R0 = Math.hypot(VW, VH) * 0.75;
@@ -374,8 +388,6 @@
         var f = pos(sl), s0 = sl.s0 / sl.s;
         sl.el.classList.add('is-vis'); sl.el.style.opacity = '1';
         place(sl, f.x, f.y, 1, 0);   // Endlage (bleibt nach der Animation stehen)
-        var off = sl.off;
-        if (off) { sl.el.classList.remove('is-off'); }   // fliegt durchs Bild, auch wenn es am Ende ausserhalb liegt
         sl.el.animate([
           { transform: tfOf(sl, cx, cy, s0, sl.rot), opacity: 0 },
           { opacity: 1, offset: .02 },   // gleich sichtbar: man sieht sie aus der Quelle schiessen
@@ -426,12 +438,27 @@
       }
     }
     function prepare(then) {
-      var done = false;
+      var done = false, warmed = false;
       function go() { if (!done) { done = true; then(); } }
+      // Vorwärmen (Hugo 25.11., 07:09: «spielt selten richtig ab»): Im Moment des Knalls musste das iPhone alle Bilder
+      // gleichzeitig auf den Grafikchip laden (~0.4 s Stillstand), während die Uhr der Animation schon lief – der Anfang
+      // (Herausschiessen) fehlte. Jetzt liegen alle Karten, Trümmer und die Kugel schon während des Punkts in voller
+      // Grösse, praktisch unsichtbar (Deckkraft 0.4 %), in der Mitte. Erst wenn das gezeichnet ist, startet der Knall.
+      function warm() {
+        if (warmed) return; warmed = true;
+        if (reduce) { go(); return; }
+        var VWn = window.innerWidth, VHn = window.innerHeight, cx = VWn / 2, cy = VHn / 2;
+        slots.forEach(function (sl) { sl.el.classList.add('is-vis'); sl.el.style.opacity = '0.004'; place(sl, cx, cy, 1, 0); });
+        debrisEls.forEach(function (d) { d.el.style.visibility = ''; d.el.style.opacity = '0.004'; d.el.style.transform = 'translate3d(' + d.x0 + 'px,' + d.y0 + 'px,0)'; });
+        var R0 = Math.hypot(VWn, VHn) * 0.75;
+        sphere.style.width = sphere.style.height = 2 * R0 + 'px';
+        sphere.style.transform = 'translate3d(' + (cx - R0).toFixed(1) + 'px,' + (cy - R0).toFixed(1) + 'px,0)'; sphere.style.opacity = '0.004';
+        requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(go, 90); }); });
+      }
       makeDebris();
       var imgs = slots.map(function (sl) { return sl.img; }).concat(debrisEls.map(function (d) { return d.img; }));
-      Promise.all(imgs.map(function (im) { return im && im.decode ? im.decode().catch(function () {}) : null; })).then(go);
-      setTimeout(go, reduce ? 0 : CONFIG.decodeMax);
+      Promise.all(imgs.map(function (im) { return im && im.decode ? im.decode().catch(function () {}) : null; })).then(warm);
+      setTimeout(warm, reduce ? 0 : CONFIG.decodeMax);
     }
 
     // ---------- Ziehen, Tippen ----------
