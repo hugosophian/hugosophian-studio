@@ -80,9 +80,12 @@
     waveCalm:   0.3,    // Stärke der ruhigsten Welle (1 = wie bisher)
     // Hugo 25.11. (09:21): am Computer werden die Wellen erst später stark – auch etwas mehr Bewegung bleibt noch ruhig,
     // die kräftigen setzen erst bei schneller Maus ein (Maus-Tempo ist höher als Finger-Tempo)
-    waveSlowDesk: 0.2,  // Computer: bis hier ruhigste Welle (px/ms)
-    waveFastDesk: 3.0,  // Computer: ab hier volle Stärke
-    waveCurveDesk: 1.8, // Computer: >1 = Stärke steigt erst spät steil an
+    // Hugo 09:45: noch später stark, und bei ganz schneller Maus etwas stärker als die bisherige Grenze
+    waveSlowDesk: 0.3,  // Computer: bis hier ruhigste Welle (px/ms) (vorher 0.2)
+    waveFastDesk: 4.5,  // Computer: hier volle Stärke wie bisher (vorher 3.0)
+    waveCurveDesk: 2.2, // Computer: >1 = Stärke steigt erst spät steil an (vorher 1.8)
+    waveTopDesk:  8.0,  // Computer: bei diesem Tempo die Extra-Stärke ganz
+    waveBoostDesk: 0.2, // Computer: so viel stärker als die bisherige Grenze (0.2 = +20 % Stärke)
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
     ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
     ldFlares:   0,      // Ladeanimation: Flares und Flare-Fäden beim Andocken
@@ -575,7 +578,7 @@
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
         // sp > 0: Fingerwelle (gleichmässig); sp < 0: Andock-Welle – schiesst schnell aus dem Rand und wird rasch langsamer,
         // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
-        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp * mix(0.45, 1.3, clamp(mix(a.w, b.w, t), 0.0, 1.0)) : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Hugo 25.11. (08:26): ruhige Welle läuft weniger weit, kräftige weiter   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
+        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp * mix(0.45, 1.3, clamp(mix(a.w, b.w, t), 0.0, 1.35)) : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Hugo 25.11. (08:26): ruhige Welle läuft weniger weit, kräftige weiter   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
         '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
@@ -593,7 +596,7 @@
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         // schwache Handys: Pixel weit weg von dieser Welle rechnen die Bahn gar nicht erst durch
-        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * abs(uB[k].w) * (uB[k].w > 0.0 ? 1.3 : 1.0) > mx * 0.62) continue;',
+        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * abs(uB[k].w) * (uB[k].w > 0.0 ? 1.6 : 1.0) > mx * 0.62) continue;',
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
@@ -614,7 +617,7 @@
         // Hugo 25.11. (08:49): wie ein Finger durchs Wasser – am Finger spitz und schmal, dahinter breitet sich die Welle aus.
         // Breite, Einblenden und Abklingen nach dem Alter der jeweiligen Stelle der Bahn (vorher: Alter der ganzen Welle)
         '    bool fW = uB[k].w > 0.0;',
-        '    float gk = fW ? clamp(sm, 0.05, 1.0) : 1.0, gA = fW ? mix(0.2, 1.2, gk) : 1.0;',
+        '    float gk = fW ? clamp(sm, 0.05, 1.35) : 1.0, gA = fW ? mix(0.2, 1.2, gk) : 1.0;',
         '    float wk = fW ? mx * min(0.006 + 0.032 * sa, 0.072) * mix(0.32, 1.35, gk) : w;',
         '    float gD = fW ? mix(0.12, 1.25, gk * gk) : 1.0;',   // Verzerrung des Bildes: kleine Welle deutlich weniger als die stärkste
         '    float x = best / wk;',
@@ -925,6 +928,7 @@
         wv.px = x; wv.py = y; wv.pt = now;
         var sk = desk ? Math.pow(sm01(CONFIG.waveSlowDesk, CONFIG.waveFastDesk, wv.v || 0), CONFIG.waveCurveDesk) : sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0);
         var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sk;
+        if (desk) mStr += CONFIG.waveBoostDesk * sm01(CONFIG.waveFastDesk, CONFIG.waveTopDesk, wv.v || 0);   // ganz schnell: über die Grenze
         if (wv.v != null && !wv.vk) { wv.vk = true; if (pts[0]) pts[0].m = mStr; }   // der erste Punkt kannte das Tempo noch nicht
         if (!last) { pts.push({ x: x, y: y, t: now, m: mStr }); wv.sp = 14; }
         else {
