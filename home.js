@@ -1322,7 +1322,8 @@
       setTimeout(go, 1200);
     }
     function startIntro() {
-      if (backIn) { introOn = false; backHold = true; endIntro(); render(); backFade(); return; }   // zurück aus der Galerie: einblenden statt Ladeanimation
+      // Hugo 09:36 (Video): startIntro läuft zweimal → das Einblenden begann zweimal (Bild kurz da, wieder schwarz, nochmal). Nur einmal.
+      if (backIn) { backIn = false; introOn = false; backHold = true; endIntro(); render(); backFade(); return; }   // zurück aus der Galerie: einblenden statt Ladeanimation
       if (!introOn) { render(); return; }
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);

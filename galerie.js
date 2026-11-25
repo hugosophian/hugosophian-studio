@@ -1350,7 +1350,7 @@
         try { sessionStorage.setItem('hp-backin', '1'); } catch (er) {}
         // Hugo 09:29: nur das Fernseher-Schliessen, dann geht der Punkt hier aus; die Homepage blendet danach ein
         crtOff(function () {
-          var d = crtFx && crtFx.children[3], leave = function () { if (leave.done) return; leave.done = true; window.hsVT = { to: '/', type: 'crt' }; location.href = '/'; };
+          var d = crtFx && crtFx.children[3], leave = function () { if (leave.done) return; leave.done = true; location.href = '/'; };   // ohne Seitenübergang: Safari startete das Einblenden danach neu (Video 09:33)
           if (!d || !d.animate) { leave(); return; }
           d.classList.remove('is-hold');
           // Hugo 09:33: der Punkt springt nicht nochmal, er geht einfach aus – kurz und knapp
