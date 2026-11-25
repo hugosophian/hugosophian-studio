@@ -1311,9 +1311,12 @@
         var free = function () { backHold = false; dsunWall(); };
         if (reduce || !root.animate) { free(); return; }
         setTimeout(free, desk ? 80 + slides.length * 140 + 1100 : 1000);
+        // Hugo 09:42: jedes Bild bleibt in seiner eigenen Spalte (vorher glitt Creator kurz über Alchemist). Die Spalte
+        // selbst bewegt sich nicht und schneidet ab (clip-path), nur ihr Inhalt gleitet darin seitlich herein.
         if (desk) slides.forEach(function (s, i) {
-          s.el.animate([{ opacity: 0, translate: '-48px 0' }, { opacity: 1, translate: '0 0' }],
-            { duration: 1000, delay: 80 + i * 140, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+          var o = { duration: 1000, delay: 80 + i * 140, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' };
+          s.el.animate([{ opacity: 0, clipPath: 'inset(0)' }, { opacity: 1, clipPath: 'inset(0)' }], o);
+          [].forEach.call(s.el.children, function (c) { c.animate([{ translate: '-26px 0', scale: '1.22' }, { translate: '0 0', scale: '1' }], o); });   // etwas grösser am Start, damit rechts keine schwarze Lücke entsteht
         });
         else root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, easing: 'cubic-bezier(.33,0,.2,1)' });
       };
