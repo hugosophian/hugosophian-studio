@@ -94,7 +94,7 @@
     waveBoostDesk: 0.2, // Computer: so viel stärker als die bisherige Grenze (0.2 = +20 % Stärke)
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
     ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
-    ldFlares:   0,      // Ladeanimation: Flares und Flare-Fäden beim Andocken
+    ldFlares:   0.6,    // Ladeanimation: Flares beim Andocken (Hugo 15:59: wieder an – ungleichmässig, macht auch die Wellen ungleich; vorher 0)
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
     deskSunIdle: 1000,  // ms ohne Mausbewegung
@@ -768,9 +768,19 @@
         '    vec3 erb = 0.5 + 0.5 * cos(6.2832 * (ang * 2.0 + uT * 0.06 + vec3(0.0, 0.33, 0.67)));',
         '    float egm = smoothstep(0.3, 0.7, n2(ca * 3.0 + vec2(uT * 0.08, 5.0)));',
         '    vec3 ecol = mix(erb, vec3(1.0, 0.8, 0.48), 0.15 + 0.3 * egm);',   // satter bunt
+        // Hugo 15:59 (Vorschlag 2 «Sonne mit Perlmutt-Rand»): der bunte Saum wird Hirsch-Perlmutt – wandert weich durch Eis-Cyan,
+        // Periwinkel, Flieder, Rosé, Champagner, Eis-Cyan hell; ein Hauch Sonne bleibt darin. Der warme Kern (Flares, faD) bleibt golden.
+        '    float ept = fract(ang * 2.0 + uT * 0.06 + egm * 0.35) * 6.0;',
+        '    vec3 epl = mix(vec3(0.588, 0.863, 0.961), vec3(0.890, 0.918, 0.973), smoothstep(0.0, 1.0, ept));',
+        '    epl = mix(epl, vec3(0.765, 0.698, 0.980), smoothstep(1.0, 2.0, ept));',
+        '    epl = mix(epl, vec3(0.949, 0.867, 0.890), smoothstep(2.0, 3.0, ept));',
+        '    epl = mix(epl, vec3(0.984, 0.953, 0.871), smoothstep(3.0, 4.0, ept));',
+        '    epl = mix(epl, vec3(0.855, 0.949, 0.973), smoothstep(4.0, 5.0, ept));',
+        '    epl = mix(epl, vec3(0.588, 0.863, 0.961), smoothstep(5.0, 6.0, ept));',
+        '    ecol = mix(epl, vec3(1.0, 0.86, 0.6), 0.1 + 0.12 * egm);',
         // Hugo 23.11.: kein gleichmässiger Bilderrahmen – das Bunte am Rand ist mal stärker, mal kaum da, und wandert
         '    float patch = 0.08 + 1.1 * smoothstep(0.42, 0.8, n2(ca * 3.2 + vec2(uT * 0.13, -uT * 0.09) + 7.0));',   // einzelne Stellen statt Rahmen
-        '    float bw = mix(0.7 + 0.6 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0)), 0.35 + 1.4 * n2(ca * 5.0 + vec2(-uT * 0.1, 2.0)), uDesk);',   // Computer: Breite stark wechselnd
+        '    float bw = mix(0.45 + 1.1 * n2(ca * 4.0 + vec2(-uT * 0.1, 2.0)), 0.35 + 1.4 * n2(ca * 5.0 + vec2(-uT * 0.1, 2.0)), uDesk);',   // Hugo 15:59: auch am Handy ungleichmässiger   // Computer: Breite stark wechselnd
         '    band = exp(-max(e, 0.0) * max(e, 0.0) / (950.0 * bw * bw)) + 0.5 * exp(-max(e, 0.0) / (mx * 0.08)) * exp(-et * 1.5);',
         '    eacc = ecol * band * flash * 0.85 * (1.0 + 0.7 * uSoft) * mix(1.0, patch, max(smoothstep(0.15, 0.7, et), 0.8 * uDesk));',   // Computer: von Anfang an ungleich (kein Rahmen)   // Hugo 24.11.: beim Aufprall rundherum kräftig bunt, danach ungleich   // von Anfang an ungleich
         // Flares wie bei der Fingerwelle (Hugo 23.11.): weiche goldene Zungen, rundherum ungleich verteilt, ihre Länge flackert
