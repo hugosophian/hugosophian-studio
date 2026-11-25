@@ -705,16 +705,29 @@
         // Hugo 25.11. (17:27): Andock-Welle mit weicherem Übergang zwischen den Abschnitten ihrer Bahn – sonst Knickfalten (feine Linien)
         '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * (uB[k].w > 0.0 ? 0.5 : 1.6));',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
         '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0, sm = 0.0, sa = 0.0; vec2 dir = vec2(0.0);',
-        '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
-        '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
-        '      vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
-        '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, uB[k].w, dv, d);',
-        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0); float mg = 0.5 * (pa.w + pb.w), za = 0.5 * (max(pa.z, 0.0) + max(pb.z, 0.0));',   // Hugo 25.11.: Stärke (Fingertempo) und Alter an dieser Stelle der Bahn
-        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; sm = sm * sc + mg; sa = sa * sc + za; dir = dir * sc + un; best = f; }',
-        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; sm += q * mg; sa += q * za; dir += q * un; }',
+        // Hugo 25.11. (17:48): Andock-Welle ohne Bahn aus Abschnitten – deren Ecken und Kanten zeichneten sich als feine gerade
+        // Linien und Sterne ins Foto. Jetzt eine glatte Form (weich gerundetes Rechteck wie vorher die Bahn, Superellipse), mit
+        // weich wechselnder Reichweite rundherum: keine einzige Kante mehr
+        '    if (uB[k].w < 0.0) {',
+        '      vec2 hc = uRes * 0.5, pc = fc - hc; float rl = max(length(pc), 1.0); vec2 ua = pc / rl; float th = atan(ua.y, ua.x), sd0 = uHue[k] * 31.0;',
+        '      vec2 qn = abs(pc) / (hc + 6.0); float L = pow(pow(qn.x, 2.6) + pow(qn.y, 2.6), 1.0 / 2.6);',
+        '      float kk = 1.0 - 0.03 * (1.0 + sin(th * 3.0 + sd0)) - 0.02 * (1.0 + sin(th * 5.0 + sd0 * 1.7)) - 0.03 * n2(ua * 2.2 + vec2(sd0, 3.0));',
+        '      float mA = 0.15 + 1.1 * pow(n2(ua * 2.4 + vec2(7.0, sd0)), 1.6), zA = age + 0.11;',
+        '      float dsA = rl * (kk / max(L, 1e-3) - 1.0);',
+        '      best = dsA - min(uRes.x, uRes.y) * (-uB[k].w) * mA * (1.0 - exp(-zA * 2.6)) + (1.0 - smoothstep(0.0, 0.12, zA)) * mx * 0.035;',
+        '      dir = -ua; sd = abs(dsA); sm = 1.0; sa = age;',
+        '    } else {',
+        '      for (int j = 0; j < ' + (PW - 1) + '; j++) {',
+        '        vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
+        '        vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
+        '        vec2 dv; float d; float f = segF(fc, pa, pb, mx, uB[k].w, dv, d);',
+        '        vec2 un = d > 0.5 ? dv / d : vec2(0.0); float mg = 0.5 * (pa.w + pb.w), za = 0.5 * (max(pa.z, 0.0) + max(pb.z, 0.0));',   // Hugo 25.11.: Stärke (Fingertempo) und Alter an dieser Stelle der Bahn
+        '        if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; sm = sm * sc + mg; sa = sa * sc + za; dir = dir * sc + un; best = f; }',
+        '        else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; sm += q * mg; sa += q * za; dir += q * un; }',
+        '      }',
+        '      if (ws <= 0.0) continue;',
+        '      best = sf / ws; dir /= ws; sd /= ws; sm /= ws; sa /= ws;',
         '    }',
-        '    if (ws <= 0.0) continue;',
-        '    best = sf / ws; dir /= ws; sd /= ws; sm /= ws; sa /= ws;',
         // Hugo 25.11. (08:10): Fingerwelle je nach Tempo – langsam schmal und ruhig, schnell breit und kräftig (Andocken unverändert)
         // Hugo 25.11. (08:26): langsam deutlich kleiner, schnell grösser als bisher
         // Hugo 25.11. (08:49): wie ein Finger durchs Wasser – am Finger spitz und schmal, dahinter breitet sich die Welle aus.
