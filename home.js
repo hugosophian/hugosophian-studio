@@ -2936,7 +2936,7 @@
             try { th.animate([{ scale: '1 1' }, { scale: '1 1.07' }, { scale: '1 0.985' }, { scale: '1 1' }], { duration: 420, easing: 'ease-out' }); } catch (er) {}
             bounceEnd = null;
           }
-          var tile = len; th.style.backgroundPosition = '0 ' + (-((st * 1.1) % tile)).toFixed(1) + 'px';
+          var tile = len; th.style.backgroundPosition = '0 ' + (-((st * 1.1 + (st > mx ? 1 : -1) * ov * 2.4) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
