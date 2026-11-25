@@ -62,6 +62,7 @@
     flyDelay:   100,    // zufällige Verzögerung bis
     spin:       70,     // Drehung beim Start (Grad, ±)
     debris:     6,      // Bilder, die quer durchs Blickfeld an der Kamera vorbeifliegen und verblassen
+    menuDelay:  1000,   // Menü-Knopf kommt so lange nach dem Knall (ms; vorher 300)
     shakePx:    12,     // Erschütterung beim Knall
     shakeMs:    380,
     maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
@@ -663,7 +664,12 @@
 
     // ---------- Urknall ----------
     // Lichtkugel, Erschütterung, Flug der Karten und Trümmer: alles auf der Zeichenfläche, Bild für Bild aus der eigenen Uhr.
-    var SPHERE_STOPS = [[0, '#fff'], [.70, '#fff'], [.79, '#ffd6f3'], [.83, '#ff8fe0'], [.87, '#b9a0ff'], [.91, '#8fdcff'], [.94, '#9cf7cf'], [.97, '#fff09a'], [1, 'rgba(255,240,160,0)']];
+    // Hugo 25.11. (09:50): der weisse Blitz war zu stark («kann Menschen stören»). Gleich wuchtig (gleiche Grösse und Zeit),
+    // aber nur ein kleiner heller Kern, darum herum durchscheinende Regenbogen-Ringe in den Farben von Nadel und Punkt.
+    // Vorher: [0,'#fff'],[.70,'#fff'],[.79,'#ffd6f3'],[.83,'#ff8fe0'],[.87,'#b9a0ff'],[.91,'#8fdcff'],[.94,'#9cf7cf'],[.97,'#fff09a'],[1,transparent]
+    var SPHERE_STOPS = [[0, 'rgba(255,255,255,.95)'], [.06, 'rgba(255,240,250,.9)'], [.16, 'rgba(255,79,216,.68)'], [.28, 'rgba(155,107,255,.66)'],
+      [.4, 'rgba(79,195,255,.64)'], [.5, 'rgba(79,240,176,.6)'], [.6, 'rgba(255,233,79,.62)'], [.7, 'rgba(255,155,79,.6)'],
+      [.8, 'rgba(255,79,216,.55)'], [.9, 'rgba(155,107,255,.35)'], [1, 'rgba(79,195,255,0)']];
     var shk = [], fin = [];
     function bang() {
       if (dot) { dot.remove(); dot = null; }
@@ -679,7 +685,8 @@
       bangEnd = Math.max(longest, CONFIG.sphereMs + CONFIG.fadeMs) + 20;
       mode = 'bang'; bangFirst = true;
       clearTimeout(bangT);
-      bangT = setTimeout(function () { root.classList.add('is-in'); mbShow(); }, 300);
+      bangT = setTimeout(function () { root.classList.add('is-in'); }, 300);
+      setTimeout(mbShow, CONFIG.menuDelay);   // Hugo 09:52: Menü-Knopf etwas später (vorher mit der Schrift nach 0.3 s)
       kick();
     }
     function endBang() {
