@@ -114,7 +114,8 @@
     '[data-hp] .hp-slide.is-vis { visibility: visible; }',
     '[data-hp] .hp-media { position: absolute; inset: 0; will-change: transform; }',
     '[data-hp] .hp-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }',
-    '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .8s ease .1s; }',
+    // Hugo 25.11. (11:03): Titel und Logo rasten mit dem Aufprall ein – kurz, schneller Start, weicher Auslauf, Handy und Computer gleich (vorher .8s ease .1s)
+    '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .45s cubic-bezier(.22,1,.36,1); }',
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
     '[data-hp] .hp-data { display: none !important; }',
     '[data-hp].is-mouse .hp-stage { cursor: pointer; }',
@@ -198,7 +199,7 @@
     // Hugo 25.11. (10:57): am Computer wie am Handy – Titel blendet zusammen mit dem Logo weich ein (vorher sofort mit dem Schlag da: zu früh)
     /* Logo und About erst, wenn das Bild angedockt ist */
     'html.hp-ldpre [data-hp] .hp-brand, html.hp-ldpre [data-hp] .hp-about-btn { opacity: 0 !important; pointer-events: none; }',
-    'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .9s ease; }',
+    'html.hp-on:not(.hp-ldpre) [data-hp] .hp-brand, html.hp-on:not(.hp-ldpre) [data-hp] .hp-about-btn { transition: color .25s ease, opacity .45s cubic-bezier(.22,1,.36,1); }',   // vorher .9s ease
     /* Sonne (Hugo 24.11., 13:36): Computer nach 1 s Mausruhe, Handy beim Antippen. Die Sonnenwand liegt als eigene Ebene
        über der Seite und wird von einer Welle ab Maus bzw. Finger nach aussen aufgedeckt (Maske im Takt der Welle, wie das
        Wegwischen der Ladeanimation). Darunter läuft alles weiter (Welle, Verzerrung), bis die Welle es zugedeckt hat.
