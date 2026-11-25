@@ -65,7 +65,9 @@
     deskStiff:  150,    // Feder beim Aufschieben
     deskDamp:   0.6,    // kleiner = mehr Nachwippen
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
-    goDelay:    200,    // Hugo 11:00: «Galerie öffnen» schreibt sich minimal später ein (ms, zusätzlich)
+    deskTextFrom: 0.25, // Computer: Text der Spalte blendet ein, sobald sie so weit offen ist …
+    deskTextSpan: 0.25, // … und ist nach diesem Stück ganz da
+    goDelay:    350,    // Hugo 11:00/11:01: «Galerie öffnen» schreibt sich später ein (ms, zusätzlich; vorher 0, dann 200)
     infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
     // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
@@ -1264,7 +1266,7 @@
         }
         s.side.style.width = Math.max(0, sw).toFixed(2) + 'px';
         s.sideIn.style.width = SW.toFixed(2) + 'px';
-        var sop = clamp((s.o - 0.45) / 0.4, 0, 1);
+        var sop = clamp((s.o - CONFIG.deskTextFrom) / CONFIG.deskTextSpan, 0, 1);   // Hugo 11:00: Text blendet schneller ein (vorher ab 45 % offen, über 40 %)
         s.sideIn.style.opacity = sop.toFixed(3);
         if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goIn(s.sideLink, 60 + CONFIG.goDelay); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
         setVis(s, true);
