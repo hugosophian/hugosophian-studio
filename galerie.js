@@ -867,7 +867,7 @@
         if (e) e.preventDefault();
         var ref = ''; try { ref = new URL(document.referrer).origin; } catch (er) {}
         if (ref === location.origin && history.length > 1) history.back();
-        else { window.hsVT = { to: '/', type: 'studio' }; location.href = '/'; }
+        else { try { sessionStorage.setItem('hp-return', location.pathname); } catch (er) {} window.hsVT = { to: '/', type: 'studio' }; location.href = '/'; }   // Startseite beginnt beim Bild dieses Bereichs
       };
       backEl.addEventListener('click', goBack);
       backEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') goBack(e); });

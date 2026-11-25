@@ -352,11 +352,14 @@
         sp.forEach(function (v, k) { if (k !== 'start') keys.push(k); });
       } catch (e) {}
       if (location.hash.length > 1) keys.push(decodeURIComponent(location.hash.slice(1)));
+      // Hugo 25.11.: zurück aus einer Galerie (Bereichsname unten links) → beim Bild dieses Bereichs starten
+      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); sessionStorage.removeItem('hp-return'); } } catch (e) {}
+      function hpath(h) { try { return new URL(h, location.href).pathname.replace(/\/$/, '').toLowerCase(); } catch (e) { return ''; } }
       for (var q = 0; q < keys.length; q++) {
         var key = String(keys[q]).trim().toLowerCase();
         if (!key) continue;
         for (var i = 0; i < n; i++) {
-          if (slides[i].name.toLowerCase() === key || slides[i].label.toLowerCase() === key) { F = C = i; return; }
+          if (slides[i].name.toLowerCase() === key || slides[i].label.toLowerCase() === key || (key.charAt(0) === '/' && slides[i].href && hpath(slides[i].href) === key.replace(/\/$/, ''))) { F = C = i; return; }
         }
       }
     })();
@@ -1337,7 +1340,13 @@
       if (b.getAnimations) b.getAnimations().forEach(function (an) { if (an.id === 'hp-crt') an.cancel(); });
       ['transform-origin', 'visibility', 'opacity'].forEach(function (p) { b.style.removeProperty(p); });
     }
-    window.addEventListener('pageshow', function (e) { if (e.persisted) crtReset(); });
+    // Zurück aus der Galerie (Seite aus dem Speicher): Röhren-TV zurücksetzen und das About sofort schliessen,
+    // damit man beim Bild des Bereichs landet (Hugo 25.11., 07:20), nicht im About
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted) return;
+      try { sessionStorage.removeItem('hp-return'); } catch (er) {}   // nur für ein frisches Laden gedacht
+      var back = !!crtFx; crtReset(); if (back) infoInstantClose();
+    });
     // Hugo 25.11. (Video 06:04): Am iPhone blieb das Bild als dicker Streifen stehen, die Linie kam nie. Ursache: Die Schritte
     // liefen pro Bild im Haupt-Thread (dort rechnet auch die Sonne) und filter: brightness auf der ganzen Seite ist teuer.
     // Jetzt laufen alle Teile als Web-Animationen (Grafikchip, auch wenn der Haupt-Thread voll ist). Heller wird es über
@@ -1416,6 +1425,7 @@
       var to = ''; try { to = new URL(href, location.href).pathname; } catch (er) {}
       if (!to) return;
       var clean = to.replace(/\/$/, '') || '/';
+      if (CRT.paths.indexOf(clean) > -1) { try { sessionStorage.setItem('hp-return', clean); } catch (er) {} }
       if (!reduce && CRT.paths.indexOf(clean) > -1) {
         // Seite schon jetzt laden, damit der Punkt nicht lange steht
         try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; document.head.appendChild(l); } catch (er) {}
@@ -2323,6 +2333,19 @@
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
       }, CONFIG.infoMs + 50);
+    }
+    // About ohne Animation schliessen (Rückkehr aus der Galerie)
+    function infoInstantClose() {
+      if (!root.classList.contains('is-info') && !infoSlide) return;
+      root.classList.remove('is-info', 'hp-info-anim'); setDialog(info, false);
+      clearTimeout(infoT); iz.a = ix.a = ip.a = null; iz.v = 0; ix.v = 0; ip.v = 1; infoClosing = false;
+      if (infoSlide) { infoSlide.el.style.transform = 'translate3d(0,0,0)'; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; infoSlide = null; }
+      if (tClone) { tClone.remove(); tClone = null; }
+      if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
+      info.style.transition = 'none'; info.getBoundingClientRect(); info.style.transition = '';   // sofort weg, ohne 1.5 s Nachlauf
+      applyPanel(); if (brand) brand.classList.remove('hp-on-white');
+      mbPop(false);
+      kick();
     }
     function openInfo() {
       if (!CONFIG.aboutSun) { openInfoPlain(); return; }
