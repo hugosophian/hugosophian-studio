@@ -67,7 +67,7 @@
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
     deskTextFrom: 0.25, // Computer: Text der Spalte blendet ein, sobald sie so weit offen ist …
     deskTextSpan: 0.25, // … und ist nach diesem Stück ganz da
-    goDelay:    350,    // Hugo 11:00/11:01: «Galerie öffnen» schreibt sich später ein (ms, zusätzlich; vorher 0, dann 200)
+    goDelay:    0,      // zusätzliche Verzögerung (ms). Hugo 11:06: zeitlich wieder wie ursprünglich, dafür erst wenn sichtbar (vorher 200, 350)
     infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
     // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
@@ -144,6 +144,7 @@
     '[data-hp] .hp-info-go { color: inherit; text-decoration: none; align-self: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; display: flex; align-items: center; gap: .5em; font-family: "Oswald Studio", sans-serif; font-size: .8rem; font-weight: 500; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; }',
     '[data-hp] .hp-info-go .lib-sort-label { font: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .hp-ch { display: inline-block; white-space: pre; }',
+    '[data-hp] .hp-go-wait .hp-ch, [data-hp] .hp-go-wait > .lib-sort-arrow { opacity: 0; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { font-size: 1.1em; line-height: 1; font-weight: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-label, [data-hp] .hp-info-go .lib-sort-arrow { color: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { transition: transform .45s cubic-bezier(.3,1.7,.55,1); }',
@@ -291,7 +292,22 @@
       }
       var a = label.closest ? label.closest('a') : null; if (a) a.setAttribute('aria-label', txt);
     }
+    // Hugo 11:06: erst animieren, wenn der Knopf wirklich sichtbar ist (lange Texte: erst wenn er beim Scrollen ins Bild kommt),
+    // frühestens zum ursprünglichen Zeitpunkt. Bis dahin sind die Buchstaben unsichtbar (hp-go-wait).
+    var goIO = ('IntersectionObserver' in window) ? new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        var a = e.target; if (!e.isIntersecting || !a.classList.contains('hp-go-wait')) return;
+        goIn(a, Math.max(0, (a.__goT || 0) - performance.now()));
+      });
+    }, { threshold: 0.6 }) : null;
+    function goArm(a, wait) {
+      if (!a) return;
+      if (reduce || !goIO || !a.animate) { a.classList.remove('hp-go-wait'); return; }
+      a.__goT = performance.now() + wait; a.classList.add('hp-go-wait');
+      goIO.unobserve(a); goIO.observe(a);   // neu beobachten: ist er schon sichtbar, meldet sich der Beobachter sofort
+    }
     function goIn(a, base) {
+      if (a) a.classList.remove('hp-go-wait');
       if (reduce || !a || !a.animate) return;
       [].forEach.call(a.querySelectorAll('.lib-sort-label .hp-ch, .lib-sort-arrow'), function (c, i) {
         if (c.closest('.hp-go-sh')) return;
@@ -1269,7 +1285,7 @@
         s.sideIn.style.width = SW.toFixed(2) + 'px';
         var sop = clamp((s.o - CONFIG.deskTextFrom) / CONFIG.deskTextSpan, 0, 1);   // Hugo 11:00: Text blendet schneller ein (vorher ab 45 % offen, über 40 %)
         s.sideIn.style.opacity = sop.toFixed(3);
-        if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goIn(s.sideLink, 60 + CONFIG.goDelay); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
+        if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goArm(s.sideLink, 60 + CONFIG.goDelay); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
         setVis(s, true);
         x += w;
       }
@@ -1697,6 +1713,7 @@
       cl.style.width = r.width.toFixed(2) + 'px'; cl.style.height = r.height.toFixed(2) + 'px'; cl.style.bottom = 'auto'; cl.style.opacity = '1';
       dText.appendChild(cl);
       s.sideIn.style.visibility = 'hidden'; dSide = s.sideIn;   // Original verstecken (doppelt übereinander wirkte die Schrift fett)
+      [].forEach.call(cl.querySelectorAll('.hp-go-wait'), function (x) { x.classList.remove('hp-go-wait'); });   // Kopie: Buchstaben sichtbar
       sunBtn = cl.querySelector('.hp-info-go');
       if (sunBtn) {
         sunBtn.tabIndex = 0;
@@ -2374,7 +2391,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
@@ -2458,7 +2475,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goIn(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
+      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
