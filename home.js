@@ -2927,7 +2927,7 @@
           if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
           var tl = Math.max(36, h * ch / sh), p = Math.max(0, Math.min(1, st / (sh - ch)));
           th.style.height = tl.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((h - tl) * p).toFixed(1) + 'px,0)';
-          var tile = tl; th.style.backgroundPosition = '0 ' + (-((st * 0.45) % tile)).toFixed(1) + 'px';
+          var tile = tl; th.style.backgroundPosition = '0 ' + (-((st * 1.1) % tile)).toFixed(1) + 'px';
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
