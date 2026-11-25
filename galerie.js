@@ -32,7 +32,8 @@
     // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
     fewFrom:   7, fewCell: 0.3, fewHoles: 0.25, fewJitter: 0.3,
     depth:     [0.62, 1.24],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne. Hugo 25.11.: hinten halb so schnell wie vorne
-    seed:      7,       // anderer Wert = andere Anordnung
+    randomLayout: true, // Hugo 25.11. (07:41): bei jedem Laden und jedem Umsortieren eine neue zufällige Anordnung (false = immer gleich, aus seed)
+    seed:      7,       // nur bei randomLayout: false – anderer Wert = andere feste Anordnung
     // Ziehen
     speedTouch: 1.0,    // Fingerweg mal
     speedMouse: 1.0,    // Mausweg mal
@@ -262,6 +263,9 @@
     [].forEach.call(root.querySelectorAll('[role="list"],[role="listitem"]'), function (e) { e.removeAttribute('role'); });
 
     var projects = all.slice();   // aktuelle Auswahl (Sortierung)
+    // Zufall pro Laden bzw. Umsortieren. Beim Drehen des Handys bleibt die Anordnung (gleicher Wert, nur neu eingepasst).
+    function newSeed() { return CONFIG.randomLayout ? (Math.random() * 4294967296) >>> 0 : CONFIG.seed; }
+    var layoutSeed = newSeed();
     var slots = [];               // Karten auf der Fläche
     var clones = [];
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
@@ -318,7 +322,7 @@
       var cols = clamp(Math.round(Math.sqrt(n * (VW / VH) * (rowH / cell))), 1, n);
       var rows = Math.ceil(n / cols);
       WW = cols * cell; WH = rows * rowH;
-      var R = rng(CONFIG.seed + strSeed(location.pathname + (current || '') + (mob ? 'm' : 'd')));
+      var R = rng(layoutSeed + strSeed(location.pathname + (current || '') + (mob ? 'm' : 'd')));
       var list = order(n, R), k = 0;
       for (var r = 0; r < rows; r++) {
         var inRow = Math.min(cols, n - r * cols), rowOff = (cols - inRow) * cell / 2;   // letzte Reihe mittig
@@ -792,7 +796,7 @@
     function applyFilter() {
       if (mode === 'load' || mode === 'gather') return;
       vel.x = vel.y = 0; drag = null; down = null;
-      if (reduce) { select(); build(); bang(); return; }
+      if (reduce) { select(); layoutSeed = newSeed(); build(); bitmaps(); bang(); return; }
       // alle sichtbaren Karten fallen zurück in den Punkt
       mode = 'gather'; gt = 0;
       slots.forEach(function (sl) { sl.from = pos(sl); });
@@ -802,7 +806,7 @@
       clear();
       showDot();
       if (dot) { dot.style.animation = 'none'; dot.style.transform = 'scale(1.3)'; }
-      select(); build();
+      select(); layoutSeed = newSeed(); build();
       prepare(bang);
     }
 
