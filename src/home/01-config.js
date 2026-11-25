@@ -50,6 +50,7 @@
     warmDelay:  1300,   // Computer: Galerie erst so lange nach dem Aufgehen der Spalte vorladen (ms), dann in einer ruhigen Lücke
     goScrollDelay: 280, // Hugo 11:09: beim Hineinscrollen schreibt sich der Knopf so viel später ein (ms)
     goDelay:    0,      // zusätzliche Verzögerung (ms). Hugo 11:06: zeitlich wieder wie ursprünglich, dafür erst wenn sichtbar (vorher 200, 350)
+    mouseMin:   24,     // Computer: so viele px muss die Maus in einem Zug machen, bevor eine Welle beginnt (Hugo 19:10: kleine Bewegungen ohne Welle)
     goAnim:     false,  // Hugo 25.11. (18:25): «Galerie öffnen» / «Werkstatt betreten» ohne Einschreiben und Schimmer, überall (true = wieder an)
     infoMs:     MOTION.pageMs,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.

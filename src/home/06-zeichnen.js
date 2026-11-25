@@ -105,16 +105,20 @@
         var s = slides[j], w = W * gs[j] / sum;
         var sw = Math.min(SW * clamp(s.o, 0, 1.15), w * 0.62);
         var iw = w - sw;
+        // Hugo 25.11. (19:10): keine weissen Streifen beim Auf- und Zugehen – die weisse Spalte wird erst ab einem Viertel offen sichtbar
+        // (ganz weiss ab drei Vierteln); solange sie schmal ist, ist sie durchsichtig und das Bild reicht darunter
+        var sq = clamp((sw / Math.max(1, SW) - 0.25) / 0.5, 0, 1), sa = sq * sq * (3 - 2 * sq); s.sideA = sa;
+        var mw = iw + sw * (1 - sa);
         var st = s.el.style;
         st.left = x.toFixed(2) + 'px'; st.width = w.toFixed(2) + 'px'; st.top = ''; st.height = '';
         st.transform = 'none'; st.zIndex = ''; st.clipPath = '';
-        if (s.media) s.media.style.width = iw.toFixed(2) + 'px';
+        if (s.media) s.media.style.width = mw.toFixed(2) + 'px';
         if (s.title && maxTw > 0) {
           s.title.style.left = '0px'; s.title.style.width = iw.toFixed(2) + 'px';
           var tfs = (Math.round(iw * CONFIG.deskTitle * 100 / maxTw * 2) / 2).toFixed(1) + 'px';   // halbe Pixel: weniger Neu-Setzen der Schrift pro Bild
           if (s.title.style.fontSize !== tfs) s.title.style.fontSize = tfs;
         }
-        s.side.style.width = Math.max(0, sw).toFixed(2) + 'px';
+        s.side.style.width = Math.max(0, sw).toFixed(2) + 'px'; var sas = sa.toFixed(3); if (s.side.style.getPropertyValue('--hp-side-a') !== sas) s.side.style.setProperty('--hp-side-a', sas);
         s.sideIn.style.width = SW.toFixed(2) + 'px';
         var sop = clamp((s.o - CONFIG.deskTextFrom) / CONFIG.deskTextSpan, 0, 1);   // Hugo 11:00: Text blendet schneller ein (vorher ab 45 % offen, über 40 %)
         var sos = sop.toFixed(3); if (s.sideIn.style.opacity !== sos) s.sideIn.style.opacity = sos;

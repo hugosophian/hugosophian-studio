@@ -181,7 +181,7 @@
         '  vec2 nI = l2 > 0.01 ? vec2(-ab.y, ab.x) / sqrt(l2) : vec2(0.0, 1.0); nI *= dot(nI, uRes * 0.5 - a.xy) < 0.0 ? -1.0 : 1.0;',
         '  float ds = sp < 0.0 ? dot(fc - a.xy, nI) : d;',   // Andocken: Abstand zur Linie des Abschnitts (überall stetig, innen positiv)
         '  return ds - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
-        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo; uniform vec4 uStrip;',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
+        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo; uniform vec4 uStrip; uniform float uWG[' + NW + '];',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
@@ -244,7 +244,7 @@
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
         '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',   // Rand und Welle des Andockens: uDA
-        '    float envT = (dockW ? smoothstep(0.0, mix(0.03, 0.6, uSoft), age) : smoothstep(0.0, 0.14, sa)) * kD, env = exp(-x * x) * envT;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
+        '    float envT = (dockW ? smoothstep(0.0, mix(0.03, 0.6, uSoft), age) : smoothstep(0.0, 0.14, sa)) * kD * uWG[k], env = exp(-x * x) * envT;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
         '    float amp = dockW ? exp(-age * 0.6) : exp(-sa * 0.45);',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
@@ -264,8 +264,8 @@
         '    float r = env * amp * gA * lk; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
-        '    edge = max(edge, exp(-0.25 * (x + sqrt(x * x + 0.09)) * (x + sqrt(x * x + 0.09))) * exp(-0.5 * (sqrt(x * x + 0.09) - x) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
-        '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
+        '    edge = max(edge, uWG[k] * exp(-0.25 * (x + sqrt(x * x + 0.09)) * (x + sqrt(x * x + 0.09))) * exp(-0.5 * (sqrt(x * x + 0.09) - x) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
+        '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD * uWG[k];',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
         '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on * gA * lk);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
@@ -373,9 +373,9 @@
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
         // Hugo 25.11. (17:27): wie bei der Fingerwelle keine Streifen mehr – das Wabbern (v. a. unter den Flares, wo es am stärksten
         // ist) schob das Foto abwechselnd nach innen und aussen (hell–dunkel–hell). Jetzt nur noch in eine Richtung, weich an- und abschwellend
-        '    off += (nin * (0.5 + 0.5 * sin(wph)) + vec2(-nin.y, nin.x) * 0.25 * (0.5 + 0.5 * cos(wph * 0.7 + 1.3))) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft);',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
+        '    off += (nin * (0.5 + 0.5 * sin(wph)) + vec2(-nin.y, nin.x) * 0.25 * (0.5 + 0.5 * cos(wph * 0.7 + 1.3))) * wa * mx * 0.013 * smoothstep(0.0, mix(0.25, 0.8, uSoft), et) * (1.0 + 0.6 * uSoft) * uGo;',   // 16:19: Wabbern sichtbarer (0.009 → 0.013)
         '  }',
-        '  off *= uGo; eacc *= uGo; faD *= uGo;',
+        '  eacc *= uGo; faD *= uGo;',   // Hugo 25.11. (19:10): uGo nur noch fürs Andock-Licht; jede Welle klingt mit ihrem eigenen Wert aus (uWG) – sonst sprangen alte Wellen zurück, wenn eine neue begann
         '  vec3 col = vec3(0.0), base = vec3(0.0); float al = 0.0, here = 0.0, alD = 0.0;',
         '  if (uHas > 0.5) {',
         // Hugo 24.11.: zum Bildschirmrand hin wird die Verschiebung nach aussen weich begrenzt (nie über die Kante) –
@@ -411,7 +411,7 @@
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
         '  edge *= (1.0 - uEdgeOff) * uWE;',
-        '  fa *= uWF * uGo; halo *= uWL * uGo; ring *= uWL * uGo; edge *= uGo;',   // Hugo 25.11.: Licht der Fingerwelle zurückgenommen   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
+        '  fa *= uWF; halo *= uWL; ring *= uWL;',   // Hugo 25.11.: Licht der Fingerwelle zurückgenommen   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
         '  float glow = clamp(ring * 1.0 + edge * 1.9, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
@@ -464,7 +464,11 @@
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         // eine deckende Fläche: das ganze Foto kommt aus der Leinwand (keine halbdurchsichtige Kopie über dem Original →
         // keine dunklen Säume, keine Doppelkanten, kein Rauch, wo sich Wellen kreuzen)
-        '    cov = mix(cov, here, uCov);',
+        // Hugo 25.11. (19:10): deckend nur dort, wo der Effekt etwas verändert (Verschiebung ab 0.03 px oder Licht) – sonst ist die
+        // Leinwand durchsichtig und man sieht das scharfe Originalfoto. Die Übergänge liegen bei Verschiebungen unter einem halben
+        // Pixel, darum gibt es keine Doppelkanten
+        '    vec3 dLit = abs(lit - base); float covL = max(smoothstep(0.03, 0.5, length(off)), smoothstep(0.004, 0.03, max(dLit.r, max(dLit.g, dLit.b))));',
+        '    cov = mix(cov, here * covL, uCov);',
         '    col = lit * cov; al = cov;',
         '  } else {',
         '    col = col + gc * (1.0 - al * 0.4) + eacc;',
@@ -490,7 +494,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop', 'uCov', 'uGo', 'uStrip'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop', 'uCov', 'uGo', 'uStrip', 'uWG'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -586,7 +590,7 @@
           dk = dvS.dv.k; qx = mr.left + mr.width / 2 + dk * dvS.dv.px; qy = mr.top + mr.height / 2 + dk * dvS.dv.py;   // Zoom-Mittelpunkt
           compCrop = [(qx - sr.left) / sr.width * (1 - 1 / dk), (qy - sr.top) / sr.height * (1 - 1 / dk), 1 / dk, 1 / dk];
         } else compCrop = null;
-        var sc = desk ? 1 : Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
+        var sc = desk ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1) * (dvS ? CONFIG.diveZoom : 1), cw2 = Math.round(sr.width * sc), ch2 = Math.round(sr.height * sc);
         var parts = [], sig = cw2 + 'x' + ch2;
         slides.forEach(function (sl) {
           if (!desk && !sl.vis) return;
@@ -594,8 +598,8 @@
           var ir = sl.img.getBoundingClientRect(), er = sl.el.getBoundingClientRect(), z = parseFloat(sl.el.style.zIndex) || 0;
           if (sl === dvS) ir = { left: qx + (ir.left - qx) / dk, top: qy + (ir.top - qy) / dk, width: ir.width / dk, height: ir.height / dk };   // wie ohne Zoom
           var sdr = desk && sl.side && sl.side.offsetWidth > 0 ? sl.side.getBoundingClientRect() : null;   // Textspalte (Computer): weiss
-          parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length, sd: sdr });
-          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z + (sdr ? ',' + Math.round(sdr.left) + ',' + Math.round(sdr.width) : '');
+          parts.push({ e: e, im: sl.img, ir: ir, er: er, z: z, i: parts.length, sd: sdr, sa: sl.sideA == null ? 1 : sl.sideA });
+          sig += '|' + [ir.left, ir.top, ir.width, ir.height, er.left, er.top, er.width, er.height].map(function (v) { return Math.round(v); }).join(',') + ',' + z + (sdr ? ',' + Math.round(sdr.left) + ',' + Math.round(sdr.width) + ',' + (sl.sideA == null ? 1 : sl.sideA).toFixed(2) : '');
         });
         // Hugo 24.11.: in der Reihenfolge wie auf dem Bildschirm übereinanderlegen (hintere Karten zuerst) – sonst lag beim
         // Andocken die Nachbarkarte, die hinter dem Bild ein paar Pixel übersteht, im Effekt obenauf (Linie oben/unten)
@@ -618,7 +622,7 @@
           cctx.drawImage(srcI, sx, sy, sw, sh, (p.ir.left - sr.left) * sc, (p.ir.top - sr.top) * sc, p.ir.width * sc, p.ir.height * sc);
           // Hugo 24.11. (13:11): die Textspalte ist durchsichtig über der weissen Wand – für die Welle ist sie darum weiss
           // (sonst zieht die Welle Schwarz in die Spalte)
-          if (p.sd) { cctx.fillStyle = '#fff'; cctx.fillRect((p.sd.left - sr.left) * sc, (p.sd.top - sr.top) * sc, p.sd.width * sc, p.sd.height * sc); }
+          if (p.sd) { cctx.globalAlpha = p.sa; cctx.fillStyle = '#fff'; cctx.fillRect((p.sd.left - sr.left) * sc, (p.sd.top - sr.top) * sc, p.sd.width * sc, p.sd.height * sc); }
           cctx.restore();
         });
         try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = parts.length > 0; }
@@ -630,10 +634,10 @@
         function pc(v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; }
         return [pc(op[0]), pc(op[1] || op[0])];
       }
-      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0, covV = 0, covT = 0;
+      var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), wgs = new Float32Array(NW), wgOne = new Float32Array(NW).fill(1), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0, covV = 0, covT = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
-      var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
+      var dprCap = weak ? 1 : (desk ? 1.5 : 2);   // Hugo 25.11. (19:10): Computer schärfer (1.5, regelt bei Ruckeln selbst herunter)   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
@@ -674,7 +678,10 @@
       }
       function draw(now) {
         raf = 0; tickNow = now;
-        waves = waves.filter(function (wv) { return now - wv.t0 < LIFE * 1000; });
+        // Hugo 25.11. (19:10): eine Welle lebt ab ihrer letzten Bewegung (vorher ab ihrem Start – eine lange Mauswelle verschwand
+        // nach 6.5 s auf einen Schlag, die Ecken sprangen zurück); jede klingt mit eigenem Wert weich aus (uWG)
+        function lastAct(wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; return la; }
+        waves = waves.filter(function (wv) { return now - lastAct(wv) < LIFE * 1000; });
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
@@ -698,6 +705,7 @@
         for (var k = 0; k < NW; k++) {
           var wv = ord[k];
           ages[k] = wv ? (now - wv.t0) / 1000 : -1;
+          if (wv) { var laW = lastAct(wv), enW = laW + (wv.sp2 < 0 ? 5600 : 5000); wgs[k] = 1 - sm01(enW - 1400, enW, now); } else wgs[k] = 0;
           // Farbe je nach Auslösung (Hugo 23.11.): Tippen → Ort, Ziehen → Richtung und Länge der Bahn
           if (wv && wv.pts.length) {
             var a0 = wv.pts[0], a1 = wv.pts[wv.pts.length - 1], dl = Math.hypot(a1.x - a0.x, a1.y - a0.y);
@@ -728,12 +736,12 @@
         // Hugo 25.11. (16:58): eine Fläche – solange der Effekt läuft, deckt die Leinwand das Foto ganz (uCov). Zum Schluss
         // klingt erst alles gemeinsam aus (uGo → das Bild steht still und klar), dann blendet die Fläche unmerklich zum Foto
         var endT = 0;
-        waves.forEach(function (wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; endT = Math.max(endT, la + (wv.sp2 < 0 ? 5600 : 5000)); });
+        waves.forEach(function (wv) { endT = Math.max(endT, lastAct(wv) + (wv.sp2 < 0 ? 5600 : 5000)); });
         if (edgeT0) endT = Math.max(endT, edgeT0 + 6000);
         var cdt = covT ? Math.min(100, now - covT) : 16; covT = now;
         if (lightMode || !compFull || !(waves.length || edgeT0)) covV = 0;
         else covV = now < endT ? Math.min(1, covV + cdt / 120) : Math.max(0, covV - cdt / 350);
-        c.uniform1f(U.uCov, covV); c.uniform1f(U.uGo, lightMode ? 1 : 1 - sm01(endT - 1400, endT, now));
+        c.uniform1f(U.uCov, covV); c.uniform1f(U.uGo, lightMode || !edgeT0 ? 1 : 1 - sm01(edgeT0 + 4600, edgeT0 + 6000, now)); c.uniform1fv(U.uWG, lightMode ? wgOne : wgs);
         if (!lightMode && endT && now >= endT && covV <= 0) { waves = []; edgeT0 = 0; killT0 = 0; }
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -786,17 +794,23 @@
       function ok() { return !desk && !root.classList.contains('is-info'); }
       function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
       // Computer (Hugo 24.11.): die Maus zieht immer eine Welle wie der Finger am Handy und wischt den Andock-Effekt weg
-      var mWave = 0;
+      var mWave = 0, mAcc = 0, mLast = 0;
       var lmx = -1, lmy = -1;
       stage.addEventListener('mousemove', function (e) {
         // nur echte Mausbewegung (der Browser meldet auch «Bewegung», wenn sich unter der ruhenden Maus etwas verschiebt)
         if (lmx < 0) { lmx = e.clientX; lmy = e.clientY; return; }
-        if (Math.hypot(e.clientX - lmx, e.clientY - lmy) < 3) return;
+        var mdd = Math.hypot(e.clientX - lmx, e.clientY - lmy);
+        if (mdd < 3) return;
         lmx = e.clientX; lmy = e.clientY;
         // Hugo 24.11.: die Maus zieht am Computer immer eine Welle wie der Finger am Handy (Text liegt darüber, bleibt ruhig)
         if (!desk || busy() || root.classList.contains('is-info') || dsunOn) return;   // bei der Sonne keine neuen Wellen (die laufende läuft zu Ende)
         var now = performance.now(), wv = waves[waves.length - 1];
-        if (!mWave || !wv || wv.sp2 < 0 || now - mWave > 350) { noEdge = false; if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
+        // Hugo 25.11. (19:10): ganz kleine Mausbewegungen lösen keine Welle aus – eine neue Welle beginnt erst, wenn die Maus
+        // in einem Zug mindestens CONFIG.mouseMin px zurückgelegt hat (Pause über 350 ms = neuer Zug)
+        if (now - mLast > 350) mAcc = 0; mLast = now; mAcc += mdd;
+        var mNew = !mWave || !wv || wv.sp2 < 0 || now - mWave > 350;
+        if (mNew && mAcc < CONFIG.mouseMin) return;
+        if (mNew) { noEdge = false; if (pendingOff) lightOff(); waves.push({ t0: now, pts: [] }); if (waves.length > NW) dropOld(); if (edgeT0 && !killT0) killT0 = now; }
         mWave = now; add(e.clientX, e.clientY);
       });
       // Andocken nach dem Laden (Hugo 23.11.): Licht mit grossen Flares läuft den Rand entlang (keine Welle aus der Mitte)
