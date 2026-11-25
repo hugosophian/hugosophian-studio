@@ -368,7 +368,9 @@
       } catch (e) {}
       if (location.hash.length > 1) keys.push(decodeURIComponent(location.hash.slice(1)));
       // Hugo 25.11.: zurück aus einer Galerie (Bereichsname unten links) → beim Bild dieses Bereichs starten
-      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); sessionStorage.removeItem('hp-return'); } } catch (e) {}
+      // Hugo 09:47: nur über den Bereichsnamen in der Galerie (dann ist auch hp-backin gesetzt). «studio» im Menü und alles
+      // andere starten immer mit dem normalen Aufbau (Alchemist zuerst).
+      try { var ret = sessionStorage.getItem('hp-return'); sessionStorage.removeItem('hp-return'); if (ret && (sessionStorage.getItem('hp-backin') || html.classList.contains('hp-backin'))) keys.push(ret); } catch (e) {}
       function hpath(h) { try { return new URL(h, location.href).pathname.replace(/\/$/, '').toLowerCase(); } catch (e) { return ''; } }
       for (var q = 0; q < keys.length; q++) {
         var key = String(keys[q]).trim().toLowerCase();

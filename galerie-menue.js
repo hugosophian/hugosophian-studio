@@ -133,6 +133,7 @@
       if (!homeLink(a) || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button > 0) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (homing) return; homing = true;
+      try { sessionStorage.removeItem('hp-return'); sessionStorage.removeItem('hp-backin'); } catch (er) {}   // Hugo 09:47: studio = normaler Aufbau, Alchemist zuerst
       var leave = function () { if (leave.done) return; leave.done = true; location.href = '/'; };   // ohne Seitenübergang (beide Seiten schwarz; Safari startete Animationen danach neu)
       document.documentElement.classList.remove('menu-open');
       if (reduce) { leave(); return; }
