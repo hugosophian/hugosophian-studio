@@ -21,13 +21,14 @@
 
   var CONFIG = {
     // Fläche
-    size:      { desktop: [0.4, 0.7], mobile: [0.4, 0.64] },     // Kartengrösse: Anteil der Grösse aus dem Designer (lib-img 30vh / 46vw)
-    cell:      { desktop: 1.5, mobile: 1.4 },     // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
+    // Hugo 25.11. (07:00): Bilder ohne weissen Rahmen (die Vorschau geht weiterhin weiss aus dem Bild auf) und näher zusammen
+    size:      { desktop: [0.5, 0.85], mobile: [0.48, 0.78] },   // Kartengrösse: Anteil der Grösse aus dem Designer (lib-img 30vh / 46vw)
+    cell:      { desktop: 1.18, mobile: 1.12 },   // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
     jitter:    0.5,     // wie weit eine Karte von ihrem Rasterplatz abweicht (Anteil vom Raster)
     holes:     0.08,    // Anteil leerer Rasterplätze
     // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
     // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
-    fewFrom:   7, fewCell: 0.5, fewHoles: 0.3, fewJitter: 0.3,
+    fewFrom:   7, fewCell: 0.3, fewHoles: 0.25, fewJitter: 0.3,
     depth:     [0.86, 1.14],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne
     seed:      7,       // anderer Wert = andere Anordnung
     // Ziehen
@@ -71,6 +72,7 @@
     '[data-lib] .lib-item.is-vis { visibility: visible; }',
     '[data-lib] .lib-item.is-off { visibility: hidden; }',
     '[data-lib] .lib-card, [data-lib] .lib-img { -webkit-user-drag: none; }',
+    '[data-lib] .lib-wheel .lib-card { padding: 0 !important; background: transparent !important; }',   /* ohne weissen Rahmen */
     '[data-lib] .lib-img { pointer-events: none; }',
     '[data-lib] .lib-data { display: none !important; }',
     '[data-lib].is-mouse .lib-stage { cursor: grab; }',
