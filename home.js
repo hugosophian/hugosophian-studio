@@ -755,7 +755,7 @@
         // Hugo 25.11. (17:34): beim Andocken lag die Bahn oben ein Stück im Bild – auf ihren beiden Seiten zeigte die Richtung
         // entgegengesetzt, das gab eine feine Linie zwischen Farbsaum und Flares. Andocken schiebt jetzt immer zur Bildmitte hin
         // (eine durchgehende Richtung, keine Kante an der Bahn)
-        '    vec2 dirW = dockW ? normalize(uRes * 0.5 - fc + 0.001) : dir; float sdK = dockW ? 1.0 : smoothstep(0.0, wk * 2.5, sd);',   // Hugo 25.11. (17:41): entlang der Fingerbahn sanfter (vorher wurde das Foto zur Bahn hin gestaucht – Linie, v. a. mit dem Andocken zusammen)
+        '    vec2 dirW = dockW ? normalize(uRes * 0.5 - fc + 0.001) * smoothstep(0.0, mx * 0.12, length(uRes * 0.5 - fc)) : dir; float sdK = dockW ? 1.0 : smoothstep(0.0, wk * 2.5, sd);',   // Hugo 25.11. (17:41): entlang der Fingerbahn sanfter (vorher wurde das Foto zur Bahn hin gestaucht – Linie, v. a. mit dem Andocken zusammen)
         '    off += dirW * (-0.5 * exp(-xd * xd) * envT * amp * sdK) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         // Hugo 16:19 (Video 16:14): beim Andocken lag ein milchiger Schleier über dem ganzen Foto – das Licht der Andock-Welle
         // leuchtet jetzt nur am Rand voll, innen nur noch 25 % (die Verschiebung = das Wabbern bleibt ganz)
@@ -867,7 +867,7 @@
         // stärker; Verschiebung klein genug, dass sich das Foto nie überschlägt
         '    float kE = (1.0 - wipe) * uKeep; faD *= kE * uDF; eacc *= kE * uDA * uRim; fI *= kE * uDF;',   // Hugo 24.11. (14:29): beim Schliessen nur der Rand (uDA), keine Flares (uDF)   // weggewischt bzw. nach dem ersten Wischen ganz aus
         '    vec2 wxy = vec2(exp(-ed.x / 18.0) * sign(uRes.x * 0.5 - fc.x), exp(-ed.y / 18.0) * sign(uRes.y * 0.5 - fc.y));',
-        '    vec2 nin = normalize(uRes * 0.5 - fc + 0.001);',   // Hugo 25.11. (17:40): zur Bildmitte (stetig) – vorher kippte die Richtung auf der Diagonale aus jeder Ecke (feine schräge Linie oben rechts)
+        '    vec2 nin = normalize(uRes * 0.5 - fc + 0.001) * smoothstep(0.0, mx * 0.12, length(uRes * 0.5 - fc));',   // zur Mitte hin weich auf null (dort hat die Richtung keinen Sinn – sonst kleiner Knick genau in der Mitte)   // Hugo 25.11. (17:40): zur Bildmitte (stetig) – vorher kippte die Richtung auf der Diagonale aus jeder Ecke (feine schräge Linie oben rechts)
         '    float wa = (exp(-max(e, 0.0) / (mx * 0.16)) * (0.6 * exp(-et * 1.2) + 0.4 * exp(-et * 0.35)) * 0.4 * (0.45 + 0.9 * smoothstep(0.3, 0.9, patch)) + min(fI, 1.2) * 1.1) * fade * kE;',   // 16:19: von den hellen Stellen aus, ungleich
         '    float wph = max(e, 0.0) * 0.07 - et * 3.2 + 2.0 * n2(ca * 4.0 + vec2(et * 0.3, 1.0));',
         // Hugo 25.11. (17:27): wie bei der Fingerwelle keine Streifen mehr – das Wabbern (v. a. unter den Flares, wo es am stärksten
@@ -893,9 +893,7 @@
         '    u = 1.0 - abs(1.0 - abs(u));',
         '    float inside = 1.0;',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
-        '    vec2 ca = off * 0.04 / uRect.zw * uCrop.zw;',                                 // nur ein Hauch Farbtrennung (keine Farbkanten)
-        '    vec2 iuA = 1.0 - abs(1.0 - abs(iu + ca)), iuB = 1.0 - abs(1.0 - abs(iu - ca));',
-        '    vec3 img = vec3(texture2D(uImg, iuA).r, texture2D(uImg, iu).g, texture2D(uImg, iuB).b);',
+                '    vec3 img = texture2D(uImg, iu).rgb;',   // Hugo 25.11. (18:00): keine Farbtrennung mehr – sie legte neben Kanten (Sattelstütze) graue Geisterlinien; nur noch ein Bild
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
         '    vec2 bh = min(vec2(u0, v0), 1.0 - vec2(u0, v0)) * uRect.zw;',
         '    here = step(0.0, min(bh.x, bh.y)) * inside; base = img;',   // Hugo 24.11.: kein Ausblenden am Bildschirmrand mehr (sonst dunkler Rahmen mit dem unverzerrten Foto)
