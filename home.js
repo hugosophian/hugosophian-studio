@@ -349,6 +349,8 @@
     // Hugo 24.11.: Start-Karte über den Link wählen – z. B. hugosophian.studio/?model oder /?creator (auch ?start=model
     // oder #model). Passt auf den CMS-Namen (mechanic, kunst, musik, persona) oder den Titel (Alchemist, Creator, Singer, Model).
     // Diese Karte fliegt in der Mitte ein und ist danach das erste Bild; ohne Angabe wie bisher die erste Karte.
+    // Hugo 25.11. (08:55): zurück aus der Galerie soll schnell gehen → ohne Lade- und Einflug-Animation direkt beim Bild
+    var retFast = false;
     (function () {
       var keys = [];
       try {
@@ -358,7 +360,7 @@
       } catch (e) {}
       if (location.hash.length > 1) keys.push(decodeURIComponent(location.hash.slice(1)));
       // Hugo 25.11.: zurück aus einer Galerie (Bereichsname unten links) → beim Bild dieses Bereichs starten
-      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); sessionStorage.removeItem('hp-return'); } } catch (e) {}
+      try { var ret = sessionStorage.getItem('hp-return'); if (ret) { keys.push(ret); retFast = true; sessionStorage.removeItem('hp-return'); } } catch (e) {}
       function hpath(h) { try { return new URL(h, location.href).pathname.replace(/\/$/, '').toLowerCase(); } catch (e) { return ''; } }
       for (var q = 0; q < keys.length; q++) {
         var key = String(keys[q]).trim().toLowerCase();
@@ -1291,6 +1293,7 @@
     }
     function startIntro() {
       if (!introOn) { render(); return; }
+      if (retFast) { endIntro(); render(); return; }   // zurück aus der Galerie: sofort fertig beim Bild
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
       var done = false;
@@ -2628,7 +2631,7 @@
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
-      if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
+      if (reduce || retFast) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer · zurück aus der Galerie: ohne
       html.classList.add('hp-ldpre');
       if (!desk && CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten nur am Handy (am Computer wieder entfernt)
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');

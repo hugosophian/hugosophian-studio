@@ -1239,12 +1239,28 @@
     var backEl = root.querySelector('.lib-bottom .ps-label');
     if (backEl) {
       backEl.setAttribute('role', 'link'); backEl.setAttribute('tabindex', '0'); backEl.setAttribute('aria-label', 'Back');
+      // Hugo 25.11. (08:55): immer zur Homepage auf das Bild dieses Bereichs, schnell. War man in einem Projekt, ist der
+      // vorherige Eintrag das Projekt – darum gezielt zum letzten Homepage-Eintrag im Verlauf springen (kommt aus dem
+      // Speicher, sofort da). Ohne solchen Eintrag: Homepage frisch laden, dann ohne Ladeanimation beim Bild (home.js).
       var goBack = function (e) {
         if (e) e.preventDefault();
-        var ref = ''; try { ref = new URL(document.referrer).origin; } catch (er) {}
-        if (ref === location.origin && history.length > 1) history.back();
-        else { try { sessionStorage.setItem('hp-return', location.pathname); } catch (er) {} window.hsVT = { to: '/', type: 'studio' }; location.href = '/'; }   // Startseite beginnt beim Bild dieses Bereichs
+        try { sessionStorage.setItem('hp-return', location.pathname); } catch (er) {}
+        try {
+          var nav = window.navigation, cur = nav && nav.currentEntry;
+          if (cur && nav.entries) {
+            var list = nav.entries();
+            for (var i = cur.index - 1; i >= 0; i--) {
+              var u = new URL(list[i].url);
+              if (u.origin === location.origin && (u.pathname.replace(/\/$/, '') || '/') === '/') { nav.traverseTo(list[i].key); return; }
+            }
+          }
+        } catch (er) {}
+        var ref = null; try { ref = new URL(document.referrer); } catch (er) {}
+        if (ref && ref.origin === location.origin && (ref.pathname.replace(/\/$/, '') || '/') === '/' && history.length > 1) { history.back(); return; }
+        window.hsVT = { to: '/', type: 'studio' }; location.href = '/';
       };
+      // Homepage im Voraus holen, damit auch ein frisches Laden schnell ist
+      setTimeout(function () { try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = '/'; document.head.appendChild(l); } catch (er) {} }, 3000);
       backEl.addEventListener('click', goBack);
       backEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') goBack(e); });
     }
