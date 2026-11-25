@@ -13,7 +13,9 @@
 
    Aufbau im Designer: gleich wie für library.js (section.lib [data-lib] [data-lib-folder], .lib-stage mit
    .lib-item > a.lib-card > img.lib-img und .lib-data, .lib-top, .lib-bottom, .lib-pv). Nichts umbauen.
-   Ein Titelbild pro Projekt. Damit die Fläche voll ist, kommen Projekte mehrfach vor (Kopien der Karte).
+   Ein Titelbild pro Projekt, jedes genau einmal.
+   Hugo 25.11. (07:23, Ziehen ruckelt, Explosion nicht verlässlich bei Creator): Alles wird auf EINE Zeichenfläche (Canvas)
+   gemalt, mit eigenem Takt. Die Karten aus dem Designer bleiben unsichtbar im Dokument (Tastatur, Daten für die Vorschau).
    Werte zum Anpassen: CONFIG.
    ============================================================ */
 (function () {
@@ -52,6 +54,8 @@
     debris:     6,      // Bilder, die quer durchs Blickfeld an der Kamera vorbeifliegen und verblassen
     shakePx:    12,     // Erschütterung beim Knall
     shakeMs:    380,
+    maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
+    follow:     0.38,   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
     // Sortierung
     gatherMs:   560,    // alle Bilder fallen zurück in den Punkt
     // Vorschau (wie library.js)
@@ -66,12 +70,11 @@
     'html.lib-on, html.lib-on body { height: 100%; overflow: hidden; overscroll-behavior: none; background-color: #000; }',
     '[data-lib] { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }',
     '[data-lib] .lib-stage { height: 100% !important; overflow: hidden; }',
-    '[data-lib] .lib-wheel { position: absolute; inset: 0; z-index: 1; transition: opacity .65s ease, filter .65s ease; }',
-    '[data-lib] .gx-sphere { position: absolute; left: 0; top: 0; border-radius: 50%; z-index: 0; pointer-events: none; opacity: 0; will-change: transform, opacity;',
-    '  background: radial-gradient(circle closest-side, #fff 0, #fff 70%, #ffd6f3 79%, #ff8fe0 83%, #b9a0ff 87%, #8fdcff 91%, #9cf7cf 94%, #fff09a 97%, rgba(255,240,160,0) 100%); }',
-    '[data-lib] .lib-item { position: absolute; left: 0; top: 0; visibility: hidden; opacity: 0; will-change: transform; transform-origin: 50% 50%; backface-visibility: hidden; }',
-    '[data-lib] .lib-item.is-vis { visibility: visible; }',
-    '[data-lib] .lib-item.is-off { visibility: hidden; }',
+    /* Hugo 25.11. (07:23): Bilder, Lichtkugel und Trümmer werden auf EINE Zeichenfläche (Canvas) gemalt, mit eigener Uhr.
+       Die Karten aus dem Designer bleiben im Dokument (Tastatur, Vorschau-Daten), werden aber nicht mehr gezeigt. */
+    '[data-lib] .gx-canvas { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; transition: opacity .65s ease, filter .65s ease; }',
+    '[data-lib] .lib-wheel { position: absolute; inset: 0; z-index: 0; opacity: 0; clip-path: inset(50%); pointer-events: none; }',
+    '[data-lib] .lib-wheel .lib-item { position: absolute; left: 0; top: 0; visibility: visible !important; opacity: 1 !important; }',   /* erreichbar für die Tastatur, aber weggeschnitten */
     '[data-lib] .lib-card, [data-lib] .lib-img { -webkit-user-drag: none; }',
     '[data-lib] .lib-wheel .lib-card { padding: 0 !important; background: transparent !important; }',   /* ohne weissen Rahmen */
     '[data-lib] .lib-img { pointer-events: none; }',
@@ -139,8 +142,8 @@
     '[data-lib] .lib-pv-go:focus-visible .lib-sort-arrow { transform: translateX(.35em); }',
     '[data-lib] .lib-pv-close { display: none !important; }',
     '[data-lib] .lib-pv-media img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: left top; }',
-    '[data-lib].is-pv-dim .lib-wheel { opacity: .25; }',
-    '@media (hover: hover) and (pointer: fine) { [data-lib].is-pv-dim .lib-wheel { filter: blur(8px); } }',
+    '[data-lib].is-pv-dim .gx-canvas { opacity: .25; }',
+    '@media (hover: hover) and (pointer: fine) { [data-lib].is-pv-dim .gx-canvas { filter: blur(8px); } }',
     '[data-lib].is-pv-dim .lib-bottom { opacity: 0; }',
     '.lib-fly { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; transform-origin: 0 0; will-change: transform; overflow: hidden; }',
     '.lib-fly img { display: block; width: 100%; height: 100%; object-fit: cover; }',
@@ -148,7 +151,7 @@
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on { translate: 0 var(--mh-drop); transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--mh-down) var(--mh-ease-down); }',
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb-small { scale: .55; }',
     'html.lib-on.mh-js .menu-toggle-wrap.mh-on.mh-on.lib-mb { translate: 0 0; scale: 1; will-change: translate, scale; transition: opacity var(--menu-dur) var(--menu-ease-out), visibility 0s, translate var(--hp-mb-up, .85s) var(--hp-mb-ease, cubic-bezier(.3, 1.9, .5, 1)), scale var(--hp-mb-up2, .85s) var(--hp-mb-ease2, cubic-bezier(.3, 1.9, .5, 1)); }',
-    '@media (prefers-reduced-motion: reduce) { [data-lib] .lib-wheel { transition-duration: .01s; } .gx-dot { animation: none; } }'
+    '@media (prefers-reduced-motion: reduce) { [data-lib] .gx-canvas { transition-duration: .01s; } .gx-dot { animation: none; } }'
   ].join('\n');
 
   // ---------- kleine Helfer ----------
@@ -157,6 +160,22 @@
   function easeOutExpo(t) { return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t); }
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
   function easeInCubic(t) { return t * t * t; }
+  function bezier(x1, y1, x2, y2) {
+    function A(p1, p2) { return 1 - 3 * p2 + 3 * p1; }
+    function B(p1, p2) { return 3 * p2 - 6 * p1; }
+    function C(p1) { return 3 * p1; }
+    function f(t, p1, p2) { return ((A(p1, p2) * t + B(p1, p2)) * t + C(p1)) * t; }
+    function d(t, p1, p2) { return 3 * A(p1, p2) * t * t + 2 * B(p1, p2) * t + C(p1); }
+    return function (x) {
+      if (x <= 0) return 0; if (x >= 1) return 1;
+      var t = x, i;
+      for (i = 0; i < 8; i++) { var dx = f(t, x1, x2) - x, dd = d(t, x1, x2); if (Math.abs(dx) < 1e-5 || !dd) break; t -= dx / dd; }
+      if (Math.abs(f(t, x1, x2) - x) > 1e-4) { var lo = 0, hi = 1; t = x; for (i = 0; i < 30; i++) { var v = f(t, x1, x2); if (v < x) lo = t; else hi = t; t = (lo + hi) / 2; } }
+      return f(t, y1, y2);
+    };
+  }
+  // gleiche Kurven wie vorher in den Web-Animationen
+  var EXPOf = bezier(.16, 1, .3, 1), OUT3 = bezier(.33, 1, .68, 1), EASEOUT = bezier(0, 0, .58, 1);
   function rng(seed) {
     return function () {
       seed = seed + 0x6D2B79F5 | 0;
@@ -191,9 +210,20 @@
     var mouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     root.classList.toggle('is-mouse', mouse);
 
-    var sphere = document.createElement('div'); sphere.className = 'gx-sphere'; sphere.setAttribute('aria-hidden', 'true');
+    var cv = document.createElement('canvas'); cv.className = 'gx-canvas'; cv.setAttribute('aria-hidden', 'true');
+    var ctx = cv.getContext('2d');
     var wheel = document.createElement('div'); wheel.className = 'lib-wheel';
-    stage.appendChild(sphere); stage.appendChild(wheel);
+    stage.appendChild(cv); stage.appendChild(wheel);
+    var DPR = 1;
+    // Zeichenfläche in Gerätepixeln (iPhone 3×). Riesige Bildschirme werden begrenzt (höchstens ~9 Mio. Pixel).
+    function sizeCanvas() {
+      DPR = Math.min(window.devicePixelRatio || 1, 3);
+      var px = VW * VH;
+      if (px * DPR * DPR > 9e6) DPR = Math.sqrt(9e6 / px);
+      var w = Math.round(VW * DPR), h = Math.round(VH * DPR);
+      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+      cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
+    }
 
     // ---------- Projekte einlesen (nur aus dem eigenen Ordner) ----------
     var folder = root.getAttribute('data-lib-folder') || '';
@@ -235,7 +265,8 @@
     var slots = [];               // Karten auf der Fläche
     var clones = [];
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
-    var cam = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
+    var cam = { x: 0, y: 0 }, tgt = { x: 0, y: 0 }, vel = { x: 0, y: 0 };   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
+    var drawOrder = [], focusSlot = null;
     var mode = 'load';            // load | bang | idle | gather | pv
     var raf = 0, last = 0, gatherAt = 0, bangT = 0;
 
@@ -269,8 +300,9 @@
       measureCards();
       // alte Kopien weg, Originale zurücksetzen
       clones.forEach(function (c) { c.remove(); }); clones = [];
-      all.forEach(function (p) { p.used = false; p.el.classList.remove('is-vis'); p.el.style.opacity = '0'; });
-      slots = [];
+      all.forEach(function (p) { p.used = false; });
+      slots = []; drawOrder = []; focusSlot = null;
+      sizeCanvas();
       if (!projects.length) return;
       var sz = mob ? CONFIG.size.mobile : CONFIG.size.desktop;
       var avgW = 0, maxD = 0;
@@ -294,7 +326,6 @@
           var p = list[k++], el = p.el;
           var s = sz[0] + R() * (sz[1] - sz[0]);
           var d = CONFIG.depth[0] + R() * (CONFIG.depth[1] - CONFIG.depth[0]);
-          el.style.zIndex = Math.round(d * 100);
           slots.push({
             p: p, el: el, a: el.querySelector('a.lib-card') || el.querySelector('a'), img: el.querySelector('img'),
             s: s, d: d, w: p.w, h: p.h,
@@ -303,11 +334,12 @@
             y: r * rowH + rowH / 2 + (R() - .5) * rowH * jit - WH / 2,
             rot: (R() - .5) * 2 * CONFIG.spin, dl: R() * CONFIG.flyDelay,
             dur: CONFIG.flyMs[0] + R() * (CONFIG.flyMs[1] - CONFIG.flyMs[0]), s0: .03 + R() * .05,
-            off: false
+            hide: false, bmp: null
           });
         }
       }
-      cam.x = 0; cam.y = 0;
+      cam.x = cam.y = tgt.x = tgt.y = 0;
+      drawOrder = slots.slice().sort(function (a, b) { return a.d - b.d; });   // hinten zuerst, vorne zuletzt
       // Hugo 25.11. (07:16/07:18): ziehen bis das äusserste Bild die Bildschirmmitte erreicht, erst dann der Dämpfer.
       // Pro Bild: bei welcher Kameralage erreicht seine Kante den Rand (mit seiner Tiefe d)? Die äussersten zählen.
       BX0 = Infinity; BX1 = -Infinity; BY0 = Infinity; BY1 = -Infinity;
@@ -332,154 +364,226 @@
     // Rand: ausserhalb von BX0…BX1 / BY0…BY1 bremst das Ziehen (Gummiband), danach federt die Fläche zurück
     function outX(v) { return v > BX1 ? v - BX1 : v < BX0 ? v - BX0 : 0; }
     function outY(v) { return v > BY1 ? v - BY1 : v < BY0 ? v - BY0 : 0; }
-    function outside() { return Math.abs(outX(cam.x)) > .3 || Math.abs(outY(cam.y)) > .3; }
-    function tfOf(sl, x, y, scale, rot) {
-      return 'translate3d(' + (x - sl.w / 2).toFixed(1) + 'px,' + (y - sl.h / 2).toFixed(1) + 'px,0) scale(' + (sl.s * scale).toFixed(4) + ') rotate(' + (rot || 0).toFixed(2) + 'deg)';
+    function outside() { return Math.abs(outX(tgt.x)) > .3 || Math.abs(outY(tgt.y)) > .3; }
+
+    // ---------- Bilder vorbereiten ----------
+    // Jede Karte wird einmal in genau ihrer Grösse (Gerätepixel) gemalt. Beim Ziehen wird nur noch dieses fertige Bild
+    // verschoben: kein Verkleinern pro Bild, nichts muss neu auf den Grafikchip.
+    function bitmap(sl) {
+      var W = Math.max(1, Math.round(sl.w * sl.s * DPR)), H = Math.max(1, Math.round(sl.h * sl.s * DPR));
+      var old = sl.p.bmp;
+      if (old && old.width === W && old.height === H) { sl.bmp = old; return; }
+      var img = sl.img;
+      if (!img || !img.naturalWidth) { sl.bmp = null; return; }
+      var src = img, sw = img.naturalWidth, sh = img.naturalHeight;
+      try {
+        while (sw > W * 2.2 && sh > H * 2.2) {   // grosse Bilder in Stufen halbieren (sauberer als ein grosser Schritt)
+          var t = document.createElement('canvas'); t.width = Math.ceil(sw / 2); t.height = Math.ceil(sh / 2);
+          var tc = t.getContext('2d'); tc.imageSmoothingQuality = 'high'; tc.drawImage(src, 0, 0, t.width, t.height);
+          src = t; sw = t.width; sh = t.height;
+        }
+        var c = document.createElement('canvas'); c.width = W; c.height = H;
+        var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+        var ar = W / H, sx = 0, sy = 0, cw = sw, ch = sh;
+        if (sw / sh > ar) { cw = sh * ar; sx = (sw - cw) / 2; } else { ch = sw / ar; sy = (sh - ch) / 2; }
+        g.drawImage(src, sx, sy, cw, ch, 0, 0, W, H);
+        sl.bmp = sl.p.bmp = c;
+      } catch (e) { sl.bmp = null; }
     }
-    function place(sl, x, y, scale, rot) {
-      sl.el.style.transform = tfOf(sl, x, y, scale, rot);
-      // Hugo 25.11. (07:09, Ziehen stottert): Karten ausserhalb des Bildschirms werden NICHT mehr versteckt. Jedes
-      // Verstecken/Zeigen warf ihr Bild vom Grafikchip und lud es neu (50–130 ms Stillstand). Ausserhalb wird ohnehin nichts gezeichnet.
+    function bitmaps() { slots.forEach(bitmap); }
+
+    // ---------- Malen ----------
+    var SNAP = 1;
+    function drawCard(sl, x, y, sc, rot, a) {
+      var b = sl.bmp; if (!b || a <= 0) return;
+      ctx.globalAlpha = a > 1 ? 1 : a;
+      var X = x * DPR, Y = y * DPR;
+      if (!rot) {
+        var w = b.width * sc, h = b.height * sc, L = X - w / 2, T = Y - h / 2;
+        if (L > cv.width || T > cv.height || L + w < 0 || T + h < 0) return;   // ausserhalb: nicht malen
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (sc === 1 && SNAP) { L = Math.round(L); T = Math.round(T); }   // ruhend gestochen scharf
+        ctx.drawImage(b, L, T, w, h);
+      } else {
+        var r = rot * Math.PI / 180, co = Math.cos(r) * sc, si = Math.sin(r) * sc;
+        ctx.setTransform(co, si, -si, co, X, Y);
+        ctx.drawImage(b, -b.width / 2, -b.height / 2);
+      }
+    }
+    function clear() { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, cv.width, cv.height); }
+    function paintIdle() {
+      clear();
+      SNAP = DPR >= 2 ? 1 : 0;
+      for (var i = 0; i < drawOrder.length; i++) {
+        var sl = drawOrder[i]; if (sl.hide) continue;
+        var f = pos(sl); drawCard(sl, f.x, f.y, 1, 0, 1);
+      }
+      if (focusSlot && !focusSlot.hide) {   // Tastatur: feiner Rahmen um die gewählte Karte
+        var q = pos(focusSlot), hw = focusSlot.w * focusSlot.s / 2 + 4, hh = focusSlot.h * focusSlot.s / 2 + 4;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+        ctx.strokeRect(q.x - hw, q.y - hh, hw * 2, hh * 2);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // Lage einer Karte auf dem Bildschirm als Rechteck (für die Vorschau)
+    function slotRect(sl) {
+      var o = cv.getBoundingClientRect(), f = pos(sl), w = sl.w * sl.s, h = sl.h * sl.s;
+      return { left: o.left + f.x - w / 2, top: o.top + f.y - h / 2, width: w, height: h };
     }
 
     // ---------- Schleife ----------
+    // Ein Takt für alles. Explosion und Sortieren laufen auf einer eigenen Uhr: pro gezeichnetem Bild höchstens
+    // CONFIG.maxStep ms weiter. Stockt das Handy kurz, wird die Bewegung langsamer, aber es fehlt nie ein Stück.
+    var bt = 0, bangEnd = 0, gt = 0, bangFirst = false;
     function kick() { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } }
     function frame(now) {
       raf = 0;
-      var dtf = last ? Math.min(3, (now - last) / 16.67) : 1; last = now;
-      var cx = VW / 2, cy = VH / 2, more = false, i, sl, f;
+      var dms = last ? now - last : 16.67; last = now;
+      var dtf = Math.min(3, dms / 16.67), more = false;
 
-      if (mode === 'gather') {
-        var tg = clamp((now - gatherAt) / CONFIG.gatherMs, 0, 1), eg = easeInCubic(tg);
-        for (i = 0; i < slots.length; i++) {
-          sl = slots[i]; f = sl.from;
-          place(sl, f.x + (cx - f.x) * eg, f.y + (cy - f.y) * eg, 1 - .96 * eg, sl.rot * eg * .5);
-          sl.el.style.opacity = (1 - clamp((tg - .7) / .3, 0, 1)).toFixed(3);
-        }
+      if (mode === 'bang') {
+        if (bangFirst) { bangFirst = false; bt = 0; } else bt += Math.min(dms, CONFIG.maxStep);
+        paintBang(bt);
+        if (bt >= bangEnd) { endBang(); return; }
+        more = true;
+      } else if (mode === 'gather') {
+        gt += Math.min(dms, CONFIG.maxStep);
+        var tg = clamp(gt / CONFIG.gatherMs, 0, 1);
+        paintGather(tg);
         if (tg >= 1) { gatherDone(); return; }
         more = true;
       } else if (mode === 'idle') {
-        var moving = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || dirty || outside();
         if (!drag) inertia(dtf);
-        if (moving) { for (i = 0; i < slots.length; i++) { sl = slots[i]; f = pos(sl); place(sl, f.x, f.y, 1, 0); } dirty = false; }
-        more = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside());
+        // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
+        var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
+        var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02;
+        if (gap) { cam.x += ox * k; cam.y += oy * k; } else { cam.x = tgt.x; cam.y = tgt.y; }
+        if (gap || dirty) { paintIdle(); dirty = false; }
+        more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
+      } else if (dirty) {   // Vorschau offen: nur neu malen, wenn sich etwas ändert (Karte aus-/eingeblendet)
+        paintIdle(); dirty = false;
       }
       if (more) raf = requestAnimationFrame(frame);
     }
     var dirty = false;
     function redraw() { dirty = true; kick(); }
     function inertia(dtf) {
-      cam.x += vel.x * dtf; cam.y += vel.y * dtf;
+      tgt.x += vel.x * dtf; tgt.y += vel.y * dtf;
       var fr = Math.pow(CONFIG.friction, dtf); vel.x *= fr; vel.y *= fr;
       // am Rand: Schwung stark bremsen und weich zurückfedern
-      var ox = outX(cam.x), oy = outY(cam.y), k = 1 - Math.pow(1 - 0.16, dtf), kb = Math.pow(0.6, dtf);
-      if (ox) { cam.x -= ox * k; if (vel.x * ox > 0) vel.x *= kb; }
-      if (oy) { cam.y -= oy * k; if (vel.y * oy > 0) vel.y *= kb; }
+      var ox = outX(tgt.x), oy = outY(tgt.y), k = 1 - Math.pow(1 - 0.16, dtf), kb = Math.pow(0.6, dtf);
+      if (ox) { tgt.x -= ox * k; if (vel.x * ox > 0) vel.x *= kb; }
+      if (oy) { tgt.y -= oy * k; if (vel.y * oy > 0) vel.y *= kb; }
       if (Math.abs(vel.x) < .05) vel.x = 0; if (Math.abs(vel.y) < .05) vel.y = 0;
     }
 
     // ---------- Urknall ----------
-    // Alles läuft als Web-Animation (Grafikchip): Kugel, Erschütterung, Trümmer und der Flug jeder Karte.
-    // Die Zielorte werden beim Start einmal berechnet; solange der Flug läuft, ist Ziehen gesperrt.
-    var EXPO = 'cubic-bezier(.16,1,.3,1)';   // wie easeOutExpo: schiesst los, bremst lange
+    // Lichtkugel, Erschütterung, Flug der Karten und Trümmer: alles auf der Zeichenfläche, Bild für Bild aus der eigenen Uhr.
+    var SPHERE_STOPS = [[0, '#fff'], [.70, '#fff'], [.79, '#ffd6f3'], [.83, '#ff8fe0'], [.87, '#b9a0ff'], [.91, '#8fdcff'], [.94, '#9cf7cf'], [.97, '#fff09a'], [1, 'rgba(255,240,160,0)']];
+    var shk = [], fin = [];
     function bang() {
       if (dot) { dot.remove(); dot = null; }
-      VW = window.innerWidth; VH = window.innerHeight;
       vel.x = vel.y = 0;
       if (reduce || !slots.length) {
-        slots.forEach(function (sl) { sl.el.classList.add('is-vis'); sl.el.style.opacity = '1'; var f = pos(sl); place(sl, f.x, f.y, 1, 0); });
-        mode = 'idle'; root.classList.add('is-in'); mbShow(); return;
+        mode = 'idle'; paintIdle(); root.classList.add('is-in'); mbShow(); return;
       }
-      mode = 'bang';
-      sphere.style.opacity = '0';
-      var cx = VW / 2, cy = VH / 2, longest = 0;
-      // Lichtkugel: füllt den Bildschirm, blendet aus
-      var R0 = Math.hypot(VW, VH) * 0.75;
-      sphere.style.width = sphere.style.height = 2 * R0 + 'px';
-      var st0 = 'translate3d(' + (cx - R0).toFixed(1) + 'px,' + (cy - R0).toFixed(1) + 'px,0) ';
-      sphere.animate([
-        { transform: st0 + 'scale(0)', opacity: 1, easing: 'cubic-bezier(.33,1,.68,1)' },
-        { transform: st0 + 'scale(1)', opacity: 1, offset: CONFIG.sphereMs / (CONFIG.sphereMs + CONFIG.fadeMs), easing: 'ease-out' },
-        { transform: st0 + 'scale(1)', opacity: 0 }
-      ], { duration: CONFIG.sphereMs + CONFIG.fadeMs, fill: 'forwards' });
-      // Erschütterung
-      var shk = [], n = 8, i;
-      for (i = 0; i <= n; i++) { var a = (1 - i / n) * CONFIG.shakePx; shk.push({ transform: i === n ? 'none' : 'translate3d(' + ((Math.random() - .5) * 2 * a).toFixed(1) + 'px,' + ((Math.random() - .5) * 2 * a).toFixed(1) + 'px,0)' }); }
-      wheel.animate(shk, { duration: CONFIG.shakeMs, easing: 'linear' });
-      // Karten fliegen aus der Mitte an ihren Platz
-      slots.forEach(function (sl) {
-        var f = pos(sl), s0 = sl.s0 / sl.s;
-        sl.el.classList.add('is-vis'); sl.el.style.opacity = '1';
-        place(sl, f.x, f.y, 1, 0);   // Endlage (bleibt nach der Animation stehen)
-        sl.el.animate([
-          { transform: tfOf(sl, cx, cy, s0, sl.rot), opacity: 0 },
-          { opacity: 1, offset: .02 },   // gleich sichtbar: man sieht sie aus der Quelle schiessen
-          { transform: tfOf(sl, f.x, f.y, 1, 0), opacity: 1 }
-        ], { duration: sl.dur, delay: sl.dl, easing: EXPO, fill: 'backwards' });
-        longest = Math.max(longest, sl.dur + sl.dl);
-      });
-      // Trümmer: ein paar Bilder fliegen gross quer durchs Blickfeld an der Kamera vorbei und verblassen
-      //  (schon in prepare() gebaut und entpackt, sonst sind sie am iPhone im Flug noch leer)
-      debrisEls.forEach(function (d) {
-        d.el.style.visibility = '';
-        var an = d.el.animate([
-          { transform: 'translate3d(' + d.x0 + 'px,' + d.y0 + 'px,0) rotate(0deg) scale(.05)', opacity: 0 },
-          { opacity: 1, offset: .06 },
-          { opacity: 1, offset: .45 },
-          { transform: 'translate3d(' + (d.x0 + d.tx) + 'px,' + (d.y0 + d.ty) + 'px,0) rotate(' + d.rot + 'deg) scale(2.65)', opacity: 0 }
-        ], { duration: d.dur, delay: d.dl, easing: 'cubic-bezier(.33,1,.68,1)', fill: 'both' });
-        an.onfinish = (function (e) { return function () { e.remove(); }; })(d.el);
-      });
-      debrisEls = [];
+      var i, longest = 0;
+      shk = [];
+      for (i = 0; i <= 8; i++) { var a = (1 - i / 8) * CONFIG.shakePx; shk.push(i === 8 ? [0, 0] : [(Math.random() - .5) * 2 * a, (Math.random() - .5) * 2 * a]); }
+      slots.forEach(function (sl) { sl.fin = pos(sl); longest = Math.max(longest, sl.dur + sl.dl); });
+      debrisEls.forEach(function (d) { longest = Math.max(longest, d.dur + d.dl); });
+      bangEnd = Math.max(longest, CONFIG.sphereMs + CONFIG.fadeMs) + 20;
+      mode = 'bang'; bangFirst = true;
       clearTimeout(bangT);
-      setTimeout(function () { root.classList.add('is-in'); mbShow(); }, 300);
-      bangT = setTimeout(function () {
-        slots.forEach(function (sl) { if (sl.el.getAnimations) sl.el.getAnimations().forEach(function (a) { a.cancel(); }); });
-        mode = 'idle'; redraw();   // ab jetzt wieder vom Ziehen gesteuert (Rand-Karten wieder ausgeblendet)
-      }, Math.max(longest, CONFIG.sphereMs + CONFIG.fadeMs) + 40);
+      bangT = setTimeout(function () { root.classList.add('is-in'); mbShow(); }, 300);
+      kick();
     }
-    // Vor dem Knall: alle Karten (auch die Kopien) entpacken, damit im Moment des Knalls nichts einfriert
+    function endBang() {
+      debrisEls = [];
+      mode = 'idle'; dirty = true; paintIdle();
+    }
+    function paintSphere(t) {
+      var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
+      if (t < CONFIG.sphereMs) { sc = OUT3(t / CONFIG.sphereMs); op = 1; }
+      else { sc = 1; op = 1 - EASEOUT(clamp((t - CONFIG.sphereMs) / CONFIG.fadeMs, 0, 1)); }
+      if (op <= 0 || sc <= 0) return;
+      var r = Math.max(1, R0 * sc), g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      SPHERE_STOPS.forEach(function (st) { g.addColorStop(st[0], st[1]); });
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = op; ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    function paintBang(t) {
+      clear(); SNAP = 0;
+      paintSphere(t);
+      // Erschütterung (nur die Karten, wie vorher)
+      var sx = 0, sy = 0;
+      if (t < CONFIG.shakeMs) {
+        var q = t / CONFIG.shakeMs * 8, i0 = Math.floor(q), fq = q - i0, A = shk[i0], B = shk[Math.min(8, i0 + 1)];
+        sx = A[0] + (B[0] - A[0]) * fq; sy = A[1] + (B[1] - A[1]) * fq;
+      }
+      var cx = VW / 2, cy = VH / 2;
+      for (var i = 0; i < drawOrder.length; i++) {
+        var sl = drawOrder[i], u = (t - sl.dl) / sl.dur;
+        if (u <= 0) continue;
+        var e = EXPOf(Math.min(1, u)), f = sl.fin, s0 = sl.s0 / sl.s;
+        drawCard(sl, cx + (f.x - cx) * e + sx, cy + (f.y - cy) * e + sy, s0 + (1 - s0) * e, sl.rot * (1 - e), e / .02);
+      }
+      // Trümmer: grosse Bilder quer durchs Blickfeld, an der Kamera vorbei, verblassen
+      debrisEls.forEach(function (d) {
+        var u = (t - d.dl) / d.dur; if (u <= 0 || u >= 1) return;
+        var p = OUT3(u), sc = .05 + 2.6 * p, op = p < .06 ? p / .06 : p < .45 ? 1 : 1 - (p - .45) / .55;
+        if (op <= 0) return;
+        var r = d.rot * p * Math.PI / 180, co = Math.cos(r) * sc * DPR, si = Math.sin(r) * sc * DPR;
+        ctx.globalAlpha = op;
+        ctx.setTransform(co, si, -si, co, (d.x0 + d.tx * p) * DPR, (d.y0 + d.ty * p) * DPR);
+        try { ctx.drawImage(d.img, 0, 0, d.w, d.h); } catch (er) {}
+      });
+      ctx.globalAlpha = 1;
+    }
+    function paintGather(tg) {
+      clear(); SNAP = 0;
+      var eg = easeInCubic(tg), cx = VW / 2, cy = VH / 2, a = 1 - clamp((tg - .7) / .3, 0, 1);
+      for (var i = 0; i < drawOrder.length; i++) {
+        var sl = drawOrder[i], f = sl.from; if (!f) continue;
+        drawCard(sl, f.x + (cx - f.x) * eg, f.y + (cy - f.y) * eg, 1 - .96 * eg, sl.rot * eg * .5, a);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // Trümmer vorbereiten (Bild, Richtung, Tempo)
     var debrisEls = [];
     function makeDebris() {
-      debrisEls.forEach(function (d) { d.el.remove(); }); debrisEls = [];
+      debrisEls = [];
       if (reduce || !projects.length) return;
-      var VWn = window.innerWidth, VHn = window.innerHeight, cx = VWn / 2, cy = VHn / 2, m = Math.min(VWn, VHn);
+      var VWn = VW, VHn = VH, cx = VWn / 2, cy = VHn / 2, m = Math.min(VWn, VHn);
       var Rr = rng(Date.now() & 4095), n = Math.min(CONFIG.debris, Math.max(2, projects.length * 2));
       for (var i = 0; i < n; i++) {
-        var p = projects[i % projects.length];
-        var src = p.img.currentSrc || p.img.src; if (!src) continue;
-        var ar = p.img.naturalWidth ? p.img.naturalWidth / p.img.naturalHeight : .8;
+        var p = projects[i % projects.length], im = p.img;
+        if (!im || !im.naturalWidth) continue;
+        var ar = im.naturalWidth / im.naturalHeight;
         var w = m * (.22 + Rr() * .16), h = w / ar;
-        // Richtungen gleichmässig verteilt, damit sie quer durchs ganze Bild gehen
-        var ang = (i + Rr() * .7) / n * Math.PI * 2;
-        var el = document.createElement('div');
-        el.className = 'lib-fly'; el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.zIndex = '15'; el.style.visibility = 'hidden';
-        var im = document.createElement('img'); im.src = src; im.alt = ''; el.appendChild(im);
-        root.appendChild(el);
-        debrisEls.push({ el: el, img: im, x0: cx - w / 2, y0: cy - h / 2, tx: Math.cos(ang) * VWn * 1.15, ty: Math.sin(ang) * VHn * 1.15,
+        var ang = (i + Rr() * .7) / n * Math.PI * 2;   // Richtungen rundherum verteilt
+        debrisEls.push({ img: im, w: w, h: h, x0: cx - w / 2, y0: cy - h / 2, tx: Math.cos(ang) * VWn * 1.15, ty: Math.sin(ang) * VHn * 1.15,
           rot: (Rr() - .5) * 120, dur: 560 + Rr() * 300, dl: Rr() * 60 });
       }
     }
+    // Vor dem Knall (während der Lichtpunkt leuchtet): Bilder entpacken, Karten fertig malen und einmal praktisch
+    // unsichtbar auf die Fläche legen, damit alles schon auf dem Grafikchip liegt. Dann Knall.
     function prepare(then) {
       var done = false, warmed = false;
       function go() { if (!done) { done = true; then(); } }
-      // Vorwärmen (Hugo 25.11., 07:09: «spielt selten richtig ab»): Im Moment des Knalls musste das iPhone alle Bilder
-      // gleichzeitig auf den Grafikchip laden (~0.4 s Stillstand), während die Uhr der Animation schon lief – der Anfang
-      // (Herausschiessen) fehlte. Jetzt liegen alle Karten, Trümmer und die Kugel schon während des Punkts in voller
-      // Grösse, praktisch unsichtbar (Deckkraft 0.4 %), in der Mitte. Erst wenn das gezeichnet ist, startet der Knall.
       function warm() {
         if (warmed) return; warmed = true;
+        bitmaps(); makeDebris();
         if (reduce) { go(); return; }
-        var VWn = window.innerWidth, VHn = window.innerHeight, cx = VWn / 2, cy = VHn / 2;
-        slots.forEach(function (sl) { sl.el.classList.add('is-vis'); sl.el.style.opacity = '0.004'; place(sl, cx, cy, 1, 0); });
-        debrisEls.forEach(function (d) { d.el.style.visibility = ''; d.el.style.opacity = '0.004'; d.el.style.transform = 'translate3d(' + d.x0 + 'px,' + d.y0 + 'px,0)'; });
-        var R0 = Math.hypot(VWn, VHn) * 0.75;
-        sphere.style.width = sphere.style.height = 2 * R0 + 'px';
-        sphere.style.transform = 'translate3d(' + (cx - R0).toFixed(1) + 'px,' + (cy - R0).toFixed(1) + 'px,0)'; sphere.style.opacity = '0.004';
-        requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(go, 90); }); });
+        clear(); ctx.globalAlpha = 0.004;
+        slots.forEach(function (sl) { if (sl.bmp) ctx.drawImage(sl.bmp, 0, 0); });
+        debrisEls.forEach(function (d) { try { ctx.drawImage(d.img, 0, 0, d.w * DPR, d.h * DPR); } catch (e) {} });
+        var g = ctx.createRadialGradient(0, 0, 0, 0, 0, 10); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 10, 10);
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(function () { requestAnimationFrame(function () { clear(); setTimeout(go, 40); }); });
       }
-      makeDebris();
-      var imgs = slots.map(function (sl) { return sl.img; }).concat(debrisEls.map(function (d) { return d.img; }));
+      var imgs = slots.map(function (sl) { return sl.img; });
+      projects.slice(0, CONFIG.debris).forEach(function (p) { imgs.push(p.img); });
       Promise.all(imgs.map(function (im) { return im && im.decode ? im.decode().catch(function () {}) : null; })).then(warm);
       setTimeout(warm, reduce ? 0 : CONFIG.decodeMax);
     }
@@ -492,6 +596,7 @@
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       down = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse', lx: e.clientX, ly: e.clientY, t: performance.now(), moved: false };
       vel.x = vel.y = 0;
+      tgt.x = cam.x; tgt.y = cam.y;   // fängt die Fläche dort, wo man sie sieht
     });
     window.addEventListener('pointermove', function (e) {
       if (!down || e.pointerId !== down.id) return;
@@ -504,10 +609,10 @@
       var now = performance.now(), k = down.touch ? CONFIG.speedTouch : CONFIG.speedMouse;
       var dx = (e.clientX - down.lx) * k, dy = (e.clientY - down.ly) * k, dt = Math.max(1, now - down.t);
       // ausserhalb des Rands nur noch gebremst (Gummiband)
-      cam.x += dx * (outX(cam.x + dx) * dx > 0 ? .35 : 1); cam.y += dy * (outY(cam.y + dy) * dy > 0 ? .35 : 1);
+      tgt.x += dx * (outX(tgt.x + dx) * dx > 0 ? .35 : 1); tgt.y += dy * (outY(tgt.y + dy) * dy > 0 ? .35 : 1);
       vel.x = .7 * (dx / dt * 16.67) + .3 * vel.x; vel.y = .7 * (dy / dt * 16.67) + .3 * vel.y;
       down.lx = e.clientX; down.ly = e.clientY; down.t = now;
-      if (mode === 'idle') redraw(); else kick();
+      kick();
     });
     function release(e, cancelled) {
       if (!down || (e && e.pointerId !== down.id)) return;
@@ -542,12 +647,24 @@
         if (sl) openPreview(sl);
       }
     });
-    function slotAt(x, y) {
-      var el = document.elementFromPoint(x, y), item = el && el.closest('.lib-item');
-      if (!item) return null;
-      for (var i = 0; i < slots.length; i++) if (slots[i].el === item) return slots[i];
+    function slotAt(x, y) {   // vorderste Karte unter dem Finger
+      var o = cv.getBoundingClientRect(); x -= o.left; y -= o.top;
+      for (var i = drawOrder.length - 1; i >= 0; i--) {
+        var sl = drawOrder[i]; if (sl.hide || !sl.bmp) continue;
+        var f = pos(sl);
+        if (Math.abs(x - f.x) <= sl.w * sl.s / 2 && Math.abs(y - f.y) <= sl.h * sl.s / 2) return sl;
+      }
       return null;
     }
+    // Tastatur: Fokus auf einer Karte holt sie in die Mitte und zeigt einen feinen Rahmen
+    wheel.addEventListener('focusin', function (e) {
+      var a = e.target.closest && e.target.closest('a.lib-card'); if (!a) return;
+      var sl = slots.filter(function (q) { return q.a === a; })[0]; if (!sl) return;
+      focusSlot = sl;
+      if (mode === 'idle') { vel.x = vel.y = 0; tgt.x = clamp(-sl.x / sl.d, BX0, BX1); tgt.y = clamp(-sl.y / sl.d, BY0, BY1); }
+      redraw();
+    });
+    wheel.addEventListener('focusout', function () { focusSlot = null; redraw(); });
     function tap(x, y) { var sl = slotAt(x, y); if (sl) openPreview(sl); }
 
     // Trackpad und Mausrad: Fläche verschieben
@@ -556,8 +673,8 @@
       e.preventDefault();
       if (mode !== 'idle' || root.classList.contains('is-pv')) return;
       var k = e.deltaMode === 1 ? 32 : 1;
-      cam.x = clamp(cam.x - e.deltaX * k, BX0 - 60, BX1 + 60); cam.y = clamp(cam.y - e.deltaY * k, BY0 - 60, BY1 + 60); vel.x = vel.y = 0;
-      redraw();
+      tgt.x = clamp(tgt.x - e.deltaX * k, BX0 - 60, BX1 + 60); tgt.y = clamp(tgt.y - e.deltaY * k, BY0 - 60, BY1 + 60); vel.x = vel.y = 0;
+      kick();
     }, { passive: false });
 
     // Tastatur
@@ -677,12 +794,12 @@
       vel.x = vel.y = 0; drag = null; down = null;
       if (reduce) { select(); build(); bang(); return; }
       // alle sichtbaren Karten fallen zurück in den Punkt
-      mode = 'gather'; gatherAt = performance.now();
+      mode = 'gather'; gt = 0;
       slots.forEach(function (sl) { sl.from = pos(sl); });
       kick();
     }
     function gatherDone() {
-      slots.forEach(function (sl) { sl.el.classList.remove('is-vis'); });
+      clear();
       showDot();
       if (dot) { dot.style.animation = 'none'; dot.style.transform = 'scale(1.3)'; }
       select(); build();
@@ -767,13 +884,13 @@
       var target = pvMedia && pvMedia.firstChild;
       if (!target) { pvFrame.style.transform = box(panelR); root.classList.add('is-pv', 'is-pv-dim', 'is-pv-in'); mode = 'pv'; return; }
       var b = mediaRect(sl);
-      var a = rect(sl.img.getBoundingClientRect());
-      var cardR = rect((sl.a || sl.img).getBoundingClientRect());
+      var a = slotRect(sl), cardR = a;   // Karten ohne Rahmen: Bild = Karte
       var D = CONFIG.pvMs;
       target.style.width = b.width + 'px'; target.style.height = b.height + 'px'; target.style.maxWidth = 'none';
       target.classList.add('is-wait');
-      sl.el.style.visibility = 'hidden';
       mode = 'pv'; pvState = 'opening';
+      cam.x = tgt.x; cam.y = tgt.y;
+      sl.hide = true; dirty = true; paintIdle();
       pvFrame.style.transform = box(cardR);
       root.classList.add('is-pv', 'is-pv-dim');
       frameTo([{ transform: box(cardR), easing: EASE }, { transform: box(panelR) }], D, function () {
@@ -804,11 +921,10 @@
       pvPanel.scrollTop = 0;
       var panelR = { left: 0, top: 0, width: pvPanel.offsetWidth, height: pvPanel.offsetHeight };
       var b = mediaRect(sl);
-      var cardR = rect((sl.a || sl.img).getBoundingClientRect());
-      var a = rect(sl.img.getBoundingClientRect());
+      var a = slotRect(sl), cardR = a;
       var from = getComputedStyle(pvFrame).transform;
       frameTo([{ transform: from && from !== 'none' ? from : box(panelR), easing: EASE }, { transform: box(cardR) }], CONFIG.pvCloseMs, function () {
-        sl.el.style.visibility = '';
+        sl.hide = false; paintIdle();
         requestAnimationFrame(finish);
       });
       target.classList.add('is-wait');
@@ -896,8 +1012,7 @@
       clearTimeout(rT);
       rT = setTimeout(function () {
         if (!started || mode !== 'idle' || Math.abs(window.innerWidth - VW) < 2 && Math.abs(window.innerHeight - VH) < 120) return;
-        build();
-        slots.forEach(function (sl) { sl.el.classList.add('is-vis'); sl.el.style.opacity = '1'; });
+        build(); bitmaps();
         redraw();
       }, 120);
     });
@@ -905,7 +1020,7 @@
       if (!e.persisted) return;
       // Zurück aus der Projektseite: Vorschau bleibt offen, das Bild fliegt dorthin zurück
       if (dot) { dot.remove(); dot = null; }
-      redraw();
+      if (mode === 'idle' || mode === 'pv') { dirty = true; paintIdle(); }
     });
   }
 
