@@ -206,11 +206,14 @@
     /* Hugo 12:36: schlicht wie bei Apple – schmale Pille mit runden Enden, ohne Schiene, ohne Schein, ohne ausblendende Spitzen;
        der Griff stösst oben und unten genau an das Ende des Bereichs. Farben wie die Horizont-Linie, wandern nur mit dem Scrollen. */
     '[data-hp] .hp-sbar { position: absolute; width: 3px; opacity: 0; transition: opacity .4s ease; pointer-events: none; }',
-    '[data-hp] .hp-sbar.is-on { opacity: .75; }',
+    '[data-hp] .hp-sbar.is-on { opacity: .85; }',
     '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
-    '[data-hp] .hp-sbar i { position: absolute; left: 0; width: 3px; top: 0; border-radius: 3px; will-change: transform;',
-    '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #a9c4ff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
-    '  background-size: 100% 100%; background-repeat: repeat-y; }',   /* Hugo 12:36: alle Farben auf einmal im Griff sichtbar */
+    /* Hugo 12:57: Perlmutt-Wolke (Vorschlag A, nach dem Cape des Neunfarbigen Hirschs aus Sky): perlweisser Grund mit weichen,
+       blassen Farbwolken (Eis-Cyan, Flieder, Rosé, Champagner), die beim Scrollen unterschiedlich schnell wandern; feiner lila Schein. */
+    /* Hugo 12:57: wie ein Buckel, der sich aus dem Weiss hebt – Licht von links oben (heller Rand), weicher Schatten rechts unten */
+    '[data-hp] .hp-sbar { width: 4px; }',
+    '[data-hp] .hp-sbar i { position: absolute; left: 0; width: 4px; top: 0; border-radius: 4px; will-change: transform; background-color: #eceff7;',
+    '  box-shadow: inset 1px 1px 0 rgba(255,255,255,.95), inset -1px -1px 1px rgba(120,110,175,.22), 1px 1.5px 2.5px rgba(110,100,165,.28), -1px -1px 1.5px rgba(255,255,255,1); }',   /* Hugo 12:36: alle Farben auf einmal im Griff sichtbar */
     /* Hugo 12:26: ohne weissen Kern und ohne Weiss im Verlauf */
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
@@ -1975,14 +1978,17 @@
       // und der Übergang liegt etwas unter dem Titel: ab 70 px unter dem Textanfang ausblenden, 16 px darunter ganz weg
       // (mit dem Aufsteigen um bis zu 28 px endet es knapp unter dem Titel, nicht darüber).
       var g = reduce ? 1 : clamp(st / 24, 0, 1);
-      var oE = topB - 4 + 20 * g, oS = topB + 70 * g, zT = Math.max(4, oS - oE);
+      // Hugo 12:56 (Video perappelgren Bild für Bild gemessen): beim Verlassen/Hereinkommen öffnet sich der Zeilenabstand über
+      // etwa 4 Zeilen wellenförmig (bis ~5 px je Zeile) und Wörter weiter rechts in der Zeile sind später dran. Darum breitere Zonen
+      // (oben ~115 px, unten 18 %) und 9 px Versatz pro Wort in der Zeile – die Zeile läuft schräg wie eine Welle aus und ein.
+      var oE = topB - 4 + 20 * g, oS = topB + 130 * g, zT = Math.max(4, oS - oE);
       var tb = oE;
       // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
-      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.12, rem), more = false;
+      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.18, rem), more = false;
       words.forEach(function (W) {
         var y = W.y - st, tin = 1;
-        var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
-        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - (y + W.h) - 5 * W.k) / zB, 0, 1));
+        var out = reduce ? 0 : eIOC(clamp((oS - y - 9 * W.k * g) / zT, 0, 1));
+        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 9 * W.k) / zB, 0, 1));
         var inn = Math.min(tin, sin);
         var o = reduce ? Math.min(smooth(oE, oS, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
@@ -2916,6 +2922,7 @@
       });
     }
     // Scroll-Leiste (Hugo 12:21): host = Element, in dem die Leiste liegt; Lage in px relativ zu host
+    var PEARL = ['rgba(160,225,245,.9)', 'rgba(205,190,250,.85)', 'rgba(250,205,225,.8)', 'rgba(250,238,200,.85)'], PEARL_SP = [.55, -.35, .8, -.6];
     function makeSbar(host) {
       var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
       var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
@@ -2931,7 +2938,13 @@
           var ov = st < 0 ? -st : (st > mx ? st - mx : 0), len = tl * (1 - 0.4 * (1 - Math.exp(-ov / 90)));
           th.style.height = len.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + (st > mx ? h - len : (h - tl) * p).toFixed(1) + 'px,0)';
           // Hugo 12:55: Eindampfen perfekt, ohne Nachfedern (Gummiband bringt ihn von selbst zurück)
-          var tile = len; th.style.backgroundPosition = '0 ' + (-((st * 1.1 + (st > mx ? 1 : -1) * ov * 2.4) % tile)).toFixed(1) + 'px';
+          // Perlmutt-Wolken: vier blasse Wolken, jede wandert mit eigenem Tempo und eigener Richtung (über das Ende hinaus schneller)
+          var sv = st + (st > mx ? 1 : -1) * ov * 2.4, img = '';
+          for (var k = 0; k < 4; k++) {
+            var yy = (((30 + k * 25 + sv * PEARL_SP[k] * 0.25) % 140) + 140) % 140 - 20;
+            img += 'radial-gradient(ellipse 140% 45% at 50% ' + yy.toFixed(1) + '%, ' + PEARL[k] + ' 0%, rgba(255,255,255,0) 70%),';
+          }
+          th.style.backgroundImage = 'linear-gradient(to right, rgba(255,255,255,.75), rgba(255,255,255,0) 50%, rgba(110,100,165,.14)),' + img.slice(0, -1);   // Wölbung quer
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
@@ -2942,11 +2955,11 @@
       var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
-      var oE = -4 + 34 * g, oS = 90 * g, zT = Math.max(4, oS - oE);
-      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.16, rem);
+      var oE = -4 + 34 * g, oS = 140 * g, zT = Math.max(4, oS - oE);   // Welle wie am Handy (12:56)
+      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.2, rem);
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 5 * W.k) / zB);
+        var out = q((oS - y - 9 * W.k * g) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 9 * W.k) / zB);
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
