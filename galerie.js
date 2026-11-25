@@ -234,7 +234,7 @@
     var projects = all.slice();   // aktuelle Auswahl (Sortierung)
     var slots = [];               // Karten auf der Fläche
     var clones = [];
-    var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX = 0, BY = 0;
+    var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
     var cam = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
     var mode = 'load';            // load | bang | idle | gather | pv
     var raf = 0, last = 0, gatherAt = 0, bangT = 0;
@@ -286,7 +286,6 @@
       var cols = clamp(Math.round(Math.sqrt(n * (VW / VH) * (rowH / cell))), 1, n);
       var rows = Math.ceil(n / cols);
       WW = cols * cell; WH = rows * rowH;
-      BX = Math.max(0, (WW - VW) / 2 + cell * 0.35); BY = Math.max(0, (WH - VH) / 2 + rowH * 0.35);
       var R = rng(CONFIG.seed + strSeed(location.pathname + (current || '') + (mob ? 'm' : 'd')));
       var list = order(n, R), k = 0;
       for (var r = 0; r < rows; r++) {
@@ -309,14 +308,29 @@
         }
       }
       cam.x = 0; cam.y = 0;
+      // Hugo 25.11. (07:16): ziehen bis das äusserste Bild genau am Bildschirmrand steht, erst dann der Dämpfer.
+      // Pro Bild: bei welcher Kameralage erreicht seine Kante den Rand (mit seiner Tiefe d)? Die äussersten zählen.
+      BX0 = Infinity; BX1 = -Infinity; BY0 = Infinity; BY1 = -Infinity;
+      slots.forEach(function (sl) {
+        var hw = sl.w * sl.s / 2, hh = sl.h * sl.s / 2;
+        BX1 = Math.max(BX1, (-VW / 2 - (sl.x - hw)) / sl.d);   // linke Kante am linken Rand (nach rechts gezogen)
+        BX0 = Math.min(BX0, (VW / 2 - (sl.x + hw)) / sl.d);    // rechte Kante am rechten Rand (nach links gezogen)
+        BY1 = Math.max(BY1, (-VH / 2 - (sl.y - hh)) / sl.d);
+        BY0 = Math.min(BY0, (VH / 2 - (sl.y + hh)) / sl.d);
+      });
+      if (!slots.length) { BX0 = BX1 = BY0 = BY1 = 0; }
+      // Breiter als der Bildschirm: nach rechts bis die linke Kante am linken Rand steht (und umgekehrt).
+      // Schmaler (z. B. Singer): nach rechts bis die rechte Kante am rechten Rand steht. Beides ergibt: Bereich zwischen den Werten.
+      var ax = BX1, bx = BX0, ay = BY1, by = BY0;
+      BX0 = Math.min(ax, bx); BX1 = Math.max(ax, bx); BY0 = Math.min(ay, by); BY1 = Math.max(ay, by);
     }
     // Lage einer Karte auf dem Bildschirm (Mitte)
     function pos(sl) {
       return { x: VW / 2 + sl.x + cam.x * sl.d, y: VH / 2 + sl.y + cam.y * sl.d };
     }
-    // Rand: ausserhalb von ±BX/±BY bremst das Ziehen (Gummiband), danach federt die Fläche zurück
-    function outX(v) { return v > BX ? v - BX : v < -BX ? v + BX : 0; }
-    function outY(v) { return v > BY ? v - BY : v < -BY ? v + BY : 0; }
+    // Rand: ausserhalb von BX0…BX1 / BY0…BY1 bremst das Ziehen (Gummiband), danach federt die Fläche zurück
+    function outX(v) { return v > BX1 ? v - BX1 : v < BX0 ? v - BX0 : 0; }
+    function outY(v) { return v > BY1 ? v - BY1 : v < BY0 ? v - BY0 : 0; }
     function outside() { return Math.abs(outX(cam.x)) > .3 || Math.abs(outY(cam.y)) > .3; }
     function tfOf(sl, x, y, scale, rot) {
       return 'translate3d(' + (x - sl.w / 2).toFixed(1) + 'px,' + (y - sl.h / 2).toFixed(1) + 'px,0) scale(' + (sl.s * scale).toFixed(4) + ') rotate(' + (rot || 0).toFixed(2) + 'deg)';
@@ -541,7 +555,7 @@
       e.preventDefault();
       if (mode !== 'idle' || root.classList.contains('is-pv')) return;
       var k = e.deltaMode === 1 ? 32 : 1;
-      cam.x = clamp(cam.x - e.deltaX * k, -BX - 60, BX + 60); cam.y = clamp(cam.y - e.deltaY * k, -BY - 60, BY + 60); vel.x = vel.y = 0;
+      cam.x = clamp(cam.x - e.deltaX * k, BX0 - 60, BX1 + 60); cam.y = clamp(cam.y - e.deltaY * k, BY0 - 60, BY1 + 60); vel.x = vel.y = 0;
       redraw();
     }, { passive: false });
 
