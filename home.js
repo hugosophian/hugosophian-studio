@@ -67,6 +67,7 @@
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
     deskTextFrom: 0.25, // Computer: Text der Spalte blendet ein, sobald sie so weit offen ist …
     deskTextSpan: 0.25, // … und ist nach diesem Stück ganz da
+    warmAfter:  2200,   // Galerien so lange nach dem Einflug vorladen (ms)
     warmDelay:  1300,   // Computer: Galerie erst so lange nach dem Aufgehen der Spalte vorladen (ms), dann in einer ruhigen Lücke
     goScrollDelay: 280, // Hugo 11:09: beim Hineinscrollen schreibt sich der Knopf so viel später ein (ms)
     goDelay:    0,      // zusätzliche Verzögerung (ms). Hugo 11:06: zeitlich wieder wie ursprünglich, dafür erst wenn sichtbar (vorher 200, 350)
@@ -146,6 +147,8 @@
     '[data-hp] .hp-info-go { color: inherit; text-decoration: none; align-self: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; display: flex; align-items: center; gap: .5em; font-family: "Oswald Studio", sans-serif; font-size: .8rem; font-weight: 500; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; }',
     '[data-hp] .hp-info-go .lib-sort-label { font: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .hp-ch { display: inline-block; white-space: pre; }',
+    /* Hugo 11:17: Ruckeln beim Einblenden am Computer – Text der Spalte auf eigener Grafik-Ebene, damit er beim Ein-/Ausblenden nicht jedes Bild neu gezeichnet wird */
+    '[data-hp] .hp-side-in { will-change: opacity; }',
     '[data-hp] .hp-go-wait .hp-ch, [data-hp] .hp-go-wait > .lib-sort-arrow { opacity: 0; }',
     '[data-hp] .hp-info-go .lib-sort-arrow { font-size: 1.1em; line-height: 1; font-weight: inherit; letter-spacing: inherit; }',
     '[data-hp] .hp-info-go .lib-sort-label, [data-hp] .hp-info-go .lib-sort-arrow { color: inherit; }',
@@ -158,6 +161,11 @@
     '[data-hp] .hp-info-go::after { content: ""; position: absolute; inset: -14px -16px; }',
     '[data-hp] .hp-info-panel .hp-intro-text { color: inherit; margin: 0; max-width: none; opacity: 1; transform: none; }',
     '[data-hp] .hp-info-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }',
+    /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
+       Streifen in der Farbe der Seite und rastet am Ende des Texts an seinem Platz ein. bottom negativ: der Klebe-Bereich endet
+       schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
+    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 1.4rem 0 .6rem; margin-top: -1.4rem;',
+    '  background: linear-gradient(to bottom, transparent, var(--hp-info-bg, #fff) 55%); box-shadow: 0 3rem 0 0 var(--hp-info-bg, #fff), 0 6rem 0 0 var(--hp-info-bg, #fff), 0 9rem 0 0 var(--hp-info-bg, #fff), 0 12rem 0 0 var(--hp-info-bg, #fff); }',   /* Streifen reicht bis unten: kein Text zwischen Knopf und Close */
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
@@ -314,7 +322,8 @@
       if (reduce || !a || !a.animate) return;
       [].forEach.call(a.querySelectorAll('.lib-sort-label .hp-ch, .lib-sort-arrow'), function (c, i) {
         if (c.closest('.hp-go-sh')) return;
-        try { c.animate([{ opacity: 0, filter: 'blur(4px)', transform: 'translateY(.35em)' }, { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0)' }],
+        var bl = desk ? [] : [{ filter: 'blur(4px)' }, { filter: 'blur(0px)' }];   // Hugo 11:17: am Computer ohne Unschärfe (Ruckeln)
+        try { c.animate([{ opacity: 0, transform: 'translateY(.35em)', filter: bl[0] ? bl[0].filter : 'none' }, { opacity: 1, transform: 'translateY(0)', filter: bl[1] ? bl[1].filter : 'none' }],
           { duration: 420, delay: base + i * 18, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }); } catch (er) {}
       });
     }
@@ -1282,12 +1291,13 @@
         if (s.media) s.media.style.width = iw.toFixed(2) + 'px';
         if (s.title && maxTw > 0) {
           s.title.style.left = '0px'; s.title.style.width = iw.toFixed(2) + 'px';
-          s.title.style.fontSize = (iw * CONFIG.deskTitle * 100 / maxTw).toFixed(2) + 'px';
+          var tfs = (Math.round(iw * CONFIG.deskTitle * 100 / maxTw * 2) / 2).toFixed(1) + 'px';   // halbe Pixel: weniger Neu-Setzen der Schrift pro Bild
+          if (s.title.style.fontSize !== tfs) s.title.style.fontSize = tfs;
         }
         s.side.style.width = Math.max(0, sw).toFixed(2) + 'px';
         s.sideIn.style.width = SW.toFixed(2) + 'px';
         var sop = clamp((s.o - CONFIG.deskTextFrom) / CONFIG.deskTextSpan, 0, 1);   // Hugo 11:00: Text blendet schneller ein (vorher ab 45 % offen, über 40 %)
-        s.sideIn.style.opacity = sop.toFixed(3);
+        var sos = sop.toFixed(3); if (s.sideIn.style.opacity !== sos) s.sideIn.style.opacity = sos;
         if (s.sideLink) { if (sop > 0.02 && !s.goShown) { s.goShown = true; goArm(s.sideLink, 60 + CONFIG.goDelay); } else if (sop <= 0) s.goShown = false; }   // Spalte geht auf: Knopf schreibt sich ein
         setVis(s, true);
         x += w;
@@ -1337,7 +1347,18 @@
     function kick() { if (!raf) { raf = requestAnimationFrame(step); if (ripple && ripple.order) ripple.order(); } }
     function goTo(t) { C = t; kick(); }
 
+    // Hugo 11:17: Übergang zur Galerie schneller – nach dem Einflug die Galerien still im Hintergrund vorladen
+    // (Computer: alle drei nacheinander; Handy: die des gezeigten Bereichs), jeweils in einer ruhigen Lücke
+    var warmAllDone = false;
+    function warmAfterIntro() {
+      if (warmAllDone) return; warmAllDone = true;
+      setTimeout(function () {
+        var list = desk ? slides.map(function (s) { return s.href; }) : [slides[current()] && slides[current()].href];
+        (function next(i) { if (i >= list.length) return; idle(function () { warmGallery(list[i]); setTimeout(function () { next(i + 1); }, 900); }); })(0);
+      }, CONFIG.warmAfter);
+    }
     function endIntro() {
+      warmAfterIntro();
       introOn = false;
       if (LD) LD.dock();
       clearInline();

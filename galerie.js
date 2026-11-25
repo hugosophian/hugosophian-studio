@@ -54,8 +54,8 @@
     // Hugo 25.11. (06:58): kein Aufladen, kein Ring – sobald geladen, sofort Knall mit der weissen Lichtkugel (wie vorher).
     // Gegen das Einfrieren im Moment des Knalls: Bilder werden während des Punkts entpackt, Flug, Kugel und Erschütterung
     // laufen als Web-Animationen auf dem Grafikchip (vorher Bild für Bild im Haupt-Thread, am iPhone 0.5 s eingefroren).
-    waitMax:    2500,   // höchstens so lange auf die Bilder warten
-    decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
+    waitMax:    1600,   // höchstens so lange auf die Bilder warten (Hugo 11:17: vorher 2500 – späte Bilder werden nachgemalt)
+    decodeMax:  600,    // höchstens so lange zusätzlich auf das Entpacken warten (vorher 900)
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
     hint:       'Zoom & dr\u00fcck auf die Bilder',   // Hugo 10:22: Hinweis ganz hinten, steht still ('' = keiner)
     hintZoom:   'Dr\u00fcck ins Schwarze',   // Hugo 10:48: so lange gezoomt ist, schreibt sich der Hinweis Buchstabe für Buchstabe hierzu um
