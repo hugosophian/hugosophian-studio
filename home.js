@@ -83,7 +83,7 @@
     // sich das Tempo dort, die Welle ist entlang der Bahn gemischt. Tempo in px pro ms (Finger/Maus):
     waveSlow:   0.12,   // bis hier ruhigste Welle (Hugo 17:03: vorher 0.08)
     waveShort:  20,     // Handy: kurze Wischer – ab hier wächst die Kraft mit dem Weg (px) (Hugo 17:13)
-    waveLong:   280,    // Handy: ab diesem Weg (px) volle Kraft aus dem Tempo
+    waveLong:   130,    // Handy: ab diesem Weg (px) volle Kraft aus dem Tempo (Hugo 17:26: halbiert und minimal früher, vorher 280)
     waveShortK: 0.15,   // Handy: Anteil der Tempo-Kraft bei ganz kurzem Wischer
     waveCurve:  1.5,    // Handy: >1 = langsames Scrollen bleibt länger ruhig (Hugo 17:03)
     waveFast:   1.2,    // ab hier volle Stärke (wie bisher)
