@@ -722,11 +722,14 @@
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
         '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',   // Rand und Welle des Andockens: uDA
-        '    float env = exp(-x * x) * (dockW ? smoothstep(0.0, mix(0.03, 0.6, uSoft), age) : smoothstep(0.0, 0.14, sa)) * kD;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
+        '    float envT = (dockW ? smoothstep(0.0, mix(0.03, 0.6, uSoft), age) : smoothstep(0.0, 0.14, sa)) * kD, env = exp(-x * x) * envT;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
         '    float amp = dockW ? exp(-age * 0.6) : exp(-sa * 0.45);',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
+        '    float xd = x / (dockW ? 2.0 : 1.6);',
+        // Hugo 25.11. (17:06): kein Strich mehr mitten durch die Welle – die Verschiebung verteilt sich auf eine breitere Zone
+        // (gleich weit, aber weicher): vorher wurde das Foto in der Wellenmitte fast 8-fach zusammengedrückt, das sah aus wie eine Linie
+        '    off += dir * (-xd * exp(-xd * xd) * envT * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         // Hugo 16:19 (Video 16:14): beim Andocken lag ein milchiger Schleier über dem ganzen Foto – das Licht der Andock-Welle
         // leuchtet jetzt nur am Rand voll, innen nur noch 25 % (die Verschiebung = das Wabbern bleibt ganz)
         '    float lk = dockW ? 0.25 + 0.75 * exp(-max(e, 0.0) / (mx * 0.07)) : 1.0;',
