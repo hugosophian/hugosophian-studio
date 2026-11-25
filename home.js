@@ -1234,16 +1234,32 @@
       cv.dropTap = function () { var now = performance.now(); waves = waves.filter(function (q) { return q.sp2 || now - q.t0 > 800 || q.pts.length > 3; }); };
       try { loadAll(); } catch (e) {}   // Hugo 24.11.: Bilder für den Effekt schon beim Laden holen (nicht erst beim Aufprall – sonst Ruckler)
       // eine Berührung = eine Welle (neue Berührung beginnt eine neue)
-      stage.addEventListener('touchstart', function (e) {
-        if (!ok() || !e.touches[0] || e.touches.length > 1) return;
-        var t = e.touches[0];
+      // Hugo 25.11. (16:29): beim blossen Tippen keine Welle mehr – sie beginnt erst, wenn der Finger zieht (ab 6 px,
+      // gleiche Schwelle wie beim Wischen); dann startet sie an der Stelle, wo der Finger aufgesetzt hat
+      var tDown = null;
+      function startWave(x, y) {
         noEdge = false;
         if (pendingOff) lightOff();
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
         if (edgeT0 && !killT0) killT0 = performance.now();
-        add(t.clientX, t.clientY);
+        add(x, y);
+      }
+      stage.addEventListener('touchstart', function (e) {
+        tDown = null;
+        if (!ok() || !e.touches[0] || e.touches.length > 1) return;
+        tDown = { x: e.touches[0].clientX, y: e.touches[0].clientY, on: false };
       }, { passive: true });
-      stage.addEventListener('touchmove', function (e) { if (ok() && e.touches[0] && waves.length) add(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+      stage.addEventListener('touchmove', function (e) {
+        if (!ok() || !e.touches[0] || !tDown) return;
+        var x = e.touches[0].clientX, y = e.touches[0].clientY;
+        if (!tDown.on) {
+          if (Math.abs(x - tDown.x) < 6 && Math.abs(y - tDown.y) < 6) return;
+          tDown.on = true; startWave(tDown.x, tDown.y);
+        }
+        add(x, y);
+      }, { passive: true });
+      stage.addEventListener('touchend', function (e) { if (!e.touches.length) tDown = null; }, { passive: true });
+      stage.addEventListener('touchcancel', function () { tDown = null; }, { passive: true });
       return cv;
     })();
 
