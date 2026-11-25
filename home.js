@@ -168,7 +168,7 @@
     '[data-hp] .hp-info-fix { position: absolute; left: 0; right: 0; bottom: calc(5vh + 4.4rem + env(safe-area-inset-bottom, 0px)); z-index: 2; padding: 0 5vw 0 var(--hp-info-left, 5vw); pointer-events: none; color: var(--hp-info-fg, #000); }',
     /* Hugo 11:34 (Video perappelgren.de): Zeile für Zeile – jede Zeile blendet zum Rand hin selbst aus, beim Scrollen bleiben
        untere Zeilen leicht zurück Code: infoLines / linesTick */
-    '[data-hp] .hp-info-panel .hp-w { display: inline-block; will-change: transform, opacity; opacity: 0; }',
+    '[data-hp] .hp-info-panel .hp-w { display: inline-block; will-change: transform, opacity; }',
     '[data-hp] .hp-info-fix .hp-info-btns > * { pointer-events: auto; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
@@ -1954,22 +1954,20 @@
       if (!words.length || !root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);   // unten: über dem festen Knopf
-      // Hugo 11:55: oben unter dem Titel wegfliegen – ganz weg, bevor ein Wort die Unterkante des Titels erreicht
-      var pr = pn.getBoundingClientRect(), tb = topB * 0.5;
-      if (tClone) { var tr = tClone.getBoundingClientRect(); tb = tr.bottom - pr.top + 6; }
-      tb = clamp(tb, 0, topB - 8);
-      var oS = topB + Math.min(st, 30), zT = Math.max(8, oS - tb);
-      // unten: nur wenn wirklich noch Text darunter liegt (kurzer Text oder Ende erreicht = alles ganz sichtbar, nichts hängt halb)
+      // Hugo 12:17: beim Öffnen steht der Text ganz normal da; erst beim Scrollen setzt der Effekt ein (g: 0 → 1 über die ersten 24 px)
+      // und der Übergang liegt etwas unter dem Titel: ab 70 px unter dem Textanfang ausblenden, 16 px darunter ganz weg
+      // (mit dem Aufsteigen um bis zu 28 px endet es knapp unter dem Titel, nicht darüber).
+      var g = reduce ? 1 : clamp(st / 24, 0, 1);
+      var oE = topB - 4 + 20 * g, oS = topB + 70 * g, zT = Math.max(4, oS - oE);
+      var tb = oE;
+      // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
       var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.12, rem), more = false;
-      var el = performance.now() - wordsT0;
       words.forEach(function (W) {
-        var y = W.y - st;
-        var tin = 1;
-        if (W.r != null && !reduce) { tin = eOQ(clamp((el - 650 * W.r) / 700, 0, 1)); if (tin < 1) more = true; }
+        var y = W.y - st, tin = 1;
         var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
         var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - (y + W.h) - 5 * W.k) / zB, 0, 1));
         var inn = Math.min(tin, sin);
-        var o = reduce ? Math.min(smooth(tb, topB, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
+        var o = reduce ? Math.min(smooth(oE, oS, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = o.toFixed(3);
