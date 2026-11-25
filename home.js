@@ -215,8 +215,11 @@
     /* Hugo 13:00: wie weicher Stoff, den der Griff von unten hochdrückt – keine harte Kante; Licht auf dem Kamm, Schatten an der
        Flanke, alles läuft weich ins Weiss aus (Maske). Farben nur auf dem Buckel selbst. Der Griff ist 14 px breit und oben/unten
        6 px länger, damit das Auslaufen nicht an der sichtbaren Länge frisst. */
-    '[data-hp] .hp-sbar i { position: absolute; left: -5px; width: 14px; top: 0; will-change: transform; background-color: transparent;',
-    '  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 52%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 52%, transparent 100%); }',   /* Hugo 12:36: alle Farben auf einmal im Griff sichtbar */
+    /* Hugo 13:05: eine Pille, die sich unter einem feinen, seidigen Stoff bewegt. Der Stoff spannt sich über die Pille (schmaler
+       heller Kamm, darunter ein breiter, sehr weicher Schattenrock links und rechts) und hat einen Seidenglanz, der beim Scrollen
+       an der Pille entlangläuft. Farben nur auf dem Kamm. 22 px breit, oben/unten 8 px Auslauf. */
+    '[data-hp] .hp-sbar i { position: absolute; left: -9px; width: 22px; top: 0; will-change: transform; background-color: transparent;',
+    '  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 38%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 38%, transparent 100%); }',   /* Hugo 12:36: alle Farben auf einmal im Griff sichtbar */
     /* Hugo 12:26: ohne weissen Kern und ohne Weiss im Verlauf */
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
@@ -1987,7 +1990,7 @@
       var oE = topB - 4 + 20 * g, oS = topB + 130 * g, zT = Math.max(4, oS - oE);
       var tb = oE;
       // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
-      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.18, rem), more = false;
+      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(Math.max(H2 * 0.18, 1.75 * (oS - oE)), H2 * 0.3, rem), more = false;   // Appelgren: Hereinkommen .28 lang, Gehen .16 → 1.75×
       words.forEach(function (W) {
         var y = W.y - st, tin = 1;
         // Hugo 13:01: oben normal ausblenden (ganze Zeile gleich), unten die Treppe – stufenlos nach der Lage im Satz (x),
@@ -2929,9 +2932,9 @@
     // Scroll-Leiste (Hugo 12:21): host = Element, in dem die Leiste liegt; Lage in px relativ zu host
     var PEARL = ['rgba(150,220,245,.95)', 'rgba(195,178,250,.9)', 'rgba(248,190,215,.85)', 'rgba(250,228,180,.9)'], PEARL_SP = [.55, -.35, .8, -.6];
     // Stoff-Buckel quer zur Leiste: Licht auf dem Kamm (links der Mitte), Schatten an der rechten Flanke, leichte Falte links am Fuss
-    var BUMP = 'linear-gradient(to right, rgba(255,255,255,0) 18%, rgba(255,255,255,.9) 40%, rgba(255,255,255,0) 54%),'
-      + 'linear-gradient(to right, rgba(110,100,165,0) 50%, rgba(110,100,165,.22) 70%, rgba(110,100,165,0) 92%),'
-      + 'linear-gradient(to right, rgba(110,100,165,0) 4%, rgba(110,100,165,.09) 16%, rgba(110,100,165,0) 30%),';
+    var BUMP = 'linear-gradient(to right, rgba(255,255,255,0) 34%, rgba(255,255,255,.9) 43%, rgba(255,255,255,0) 52%),'   // Kamm im Licht
+      + 'linear-gradient(to right, rgba(110,100,165,0) 50%, rgba(110,100,165,.2) 60%, rgba(110,100,165,.07) 78%, rgba(110,100,165,0) 100%),'   // Flanke rechts, Stoff zieht weit aus
+      + 'linear-gradient(to right, rgba(110,100,165,0) 0%, rgba(110,100,165,.06) 20%, rgba(110,100,165,.1) 33%, rgba(110,100,165,0) 41%),';   // Stoff-Falte links am Fuss
     function makeSbar(host) {
       var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
       var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
@@ -2945,15 +2948,18 @@
           // Hugo 12:48: zieht man über Anfang oder Ende hinaus (Gummiband am iPhone), dampft der Griff dezent ein (höchstens 40 %,
           // weich auslaufend) und bleibt am Rand; beim Loslassen federt er mit dem Gummiband zurück in seine Grösse.
           var ov = st < 0 ? -st : (st > mx ? st - mx : 0), len = tl * (1 - 0.4 * (1 - Math.exp(-ov / 90)));
-          th.style.height = (len + 12).toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((st > mx ? h - len : (h - tl) * p) - 6).toFixed(1) + 'px,0)';
+          th.style.height = (len + 16).toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((st > mx ? h - len : (h - tl) * p) - 8).toFixed(1) + 'px,0)';
           // Hugo 12:55: Eindampfen perfekt, ohne Nachfedern (Gummiband bringt ihn von selbst zurück)
           // Perlmutt-Wolken: vier blasse Wolken, jede wandert mit eigenem Tempo und eigener Richtung (über das Ende hinaus schneller)
           var sv = st + (st > mx ? 1 : -1) * ov * 2.4, img = '';
           for (var k = 0; k < 4; k++) {
             var yy = (((30 + k * 25 + sv * PEARL_SP[k] * 0.25) % 140) + 140) % 140 - 20;
-            img += 'radial-gradient(ellipse 32% 40% at 47% ' + yy.toFixed(1) + '%, ' + PEARL[k] + ' 0%, rgba(255,255,255,0) 100%),';
+            img += 'radial-gradient(ellipse 15% 40% at 47% ' + yy.toFixed(1) + '%, ' + PEARL[k] + ' 0%, rgba(255,255,255,0) 100%),';
           }
-          th.style.backgroundImage = BUMP + img.slice(0, -1);
+          // Seidenglanz: ein heller Streifen entlang des Kamms, der mit dem Scrollen wandert (Stoff gleitet über die Pille)
+          var gy = ((((sv * 0.6) % 160) + 160) % 160) - 30;
+          var silk = 'radial-gradient(ellipse 9% 22% at 42% ' + gy.toFixed(1) + '%, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 100%),';
+          th.style.backgroundImage = silk + BUMP + img.slice(0, -1);
           if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
         },
         hide: function () { bar.classList.remove('is-on', 'is-active'); }
@@ -2965,7 +2971,7 @@
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
       var oE = -4 + 34 * g, oS = 140 * g, zT = Math.max(4, oS - oE);   // Welle wie am Handy (12:56)
-      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.2, rem);
+      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(Math.max(H2 * 0.2, 1.75 * (oS - oE)), H2 * 0.32, rem);
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
         var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 0.14 * (W.x || 0)) / zB);
