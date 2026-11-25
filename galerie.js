@@ -65,7 +65,15 @@
     shakePx:    12,     // Erschütterung beim Knall
     shakeMs:    380,
     maxStep:    34,     // Hugo 25.11. (07:23): eigene Uhr – stockt das Handy, läuft die Explosion langsamer statt Bilder zu überspringen (ms pro Bild höchstens)
-    follow:     0.38,   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
+    follow:     0.38,
+    // Hugo 25.11. (08:26): Zoom, um an hintere Bilder heranzugehen und wieder heraus. Zwei Finger (Handy), Trackpad-Pinch
+    // oder Ctrl + Mausrad (Computer), Tasten + und −. Vordere Bilder wachsen schneller als hintere (Tiefe zoomt mit).
+    zoomMin:    0.45,   // ganz heraus
+    zoomMax:    2.6,    // ganz hinein
+    zoomKey:    1.35,   // Schritt pro Tastendruck
+    // Hugo 25.11. (08:32): beim Reinzoomen Tiefenunschärfe – das angezoomte Bild bleibt scharf, die anderen werden je nach
+    // Abstand ihrer Parallax-Ebene unscharf (wie bei einer Kamera). 0 = aus, grösser = schneller unscharf.
+    dof:        2.4,   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
     // Sortierung
     gatherMs:   560,    // alle Bilder fallen zurück in den Punkt
     // Vorschau (wie library.js)
@@ -289,7 +297,9 @@
     var slots = [];               // Karten auf der Fläche
     var clones = [];
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
-    var cam = { x: 0, y: 0 }, tgt = { x: 0, y: 0 }, vel = { x: 0, y: 0 };   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
+    var cam = { x: 0, y: 0 }, tgt = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
+    var Z = 1, tZ = 1;   // Zoom gezeigt / Ziel
+    var dF = 1, tdF = 1;  // Tiefe, auf die scharf gestellt ist (gezeigt / Ziel)   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
     var drawOrder = [], focusSlot = null;
     var mode = 'load';            // load | bang | idle | gather | pv
     var raf = 0, last = 0, gatherAt = 0, bangT = 0;
@@ -404,7 +414,7 @@
         }
       }
       spreadDepth(R, cell);
-      cam.x = cam.y = tgt.x = tgt.y = 0;
+      cam.x = cam.y = tgt.x = tgt.y = 0; Z = tZ = 1; dF = tdF = 1;
       drawOrder = slots.slice().sort(function (a, b) { return a.d - b.d; });   // hinten zuerst, vorne zuletzt
       // Hugo 25.11. (07:16/07:18): ziehen bis das äusserste Bild die Bildschirmmitte erreicht, erst dann der Dämpfer.
       // Pro Bild: bei welcher Kameralage erreicht seine Kante den Rand (mit seiner Tiefe d)? Die äussersten zählen.
@@ -424,8 +434,23 @@
       BX0 = Math.min(ax, bx); BX1 = Math.max(ax, bx); BY0 = Math.min(ay, by); BY1 = Math.max(ay, by);
     }
     // Lage einer Karte auf dem Bildschirm (Mitte)
+    // Zoom je Karte: vorne (grosse Tiefe) wächst stärker als hinten – wie eine Kamera, die in den Raum fährt
+    function zf(sl) { return Z === 1 ? 1 : Math.pow(Z, sl.d); }
     function pos(sl) {
-      return { x: VW / 2 + sl.x + cam.x * sl.d, y: VH / 2 + sl.y + cam.y * sl.d };
+      var z = zf(sl);
+      return { x: VW / 2 + (sl.x + cam.x * sl.d) * z, y: VH / 2 + (sl.y + cam.y * sl.d) * z };
+    }
+    // Zoomen um einen Punkt (Finger-Mitte, Maus): der Punkt bleibt unter dem Finger stehen
+    function zoomAt(px, py, nz) {
+      nz = clamp(nz, CONFIG.zoomMin, CONFIG.zoomMax);
+      var o = cv.getBoundingClientRect(), ax = px - o.left - VW / 2, ay = py - o.top - VH / 2;
+      tgt.x += ax * (1 / nz - 1 / tZ); tgt.y += ay * (1 / nz - 1 / tZ);
+      tZ = nz;
+      // scharf gestellt wird auf das Bild unter dem Finger bzw. der Maus (sonst das nächste)
+      var hit = slotAt(px, py), best = 1e9;
+      if (!hit) drawOrder.forEach(function (sl) { if (sl.hide) return; var f = pos(sl), dd = Math.hypot(f.x - (px - o.left), f.y - (py - o.top)); if (dd < best) { best = dd; hit = sl; } });
+      if (hit) tdF = hit.d;
+      kick();
     }
     // Rand: ausserhalb von BX0…BX1 / BY0…BY1 bremst das Ziehen (Gummiband), danach federt die Fläche zurück
     function outX(v) { return v > BX1 ? v - BX1 : v < BX0 ? v - BX0 : 0; }
@@ -438,7 +463,7 @@
     function bitmap(sl) {
       var W = Math.max(1, Math.round(sl.w * sl.s * DPR)), H = Math.max(1, Math.round(sl.h * sl.s * DPR));
       var old = sl.p.bmp;
-      if (old && old.width === W && old.height === H) { sl.bmp = old; return; }
+      if (old && old.width === W && old.height === H) { sl.bmp = old; sl.crop = sl.p.crop; return; }
       var img = sl.img;
       if (!img || !img.naturalWidth) { sl.bmp = null; return; }
       var src = img, sw = img.naturalWidth, sh = img.naturalHeight;
@@ -454,13 +479,38 @@
         if (sw / sh > ar) { cw = sh * ar; sx = (sw - cw) / 2; } else { ch = sw / ar; sy = (sh - ch) / 2; }
         g.drawImage(src, sx, sy, cw, ch, 0, 0, W, H);
         sl.bmp = sl.p.bmp = c;
+        var nW = img.naturalWidth, nH = img.naturalHeight;   // Ausschnitt im Originalbild (für scharfes Reinzoomen)
+        sl.crop = sl.p.crop = nW / nH > ar ? [(nW - nH * ar) / 2, 0, nH * ar, nH] : [0, (nH - nW / ar) / 2, nW, nW / ar];
       } catch (e) { sl.bmp = null; }
     }
     function bitmaps() { slots.forEach(bitmap); }
+    // Unschärfe-Stufen einer Karte (erst beim ersten Reinzoomen gebaut): stark verkleinert, beim Malen wieder vergrössert –
+    // das ergibt eine weiche Unschärfe mit weichen Rändern und kostet fast nichts. Stufe 1 leicht, Stufe 2 stark.
+    function blurLv(sl, lv) {
+      var key = lv === 1 ? 'b1' : 'b2';
+      if (sl[key] !== undefined) return sl[key];
+      var b = sl.bmp; if (!b) return null;
+      var f = lv === 1 ? 7 : 18, pad = 3, w = Math.max(2, Math.round(b.width / f)), h = Math.max(2, Math.round(b.height / f));
+      try {
+        var src = b, sw = b.width, sh = b.height;
+        while (sw / 2 > w * 1.6) { var t = document.createElement('canvas'); t.width = Math.ceil(sw / 2); t.height = Math.ceil(sh / 2); t.getContext('2d').drawImage(src, 0, 0, t.width, t.height); src = t; sw = t.width; sh = t.height; }
+        var c = document.createElement('canvas'); c.width = w + 2 * pad; c.height = h + 2 * pad;
+        var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+        g.filter = 'blur(' + (lv === 1 ? 0.8 : 1.2) + 'px)';   // wo vorhanden noch weicher (sonst ohne)
+        g.drawImage(src, pad, pad, w, h);
+        sl[key] = { c: c, pad: pad, w: w, h: h };
+      } catch (e) { sl[key] = null; }
+      return sl[key];
+    }
+    function drawLv(q, L, T, w, h, a) {
+      var kx = w / q.w, ky = h / q.h;
+      ctx.globalAlpha = a;
+      ctx.drawImage(q.c, L - q.pad * kx, T - q.pad * ky, w + 2 * q.pad * kx, h + 2 * q.pad * ky);
+    }
 
     // ---------- Malen ----------
     var SNAP = 1;
-    function drawCard(sl, x, y, sc, rot, a) {
+    function drawCard(sl, x, y, sc, rot, a, bl) {
       var b = sl.bmp; if (!b || a <= 0) return;
       ctx.globalAlpha = a > 1 ? 1 : a;
       var X = x * DPR, Y = y * DPR;
@@ -469,7 +519,18 @@
         if (L > cv.width || T > cv.height || L + w < 0 || T + h < 0) return;   // ausserhalb: nicht malen
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         if (sc === 1 && SNAP) { L = Math.round(L); T = Math.round(T); }   // ruhend gestochen scharf
-        ctx.drawImage(b, L, T, w, h);
+        // Tiefenunschärfe (bl 0…2): Stufen weich übereinander geblendet
+        if (bl > 0.02) {
+          var q1 = blurLv(sl, 1), q2 = bl > 1 ? blurLv(sl, 2) : null;
+          if (q1 && (bl <= 1 || q2)) {
+            if (bl <= 1) { drawLv(q1, L, T, w, h, 1); a = 1 - bl; ctx.globalAlpha = a; if (a < 0.02) { ctx.globalAlpha = 1; return; } }
+            else { drawLv(q2, L, T, w, h, 1); drawLv(q1, L, T, w, h, Math.max(0, 2 - bl)); ctx.globalAlpha = 1; return; }
+          }
+        }
+        // reingezoomt: direkt aus dem Originalbild malen, sonst würde das kleine Kartenbild unscharf vergrössert
+        if (sc > 1.12 && sl.crop && sl.img && sl.img.complete && sl.img.naturalWidth) { var q = sl.crop; ctx.drawImage(sl.img, q[0], q[1], q[2], q[3], L, T, w, h); }
+        else ctx.drawImage(b, L, T, w, h);
+        ctx.globalAlpha = 1;
       } else {
         var r = rot * Math.PI / 180, co = Math.cos(r) * sc, si = Math.sin(r) * sc;
         ctx.setTransform(co, si, -si, co, X, Y);
@@ -482,10 +543,11 @@
       SNAP = DPR >= 2 ? 1 : 0;
       for (var i = 0; i < drawOrder.length; i++) {
         var sl = drawOrder[i]; if (sl.hide) continue;
-        var f = pos(sl); drawCard(sl, f.x, f.y, 1, 0, 1);
+        var f = pos(sl), bl = Z > 1.01 && CONFIG.dof ? Math.min(2, Math.abs(sl.d - dF) * (Z - 1) * CONFIG.dof) : 0;
+        drawCard(sl, f.x, f.y, zf(sl), 0, 1, bl);
       }
       if (focusSlot && !focusSlot.hide) {   // Tastatur: feiner Rahmen um die gewählte Karte
-        var q = pos(focusSlot), hw = focusSlot.w * focusSlot.s / 2 + 4, hh = focusSlot.h * focusSlot.s / 2 + 4;
+        var q = pos(focusSlot), fz = zf(focusSlot), hw = focusSlot.w * focusSlot.s * fz / 2 + 4, hh = focusSlot.h * focusSlot.s * fz / 2 + 4;
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
         ctx.strokeRect(q.x - hw, q.y - hh, hw * 2, hh * 2);
       }
@@ -493,7 +555,7 @@
     }
     // Lage einer Karte auf dem Bildschirm als Rechteck (für die Vorschau)
     function slotRect(sl) {
-      var o = cv.getBoundingClientRect(), f = pos(sl), w = sl.w * sl.s, h = sl.h * sl.s;
+      var o = cv.getBoundingClientRect(), f = pos(sl), z = zf(sl), w = sl.w * sl.s * z, h = sl.h * sl.s * z;
       return { left: o.left + f.x - w / 2, top: o.top + f.y - h / 2, width: w, height: h };
     }
 
@@ -522,8 +584,8 @@
         if (!drag) inertia(dtf);
         // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
         var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
-        var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02;
-        if (gap) { cam.x += ox * k; cam.y += oy * k; } else { cam.x = tgt.x; cam.y = tgt.y; }
+        var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3;
+        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * k * 0.6; } else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; }
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
       } else if (dirty) {   // Vorschau offen: nur neu malen, wenn sich etwas ändert (Karte aus-/eingeblendet)
@@ -625,7 +687,7 @@
       var eg = easeInCubic(tg), cx = VW / 2, cy = VH / 2, a = 1 - clamp((tg - .7) / .3, 0, 1);
       for (var i = 0; i < drawOrder.length; i++) {
         var sl = drawOrder[i], f = sl.from; if (!f) continue;
-        drawCard(sl, f.x + (cx - f.x) * eg, f.y + (cy - f.y) * eg, 1 - .96 * eg, sl.rot * eg * .5, a);
+        drawCard(sl, f.x + (cx - f.x) * eg, f.y + (cy - f.y) * eg, (sl.fromS || 1) * (1 - .96 * eg), sl.rot * eg * .5, a);
       }
       ctx.globalAlpha = 1;
     }
@@ -670,15 +732,47 @@
 
     // ---------- Ziehen, Tippen ----------
     var drag = null, down = null;
+    // Zwei Finger: zoomen (Abstand) und zugleich verschieben (Mitte)
+    var ptrs = {}, pinch = null;
+    function nPtr() { return Object.keys(ptrs).length; }
+    function pinchGeo() {
+      var k = Object.keys(ptrs), a = ptrs[k[0]], b = ptrs[k[1]];
+      return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    function forget(e) {
+      if (!ptrs[e.pointerId]) return;
+      delete ptrs[e.pointerId];
+      if (pinch && nPtr() < 2) { pinch = null; down = null; drag = null; root.classList.remove('is-dragging'); kick(); }
+    }
     root.addEventListener('pointerdown', function (e) {
       if (mode === 'load' || mode === 'gather' || mode === 'bang' || root.classList.contains('is-pv')) return;
       if (e.target.closest('.lib-top, .lib-pv, .ps-label')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.pointerType !== 'mouse') {
+        ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+        if (nPtr() >= 2) {
+          if (!pinch && mode === 'idle') {
+            var g0 = pinchGeo(); pinch = { d0: g0.d, z0: tZ, x: g0.x, y: g0.y };
+            down = null; drag = null; root.classList.remove('is-dragging'); vel.x = vel.y = 0;
+            tgt.x = cam.x; tgt.y = cam.y; tZ = Z;
+          }
+          return;
+        }
+      }
       down = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType !== 'mouse', lx: e.clientX, ly: e.clientY, t: performance.now(), moved: false };
       vel.x = vel.y = 0;
       tgt.x = cam.x; tgt.y = cam.y;   // fängt die Fläche dort, wo man sie sieht
     });
     window.addEventListener('pointermove', function (e) {
+      if (ptrs[e.pointerId]) { ptrs[e.pointerId].x = e.clientX; ptrs[e.pointerId].y = e.clientY; }
+      if (pinch) {
+        if (nPtr() < 2) return;
+        var g = pinchGeo();
+        tgt.x += (g.x - pinch.x) / tZ; tgt.y += (g.y - pinch.y) / tZ;   // mit zwei Fingern verschieben
+        pinch.x = g.x; pinch.y = g.y;
+        zoomAt(g.x, g.y, pinch.z0 * g.d / pinch.d0);
+        return;
+      }
       if (!down || e.pointerId !== down.id) return;
       if (!down.moved) {
         if (Math.abs(e.clientX - down.x) < CONFIG.tapSlop && Math.abs(e.clientY - down.y) < CONFIG.tapSlop) return;
@@ -687,7 +781,7 @@
         return;
       }
       var now = performance.now(), k = down.touch ? CONFIG.speedTouch : CONFIG.speedMouse;
-      var dx = (e.clientX - down.lx) * k, dy = (e.clientY - down.ly) * k, dt = Math.max(1, now - down.t);
+      var dx = (e.clientX - down.lx) * k / tZ, dy = (e.clientY - down.ly) * k / tZ, dt = Math.max(1, now - down.t);   // reingezoomt: Finger und Bild bleiben beisammen
       // ausserhalb des Rands nur noch gebremst (Gummiband)
       tgt.x += dx * (outX(tgt.x + dx) * dx > 0 ? .35 : 1); tgt.y += dy * (outY(tgt.y + dy) * dy > 0 ? .35 : 1);
       vel.x = .7 * (dx / dt * 16.67) + .3 * vel.x; vel.y = .7 * (dy / dt * 16.67) + .3 * vel.y;
@@ -708,8 +802,8 @@
         tap(d.x, d.y);
       }
     }
-    window.addEventListener('pointerup', function (e) { release(e, false); });
-    window.addEventListener('pointercancel', function (e) { release(e, true); });
+    window.addEventListener('pointerup', function (e) { forget(e); release(e, false); });
+    window.addEventListener('pointercancel', function (e) { forget(e); release(e, true); });
     root.addEventListener('dragstart', function (e) { e.preventDefault(); });
     root.addEventListener('touchstart', function (e) {
       if (e.touches.length !== 1 || root.classList.contains('is-pv')) return;
@@ -731,8 +825,8 @@
       var o = cv.getBoundingClientRect(); x -= o.left; y -= o.top;
       for (var i = drawOrder.length - 1; i >= 0; i--) {
         var sl = drawOrder[i]; if (sl.hide || !sl.bmp) continue;
-        var f = pos(sl);
-        if (Math.abs(x - f.x) <= sl.w * sl.s / 2 && Math.abs(y - f.y) <= sl.h * sl.s / 2) return sl;
+        var f = pos(sl), z = zf(sl);
+        if (Math.abs(x - f.x) <= sl.w * sl.s * z / 2 && Math.abs(y - f.y) <= sl.h * sl.s * z / 2) return sl;
       }
       return null;
     }
@@ -753,9 +847,23 @@
       e.preventDefault();
       if (mode !== 'idle' || root.classList.contains('is-pv')) return;
       var k = e.deltaMode === 1 ? 32 : 1;
-      tgt.x = clamp(tgt.x - e.deltaX * k, BX0 - 60, BX1 + 60); tgt.y = clamp(tgt.y - e.deltaY * k, BY0 - 60, BY1 + 60); vel.x = vel.y = 0;
+      vel.x = vel.y = 0;
+      if (e.ctrlKey || e.metaKey) { zoomAt(e.clientX, e.clientY, tZ * Math.exp(-e.deltaY * k * 0.01)); return; }   // Trackpad-Pinch (Chrome, Firefox) und Ctrl + Mausrad
+      tgt.x = clamp(tgt.x - e.deltaX * k / tZ, BX0 - 60, BX1 + 60); tgt.y = clamp(tgt.y - e.deltaY * k / tZ, BY0 - 60, BY1 + 60);
       kick();
     }, { passive: false });
+
+    // Safari am Mac: Trackpad-Pinch kommt als «gesture» (nur Computer; am iPhone zoomen die zwei Finger oben)
+    if (mouse) {
+      var gz0 = 1;
+      root.addEventListener('gesturestart', function (e) { e.preventDefault(); gz0 = tZ; }, { passive: false });
+      root.addEventListener('gesturechange', function (e) {
+        e.preventDefault();
+        if (mode !== 'idle' || root.classList.contains('is-pv')) return;
+        zoomAt(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2, gz0 * e.scale);
+      }, { passive: false });
+      root.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
+    }
 
     // Tastatur
     document.addEventListener('keydown', function (e) {
@@ -765,7 +873,10 @@
       if (mode !== 'idle') return;
       var s = 16, hit = true;
       if (e.key === 'ArrowLeft') vel.x = s; else if (e.key === 'ArrowRight') vel.x = -s;
-      else if (e.key === 'ArrowUp') vel.y = s; else if (e.key === 'ArrowDown') vel.y = -s; else hit = false;
+      else if (e.key === 'ArrowUp') vel.y = s; else if (e.key === 'ArrowDown') vel.y = -s;
+      else if (e.key === '+' || e.key === '=') zoomAt(window.innerWidth / 2, window.innerHeight / 2, tZ * CONFIG.zoomKey);
+      else if (e.key === '-' || e.key === '_') zoomAt(window.innerWidth / 2, window.innerHeight / 2, tZ / CONFIG.zoomKey);
+      else hit = false;
       if (hit) { e.preventDefault(); kick(); }
     });
 
@@ -876,7 +987,7 @@
       if (reduce) { select(); layoutSeed = newSeed(); build(); bitmaps(); bang(); return; }
       // alle sichtbaren Karten fallen zurück in den Punkt
       mode = 'gather'; gt = 0;
-      slots.forEach(function (sl) { sl.from = pos(sl); });
+      slots.forEach(function (sl) { sl.from = pos(sl); sl.fromS = zf(sl); });
       kick();
     }
     function gatherDone() {

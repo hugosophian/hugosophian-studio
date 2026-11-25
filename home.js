@@ -568,7 +568,7 @@
         '  float z = max(mix(a.z, b.z, t), 0.0); dv = fc - (a.xy + ab * t); d = length(dv);',
         // sp > 0: Fingerwelle (gleichmässig); sp < 0: Andock-Welle – schiesst schnell aus dem Rand und wird rasch langsamer,
         // jede Stelle reicht unterschiedlich weit (Punkt.w), so läuft nie ein Viereck zur Mitte
-        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
+        '  float tr = sp > 0.0 ? z * mx * 0.15 * sp * mix(0.45, 1.3, clamp(mix(a.w, b.w, t), 0.0, 1.0)) : min(uRes.x, uRes.y) * (-sp) * mix(a.w, b.w, t) * (1.0 - exp(-z * 2.6));',   // Hugo 25.11. (08:26): ruhige Welle läuft weniger weit, kräftige weiter   // Andocken: Reichweite nach der schmalen Seite, die Seiten treffen sich nie
         '  return d - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
         'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop;',   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
@@ -586,7 +586,7 @@
         '  for (int k = 0; k < ' + NW + '; k++) {',
         '    float age = uAge[k]; if (age < 0.0) continue;',
         // schwache Handys: Pixel weit weg von dieser Welle rechnen die Bahn gar nicht erst durch
-        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * abs(uB[k].w) > mx * 0.62) continue;',
+        '    if (length(fc - uB[k].xy) - uB[k].z - age * mx * 0.15 * abs(uB[k].w) * (uB[k].w > 0.0 ? 1.3 : 1.0) > mx * 0.62) continue;',
         // Hugo 23.11.: keine Striche beim Auslösen — die Bahn ist eine durchgehende Linie (Abschnitte zwischen den Punkten),
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
@@ -603,7 +603,8 @@
         '    if (ws <= 0.0) continue;',
         '    best = sf / ws; dir /= ws; sd /= ws; sm /= ws;',
         // Hugo 25.11. (08:10): Fingerwelle je nach Tempo – langsam schmal und ruhig, schnell breit und kräftig (Andocken unverändert)
-        '    float gk = uB[k].w > 0.0 ? clamp(sm, 0.05, 1.0) : 1.0, wk = w * mix(0.5, 1.0, gk), gA = mix(0.3, 1.0, gk);',
+        // Hugo 25.11. (08:26): langsam deutlich kleiner, schnell grösser als bisher
+        '    float gk = uB[k].w > 0.0 ? clamp(sm, 0.05, 1.0) : 1.0, wk = w * (uB[k].w > 0.0 ? mix(0.32, 1.35, gk) : 1.0), gA = uB[k].w > 0.0 ? mix(0.2, 1.2, gk) : 1.0;',
         '    float x = best / wk;',
         // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
         '    bool dockW = uB[k].w < 0.0;',
@@ -1135,7 +1136,8 @@
             // Hugo 24.11.: am Computer gleich snappig wie am Handy – dieselbe Kurve und dasselbe Tempo; die Bilder bremsen
             // weiter weg ab (84 % wie am Handy) und warten aufeinander, dann zieht der Magnet alle gemeinsam an
             var xM = clamp((P - 0.25 - 0.02 * j) / 0.61, 0, 1), xL = clamp((P - 0.25 - 0.02 * (n - 1)) / 0.61, 0, 1);
-            E = 0.79 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.21 * Math.pow(clamp((xL - 0.64) / 0.25, 0, 1), 5.4);   // Hugo 24.11.: weiter weg (79 %), Zug nimmt schneller Schwung auf   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
+            // Hugo 25.11. (08:26): Magnet am Computer stärker – bremst schon bei 71 % ab, der Magnet zieht den Rest kräftiger und schneller
+            E = 0.71 * easeDockF(Math.min(1, xM / 0.98), easeDockM, 1.4) + 0.29 * Math.pow(clamp((xL - 0.65) / 0.23, 0, 1), 6.2);   // Hugo 24.11.: weiter weg (79 %), Zug nimmt schneller Schwung auf   // Hugo 24.11.: mehr Schwung beim Zug (Potenz 6.2, etwas kürzer)   // Hugo 24.11.: Übergang Abbremsen → Magnet minimal länger; Magnet setzt weicher ein (Potenz 5 statt 6.5)   // Hugo 24.11.: Magnet am Computer stärker (bremst bei 78 % statt 84 %)
           } else E = easeDock(xD);
           minE = Math.min(minE, E);
         } else {
@@ -1427,7 +1429,14 @@
       fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (t) {
         var x = new DOMParser().parseFromString(t, 'text/html');
         [].forEach.call(x.querySelectorAll('script[src*="galerie"]'), function (sc) { fetch(sc.src, { mode: 'no-cors' }).catch(function () {}); });
-        [].slice.call(x.querySelectorAll('[data-lib] img.lib-img'), 0, 40).forEach(function (im) {
+        // Audit 25.11.: nur die Bilder dieses Bereichs (die Seite enthält auch die der anderen, galerie.js blendet sie aus)
+        var sec = x.querySelector('[data-lib]'), fold = sec && sec.getAttribute('data-lib-folder');
+        [].filter.call(x.querySelectorAll('[data-lib] img.lib-img'), function (im) {
+          if (!fold) return true;
+          var a = im.closest('a[href]'), pth = '';
+          try { pth = new URL(a.getAttribute('href'), location.href).pathname; } catch (er) {}
+          return pth.indexOf(fold) === 0;
+        }).slice(0, 40).forEach(function (im) {
           var p = new Image();
           p.sizes = '(max-width: 767px) 60vw, 30vw';   // gleiche Bildgrösse wie in galerie.js (SIZES), damit der Speicher trifft
           if (im.getAttribute('srcset')) p.srcset = im.getAttribute('srcset');
