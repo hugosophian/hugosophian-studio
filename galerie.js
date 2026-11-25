@@ -73,7 +73,20 @@
     zoomKey:    1.35,   // Schritt pro Tastendruck
     // Hugo 25.11. (08:32): beim Reinzoomen Tiefenunschärfe – das angezoomte Bild bleibt scharf, die anderen werden je nach
     // Abstand ihrer Parallax-Ebene unscharf (wie bei einer Kamera). 0 = aus, grösser = schneller unscharf.
-    dof:        2.4,
+    dof:        2.4,    // Computer
+    dofTouch:   3.3,    // Handy (Hugo 08:48: etwas stärker)
+    // Hugo 25.11. (08:48): die Schärfe folgt weich – am Computer der Maus, am Handy einem kleinen Feld in der Bildschirmmitte.
+    // Das Feld tastet mehrere Punkte ab und mittelt die Tiefe, darum gleitet die Schärfe von Bild zu Bild statt zu springen.
+    focusField: 34,     // px Radius des Felds am Computer
+    focusFieldTouch: 70,// px Radius des Felds am Handy
+    focusEase:  0.09,   // wie weich die Schärfe wandert (Anteil pro Bild bei 60 fps)
+    // Hugo 25.11. (08:52, Foto): unscharfe Bilder VOR dem scharfen werden durchsichtig, damit man das hintere sieht
+    seeThrough: 0.75,   // so viel durchsichtiger werden sie höchstens (0 = gar nicht, 1 = ganz unsichtbar)
+    // Hugo 25.11. (08:48): beim Zoomen rastet die Ausgangsgrösse (100 %, alles scharf) weich ein – man spürt sie, bleibt aber
+    // nicht hängen. snapZone: so nah an 100 % schnappt sie beim Loslassen ganz ein (Anteil, logarithmisch).
+    snapPull:   0.55,   // 0 = kein Einrasten, 1 = steht kurz still
+    snapWidth:  0.09,
+    snapZone:   0.13,
     // Hugo 25.11. (08:36): am Computer löst schon die Maus den Parallax leicht aus (Bildmitte = ruhig, am Rand am meisten)
     mouseParallax: 26,  // px: so weit verschieben sich vorderste und hinterste Bilder gegeneinander (je Richtung)
     mouseEase:  0.07,   // Weichheit (Anteil pro Bild bei 60 fps)   // Hugo 25.11. (07:23): Fläche folgt dem Finger weich nach (Anteil pro Bild bei 60 fps; 1 = hart, kleiner = weicher)
@@ -301,7 +314,7 @@
     var clones = [];
     var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX0 = 0, BX1 = 0, BY0 = 0, BY1 = 0;
     var cam = { x: 0, y: 0 }, tgt = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
-    var Z = 1, tZ = 1;   // Zoom gezeigt / Ziel
+    var Z = 1, tZ = 1, zr = 0;   // Zoom gezeigt / Ziel / roh (logarithmisch, vor dem Einrasten)
     var dF = 1, tdF = 1;  // Tiefe, auf die scharf gestellt ist (gezeigt / Ziel)
     var mo = { x: 0, y: 0 }, tmo = { x: 0, y: 0 };   // Maus-Parallax (gezeigt / Ziel)   // cam = gezeigt, tgt = wo Finger/Schwung hinwollen
     var drawOrder = [], focusSlot = null;
@@ -418,7 +431,7 @@
         }
       }
       spreadDepth(R, cell);
-      cam.x = cam.y = tgt.x = tgt.y = 0; Z = tZ = 1; dF = tdF = 1;
+      cam.x = cam.y = tgt.x = tgt.y = 0; Z = tZ = 1; zr = 0; dF = tdF = 1;
       drawOrder = slots.slice().sort(function (a, b) { return a.d - b.d; });   // hinten zuerst, vorne zuletzt
       // Hugo 25.11. (07:16/07:18): ziehen bis das äusserste Bild die Bildschirmmitte erreicht, erst dann der Dämpfer.
       // Pro Bild: bei welcher Kameralage erreicht seine Kante den Rand (mit seiner Tiefe d)? Die äussersten zählen.
@@ -446,16 +459,46 @@
       return { x: VW / 2 + (sl.x + cam.x * sl.d) * z + mo.x * md, y: VH / 2 + (sl.y + cam.y * sl.d) * z + mo.y * md };
     }
     // Zoomen um einen Punkt (Finger-Mitte, Maus): der Punkt bleibt unter dem Finger stehen
-    function zoomAt(px, py, nz) {
-      nz = clamp(nz, CONFIG.zoomMin, CONFIG.zoomMax);
+    // weiches Einrasten bei 100 %: um den Punkt herum wird der Zoom gebremst (die Kurve ist dort flacher), aber nie angehalten
+    function snapMap(r) { var B = CONFIG.snapWidth; return r - CONFIG.snapPull * B * Math.tanh(r / B); }
+    function zoomRaw(px, py, nr) {
+      var lo = Math.log(CONFIG.zoomMin), hi = Math.log(CONFIG.zoomMax);
+      zr = clamp(nr, lo - 0.02, hi + 0.02);
+      var nz = clamp(Math.exp(snapMap(zr)), CONFIG.zoomMin, CONFIG.zoomMax);
       var o = cv.getBoundingClientRect(), ax = px - o.left - VW / 2, ay = py - o.top - VH / 2;
       tgt.x += ax * (1 / nz - 1 / tZ); tgt.y += ay * (1 / nz - 1 / tZ);
       tZ = nz;
-      // scharf gestellt wird auf das Bild unter dem Finger bzw. der Maus (sonst das nächste)
-      var hit = slotAt(px, py), best = 1e9;
-      if (!hit) drawOrder.forEach(function (sl) { if (sl.hide) return; var f = pos(sl), dd = Math.hypot(f.x - (px - o.left), f.y - (py - o.top)); if (dd < best) { best = dd; hit = sl; } });
-      if (hit) tdF = hit.d;
       kick();
+    }
+    function zoomAt(px, py, nz) { zoomRaw(px, py, Math.log(Math.max(1e-3, nz))); }
+    // nach dem Zoomen: nah an 100 %? dann weich ganz einrasten (um die Bildschirmmitte)
+    var snapT = 0;
+    function settleZoom(delay) {
+      clearTimeout(snapT);
+      snapT = setTimeout(function () {
+        if (mode !== 'idle' || pinch) return;
+        if (zr !== 0 && Math.abs(zr) < CONFIG.snapZone) { var o = cv.getBoundingClientRect(); zoomRaw(o.left + VW / 2, o.top + VH / 2, 0); }
+      }, delay || 0);
+    }
+    // Schärfe: welches Bild liegt im Feld (am Computer um die Maus, am Handy in der Mitte)? Mehrere Punkte, gewichtet gemittelt
+    var mouseIn = false, mX = 0, mY = 0;
+    function frontAt(x, y) {
+      for (var i = drawOrder.length - 1; i >= 0; i--) {
+        var sl = drawOrder[i]; if (sl.hide || !sl.bmp) continue;
+        var f = pos(sl), z = zf(sl);
+        if (Math.abs(x - f.x) <= sl.w * sl.s * z / 2 && Math.abs(y - f.y) <= sl.h * sl.s * z / 2) return sl;
+      }
+      return null;
+    }
+    function focusDepth() {
+      var px = VW / 2, py = VH / 2, R = mouse ? CONFIG.focusField : CONFIG.focusFieldTouch;
+      if (mouse && mouseIn) { var o = cv.getBoundingClientRect(); px = mX - o.left; py = mY - o.top; }
+      var sum = 0, ws = 0;
+      for (var gy = -2; gy <= 2; gy++) for (var gx = -2; gx <= 2; gx++) {
+        var hit = frontAt(px + gx * R / 2, py + gy * R / 2); if (!hit) continue;
+        var w = Math.exp(-(gx * gx + gy * gy) / 4); sum += hit.d * w; ws += w;
+      }
+      return ws > 0 ? sum / ws : null;
     }
     // Rand: ausserhalb von BX0…BX1 / BY0…BY1 bremst das Ziehen (Gummiband), danach federt die Fläche zurück
     function outX(v) { return v > BX1 ? v - BX1 : v < BX0 ? v - BX0 : 0; }
@@ -528,8 +571,9 @@
         if (bl > 0.02) {
           var q1 = blurLv(sl, 1), q2 = bl > 1 ? blurLv(sl, 2) : null;
           if (q1 && (bl <= 1 || q2)) {
-            if (bl <= 1) { drawLv(q1, L, T, w, h, 1); a = 1 - bl; ctx.globalAlpha = a; if (a < 0.02) { ctx.globalAlpha = 1; return; } }
-            else { drawLv(q2, L, T, w, h, 1); drawLv(q1, L, T, w, h, Math.max(0, 2 - bl)); ctx.globalAlpha = 1; return; }
+            var A = a > 1 ? 1 : a;
+            if (bl <= 1) { drawLv(q1, L, T, w, h, A); a = A * (1 - bl); ctx.globalAlpha = a; if (a < 0.02) { ctx.globalAlpha = 1; return; } }
+            else { drawLv(q2, L, T, w, h, A); drawLv(q1, L, T, w, h, A * Math.max(0, 2 - bl)); ctx.globalAlpha = 1; return; }
           }
         }
         // reingezoomt: direkt aus dem Originalbild malen, sonst würde das kleine Kartenbild unscharf vergrössert
@@ -548,8 +592,11 @@
       SNAP = DPR >= 2 ? 1 : 0;
       for (var i = 0; i < drawOrder.length; i++) {
         var sl = drawOrder[i]; if (sl.hide) continue;
-        var f = pos(sl), bl = Z > 1.01 && CONFIG.dof ? Math.min(2, Math.abs(sl.d - dF) * (Z - 1) * CONFIG.dof) : 0;
-        drawCard(sl, f.x, f.y, zf(sl), 0, 1, bl);
+        var dof = mouse ? CONFIG.dof : CONFIG.dofTouch;
+        var f = pos(sl), bl = Z > 1.01 && dof ? Math.min(2, Math.abs(sl.d - dF) * (Z - 1) * dof) : 0;
+        var front = clamp((sl.d - dF - 0.02) / 0.1, 0, 1);   // liegt vor der scharfen Ebene (weich übergeblendet)
+        var al = 1 - CONFIG.seeThrough * front * Math.min(1, bl / 1.1);
+        drawCard(sl, f.x, f.y, zf(sl), 0, al, bl);
       }
       if (focusSlot && !focusSlot.hide) {   // Tastatur: feiner Rahmen um die gewählte Karte
         var q = pos(focusSlot), fz = zf(focusSlot), hw = focusSlot.w * focusSlot.s * fz / 2 + 4, hh = focusSlot.h * focusSlot.s * fz / 2 + 4;
@@ -589,9 +636,10 @@
         if (!drag) inertia(dtf);
         // Fläche folgt dem Ziel weich (Fingerereignisse kommen am iPhone nicht im Bildtakt: ohne das stockt es)
         var k = 1 - Math.pow(1 - CONFIG.follow, dtf), ox = tgt.x - cam.x, oy = tgt.y - cam.y;
-        var km = 1 - Math.pow(1 - CONFIG.mouseEase, dtf);
+        var km = 1 - Math.pow(1 - CONFIG.mouseEase, dtf), kf = 1 - Math.pow(1 - CONFIG.focusEase, dtf);
+        if (Z > 1.01 || tZ > 1.01) { var fd = focusDepth(); if (fd != null) tdF = fd; }
         var gap = Math.abs(ox) > .02 || Math.abs(oy) > .02 || Math.abs(tZ - Z) > 1e-4 || Math.abs(tdF - dF) > 1e-3 || Math.abs(tmo.x - mo.x) > .03 || Math.abs(tmo.y - mo.y) > .03;
-        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * k * 0.6; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
+        if (gap) { cam.x += ox * k; cam.y += oy * k; Z += (tZ - Z) * k; dF += (tdF - dF) * kf; mo.x += (tmo.x - mo.x) * km; mo.y += (tmo.y - mo.y) * km; }
         else { cam.x = tgt.x; cam.y = tgt.y; Z = tZ; dF = tdF; mo.x = tmo.x; mo.y = tmo.y; }
         if (gap || dirty) { paintIdle(); dirty = false; }
         more = !!drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside()) || gap;
@@ -749,7 +797,7 @@
     function forget(e) {
       if (!ptrs[e.pointerId]) return;
       delete ptrs[e.pointerId];
-      if (pinch && nPtr() < 2) { pinch = null; down = null; drag = null; root.classList.remove('is-dragging'); kick(); }
+      if (pinch && nPtr() < 2) { pinch = null; down = null; drag = null; root.classList.remove('is-dragging'); kick(); settleZoom(60); }
     }
     root.addEventListener('pointerdown', function (e) {
       if (mode === 'load' || mode === 'gather' || mode === 'bang' || root.classList.contains('is-pv')) return;
@@ -759,7 +807,7 @@
         ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
         if (nPtr() >= 2) {
           if (!pinch && mode === 'idle') {
-            var g0 = pinchGeo(); pinch = { d0: g0.d, z0: tZ, x: g0.x, y: g0.y };
+            var g0 = pinchGeo(); pinch = { d0: g0.d, r0: zr, x: g0.x, y: g0.y };
             down = null; drag = null; root.classList.remove('is-dragging'); vel.x = vel.y = 0;
             tgt.x = cam.x; tgt.y = cam.y; tZ = Z;
           }
@@ -777,7 +825,7 @@
         var g = pinchGeo();
         tgt.x += (g.x - pinch.x) / tZ; tgt.y += (g.y - pinch.y) / tZ;   // mit zwei Fingern verschieben
         pinch.x = g.x; pinch.y = g.y;
-        zoomAt(g.x, g.y, pinch.z0 * g.d / pinch.d0);
+        zoomRaw(g.x, g.y, pinch.r0 + Math.log(g.d / pinch.d0));
         return;
       }
       if (!down || e.pointerId !== down.id) return;
@@ -855,7 +903,7 @@
       if (mode !== 'idle' || root.classList.contains('is-pv')) return;
       var k = e.deltaMode === 1 ? 32 : 1;
       vel.x = vel.y = 0;
-      if (e.ctrlKey || e.metaKey) { zoomAt(e.clientX, e.clientY, tZ * Math.exp(-e.deltaY * k * 0.01)); return; }   // Trackpad-Pinch (Chrome, Firefox) und Ctrl + Mausrad
+      if (e.ctrlKey || e.metaKey) { zoomRaw(e.clientX, e.clientY, zr - e.deltaY * k * 0.01); settleZoom(260); return; }   // Trackpad-Pinch (Chrome, Firefox) und Ctrl + Mausrad
       tgt.x = clamp(tgt.x - e.deltaX * k / tZ, BX0 - 60, BX1 + 60); tgt.y = clamp(tgt.y - e.deltaY * k / tZ, BY0 - 60, BY1 + 60);
       kick();
     }, { passive: false });
@@ -863,24 +911,25 @@
     // Maus-Parallax (nur Computer)
     if (mouse) {
       root.addEventListener('mousemove', function (e) {
+        mouseIn = true; mX = e.clientX; mY = e.clientY;
         var mp = CONFIG.mouseParallax;
         tmo.x = -((e.clientX / window.innerWidth) - 0.5) * 2 * mp;
         tmo.y = -((e.clientY / window.innerHeight) - 0.5) * 2 * mp * 0.7;
         if (mode === 'idle') kick();
       });
-      root.addEventListener('mouseleave', function () { tmo.x = tmo.y = 0; if (mode === 'idle') kick(); });
+      root.addEventListener('mouseleave', function () { mouseIn = false; tmo.x = tmo.y = 0; if (mode === 'idle') kick(); });
     }
 
     // Safari am Mac: Trackpad-Pinch kommt als «gesture» (nur Computer; am iPhone zoomen die zwei Finger oben)
     if (mouse) {
       var gz0 = 1;
-      root.addEventListener('gesturestart', function (e) { e.preventDefault(); gz0 = tZ; }, { passive: false });
+      root.addEventListener('gesturestart', function (e) { e.preventDefault(); gz0 = zr; }, { passive: false });
       root.addEventListener('gesturechange', function (e) {
         e.preventDefault();
         if (mode !== 'idle' || root.classList.contains('is-pv')) return;
-        zoomAt(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2, gz0 * e.scale);
+        zoomRaw(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2, gz0 + Math.log(Math.max(0.01, e.scale)));
       }, { passive: false });
-      root.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
+      root.addEventListener('gestureend', function (e) { e.preventDefault(); settleZoom(60); }, { passive: false });
     }
 
     // Tastatur
@@ -892,8 +941,8 @@
       var s = 16, hit = true;
       if (e.key === 'ArrowLeft') vel.x = s; else if (e.key === 'ArrowRight') vel.x = -s;
       else if (e.key === 'ArrowUp') vel.y = s; else if (e.key === 'ArrowDown') vel.y = -s;
-      else if (e.key === '+' || e.key === '=') zoomAt(window.innerWidth / 2, window.innerHeight / 2, tZ * CONFIG.zoomKey);
-      else if (e.key === '-' || e.key === '_') zoomAt(window.innerWidth / 2, window.innerHeight / 2, tZ / CONFIG.zoomKey);
+      else if (e.key === '+' || e.key === '=') { zoomRaw(window.innerWidth / 2, window.innerHeight / 2, zr + Math.log(CONFIG.zoomKey)); settleZoom(200); }
+      else if (e.key === '-' || e.key === '_') { zoomRaw(window.innerWidth / 2, window.innerHeight / 2, zr - Math.log(CONFIG.zoomKey)); settleZoom(200); }
       else hit = false;
       if (hit) { e.preventDefault(); kick(); }
     });
@@ -920,7 +969,7 @@
       try { var v = getComputedStyle(html).getPropertyValue('--mh-down').trim(); dropMs = parseFloat(v) * (v.indexOf('ms') > -1 ? 1 : 1000) || 500; } catch (e) {}
       mbT = setTimeout(function () {
         b.textContent = toClose ? (pvClose && pvClose.textContent.trim()) || 'close' : mbOrig;
-        b.setAttribute('aria-label', toClose ? 'Vorschau schliessen' : 'Menü öffnen');
+        b.setAttribute('aria-label', toClose ? 'Close preview' : 'Open menu');
         w.classList.add('mh-now', 'lib-mb-small'); void w.offsetWidth; w.classList.remove('mh-now');
       }, Math.min(dropMs, popAt - 30));
       mbT2 = setTimeout(function () { w.classList.remove('lib-mb-small'); w.classList.add('lib-mb'); }, Math.max(popAt, dropMs + 40));
@@ -1025,7 +1074,7 @@
     var pvOpen = pv && pv.querySelector('.lib-pv-open');
     var pvClose = pv && pv.querySelector('.lib-pv-close');
     if (pvOpen) {
-      var goTxt = pvOpen.textContent.trim() || 'Galerie öffnen';
+      var goTxt = pvOpen.textContent.trim() || 'Open gallery';
       pvOpen.classList.remove('grey', 'is-menu');
       pvOpen.classList.add('lib-pv-go');
       pvOpen.textContent = '';
@@ -1189,7 +1238,7 @@
     // Kam man direkt (Link, Lesezeichen), geht es zur Startseite.
     var backEl = root.querySelector('.lib-bottom .ps-label');
     if (backEl) {
-      backEl.setAttribute('role', 'link'); backEl.setAttribute('tabindex', '0'); backEl.setAttribute('aria-label', 'Zurück');
+      backEl.setAttribute('role', 'link'); backEl.setAttribute('tabindex', '0'); backEl.setAttribute('aria-label', 'Back');
       var goBack = function (e) {
         if (e) e.preventDefault();
         var ref = ''; try { ref = new URL(document.referrer).origin; } catch (er) {}

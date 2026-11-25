@@ -302,7 +302,7 @@
         // Link zur Galerie im Stil von „Alle Projekte ↓“ (wie im About am Handy), Pfeil nach rechts
         var a = document.createElement('a'); a.className = 'lib-sort hp-info-go';
         a.href = s.href; a.tabIndex = -1;
-        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Galerie öffnen';
+        var al = document.createElement('span'); al.className = 'lib-sort-label'; al.textContent = s.btn || 'Open gallery';
         var ar = document.createElement('span'); ar.className = 'lib-sort-arrow'; ar.setAttribute('aria-hidden', 'true'); ar.textContent = '\u2192';
         a.appendChild(al); a.appendChild(ar);
         a.addEventListener('click', function (e) { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); go(s.href); } });
@@ -591,20 +591,25 @@
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
         '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
-        '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0, sm = 0.0; vec2 dir = vec2(0.0);',
+        '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0, sm = 0.0, sa = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
         '      vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
         '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, uB[k].w, dv, d);',
-        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0); float mg = 0.5 * (pa.w + pb.w);',   // Hugo 25.11.: Stärke an dieser Stelle der Bahn (Fingertempo)
-        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; sm = sm * sc + mg; dir = dir * sc + un; best = f; }',
-        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; sm += q * mg; dir += q * un; }',
+        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0); float mg = 0.5 * (pa.w + pb.w), za = 0.5 * (max(pa.z, 0.0) + max(pb.z, 0.0));',   // Hugo 25.11.: Stärke (Fingertempo) und Alter an dieser Stelle der Bahn
+        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; sm = sm * sc + mg; sa = sa * sc + za; dir = dir * sc + un; best = f; }',
+        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; sm += q * mg; sa += q * za; dir += q * un; }',
         '    }',
         '    if (ws <= 0.0) continue;',
-        '    best = sf / ws; dir /= ws; sd /= ws; sm /= ws;',
+        '    best = sf / ws; dir /= ws; sd /= ws; sm /= ws; sa /= ws;',
         // Hugo 25.11. (08:10): Fingerwelle je nach Tempo – langsam schmal und ruhig, schnell breit und kräftig (Andocken unverändert)
         // Hugo 25.11. (08:26): langsam deutlich kleiner, schnell grösser als bisher
-        '    float gk = uB[k].w > 0.0 ? clamp(sm, 0.05, 1.0) : 1.0, wk = w * (uB[k].w > 0.0 ? mix(0.32, 1.35, gk) : 1.0), gA = uB[k].w > 0.0 ? mix(0.2, 1.2, gk) : 1.0;',
+        // Hugo 25.11. (08:49): wie ein Finger durchs Wasser – am Finger spitz und schmal, dahinter breitet sich die Welle aus.
+        // Breite, Einblenden und Abklingen nach dem Alter der jeweiligen Stelle der Bahn (vorher: Alter der ganzen Welle)
+        '    bool fW = uB[k].w > 0.0;',
+        '    float gk = fW ? clamp(sm, 0.05, 1.0) : 1.0, gA = fW ? mix(0.2, 1.2, gk) : 1.0;',
+        '    float wk = fW ? mx * min(0.006 + 0.032 * sa, 0.072) * mix(0.32, 1.35, gk) : w;',
+        '    float gD = fW ? mix(0.12, 1.25, gk * gk) : 1.0;',   // Verzerrung des Bildes: kleine Welle deutlich weniger als die stärkste
         '    float x = best / wk;',
         // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
         '    bool dockW = uB[k].w < 0.0;',
@@ -612,11 +617,11 @@
         // Liste zuerst, die Andock-Welle zuletzt – so ist «wipe» hier schon bekannt)
         '    if (!dockW) wipe = max(wipe, (1.0 - smoothstep(-1.2, 0.3, x)) * smoothstep(0.0, 0.15, age));',
         '    float kD = dockW ? (1.0 - wipe) * uKeep * uDA : 1.0;',   // Rand und Welle des Andockens: uDA
-        '    float env = exp(-x * x) * smoothstep(0.0, dockW ? mix(0.03, 0.6, uSoft) : 0.35, age) * kD;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
-        '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
+        '    float env = exp(-x * x) * (dockW ? smoothstep(0.0, mix(0.03, 0.6, uSoft), age) : smoothstep(0.0, 0.14, sa)) * kD;',   // Schimmer (Hugo 24.11., 18:19): ohne Aufprall, weich
+        '    float amp = dockW ? exp(-age * 0.6) : exp(-sa * 0.45);',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gA * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
+        '    off += dir * (-x * env * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gD * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
         '    float r = env * amp * gA; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
@@ -1768,7 +1773,7 @@
     infoText.removeAttribute('id'); if (!inText) infoText.className = 'hp-intro-text';
     var infoBtns = document.createElement('div'); infoBtns.className = 'hp-info-btns';
     var infoOpen = document.createElement('a'); infoOpen.className = 'lib-sort hp-info-go';
-    var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Galerie öffnen';
+    var infoGoLabel = document.createElement('span'); infoGoLabel.className = 'lib-sort-label'; infoGoLabel.textContent = 'Open gallery';
     var infoGoArrow = document.createElement('span'); infoGoArrow.className = 'lib-sort-arrow'; infoGoArrow.setAttribute('aria-hidden', 'true'); infoGoArrow.textContent = '\u2192';
     infoOpen.appendChild(infoGoLabel); infoOpen.appendChild(infoGoArrow);
     var infoGoSh = document.createElement('span'); infoGoSh.className = 'hp-go-sh'; infoGoSh.setAttribute('aria-hidden', 'true');
@@ -2568,7 +2573,7 @@
       clearTimeout(mbT);
       if (on) {
         b.textContent = mbClose;
-        b.setAttribute('aria-label', 'Bereich schliessen');
+        b.setAttribute('aria-label', 'Close section');
         if (!w.classList.contains('lib-mb')) { w.classList.add('mh-now', 'hp-mb-small'); void w.offsetWidth; w.classList.remove('mh-now'); }
         mbT = setTimeout(function () { w.classList.remove('hp-mb-small'); w.classList.add('lib-mb'); }, CONFIG.infoMs * 0.72);
       } else {
@@ -2576,7 +2581,7 @@
         mbT = setTimeout(function () {
           if (root.classList.contains('is-info')) return;
           b.textContent = mbOrig;
-          b.setAttribute('aria-label', 'Menü öffnen');
+          b.setAttribute('aria-label', 'Open menu');
         }, 700);
       }
     }
