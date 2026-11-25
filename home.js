@@ -81,7 +81,8 @@
     waveEdge:   0.2,    // Leuchten, wenn die Welle den Bildschirmrand erreicht (lief bis 5 s nach)
     // Hugo 25.11. (08:10): langsam wischen = schmale, ruhige Welle; schnell = kräftige. Jeder Punkt der Fingerbahn merkt
     // sich das Tempo dort, die Welle ist entlang der Bahn gemischt. Tempo in px pro ms (Finger/Maus):
-    waveSlow:   0.08,   // bis hier ruhigste Welle
+    waveSlow:   0.12,   // bis hier ruhigste Welle (Hugo 17:03: vorher 0.08)
+    waveCurve:  1.5,    // Handy: >1 = langsames Scrollen bleibt länger ruhig (Hugo 17:03)
     waveFast:   1.2,    // ab hier volle Stärke (wie bisher)
     waveCalm:   0.3,    // Stärke der ruhigsten Welle (1 = wie bisher)
     // Hugo 25.11. (09:21): am Computer werden die Wellen erst später stark – auch etwas mehr Bewegung bleibt noch ruhig,
@@ -1053,7 +1054,7 @@
           wv.v = wv.v == null ? v : wv.v * 0.65 + v * 0.35;
         }
         wv.px = x; wv.py = y; wv.pt = now;
-        var sk = desk ? Math.pow(sm01(CONFIG.waveSlowDesk, CONFIG.waveFastDesk, wv.v || 0), CONFIG.waveCurveDesk) : sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0);
+        var sk = desk ? Math.pow(sm01(CONFIG.waveSlowDesk, CONFIG.waveFastDesk, wv.v || 0), CONFIG.waveCurveDesk) : Math.pow(sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0), CONFIG.waveCurve);
         var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sk;
         if (desk) mStr += CONFIG.waveBoostDesk * sm01(CONFIG.waveFastDesk, CONFIG.waveTopDesk, wv.v || 0);   // ganz schnell: über die Grenze
         if (wv.v != null && !wv.vk) { wv.vk = true; if (pts[0]) pts[0].m = mStr; }   // der erste Punkt kannte das Tempo noch nicht
@@ -1255,24 +1256,27 @@
       // Hugo 25.11. (16:29): beim blossen Tippen keine Welle mehr – sie beginnt erst, wenn der Finger zieht (ab 6 px,
       // gleiche Schwelle wie beim Wischen); dann startet sie an der Stelle, wo der Finger aufgesetzt hat
       var tDown = null;
-      function startWave(x, y) {
+      function startWave(x, y, t) {
         noEdge = false;
         if (pendingOff) lightOff();
         waves.push({ t0: performance.now(), pts: [] }); if (waves.length > NW) dropOld();
         if (edgeT0 && !killT0) killT0 = performance.now();
         add(x, y);
+        // Hugo 25.11. (17:03): das erste Tempo vom Aufsetzen an messen – sonst galten die ersten 6 px als in einem Augenblick
+        // gezogen (riesiges Tempo) und schon langsames Scrollen machte eine grosse Welle
+        var wv = waves[waves.length - 1]; if (wv && t) wv.pt = t;
       }
       stage.addEventListener('touchstart', function (e) {
         tDown = null;
         if (!ok() || !e.touches[0] || e.touches.length > 1) return;
-        tDown = { x: e.touches[0].clientX, y: e.touches[0].clientY, on: false };
+        tDown = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), on: false };
       }, { passive: true });
       stage.addEventListener('touchmove', function (e) {
         if (!ok() || !e.touches[0] || !tDown) return;
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         if (!tDown.on) {
           if (Math.abs(x - tDown.x) < 6 && Math.abs(y - tDown.y) < 6) return;
-          tDown.on = true; startWave(tDown.x, tDown.y);
+          tDown.on = true; startWave(tDown.x, tDown.y, tDown.t);
         }
         add(x, y);
       }, { passive: true });
