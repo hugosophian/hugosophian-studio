@@ -164,11 +164,12 @@
     /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
        Streifen in der Farbe der Seite und rastet am Ende des Texts an seinem Platz ein. bottom negativ: der Klebe-Bereich endet
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
-    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: .6rem 0; margin-top: -.6rem; pointer-events: none; }',
+    /* Hugo 11:40: «Galerie öffnen» fest über dem Close-Knopf (scrollt nicht mit), fährt mit der weissen Seite herein */
+    '[data-hp] .hp-info-fix { position: absolute; left: 0; right: 0; bottom: calc(5vh + 4.4rem + env(safe-area-inset-bottom, 0px)); z-index: 2; padding: 0 5vw 0 var(--hp-info-left, 5vw); pointer-events: none; color: var(--hp-info-fg, #000); }',
     /* Hugo 11:34 (Video perappelgren.de): Zeile für Zeile – jede Zeile blendet zum Rand hin selbst aus, beim Scrollen bleiben
        untere Zeilen leicht zurück Code: infoLines / linesTick */
     '[data-hp] .hp-info-panel .hp-line { display: block; will-change: transform, opacity; }',
-    '[data-hp] .hp-info-btns > * { pointer-events: auto; }',
+    '[data-hp] .hp-info-fix .hp-info-btns > * { pointer-events: auto; }',
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
@@ -1913,7 +1914,8 @@
     infoClose.setAttribute('role', 'button'); infoClose.setAttribute('tabindex', '-1'); infoClose.setAttribute('data-hp-close', '');
     infoBtns.appendChild(infoOpen); infoBtns.appendChild(infoClose);
     var infoScroll = document.createElement('div'); infoScroll.className = 'hp-info-scroll';
-    infoScroll.appendChild(infoText); infoScroll.appendChild(infoBtns);
+    infoScroll.appendChild(infoText);
+    var infoFix = document.createElement('div'); infoFix.className = 'hp-info-fix'; infoFix.appendChild(infoBtns);
     infoPanel.appendChild(infoScroll);
     // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
     function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
@@ -1937,7 +1939,7 @@
       linesRaf = 0;
       if (!lines.length || !root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
-      var topB = parseFloat(cs.paddingTop) || 0, botB = infoBtns.classList.contains('is-stuck') ? infoBtns.offsetTop - st + parseFloat(getComputedStyle(infoBtns).paddingTop) : H2 - (parseFloat(cs.paddingBottom) || 0);
+      var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);   // unten: über dem festen Knopf
       var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.16, more = false;
       // Hugo 11:36 (perappelgren.de im Code nachgeschaut): Wörter blenden beim Verlassen mit easeInOutCubic aus und gleiten dabei
       // bis 28 px nach oben, beim Hereinkommen mit easeOutQuart ein und steigen 22 px auf. Hier Zeile für Zeile, gemessen an der
@@ -1960,7 +1962,7 @@
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
     window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); linesKick(); } });
     window.addEventListener('resize', stuckCheck);
-    info.appendChild(infoPanel); root.appendChild(info);
+    info.appendChild(infoPanel); info.appendChild(infoFix); root.appendChild(info);
     setDialog(info, false);
 
     // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
@@ -2350,6 +2352,7 @@
     }
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
+      infoFix.style.transform = infoPanel.style.transform;   // fester Knopf fährt mit der Seite
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
       // ohne Sonne (Mario): Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       else if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
