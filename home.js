@@ -164,7 +164,7 @@
     /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
        Streifen in der Farbe der Seite und rastet am Ende des Texts an seinem Platz ein. bottom negativ: der Klebe-Bereich endet
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
-    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 1.4rem 0 .6rem; margin-top: -1.4rem;',
+    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 2.8rem 0 .6rem; margin-top: -2.8rem;',   /* Hugo 11:22: Weiss beginnt höher (vorher 1.4rem) */
     '  background: linear-gradient(to bottom, transparent, var(--hp-info-bg, #fff) 55%); box-shadow: 0 3rem 0 0 var(--hp-info-bg, #fff), 0 6rem 0 0 var(--hp-info-bg, #fff), 0 9rem 0 0 var(--hp-info-bg, #fff), 0 12rem 0 0 var(--hp-info-bg, #fff); }',   /* Streifen reicht bis unten: kein Text zwischen Knopf und Close */
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
