@@ -67,6 +67,13 @@
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
     // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
     aboutSun:   false,
+    // Hugo 25.11.: Effekte ruhiger (vorher alles 1). Fingerwelle: das Wasser verzieht das Bild weiter wie bisher,
+    // nur das Licht darauf ist zurückgenommen.
+    waveLight:  0.4,    // Regenbogen-Licht auf der Welle (Ring, Halo)
+    waveEdge:   0.2,    // Leuchten, wenn die Welle den Bildschirmrand erreicht (lief bis 5 s nach)
+    waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
+    ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
+    ldFlares:   0,      // Ladeanimation: Flares und Flare-Fäden beim Andocken
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
     deskSunIdle: 1000,  // ms ohne Mausbewegung
@@ -392,7 +399,7 @@
       if (!c) return null;
       var NW = 3, PW = 16, NP = NW * PW;   // bis zu 3 Wellen mit je 16 Bahnpunkten
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
-        'uniform float uRim; uniform float uSoft; uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
+        'uniform float uRim; uniform float uSoft; uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform float uWL; uniform float uWE; uniform float uWF; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
         'float n2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
         '  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }',      // Punkte der Fingerbahn: x, y, eigenes Alter, aktiv
@@ -728,7 +735,8 @@
         '    al = smoothstep(0.15, 1.0, length(off)) * here; col = img * al; alD = al;',
         '  }',
         '  float fm = smoothstep(0.35, 0.85, sv);',                                    // breite Sonnenzellen
-        '  edge *= 1.0 - uEdgeOff;',   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
+        '  edge *= (1.0 - uEdgeOff) * uWE;',
+        '  fa *= uWF; halo *= uWL; ring *= uWL;',   // Hugo 25.11.: Licht der Fingerwelle zurückgenommen   // Hugo 24.11. (15:39): beim Öffnen leuchtet die Welle am Bildschirmrand nicht auf (nicht im Blitz sichtbar)
         '  float glow = clamp(ring * 1.0 + edge * 1.9, 0.0, 1.0);',   // ein weiches Band statt heller Linien an Vorder- und Hinterkante
         '  vec3 fc2 = 0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + vec3(0.0, 0.33, 0.67)));',
         '  fc2 = mix(vec3(dot(fc2, vec3(0.333))), fc2, 0.6);',
@@ -786,7 +794,7 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
@@ -952,7 +960,7 @@
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
         var et = edgeT0 ? (now - edgeT0) / 1000 : -1; if (et > 7.2) { edgeT0 = 0; et = -1; } c.uniform1f(U.uEdgeT, et); c.uniform1f(U.uSeed, edgeSeed);
         // nach dem ersten Wischen klingt der ganze Andock-Effekt in 1.5–3 s aus (auch was nicht überstrichen wurde)
-        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uSoft, dockSoft); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uEdgeOff, edgeOffV(now)); c.uniform1f(U.uRim, dockRim);   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
+        c.uniform1f(U.uImp, desk ? 0.8 : 1); c.uniform1f(U.uSoft, dockSoft); c.uniform1f(U.uDesk, desk ? 1 : 0); c.uniform1f(U.uFade, lightMode && lf <= 0.001 ? 0 : 1); c.uniform1f(U.uTint, lightMode && shimOn ? 1 : 0); c.uniform1f(U.uDA, dockAmt); c.uniform1f(U.uDF, dockFl); c.uniform1f(U.uWL, CONFIG.waveLight); c.uniform1f(U.uWE, CONFIG.waveEdge); c.uniform1f(U.uWF, CONFIG.waveFlares); c.uniform1f(U.uEdgeOff, edgeOffV(now)); c.uniform1f(U.uRim, dockRim);   // Hugo 24.11. (15:25): Prisma zart und klingt bald aus
         c.uniform1f(U.uKeep, killT0 ? 1 - sm01(1.5, 3.0, (now - killT0) / 1000) : 1); if (!edgeT0) killT0 = 0;
         c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT);
         var on = waves.length || edgeT0;
@@ -1293,16 +1301,24 @@
     var CRT = {
       paths:    ['/creator', '/singer', '/model-2027'],   // Seiten mit galerie.js
       squashMs: 220,    // Bild klappt zur Linie zusammen, wird dabei heller
-      lineMs:   300     // Linie schlägt zum Punkt zusammen (beschleunigt)
+      lineMs:   440     // Linie schlägt zum Punkt zusammen: holt kurz Schwung nach aussen, dann immer schneller zur Mitte
     };
+    // Hugo 25.11.: Linie spitz zulaufend (links und rechts wie eine Nadel), schillernd (Iridescence), zieht schwungvoll zur
+    // Mitte bis zum Knall. Lichtpunkt und Knall auf der Galerie-Seite schillern in denselben Farben (galerie.js).
+    var IRI = 'linear-gradient(90deg, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #fff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%)';
+    var NEEDLE = 'polygon(0 50%, 50% 0, 100% 50%, 50% 100%)';
     var crtCss = [
       '.hp-crt { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }',
-      '.hp-crt i { position: absolute; display: block; opacity: 0; }',
-      '.hp-crt-line { left: 0; top: 50%; width: 100%; height: 3px; margin-top: -1.5px; background: #fff; box-shadow: 0 0 6px 2px #fff, 0 0 22px 6px rgba(210,230,255,.9), 0 0 70px 18px rgba(140,190,255,.45); }',
-      '.hp-crt-streak { left: -30vw; top: 50%; width: 160vw; height: 90px; margin-top: -45px; background: radial-gradient(ellipse at center, rgba(255,255,255,.95) 0, rgba(200,225,255,.55) 18%, rgba(120,170,255,.12) 45%, rgba(0,0,0,0) 70%); }',
-      '.hp-crt-dot { left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 4px #fff, 0 0 40px 14px rgba(190,220,255,.8); }',
-      '.hp-crt-dot.is-hold { opacity: 1; animation: hpCrtPulse 1.1s ease-in-out infinite; }',
-      '@keyframes hpCrtPulse { 50% { transform: scale(.82); box-shadow: 0 0 8px 3px #fff, 0 0 30px 10px rgba(190,220,255,.6); } }',
+      '.hp-crt > i { position: absolute; display: block; opacity: 0; }',
+      '.hp-crt-line { left: 0; top: 50%; width: 100%; height: 16px; margin-top: -8px; filter: drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 16px rgba(190,170,255,.7)); }',
+      '.hp-crt-line b { position: absolute; left: 0; right: 0; top: 0; bottom: 0; clip-path: ' + NEEDLE + '; -webkit-clip-path: ' + NEEDLE + '; background: ' + IRI + '; }',
+      '.hp-crt-line b + b { top: 34%; bottom: 34%; left: 3%; right: 3%; background: #fff; }',
+      '.hp-crt-streak { left: -30vw; top: 50%; width: 160vw; height: 90px; margin-top: -45px; background: radial-gradient(ellipse at center, rgba(255,255,255,.9) 0, rgba(225,205,255,.5) 18%, rgba(140,200,255,.14) 45%, rgba(0,0,0,0) 70%); }',
+      '.hp-crt-dot { left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff;',
+      '  box-shadow: 0 0 6px 2px #fff, 0 0 16px 5px rgba(255,110,220,.55), 0 0 30px 10px rgba(120,210,255,.45), 0 0 56px 18px rgba(255,230,120,.22); }',
+      '.hp-crt-dot.is-hold { opacity: 1; animation: hpCrtPulse 1.1s ease-in-out infinite, hpCrtHue 2.4s linear infinite; }',
+      '@keyframes hpCrtPulse { 50% { transform: scale(.82); } }',
+      '@keyframes hpCrtHue { to { filter: hue-rotate(360deg); } }',
       '.hp-crt-wash { left: 0; top: 0; width: 100%; height: 100%; background: #fff; mix-blend-mode: screen; }',
       'html.hp-crt-on .menu-toggle-wrap { opacity: 0 !important; transition: opacity .15s !important; }',
       'html.hp-crt-on, html.hp-crt-on body { background: #000 !important; }'
@@ -1327,7 +1343,7 @@
       }
       var R = document.documentElement, b = document.body, A = CRT.squashMs, L = CRT.lineMs;
       crtFx = document.createElement('div'); crtFx.className = 'hp-crt'; crtFx.setAttribute('aria-hidden', 'true');
-      crtFx.innerHTML = '<i class="hp-crt-wash"></i><i class="hp-crt-streak"></i><i class="hp-crt-line"></i><i class="hp-crt-dot"></i>';
+      crtFx.innerHTML = '<i class="hp-crt-wash"></i><i class="hp-crt-streak"></i><i class="hp-crt-line"><b></b><b></b></i><i class="hp-crt-dot"></i>';
       R.appendChild(crtFx);
       R.classList.add('hp-crt-on');
       var wash = crtFx.children[0], streak = crtFx.children[1], line = crtFx.children[2], dotEl = crtFx.children[3];
@@ -1337,20 +1353,31 @@
       var sq = b.animate([{ transform: 'none' }, { transform: 'scale(1.05, .004)' }], { duration: A, easing: IN, fill: 'forwards', id: 'hp-crt' });
       wash.animate([{ transform: 'scaleY(1)', opacity: 0 }, { transform: 'scaleY(.004)', opacity: .9 }], { duration: A, easing: IN, fill: 'forwards' });
       streak.animate([{ opacity: 0 }, { opacity: 0, offset: .65 }, { opacity: 1 }], { duration: A, fill: 'forwards' });
-      // 2) Blitz am Horizont, die Linie schlägt immer schneller zum Punkt zusammen
-      line.animate([{ opacity: 0, transform: 'scaleX(1) scaleY(2.5)' }, { opacity: 1, transform: 'scaleX(1) scaleY(2.5)', offset: .01 }, { opacity: 1, transform: 'scaleX(.9) scaleY(1)', offset: .15 }, { opacity: 1, transform: 'scaleX(.003) scaleY(1)' }],
-        { duration: L, delay: A, easing: IN4, fill: 'both' });
-      streak.animate([{ opacity: 1, transform: 'scaleX(1) scaleY(1.8)' }, { opacity: .35, transform: 'scaleX(.02) scaleY(1)' }], { duration: L, delay: A, easing: IN4, fill: 'forwards' });
-      dotEl.animate([{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 0, transform: 'scale(1.3)', offset: .7 }, { opacity: 1, transform: 'scale(1.3)' }], { duration: L, delay: A, fill: 'both' });
+      // 2) Blitz am Horizont: die Nadel leuchtet dick auf, holt kurz Schwung nach aussen und schlägt dann immer schneller
+      //    zur Mitte zusammen. Die Farben drängen sich dabei zusammen (Schillern).
+      var SNAP = 'cubic-bezier(.62,0,.98,.55)';
+      line.animate([
+        { opacity: 0, transform: 'scaleX(1) scaleY(2.6)', easing: 'ease-out' },
+        { opacity: 1, transform: 'scaleX(1) scaleY(2.6)', offset: .02, easing: 'cubic-bezier(.2,.7,.3,1)' },
+        { opacity: 1, transform: 'scaleX(1.06) scaleY(1)', offset: .2, easing: SNAP },
+        { opacity: 1, transform: 'scaleX(.002) scaleY(1.2)' }
+      ], { duration: L, delay: A, fill: 'both' });
+      streak.animate([
+        { opacity: 1, transform: 'scaleX(1) scaleY(1.8)', easing: 'ease-out' },
+        { opacity: .85, transform: 'scaleX(1.05) scaleY(1)', offset: .2, easing: SNAP },
+        { opacity: .4, transform: 'scaleX(.02) scaleY(.8)' }
+      ], { duration: L, delay: A, fill: 'forwards' });
+      // Ankommen in der Mitte: kurzer Lichtblitz im Punkt
+      dotEl.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(.4)', offset: .82 }, { opacity: 1, transform: 'scale(2.2)', offset: .93 }, { opacity: 1, transform: 'scale(1)' }], { duration: L + 120, delay: A, fill: 'both' });
       sq.onfinish = function () { if (crtFx) { b.style.setProperty('visibility', 'hidden', 'important'); wash.style.display = 'none'; } };
       setTimeout(function () {
         if (!crtFx) return;
-        // 3) Lichtpunkt bleibt und pulsiert, bis die Galerie da ist
+        // 3) Lichtpunkt bleibt, pulsiert und schillert, bis die Galerie da ist
         line.style.display = streak.style.display = 'none';
         dotEl.getAnimations().forEach(function (an) { an.cancel(); });
         dotEl.classList.add('is-hold');
         done();
-      }, A + L);
+      }, A + L + 120);
     }
     // Galerie vorladen (Hugo 25.11.: «muss die Galerie im Voraus laden»): sobald ein Bereich geöffnet wird,
     // holt die Homepage die Galerie-Seite, ihr Skript und alle Titelbilder in derselben Grösse wie dort.
@@ -2551,7 +2578,7 @@
         dock: function () {
           if (docked) return; docked = true;
           slides.forEach(function (s) { if (s.gold) { s.gold.remove(); s.gold = null; } s.el.style.boxShadow = ''; });
-          if (ripple && ripple.dock) ripple.dock();
+          if (ripple && ripple.dock) ripple.dock(CONFIG.ldRim, CONFIG.ldFlares);   // Hugo 25.11.: Rand-Leuchten ruhiger, ohne Flares
           html.classList.remove('hp-ldpre');   // Logo und About blenden ein
           fitTitles(); if (desk) renderDesk(); root.classList.remove('hp-run');   // Computer: Titel gleich in der richtigen Grösse (sonst kurz 100 px)     // Hugo 24.11.: Titel erscheint mit dem Schlag, gleich in der richtigen Grösse und Lage
           root.classList.add('hp-dock-hit'); setTimeout(function () { root.classList.remove('hp-dock-hit'); }, 800);

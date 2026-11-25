@@ -65,7 +65,8 @@
     '[data-lib] .lib-stage { height: 100% !important; overflow: hidden; }',
     '[data-lib] .lib-wheel { position: absolute; inset: 0; z-index: 1; transition: opacity .65s ease, filter .65s ease; }',
     '[data-lib] .gx-sphere { position: absolute; left: 50%; top: 50%; border-radius: 50%; z-index: 0; pointer-events: none; opacity: 0;',
-    '  background: radial-gradient(circle, #fff 0, #fff 55%, #f4f8ff 70%, rgba(255,255,255,0) 72%); transform: translate(-50%,-50%) scale(0); }',
+    // Hugo 25.11.: Knall mit schillerndem Rand (gleiche Farben wie die Nadel auf der Homepage)
+    '  background: radial-gradient(circle, #fff 0, #fff 50%, #ffd6f3 56%, #ff8fe0 59%, #b9a0ff 62%, #8fdcff 65%, #9cf7cf 67.5%, #fff09a 70%, rgba(255,240,160,0) 73%); transform: translate(-50%,-50%) scale(0); }',
     '[data-lib] .lib-item { position: absolute; left: 0; top: 0; visibility: hidden; opacity: 0; will-change: transform; transform-origin: 50% 50%; backface-visibility: hidden; }',
     '[data-lib] .lib-item.is-vis { visibility: visible; }',
     '[data-lib] .lib-item.is-off { visibility: hidden; }',
@@ -82,9 +83,11 @@
     /* Schrift bleibt über weissen Karten lesbar */
     '[data-lib] .lib-top, [data-lib] .lib-bottom { mix-blend-mode: difference; }',
     /* Lichtpunkt (gleich wie am Ende des Röhren-TV auf der Homepage) */
-    '.gx-dot { position: fixed; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; z-index: 50; pointer-events: none;',
-    '  box-shadow: 0 0 10px 4px #fff, 0 0 40px 14px rgba(190,220,255,.8); animation: gxPulse 1.1s ease-in-out infinite; }',
-    '@keyframes gxPulse { 50% { transform: scale(.82); box-shadow: 0 0 8px 3px #fff, 0 0 30px 10px rgba(190,220,255,.6); } }',
+    '.gx-dot { position: fixed; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff; z-index: 50; pointer-events: none;',
+    '  box-shadow: 0 0 6px 2px #fff, 0 0 16px 5px rgba(255,110,220,.55), 0 0 30px 10px rgba(120,210,255,.45), 0 0 56px 18px rgba(255,230,120,.22);',
+    '  animation: gxPulse 1.1s ease-in-out infinite, gxHue 2.4s linear infinite; }',
+    '@keyframes gxPulse { 50% { transform: scale(.82); } }',
+    '@keyframes gxHue { to { filter: hue-rotate(360deg); } }',
     '.gx-dot.is-go { animation: none; }',
     /* Ankunft von der Homepage: kein Überblenden, der Punkt steht schon da */
     '.hs-vt-crt::view-transition-old(root) { animation: none; opacity: 0; }',
