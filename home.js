@@ -208,7 +208,9 @@
     '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
     '[data-hp] .hp-sbar i { position: absolute; left: -1.5px; width: 5px; top: 0; border-radius: 5px; will-change: transform;',
     '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #ffffff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
-    '  background-size: 100% 260%; animation: hpSbarIri 7s linear infinite;',
+    '  background-size: 100% 260%; animation: hpSbarIri 2.4s linear infinite; animation-play-state: paused; }',
+    '[data-hp] .hp-sbar.is-active i { animation-play-state: running; }',   /* Hugo 12:24: Farben wandern nur beim Scrollen */
+    '[data-hp] .hp-sbar i {',
     '  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);',
     '  filter: drop-shadow(0 0 3px rgba(173,140,255,.85)) drop-shadow(0 0 9px rgba(148,208,255,.6)); }',
     '[data-hp] .hp-sbar i::after { content: ""; position: absolute; left: 1.5px; width: 2px; top: 30%; bottom: 30%; border-radius: 2px; background: #fff; opacity: .9; }',
@@ -2583,10 +2585,11 @@
     // Wischt man, solange der Titel noch zurückfliegt, bleibt er stehen und blendet in 0.15 s aus; das Original ist sofort da.
     function titleQuick() {
       if (!tClone || root.classList.contains('is-info')) return;
+      // Hugo 12:24 (Video, hoch wischen): ausblendende Kopie und Original standen kurz doppelt da. Jetzt nie zwei Titel:
+      // die Kopie ist sofort weg, das Original (fährt mit seinem Bild mit) blendet in 0.22 s ein.
       var c = tClone, o = tOrig; tClone = null; tOrig = null; clearTimeout(infoT);
-      c.style.transform = getComputedStyle(c).transform; c.style.transition = 'opacity .15s ease'; c.style.opacity = '0';
-      if (o) o.style.visibility = '';
-      setTimeout(function () { c.remove(); }, 200);
+      c.remove();
+      if (o) { o.style.visibility = ''; if (!reduce && o.animate) try { o.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }); } catch (er) {} }
     }
     // About ohne Animation schliessen (Rückkehr aus der Galerie)
     function infoInstantClose() {
