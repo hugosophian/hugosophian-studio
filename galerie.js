@@ -57,6 +57,7 @@
     waitMax:    2500,   // höchstens so lange auf die Bilder warten
     decodeMax:  900,    // höchstens so lange zusätzlich auf das Entpacken der Kopien warten
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
+    needleMs:   420,    // Hugo 09:57: Linie wie beim Fernseher, leuchtet beim Knall kurz auf
     fadeMs:     700,    // Licht blendet aus (Hugo 25.11. 07:05: wie am Anfang – vor dem Licht sieht man die Bilder herausschiessen)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
@@ -709,6 +710,7 @@
     // Ein weicher, nicht ganz weisser Lichtschein (kleiner heller Kern) und darüber schillernde Farbwolken (Pink, Blau,
     // Mint, Gelb, Violett), die sich langsam drehen und mit dem Licht aufblühen, plus ein schillernder Streifen am
     // Horizont wie die Nadel. Gleiche Zeiten wie vorher (sphereMs, fadeMs).
+    var NEEDLE_P = null, CORE_P = null, NEEDLE_G = null;
     var GLOW = [[255, 106, 213], [148, 208, 255], [143, 247, 200], [255, 243, 138], [173, 140, 255]];
     function paintSphere(t) {
       var cx = VW / 2 * DPR, cy = VH / 2 * DPR, R0 = Math.hypot(VW, VH) * 0.75 * DPR, sc, op;
@@ -732,13 +734,34 @@
         g.addColorStop(0, 'rgba(' + c + ',.78)'); g.addColorStop(.4, 'rgba(' + c + ',.4)'); g.addColorStop(1, 'rgba(' + c + ',0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
       }
-      // schillernder Streifen am Horizont (wie die Nadel), wird breiter und blasser
-      var sw = VW * DPR * (0.6 + 0.9 * sc), sh = Math.max(2, 26 * DPR * (1 - 0.5 * sc));
-      g = ctx.createLinearGradient(cx - sw / 2, 0, cx + sw / 2, 0);
-      [['0', 'rgba(255,106,213,0)'], ['.15', 'rgba(199,116,232,.35)'], ['.3', 'rgba(135,149,232,.45)'], ['.42', 'rgba(148,208,255,.6)'], ['.5', 'rgba(255,255,255,.75)'],
-       ['.58', 'rgba(148,208,255,.6)'], ['.7', 'rgba(143,247,200,.45)'], ['.85', 'rgba(255,184,107,.35)'], ['1', 'rgba(255,106,213,0)']].forEach(function (st) { g.addColorStop(+st[0], st[1]); });
-      ctx.globalAlpha = op * (1 - 0.6 * sc);
-      ctx.fillStyle = g; ctx.fillRect(cx - sw / 2, cy - sh / 2, sw, sh);
+      // Hugo 09:57: die Linie genau wie beim Fernseher (gleiche Nadel-Form und Farben, Schein drumherum), nur kurz aufleuchten
+      var L = t / CONFIG.needleMs;
+      if (L < 1) {
+        if (!NEEDLE_P) { NEEDLE_P = new Path2D(NEEDLE_D); CORE_P = new Path2D(CORE_D); }
+        var la = L < 0.06 ? L / 0.06 : 1 - EASEOUT((L - 0.06) / 0.94), W2 = VW * DPR, sx = W2 / 1000 * (1 + 0.06 * OUT3(L));
+        var thick = 18 * DPR * (2.6 - 1.6 * OUT3(Math.min(1, L * 1.6))), sy = thick / 20;
+        ctx.globalCompositeOperation = 'screen';
+        // Schein (wie .hp-crt-streak)
+        ctx.globalAlpha = la * 0.85;
+        ctx.setTransform(1, 0, 0, 0.06 * (1 + 0.8 * (1 - L)), cx, cy);
+        g = ctx.createRadialGradient(0, 0, 0, 0, 0, W2 * 0.8);
+        g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(.18, 'rgba(225,205,255,.5)'); g.addColorStop(.45, 'rgba(140,200,255,.14)'); g.addColorStop(.7, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(-W2 * 0.8, -W2 * 0.8, W2 * 1.6, W2 * 1.6);
+        // Nadel
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = la;
+        ctx.setTransform(sx, 0, 0, sy, cx - 500 * sx, cy - 10 * sy);
+        if (!NEEDLE_G) {
+          NEEDLE_G = ctx.createLinearGradient(0, 0, 1000, 0);
+          [[0, '#ff6ad5'], [.12, '#c774e8'], [.22, '#ad8cff'], [.32, '#8795e8'], [.42, '#94d0ff'], [.5, '#ffffff'], [.58, '#94d0ff'], [.68, '#8ff7c8'], [.78, '#fff38a'], [.88, '#ffb86b'], [1, '#ff6ad5']]
+            .forEach(function (st) { NEEDLE_G.addColorStop(st[0], st[1]); });
+        }
+        ctx.shadowColor = 'rgba(190,170,255,.75)'; ctx.shadowBlur = 16 * DPR;
+        ctx.fillStyle = NEEDLE_G; ctx.fill(NEEDLE_P);
+        ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 4 * DPR;
+        ctx.fillStyle = '#fff'; ctx.fill(CORE_P);
+        ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
       ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
     function paintBang(t) {
