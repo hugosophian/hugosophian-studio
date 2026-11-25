@@ -129,7 +129,7 @@
     '[data-hp].is-info .hp-info { pointer-events: auto; visibility: visible; transition-delay: 0s; }',
     /* Text im About scrollt (Finger, Mausrad); unten Platz, damit er über den Close-Knopf hinaus geschoben werden kann */
     '[data-hp].is-info, [data-hp].is-info .hp-info { touch-action: pan-y; }',
-    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 9rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
+    '[data-hp] .hp-info-panel { position: absolute; inset: 0; box-sizing: border-box; padding: var(--hp-info-top, 30vh) 5vw calc(5vh + 7.4rem + env(safe-area-inset-bottom, 0px)) var(--hp-info-left, 5vw); background: var(--hp-info-bg, #fff); color: var(--hp-info-fg, #000); transform: translate3d(100%,0,0); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }',
     /* Text und Knöpfe; der ganze weisse Bereich scrollt, der Text läuft dabei unter dem Titel durch */
     '[data-hp] .hp-sun-light { z-index: 8; mix-blend-mode: screen; visibility: hidden; }',
     '[data-hp] .hp-sun-back canvas { position: absolute; display: block; pointer-events: none; }',
@@ -1834,6 +1834,7 @@
       if (!moved) {
         if (Math.abs(dy) < 6 && Math.abs(e.clientX - down.x) < 6) return;
         moved = true; down.y = e.clientY; down.c0 = C; dy = 0;
+        titleQuick();
         root.classList.add('is-dragging'); activity();
       }
       C = down.c0 - dy * down.sp / H;
@@ -1868,6 +1869,7 @@
       if (desk && e.target.closest && e.target.closest('.hp-side-in.is-scroll')) return;   // zu langer Spaltentext scrollt selbst (Hugo 11:27)
       e.preventDefault();
       if (desk || busy()) return;
+      titleQuick();
       var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       if (e.deltaMode === 1) d *= 32;
       if (!d) return;
@@ -1952,17 +1954,22 @@
       if (!words.length || !root.classList.contains('is-info')) return;
       var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
       var topB = parseFloat(cs.paddingTop) || 0, botB = Math.min(H2 - (parseFloat(cs.paddingBottom) || 0), infoFix.offsetTop - 12);   // unten: über dem festen Knopf
-      var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.16, more = false;
+      // Hugo 11:55: oben unter dem Titel wegfliegen – ganz weg, bevor ein Wort die Unterkante des Titels erreicht
+      var pr = pn.getBoundingClientRect(), tb = topB * 0.5;
+      if (tClone) { var tr = tClone.getBoundingClientRect(); tb = tr.bottom - pr.top + 6; }
+      tb = clamp(tb, 0, topB - 8);
+      var oS = topB + Math.min(st, 30), zT = Math.max(8, oS - tb);
+      // unten: nur wenn wirklich noch Text darunter liegt (kurzer Text oder Ende erreicht = alles ganz sichtbar, nichts hängt halb)
+      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.12, rem), more = false;
       var el = performance.now() - wordsT0;
       words.forEach(function (W) {
         var y = W.y - st;
-        // zeitlich beim Öffnen: 700 ms pro Wort, Start über 650 ms gestaffelt
         var tin = 1;
         if (W.r != null && !reduce) { tin = eOQ(clamp((el - 650 * W.r) / 700, 0, 1)); if (tin < 1) more = true; }
-        var out = reduce ? 0 : eIOC(clamp((topB - y) / zT, 0, 1));
-        var sin = reduce ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 14 * W.k) / zB, 0, 1));   // in der Zeile leicht von links nach rechts versetzt
+        var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
+        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - (y + W.h) - 5 * W.k) / zB, 0, 1));
         var inn = Math.min(tin, sin);
-        var o = reduce ? Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
+        var o = reduce ? Math.min(smooth(tb, topB, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = o.toFixed(3);
@@ -2552,6 +2559,15 @@
         if (tClone) { tClone.remove(); tClone = null; }
         if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
       }, CONFIG.infoMs + 50);
+    }
+    // Hugo 11:55 (Video): nach «close» sofort weitergewischt – der zurückfliegende Titel lag über dem Titel des nächsten Bilds.
+    // Wischt man, solange der Titel noch zurückfliegt, bleibt er stehen und blendet in 0.15 s aus; das Original ist sofort da.
+    function titleQuick() {
+      if (!tClone || root.classList.contains('is-info')) return;
+      var c = tClone, o = tOrig; tClone = null; tOrig = null; clearTimeout(infoT);
+      c.style.transform = getComputedStyle(c).transform; c.style.transition = 'opacity .15s ease'; c.style.opacity = '0';
+      if (o) o.style.visibility = '';
+      setTimeout(function () { c.remove(); }, 200);
     }
     // About ohne Animation schliessen (Rückkehr aus der Galerie)
     function infoInstantClose() {
