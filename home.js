@@ -1297,32 +1297,31 @@
       mbShow();
       dsunWall();
     }
-    // ---------- Zurück aus der Galerie (Hugo 25.11., 09:21) ----------
-    // Die Galerie schaltet ab wie ein Röhren-TV, hier steht der Lichtpunkt sofort (Seiten-Head: html.hp-dotin::after).
-    // Er bleibt, bis die Bilder bereit sind, blitzt kurz auf und geht aus – dann kommen die Bilder wie bei der Ladeanimation.
-    var dotIn = false;
-    try { dotIn = html.classList.contains('hp-dotin') || !!sessionStorage.getItem('hp-dotin'); sessionStorage.removeItem('hp-dotin'); } catch (e) {}
-    var dotEl = null;
-    if (dotIn) {
-      dotEl = document.createElement('div'); dotEl.setAttribute('aria-hidden', 'true');
-      dotEl.style.cssText = 'position:fixed;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;z-index:2147483000;pointer-events:none;'
-        + 'box-shadow:0 0 6px 2px #fff,0 0 16px 5px rgba(255,110,220,.55),0 0 30px 10px rgba(120,210,255,.45),0 0 56px 18px rgba(255,230,120,.22);'
-        + 'animation:hpDotP 1.1s ease-in-out infinite,hpDotH 2.4s linear infinite';
-      html.appendChild(dotEl);
-      html.classList.remove('hp-dotin');
+    // ---------- Zurück aus der Galerie (Hugo 25.11., 09:29) ----------
+    // Die Galerie schaltet ab wie ein Röhren-TV und der Lichtpunkt geht dort aus. Hier keine Ladeanimation: Die Seite
+    // bleibt schwarz, bis die Bilder bereit sind, dann blenden sie ein, beim Bild des Bereichs (hp-return).
+    // Computer: die Bilder gleiten stufenweise von links nach rechts weich seitlich herein. Handy: aus dem Schwarz faden.
+    // Seiten-Head: html.hp-backin versteckt [data-hp], bis dieser Code übernimmt.
+    var backIn = false;
+    try { backIn = html.classList.contains('hp-backin') || !!sessionStorage.getItem('hp-backin'); sessionStorage.removeItem('hp-backin'); } catch (e) {}
+    function backFade() {
+      var go = function () {
+        if (go.done) return; go.done = true;
+        html.classList.remove('hp-backin');
+        if (reduce || !root.animate) return;
+        if (desk) slides.forEach(function (s, i) {
+          s.el.animate([{ opacity: 0, translate: '-48px 0' }, { opacity: 1, translate: '0 0' }],
+            { duration: 1000, delay: 80 + i * 140, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+        });
+        else root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, easing: 'cubic-bezier(.33,0,.2,1)' });
+      };
+      var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
+      Promise.all(imgs.map(function (im) { return im.decode ? im.decode().catch(function () {}) : Promise.resolve(); })).then(go);
+      setTimeout(go, 1200);
     }
-    function dotOut(cb) {
-      if (!dotEl) { cb(); return; }
-      var d = dotEl; dotEl = null;
-      if (reduce || !d.animate) { d.remove(); cb(); return; }
-      d.style.animation = 'none';
-      var a = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(2.2)', opacity: 1, offset: .35, easing: 'cubic-bezier(.5,0,.9,.5)' }, { transform: 'scale(0)', opacity: 0 }], { duration: 420, fill: 'forwards' });
-      var fired = false, go = function () { if (fired) return; fired = true; d.remove(); cb(); };
-      a.onfinish = go; setTimeout(go, 700);
-    }
-    window.addEventListener('pageshow', function (e) { if (e.persisted && dotEl) { dotEl.remove(); dotEl = null; } });
     function startIntro() {
-      if (!introOn) { dotOut(function () {}); render(); return; }
+      if (backIn) { introOn = false; endIntro(); render(); backFade(); return; }   // zurück aus der Galerie: einblenden statt Ladeanimation
+      if (!introOn) { render(); return; }
       root.classList.add('hp-run');
       var imgs = slides.map(function (s) { return s.img; }).filter(Boolean);
       var done = false;
@@ -1331,10 +1330,8 @@
         // Kommt man über „zum Studio“ (Seite gleitet nach oben weg), setzt die Animation leicht versetzt ein
         var d = document.documentElement.classList.contains('hs-vt-studio') ? CONFIG.vtDelay : 0;
         setTimeout(function () {
-          dotOut(function () {   // zurück aus der Galerie: erst geht der Lichtpunkt aus
-            if (LD) LD.ready(function () { introT0 = 0; kick(); });   // Ladeanimation: erst wenn der Schriftzug lange genug leuchtete
-            else { introT0 = 0; kick(); }
-          });
+          if (LD) LD.ready(function () { introT0 = 0; kick(); });   // Ladeanimation: erst wenn der Schriftzug lange genug leuchtete
+          else { introT0 = 0; kick(); }
         }, d);
       }
       Promise.all(imgs.map(function (im) {
@@ -2662,7 +2659,7 @@
     //   Nur beim ersten Besuch pro Sitzung; mit «Bewegung reduzieren» ohne.
     LD = (function () {
       // Hugo 24.11.: die Ladeanimation läuft bei jedem Laden der Startseite (nicht nur beim ersten Besuch pro Sitzung)
-      if (reduce) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer
+      if (reduce || backIn) { html.classList.remove('hp-ldpre'); return null; }   // Hugo 24.11.: auch am Computer · zurück aus der Galerie: ohne (Hugo 09:29)
       html.classList.add('hp-ldpre');
       if (!desk && CONFIG.ldCards) slides.forEach(function (s) {   // Hugo 24.11.: weisse Karten nur am Handy (am Computer wieder entfernt)
         var g = document.createElement('div'); g.className = 'hp-gold'; g.setAttribute('aria-hidden', 'true');

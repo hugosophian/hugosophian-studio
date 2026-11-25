@@ -1235,8 +1235,8 @@
     hitSize(); window.addEventListener('resize', hitSize); window.addEventListener('load', hitSize);
 
     // ---------- Röhren-TV (gleich wie home.js crtOff) ----------
-    // Hugo 25.11. (09:21): zurück zur Homepage schaltet auch die Galerie ab wie ein Röhrenfernseher; auf der Homepage
-    // geht der Lichtpunkt aus und die Bilder kommen wie bei der Ladeanimation.
+    // Hugo 25.11. (09:21/09:29): zurück zur Homepage schaltet auch die Galerie ab wie ein Röhrenfernseher, der Punkt geht
+    // hier aus; die Homepage blendet danach beim Bild des Bereichs ein (Computer stufenweise seitlich, Handy aus dem Schwarz).
   var CRT = { squashMs: 220, lineMs: 440 };   // gleiche Werte wie home.js
     var NEEDLE_D = 'M0 10 C 260 9.7, 400 8.6, 455 5.2 C 478 1.2, 522 1.2, 545 5.2 C 600 8.6, 740 9.7, 1000 10 C 740 10.3, 600 11.4, 545 14.8 C 522 18.8, 478 18.8, 455 14.8 C 400 11.4, 260 10.3, 0 10 Z';
     var CORE_D = 'M40 10 C 300 9.85, 420 9.2, 465 7.4 C 484 5.6, 516 5.6, 535 7.4 C 580 9.2, 700 9.85, 960 10 C 700 10.15, 580 10.8, 535 12.6 C 516 14.4, 484 14.4, 465 12.6 C 420 10.8, 300 10.15, 40 10 Z';
@@ -1337,8 +1337,7 @@
 
 
     // ---------- Bereichsname = zurück zur Homepage ----------
-    // Hugo 25.11.: immer zur Homepage auf das Bild dieses Bereichs (sessionStorage hp-return). Hugo 09:21: mit Röhren-TV,
-    // die Homepage zeigt den Punkt sofort (Seiten-Head, hp-dotin), lässt ihn ausgehen und spielt die Ladeanimation.
+    // Hugo 25.11.: immer zur Homepage auf das Bild dieses Bereichs (sessionStorage hp-return), mit Röhren-TV (siehe oben).
     var backEl = root.querySelector('.lib-bottom .ps-label'), leaving = false;
     window.addEventListener('pageshow', function (e) { if (e.persisted) { crtReset(); leaving = false; } });
     if (backEl) {
@@ -1348,8 +1347,15 @@
         if (leaving) return; leaving = true;
         try { sessionStorage.setItem('hp-return', location.pathname); } catch (er) {}
         if (reduce) { window.hsVT = { to: '/', type: 'studio' }; location.href = '/'; return; }
-        try { sessionStorage.setItem('hp-dotin', '1'); } catch (er) {}
-        crtOff(function () { window.hsVT = { to: '/', type: 'crt' }; location.href = '/'; });
+        try { sessionStorage.setItem('hp-backin', '1'); } catch (er) {}
+        // Hugo 09:29: nur das Fernseher-Schliessen, dann geht der Punkt hier aus; die Homepage blendet danach ein
+        crtOff(function () {
+          var d = crtFx && crtFx.children[3], leave = function () { if (leave.done) return; leave.done = true; window.hsVT = { to: '/', type: 'crt' }; location.href = '/'; };
+          if (!d || !d.animate) { leave(); return; }
+          d.classList.remove('is-hold');
+          var a = d.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.9)', opacity: 1, offset: .3, easing: 'cubic-bezier(.5,0,.9,.5)' }, { transform: 'scale(0)', opacity: 0 }], { duration: 380, fill: 'forwards' });
+          a.onfinish = leave; setTimeout(leave, 600);
+        });
       };
       // Homepage im Voraus holen, damit sie schnell da ist
       setTimeout(function () { try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = '/'; document.head.appendChild(l); } catch (er) {} }, 3000);
