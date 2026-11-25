@@ -230,7 +230,7 @@
     var projects = all.slice();   // aktuelle Auswahl (Sortierung)
     var slots = [];               // Karten auf der Fläche
     var clones = [];
-    var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0;
+    var VW = 1, VH = 1, WW = 1, WH = 1, PAD = 0, BX = 0, BY = 0;
     var cam = { x: 0, y: 0 }, vel = { x: 0, y: 0 };
     var mode = 'load';            // load | bang | idle | gather | pv
     var raf = 0, last = 0, gatherAt = 0, bangT = 0;
@@ -276,44 +276,44 @@
       var cell = avgW * (mob ? CONFIG.cell.mobile : CONFIG.cell.desktop) * (1 + CONFIG.fewCell * few);
       var holes = CONFIG.holes + CONFIG.fewHoles * few, jit = CONFIG.jitter + CONFIG.fewJitter * few;
       var rowH = cell * 1.05;
-      PAD = maxD * sz[1] / 2 + 4;
-      var cols = Math.max(3, Math.ceil((VW + 2 * PAD) / cell) + 1);
-      var rows = Math.max(3, Math.ceil((VH + 2 * PAD) / rowH) + 1);
+      // Hugo 25.11. (07:13): keine Wiederholungen – jedes Projekt genau einmal («es gibt halt das, was es gibt»).
+      // Die Fläche ist so gross wie nötig (Seitenverhältnis wie der Bildschirm), mittig; am Rand federt sie zurück.
+      var n = projects.length;
+      var cols = clamp(Math.round(Math.sqrt(n * (VW / VH) * (rowH / cell))), 1, n);
+      var rows = Math.ceil(n / cols);
       WW = cols * cell; WH = rows * rowH;
+      BX = Math.max(0, (WW - VW) / 2 + cell * 0.35); BY = Math.max(0, (WH - VH) / 2 + rowH * 0.35);
       var R = rng(CONFIG.seed + strSeed(location.pathname + (current || '') + (mob ? 'm' : 'd')));
-      var list = order(cols * rows, R), k = 0;
-      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
-        var p = list[k++];
-        if (R() < holes) continue;
-        var el;
-        if (!p.used) { el = p.el; p.used = true; }
-        else {
-          el = p.el.cloneNode(true);
-          el.setAttribute('aria-hidden', 'true');
-          var ca = el.querySelector('a'); if (ca) { ca.setAttribute('tabindex', '-1'); ca.setAttribute('draggable', 'false'); }
-          var ci = el.querySelector('img'); if (ci) { ci.setAttribute('draggable', 'false'); ci.loading = 'eager'; }
-          wheel.appendChild(el); clones.push(el);
+      var list = order(n, R), k = 0;
+      for (var r = 0; r < rows; r++) {
+        var inRow = Math.min(cols, n - r * cols), rowOff = (cols - inRow) * cell / 2;   // letzte Reihe mittig
+        for (var c = 0; c < inRow; c++) {
+          var p = list[k++], el = p.el;
+          var s = sz[0] + R() * (sz[1] - sz[0]);
+          var d = CONFIG.depth[0] + R() * (CONFIG.depth[1] - CONFIG.depth[0]);
+          el.style.zIndex = Math.round(d * 100);
+          slots.push({
+            p: p, el: el, a: el.querySelector('a.lib-card') || el.querySelector('a'), img: el.querySelector('img'),
+            s: s, d: d, w: p.w, h: p.h,
+            // Weltlage relativ zur Mitte; Reihen leicht versetzt, damit kein Raster sichtbar ist
+            x: rowOff + c * cell + cell / 2 + (rows > 1 ? (r % 2 - .5) * cell * .35 : 0) + (R() - .5) * cell * jit - WW / 2,
+            y: r * rowH + rowH / 2 + (R() - .5) * rowH * jit - WH / 2,
+            rot: (R() - .5) * 2 * CONFIG.spin, dl: R() * CONFIG.flyDelay,
+            dur: CONFIG.flyMs[0] + R() * (CONFIG.flyMs[1] - CONFIG.flyMs[0]), s0: .03 + R() * .05,
+            off: false
+          });
         }
-        var s = sz[0] + R() * (sz[1] - sz[0]);
-        var d = CONFIG.depth[0] + R() * (CONFIG.depth[1] - CONFIG.depth[0]);
-        el.style.zIndex = Math.round(d * 100);
-        slots.push({
-          p: p, el: el, a: el.querySelector('a.lib-card') || el.querySelector('a'), img: el.querySelector('img'),
-          s: s, d: d, w: p.w, h: p.h,
-          x: c * cell + cell / 2 + (r % 2) * cell / 2 + (R() - .5) * cell * jit,   // Reihen versetzt (kein Raster sichtbar)
-          y: r * rowH + rowH / 2 + (R() - .5) * rowH * jit,
-          rot: (R() - .5) * 2 * CONFIG.spin, dl: R() * CONFIG.flyDelay,
-          dur: CONFIG.flyMs[0] + R() * (CONFIG.flyMs[1] - CONFIG.flyMs[0]), s0: .03 + R() * .05,
-          off: false
-        });
       }
-      // Start so, dass die Fläche mittig liegt
-      cam.x = -(WW - VW) / 2; cam.y = -(WH - VH) / 2;
+      cam.x = 0; cam.y = 0;
     }
-    // Lage einer Karte auf dem Bildschirm (Mitte), endlos in beide Richtungen
+    // Lage einer Karte auf dem Bildschirm (Mitte)
     function pos(sl) {
-      return { x: mod(sl.x + cam.x * sl.d + PAD, WW) - PAD, y: mod(sl.y + cam.y * sl.d + PAD, WH) - PAD };
+      return { x: VW / 2 + sl.x + cam.x * sl.d, y: VH / 2 + sl.y + cam.y * sl.d };
     }
+    // Rand: ausserhalb von ±BX/±BY bremst das Ziehen (Gummiband), danach federt die Fläche zurück
+    function outX(v) { return v > BX ? v - BX : v < -BX ? v + BX : 0; }
+    function outY(v) { return v > BY ? v - BY : v < -BY ? v + BY : 0; }
+    function outside() { return Math.abs(outX(cam.x)) > .3 || Math.abs(outY(cam.y)) > .3; }
     function tfOf(sl, x, y, scale, rot) {
       return 'translate3d(' + (x - sl.w / 2).toFixed(1) + 'px,' + (y - sl.h / 2).toFixed(1) + 'px,0) scale(' + (sl.s * scale).toFixed(4) + ') rotate(' + (rot || 0).toFixed(2) + 'deg)';
     }
@@ -340,10 +340,10 @@
         if (tg >= 1) { gatherDone(); return; }
         more = true;
       } else if (mode === 'idle') {
-        var moving = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || dirty;
+        var moving = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || dirty || outside();
         if (!drag) inertia(dtf);
         if (moving) { for (i = 0; i < slots.length; i++) { sl = slots[i]; f = pos(sl); place(sl, f.x, f.y, 1, 0); } dirty = false; }
-        more = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05;
+        more = drag || Math.abs(vel.x) > .05 || Math.abs(vel.y) > .05 || (!drag && outside());
       }
       if (more) raf = requestAnimationFrame(frame);
     }
@@ -352,6 +352,10 @@
     function inertia(dtf) {
       cam.x += vel.x * dtf; cam.y += vel.y * dtf;
       var fr = Math.pow(CONFIG.friction, dtf); vel.x *= fr; vel.y *= fr;
+      // am Rand: Schwung stark bremsen und weich zurückfedern
+      var ox = outX(cam.x), oy = outY(cam.y), k = 1 - Math.pow(1 - 0.16, dtf), kb = Math.pow(0.6, dtf);
+      if (ox) { cam.x -= ox * k; if (vel.x * ox > 0) vel.x *= kb; }
+      if (oy) { cam.y -= oy * k; if (vel.y * oy > 0) vel.y *= kb; }
       if (Math.abs(vel.x) < .05) vel.x = 0; if (Math.abs(vel.y) < .05) vel.y = 0;
     }
 
@@ -480,7 +484,8 @@
       }
       var now = performance.now(), k = down.touch ? CONFIG.speedTouch : CONFIG.speedMouse;
       var dx = (e.clientX - down.lx) * k, dy = (e.clientY - down.ly) * k, dt = Math.max(1, now - down.t);
-      cam.x += dx; cam.y += dy;
+      // ausserhalb des Rands nur noch gebremst (Gummiband)
+      cam.x += dx * (outX(cam.x + dx) * dx > 0 ? .35 : 1); cam.y += dy * (outY(cam.y + dy) * dy > 0 ? .35 : 1);
       vel.x = .7 * (dx / dt * 16.67) + .3 * vel.x; vel.y = .7 * (dy / dt * 16.67) + .3 * vel.y;
       down.lx = e.clientX; down.ly = e.clientY; down.t = now;
       if (mode === 'idle') redraw(); else kick();
@@ -532,7 +537,7 @@
       e.preventDefault();
       if (mode !== 'idle' || root.classList.contains('is-pv')) return;
       var k = e.deltaMode === 1 ? 32 : 1;
-      cam.x -= e.deltaX * k; cam.y -= e.deltaY * k; vel.x = vel.y = 0;
+      cam.x = clamp(cam.x - e.deltaX * k, -BX - 60, BX + 60); cam.y = clamp(cam.y - e.deltaY * k, -BY - 60, BY + 60); vel.x = vel.y = 0;
       redraw();
     }, { passive: false });
 
