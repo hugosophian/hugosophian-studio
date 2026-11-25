@@ -164,17 +164,11 @@
     /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
        Streifen in der Farbe der Seite und rastet am Ende des Texts an seinem Platz ein. bottom negativ: der Klebe-Bereich endet
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
-    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 6.5rem 0 .6rem; margin-top: -6.5rem; pointer-events: none; }',   /* Hugo 11:22/11:26: mehr Weiss über dem Knopf */
+    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: .6rem 0; margin-top: -.6rem; pointer-events: none; }',
+    /* Hugo 11:34 (Video perappelgren.de): Zeile für Zeile – jede Zeile blendet zum Rand hin selbst aus, beim Scrollen bleiben
+       untere Zeilen leicht zurück (Zeilenabstand öffnet sich kurz). Code: infoLines / linesTick */
+    '[data-hp] .hp-info-panel .hp-line { display: block; will-change: transform, opacity; }',
     '[data-hp] .hp-info-btns > * { pointer-events: auto; }',
-    /* Hugo 11:26 (Video perappelgren.de): weicher Verlauf mit Zwischenstufen, reicht bis ganz unten. Nur sichtbar, solange Text darunter
-       versteckt ist (is-stuck, setzt der Code beim Scrollen); am Ende des Texts blendet er aus, damit nichts verdeckt bleibt */
-    '[data-hp] .hp-info-btns::before { content: ""; position: absolute; left: -6vw; right: -6vw; top: 0; bottom: -12rem; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .35s ease;',
-    '  background: linear-gradient(to bottom, transparent 0, color-mix(in srgb, var(--hp-info-bg, #fff) 18%, transparent) 1.2rem, color-mix(in srgb, var(--hp-info-bg, #fff) 45%, transparent) 2.4rem, color-mix(in srgb, var(--hp-info-bg, #fff) 75%, transparent) 3.5rem, color-mix(in srgb, var(--hp-info-bg, #fff) 93%, transparent) 4.3rem, var(--hp-info-bg, #fff) 4.9rem); }',
-    '[data-hp] .hp-info-btns.is-stuck::before { opacity: 1; }',
-    /* Hugo 11:23: oben gleich – der Text läuft beim Scrollen unter einem weissen Band durch, das wie unten 2.8rem weich ausläuft.
-       Das Band liegt im Innenabstand oben (über dem Textanfang) und klebt dort; Titel und Schriftzug liegen darüber */
-    '[data-hp] .hp-info-scroll::before { content: ""; display: block; flex: 0 0 auto; position: sticky; top: calc(-1 * var(--hp-info-top, 30vh)); z-index: 2; pointer-events: none;',
-    '  height: var(--hp-info-top, 30vh); margin: calc(-1 * var(--hp-info-top, 30vh)) 0 -2.2vh; background: linear-gradient(to bottom, var(--hp-info-bg, #fff) calc(100% - 7rem), color-mix(in srgb, var(--hp-info-bg, #fff) 92%, transparent) calc(100% - 5.6rem), color-mix(in srgb, var(--hp-info-bg, #fff) 72%, transparent) calc(100% - 4rem), color-mix(in srgb, var(--hp-info-bg, #fff) 42%, transparent) calc(100% - 2.4rem), color-mix(in srgb, var(--hp-info-bg, #fff) 15%, transparent) calc(100% - 1rem), transparent); }',   /* Hugo 11:26: oben ebenfalls länger und weicher (vorher 2.8rem hart) */
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
@@ -1924,6 +1918,42 @@
     // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
     function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
     infoPanel.addEventListener('scroll', stuckCheck, { passive: true });
+    // ---------- About-Text Zeile für Zeile (Hugo 11:34, wie perappelgren.de) ----------
+    var lines = [], linesRaf = 0, linesOrig = '';
+    function infoLines() {
+      linesOrig = infoText.innerHTML; lines = [];
+      [].forEach.call(infoText.querySelectorAll('p'), function (p) {
+        var words = (p.textContent || '').split(/\s+/).filter(Boolean); if (!words.length) return;
+        p.innerHTML = '';
+        var ws = words.map(function (w, i) { var sp = document.createElement('span'); sp.textContent = w + (i < words.length - 1 ? ' ' : ''); p.appendChild(sp); return sp; });
+        var groups = [], top = null;
+        ws.forEach(function (sp) { var t = sp.offsetTop; if (top === null || Math.abs(t - top) > 2) { groups.push([]); top = t; } groups[groups.length - 1].push(sp.textContent); });
+        p.innerHTML = '';
+        groups.forEach(function (g) { var l = document.createElement('span'); l.className = 'hp-line'; l.textContent = g.join(''); p.appendChild(l); lines.push({ el: l, s: null }); });
+      });
+      lines.forEach(function (L) { L.y = L.el.offsetTop; });
+    }
+    function linesTick() {
+      linesRaf = 0;
+      if (!lines.length || !root.classList.contains('is-info')) return;
+      var pn = infoPanel, st = pn.scrollTop, H2 = pn.clientHeight, cs = getComputedStyle(pn);
+      var topB = parseFloat(cs.paddingTop) || 0, botB = infoBtns.classList.contains('is-stuck') ? infoBtns.offsetTop - st + parseFloat(getComputedStyle(infoBtns).paddingTop) : H2 - (parseFloat(cs.paddingBottom) || 0);
+      var zT = Math.min(topB, H2 * 0.22), zB = H2 * 0.14, more = false;
+      lines.forEach(function (L) {
+        if (L.s === null) L.s = st;
+        var yv = L.y - st, k = reduce ? 1 : clamp(0.32 - 0.22 * (yv / H2), 0.1, 0.32);   // weiter unten = mehr Nachlauf
+        L.s += (st - L.s) * k; if (Math.abs(st - L.s) < 0.1) L.s = st; else more = true;
+        var off = clamp(st - L.s, -40, 40), y = yv + off, lh = L.el.offsetHeight || 20;
+        var o = Math.min(smooth(topB - zT, topB, y), smooth(botB, botB - zB, y + lh));   // oben: über dem Textanfang zum Kopf hin ausblenden
+        L.el.style.transform = off ? 'translate3d(0,' + off.toFixed(2) + 'px,0)' : '';
+        L.el.style.opacity = o.toFixed(3);
+      });
+      if (more) linesRaf = requestAnimationFrame(linesTick);
+    }
+    function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+    function linesKick() { if (!linesRaf) linesRaf = requestAnimationFrame(linesTick); }
+    infoPanel.addEventListener('scroll', linesKick, { passive: true });
+    window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); linesKick(); } });
     window.addEventListener('resize', stuckCheck);
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
@@ -2441,7 +2471,7 @@
       clearTimeout(infoT); infoFrom = null;
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
-      infoText.innerHTML = s.intro;
+      infoText.innerHTML = s.intro; lines = []; requestAnimationFrame(function () { infoLines(); stuckCheck(); linesKick(); });
       infoOpen.setAttribute('href', s.href || '#'); requestAnimationFrame(stuckCheck); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       infoOpen.style.display = s.href ? '' : 'none';
@@ -2525,7 +2555,7 @@
       clearTimeout(infoT);
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
-      infoText.innerHTML = s.intro;
+      infoText.innerHTML = s.intro; lines = []; requestAnimationFrame(function () { infoLines(); stuckCheck(); linesKick(); });
       infoOpen.setAttribute('href', s.href || '#'); requestAnimationFrame(stuckCheck); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
