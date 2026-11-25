@@ -164,12 +164,17 @@
     /* Hugo 11:17: «Galerie öffnen» bleibt bei langen Texten sichtbar – klebt über dem Close-Knopf auf einem weich auslaufenden
        Streifen in der Farbe der Seite und rastet am Ende des Texts an seinem Platz ein. bottom negativ: der Klebe-Bereich endet
        schon am Innenabstand unten des Panels (5vh + 9rem), -4.4rem setzt den Knopf 4.6rem über dessen Unterkante */
-    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 2.8rem 0 .6rem; margin-top: -2.8rem;',   /* Hugo 11:22: Weiss beginnt höher (vorher 1.4rem) */
-    '  background: linear-gradient(to bottom, transparent, var(--hp-info-bg, #fff) 55%); box-shadow: 0 3rem 0 0 var(--hp-info-bg, #fff), 0 6rem 0 0 var(--hp-info-bg, #fff), 0 9rem 0 0 var(--hp-info-bg, #fff), 0 12rem 0 0 var(--hp-info-bg, #fff); }',   /* Streifen reicht bis unten: kein Text zwischen Knopf und Close */
+    '[data-hp] .hp-info-btns { position: sticky; bottom: -4.4rem; z-index: 2; padding: 6.5rem 0 .6rem; margin-top: -6.5rem; pointer-events: none; }',   /* Hugo 11:22/11:26: mehr Weiss über dem Knopf */
+    '[data-hp] .hp-info-btns > * { pointer-events: auto; }',
+    /* Hugo 11:26 (Video perappelgren.de): weicher Verlauf mit Zwischenstufen, reicht bis ganz unten. Nur sichtbar, solange Text darunter
+       versteckt ist (is-stuck, setzt der Code beim Scrollen); am Ende des Texts blendet er aus, damit nichts verdeckt bleibt */
+    '[data-hp] .hp-info-btns::before { content: ""; position: absolute; left: -6vw; right: -6vw; top: 0; bottom: -12rem; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .35s ease;',
+    '  background: linear-gradient(to bottom, transparent 0, color-mix(in srgb, var(--hp-info-bg, #fff) 18%, transparent) 1.2rem, color-mix(in srgb, var(--hp-info-bg, #fff) 45%, transparent) 2.4rem, color-mix(in srgb, var(--hp-info-bg, #fff) 75%, transparent) 3.5rem, color-mix(in srgb, var(--hp-info-bg, #fff) 93%, transparent) 4.3rem, var(--hp-info-bg, #fff) 4.9rem); }',
+    '[data-hp] .hp-info-btns.is-stuck::before { opacity: 1; }',
     /* Hugo 11:23: oben gleich – der Text läuft beim Scrollen unter einem weissen Band durch, das wie unten 2.8rem weich ausläuft.
        Das Band liegt im Innenabstand oben (über dem Textanfang) und klebt dort; Titel und Schriftzug liegen darüber */
     '[data-hp] .hp-info-scroll::before { content: ""; display: block; flex: 0 0 auto; position: sticky; top: calc(-1 * var(--hp-info-top, 30vh)); z-index: 2; pointer-events: none;',
-    '  height: var(--hp-info-top, 30vh); margin: calc(-1 * var(--hp-info-top, 30vh)) 0 -2.2vh; background: linear-gradient(to bottom, var(--hp-info-bg, #fff) calc(100% - 2.8rem), transparent); }',
+    '  height: var(--hp-info-top, 30vh); margin: calc(-1 * var(--hp-info-top, 30vh)) 0 -2.2vh; background: linear-gradient(to bottom, var(--hp-info-bg, #fff) calc(100% - 7rem), color-mix(in srgb, var(--hp-info-bg, #fff) 92%, transparent) calc(100% - 5.6rem), color-mix(in srgb, var(--hp-info-bg, #fff) 72%, transparent) calc(100% - 4rem), color-mix(in srgb, var(--hp-info-bg, #fff) 42%, transparent) calc(100% - 2.4rem), color-mix(in srgb, var(--hp-info-bg, #fff) 15%, transparent) calc(100% - 1rem), transparent); }',   /* Hugo 11:26: oben ebenfalls länger und weicher (vorher 2.8rem hart) */
     '[data-hp] .hp-title.hp-info-title { z-index: 7; pointer-events: none; opacity: 1; transition: transform 1.5s cubic-bezier(.6,0,.1,1), opacity .5s ease; will-change: transform; }',
     '[data-hp] .hp-about-btn { transition: opacity .5s ease; }',
     '[data-hp].is-info .hp-about-btn { opacity: 0; pointer-events: none; }',
@@ -191,6 +196,12 @@
     '[data-hp].is-desk .hp-side { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 0; overflow: hidden; z-index: 5; background: var(--hp-side-bg, #fff); color: var(--hp-side-fg, #000); }',   // Hugo 24.11. (13:04): weiss mit schwarzem Text
     '[data-hp] .hp-side-in { position: absolute; top: 0; bottom: 0; left: 0; box-sizing: border-box; padding: 6vh 2.2vw 7vh; display: flex; flex-direction: column; justify-content: center; gap: 2.2vh; }',   // Hugo 24.11.: Text in der Spalte mittig (vorher unten)
     '[data-hp] .hp-side-in .hp-intro-text { margin: 0; max-width: none; color: inherit; opacity: 1; transform: none; }',
+    /* Hugo 11:27: in Safari am Computer war der Text riesig (die Webflow-Variable für die Textgrösse kam dort mit dem Handy-Wert 5vw an)
+       und lief aus der Spalte. Am Computer fest die Computer-Werte; ist ein Text trotzdem zu lang, verkleinert ihn der Code (fitSides). */
+    '[data-hp].is-desk .hp-side-in .hp-intro-text { font-size: var(--hp-side-fs, 1.25rem) !important; line-height: var(--hp-side-lh, 1.5rem) !important; }',
+    '[data-hp] .hp-side-in.is-scroll { justify-content: flex-start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; pointer-events: auto; padding-top: calc(6vh + 4rem); padding-bottom: calc(7vh + 4rem);',
+    '  -webkit-mask-image: linear-gradient(to bottom, transparent 6vh, #000 calc(6vh + 4rem), #000 calc(100% - 7vh - 4rem), transparent calc(100% - 7vh)); mask-image: linear-gradient(to bottom, transparent 6vh, #000 calc(6vh + 4rem), #000 calc(100% - 7vh - 4rem), transparent calc(100% - 7vh)); }',
+    '[data-hp] .hp-side-in.is-scroll::-webkit-scrollbar { display: none; }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -1363,6 +1374,7 @@
     }
     function endIntro() {
       warmAfterIntro();
+      if (typeof fitSidesSoon === 'function') fitSidesSoon();   // Spaltenbreite steht erst jetzt fest
       introOn = false;
       if (LD) LD.dock();
       clearInline();
@@ -1732,6 +1744,7 @@
     }
     function dsunStart() {
       if (dsunOn || !sun || !desk || busy() || hov < 0 || !inHov(dsunX, dsunY)) return;
+      if (slides[hov] && slides[hov].sideIn.classList.contains('is-scroll')) return;   // scrollender Text: keine Sonne (die Kopie würde nicht mitscrollen)
       var s = slides[hov];
       if (s.o < 0.98) { dsunArm(); return; }   // Spalte geht noch auf
       var wasLive = dsunLive;   // Sonne blendet noch aus: nicht von vorn aufdecken, sondern einfach wieder da
@@ -1857,6 +1870,7 @@
     var wheelT = 0;
     root.addEventListener('wheel', function (e) {
       if (root.classList.contains('is-info') && e.target.closest && e.target.closest('.hp-info-panel')) return;   // About-Text scrollt selbst
+      if (desk && e.target.closest && e.target.closest('.hp-side-in.is-scroll')) return;   // zu langer Spaltentext scrollt selbst (Hugo 11:27)
       e.preventDefault();
       if (desk || busy()) return;
       var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -1907,6 +1921,10 @@
     var infoScroll = document.createElement('div'); infoScroll.className = 'hp-info-scroll';
     infoScroll.appendChild(infoText); infoScroll.appendChild(infoBtns);
     infoPanel.appendChild(infoScroll);
+    // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
+    function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
+    infoPanel.addEventListener('scroll', stuckCheck, { passive: true });
+    window.addEventListener('resize', stuckCheck);
     info.appendChild(infoPanel); root.appendChild(info);
     setDialog(info, false);
 
@@ -2424,7 +2442,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
+      infoOpen.setAttribute('href', s.href || '#'); requestAnimationFrame(stuckCheck); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
@@ -2508,7 +2526,7 @@
       if (tClone) { tClone.remove(); tClone = null; }
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
-      infoOpen.setAttribute('href', s.href || '#'); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
+      infoOpen.setAttribute('href', s.href || '#'); requestAnimationFrame(stuckCheck); goSplit(infoGoLabel, s.btn || 'Galerie öffnen'); goArm(infoOpen, Math.round(CONFIG.infoMs * 0.45) + CONFIG.goDelay);
       warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
@@ -2783,7 +2801,27 @@
     root.classList.add('is-ready');
     startIntro();
     if (!introOn) mbShow();
-    window.addEventListener('resize', function () { fitTitles(); render(); });
+    // Text der Spalten muss ganz hineinpassen (Computer): sonst Schrift schrittweise kleiner, höchstens bis 0.8rem
+    function fitSides() {
+      if (!desk) return;
+      slides.forEach(function (s) {
+        var sin = s.sideIn, t = sin && sin.querySelector('.hp-intro-text'); if (!t) return;
+        sin.style.removeProperty('--hp-side-fs'); sin.style.removeProperty('--hp-side-lh');
+        var cs = getComputedStyle(sin), avail = sin.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        if (!(avail > 0)) return;
+        var gap = parseFloat(cs.rowGap) || 0;
+        function need() { var h = 0, k = sin.children; for (var i = 0; i < k.length; i++) h += k[i].offsetHeight; return h + gap * Math.max(0, k.length - 1); }
+        var rem = parseFloat(getComputedStyle(html).fontSize) || 16, fs = 1.25;
+        sin.classList.remove('is-scroll');
+        while (need() > avail && fs > 0.8) { fs = Math.round((fs - 0.05) * 100) / 100; sin.style.setProperty('--hp-side-fs', fs + 'rem'); sin.style.setProperty('--hp-side-lh', (fs * 1.2) + 'rem'); }
+        if (need() > avail) sin.classList.add('is-scroll');   // immer noch zu lang: Spalte scrollt (Mausrad), oben und unten weich ausgeblendet
+      });
+    }
+    var fitSidesT = 0;
+    function fitSidesSoon() { clearTimeout(fitSidesT); fitSidesT = setTimeout(fitSides, 150); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSidesSoon); else fitSidesSoon();
+    window.addEventListener('load', fitSidesSoon);
+    window.addEventListener('resize', function () { fitTitles(); render(); fitSidesSoon(); });
     window.addEventListener('pageshow', function (e) { if (e.persisted) { render(); if (!introOn) mbShow(); } });
     fitViewport();
   }
