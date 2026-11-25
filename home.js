@@ -77,7 +77,8 @@
     aboutSun:   false,
     // Hugo 25.11.: Effekte ruhiger (vorher alles 1). Fingerwelle: das Wasser verzieht das Bild weiter wie bisher,
     // nur das Licht darauf ist zurückgenommen.
-    waveLight:  0.4,    // Regenbogen-Licht auf der Welle (Ring, Halo)
+    waveLight:  0.46,   // Hugo 18:06: minimal sichtbarer (vorher 0.4)
+       // Regenbogen-Licht auf der Welle (Ring, Halo)
     waveEdge:   0.2,    // Leuchten, wenn die Welle den Bildschirmrand erreicht (lief bis 5 s nach)
     // Hugo 25.11. (08:10): langsam wischen = schmale, ruhige Welle; schnell = kräftige. Jeder Punkt der Fingerbahn merkt
     // sich das Tempo dort, die Welle ist entlang der Bahn gemischt. Tempo in px pro ms (Finger/Maus):
@@ -97,7 +98,8 @@
     waveTopDesk:  8.0,  // Computer: bei diesem Tempo die Extra-Stärke ganz
     waveBoostDesk: 0.2, // Computer: so viel stärker als die bisherige Grenze (0.2 = +20 % Stärke)
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
-    ldRim:      0.5,    // Ladeanimation: Rand-Leuchten beim Andocken (Hugo 16:16: Perlmutt minimal sichtbarer, vorher 0.35)
+    ldRim:      0.58,   // Hugo 18:06: minimal sichtbarer (vorher 0.5)
+       // Ladeanimation: Rand-Leuchten beim Andocken (Hugo 16:16: Perlmutt minimal sichtbarer, vorher 0.35)
     ldFlares:   0.6,    // Ladeanimation: Flares beim Andocken (Hugo 15:59: wieder an – ungleichmässig, macht auch die Wellen ungleich; vorher 0)
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
@@ -947,8 +949,11 @@
         // Hugo 24.11.: kein weisser Blitz – der Aufprall zeigt sich im kräftigen bunten Aufleuchten am Rand
         // Hugo 25.11. (16:58): alles verschmilzt – das Licht wird weich aufaddiert (nie hart ins Weiss abgeschnitten, sich
         // kreuzende Lichter gehen ineinander über statt heller Streifen); Abdunkeln/Einfärben bleibt wie es war
-        '    vec3 dl = lit - base, hr = max(1.0 - base, vec3(0.02));',
-        '    lit = base + min(dl, 0.0) + hr * (1.0 - exp(-max(dl, 0.0) * 1.15 / hr));',
+        // Hugo 25.11. (18:06): nur die Helligkeit wird weich begrenzt, die Farbe bleibt ganz (vorher wurde auf hellen Stellen auch die
+        // Farbe gedämpft – darum zeigten die Texte mit «difference» kaum noch Farbwechsel, wenn die Welle darunter lief)
+        '    vec3 dl = lit - base; float lB = dot(base, vec3(0.3, 0.59, 0.11)), dL = dot(dl, vec3(0.3, 0.59, 0.11)), hrL = max(1.0 - lB, 0.02);',
+        '    float dLs = dL > 0.0 ? hrL * (1.0 - exp(-dL * 1.15 / hrL)) : dL;',
+        '    lit = clamp(base + dLs + (dl - dL) * 1.15, 0.0, 1.0);',
         '    float cov = clamp(max(max(al, L * 6.0), ea * 6.0), 0.0, 1.0) * here;',
         // eine deckende Fläche: das ganze Foto kommt aus der Leinwand (keine halbdurchsichtige Kopie über dem Original →
         // keine dunklen Säume, keine Doppelkanten, kein Rauch, wo sich Wellen kreuzen)
