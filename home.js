@@ -64,6 +64,9 @@
     deskDamp:   0.6,    // kleiner = mehr Nachwippen
     deskTitle:  0.9,    // der längste Titel füllt so viel der Bildbreite
     infoMs:     1500,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
+    // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
+    // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
+    aboutSun:   false,
     // Computer (Hugo 24.11.): Maus ruht so lange auf dem geöffneten Bereich → alles ausser Text und «Galerie öffnen»
     // blendet aus und die Sonne vom Handy-About geht an. Maus ausserhalb des Bereichs → alles zurück, Sonne weg.
     deskSunIdle: 1000,  // ms ohne Mausbewegung
@@ -189,6 +192,9 @@
     '[data-hp].is-info:not(.is-desk) .hp-info { opacity: 1; transition: visibility 0s; }',
     '[data-hp]:not(.is-desk) > .hp-sun-light { opacity: 0; transition: opacity var(--hp-dsun-fade, .9s) ease var(--hp-dsun-beam, .4s); }',
     '[data-hp].is-info:not(.is-desk) > .hp-sun-light { opacity: 1; transition: none; }',
+    // Ohne Sonne (aboutSun false): About blendet nicht aus, die weisse Seite fährt wie bei Mario nach rechts weg
+    '[data-hp].hp-nosun:not(.is-desk) .hp-info { opacity: 1; transition: visibility 0s linear 1.5s; }',
+    '[data-hp].hp-nosun.is-info:not(.is-desk) .hp-info { transition: visibility 0s; }',
     '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-info-panel, [data-hp] .hp-stage, [data-hp] .hp-info-title { transition-duration: .01s !important; } }'
   ].join('\n');
 
@@ -223,6 +229,7 @@
     };
   }
   var easeDock = bezier(0.72, 0, 0.11, 1);
+  var easeInfo = bezier(0.6, 0, 0.1, 1);   // Marios About-Kurve (wieder gebraucht seit 25.11.)
   // Hugo 24.11. (18:35): Eintauchen mit Schwung – eine Feder: nimmt Fahrt auf, schiesst leicht über das Ziel hinaus und
   // federt zurück (z = Dämpfung: 0.7 ≈ 5 % über das Ziel, 1 = ohne Nachfedern); endet genau auf 1
   function springEase(z, w) {
@@ -1635,8 +1642,8 @@
       if (wasMoved || cancel) { goTo(Math.round(C)); activity(); }   // aufs nächstgelegene Bild einrasten
       else {
         var tx = e ? e.clientX : W / 2, ty = e ? e.clientY : H / 2, tb0 = 0;
-        if (!reduce && Math.abs(C - F) <= 0.02) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); if (ripple && ripple.dropTap) ripple.dropTap(); }   // Bild taucht gleich mit ein; Hugo 24.11. (16:02): kein Kreis beim Tippen
-        setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, reduce ? 0 : 200);
+        if (!reduce && Math.abs(C - F) <= 0.02) { if (CONFIG.aboutSun) { tapDive = slides[current()]; dive(tapDive, tx, ty, true); } if (ripple && ripple.dropTap) ripple.dropTap(); }   // Bild taucht gleich mit ein; Hugo 24.11. (16:02): kein Kreis beim Tippen
+        setTimeout(function () { infoFrom = { x: tx, y: ty, t: tb0 }; openInfo(); }, (reduce || !CONFIG.aboutSun) ? 0 : 200);
       }   // Hugo 23.11.: About öffnet 0.2 s später, damit die Welle zuerst sichtbar ist; die Sonne kommt von dieser Stelle
     }
     window.addEventListener('pointerup', function (e) { release(e, false); });
@@ -2025,7 +2032,8 @@
         horizon: function (top, bottom) { G = { bx: 0, by: top, bw: 1, bh: (bottom - top) / 0.62 }; start(); }
       };
     }
-    var sun = makeSun(SUN);
+    var sun = CONFIG.aboutSun ? makeSun(SUN) : null;
+    if (!CONFIG.aboutSun) root.classList.add('hp-nosun');
     if (sun) {
       info.insertBefore(sun.back, infoPanel); root.appendChild(sun.glow);   // Lichtebene über Text UND Titel
       root.classList.add('hp-info-sunlit');
@@ -2093,7 +2101,11 @@
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
+      // ohne Sonne (Mario): Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
+      else if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
     }
+    function zoomOpen(t) { return 0.9 * easeDock(Math.min(1, t * CONFIG.infoMs / 1000)) + 0.1 * easeInfo(t); }
+    function tween(o, to, ms, ease, from) { o.a = { from: from === undefined ? o.v : from, to: to, t0: performance.now(), ms: ms, ease: ease }; if (from !== undefined) o.v = from; kick(); }
     function tick(o, now) {
       if (!o.a) return false;
       var t = clamp((now - o.a.t0) / o.a.ms, 0, 1);
@@ -2207,7 +2219,75 @@
       // aufblitzen); nur das Licht wird danach entfernt
       setTimeout(function () { units.forEach(lightClear); }, d0 + total + each + 80);
     }
+    // ---------- About wie bei Mario (Stand 21.11., wieder aktiv seit 25.11.) ----------
+    function openInfoPlain() {
+      if (desk || busy() || Math.abs(C - F) > 0.02) return;
+      var s = slides[current()];
+      clearTimeout(infoT); infoFrom = null;
+      if (tClone) { tClone.remove(); tClone = null; }
+      if (tOrig) tOrig.style.visibility = '';
+      infoText.innerHTML = s.intro;
+      infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
+      warmGallery(s.href);
+      infoOpen.style.display = s.href ? '' : 'none';
+      infoPanel.scrollTop = 0;
+      infoScroll.style.transition = 'none'; infoScroll.style.opacity = '';
+      // Titel: Kopie über alles legen (genau am Platz des Originals) und nach oben rechts neben
+      // „Hugo Sophian Studio“ fahren. Der Text steht ebenfalls rechts davon, unter dem Schriftzug bleibt es leer.
+      var rr = root.getBoundingClientRect();
+      var top = Math.max(12, W * 0.03), left = W * 0.05, gap = Math.max(14, W * 0.045), right = W * 0.05;
+      if (brand) { var br = brand.getBoundingClientRect(); top = br.top - rr.top; left = br.right - rr.left + gap; }
+      root.style.setProperty('--hp-info-left', left.toFixed(0) + 'px');
+      root.style.setProperty('--hp-info-top', (top + H * 0.12).toFixed(0) + 'px');
+      if (s.title) {
+        tOrig = s.title;
+        tClone = s.title.cloneNode(true);
+        tClone.removeAttribute('id'); tClone.classList.add('hp-info-title'); tClone.setAttribute('aria-hidden', 'true');
+        tClone.style.transition = ''; tClone.style.opacity = '';
+        tClone.style.transform = 'translate3d(0,0,0)';
+        root.appendChild(tClone);
+        tOrig.style.visibility = 'hidden';
+        var cr = tClone.getBoundingClientRect();
+        var rg = document.createRange(); rg.selectNodeContents(tClone);
+        var tr = rg.getBoundingClientRect();
+        var sc = Math.min(1, (W - left - right) / Math.max(1, tr.width));
+        var ox = tr.left - cr.left, oy = tr.top - cr.top;   // Textanfang innerhalb der Kopie
+        var dx = left - (cr.left - rr.left) - sc * ox;
+        var dy = top - (cr.top - rr.top) - sc * oy;
+        tClone.style.transformOrigin = '0 0';
+        root.style.setProperty('--hp-info-top', (top + tr.height * sc + H * 0.035).toFixed(0) + 'px');
+        tClone.getBoundingClientRect();   // Startlage festhalten, damit der Übergang läuft
+        tClone.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')';
+      }
+      if (infoSlide && infoSlide !== s) { infoSlide.el.style.transform = ''; if (infoSlide.media) infoSlide.media.style.transform = 'scale(' + CONFIG.imgBase + ')'; iz.v = 0; ix.v = 0; iz.a = ix.a = null; }
+      infoSlide = s; infoClosing = false;
+      ix.a = null; ix.v = 0;
+      // Bild zoomt hinein, die weisse Seite schiebt sich von rechts darüber (Mario: 1.5 s, .6,0,.1,1)
+      tween(iz, 1, CONFIG.infoMs, zoomOpen);
+      tween(ip, 0, CONFIG.infoMs, easeInfo);
+      root.classList.add('is-info'); setDialog(info, true);
+      mbPop(true);
+      if (s.href && !s.pref) { s.pref = true; var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }
+    }
+    function closeInfoPlain() {
+      if (!root.classList.contains('is-info')) return;
+      root.classList.remove('is-info'); setDialog(info, false);
+      mbPop(false);
+      if (infoSlide) {
+        ix.a = null; infoClosing = true;                 // Bild kommt von links herein, geführt von der weissen Seite
+        tween(iz, 0, 1000, easeDock);
+      }
+      tween(ip, 1, CONFIG.infoMs, easeInfo);
+      if (tClone) tClone.style.transform = 'translate3d(0,0,0)';   // Titel fährt zurück an seinen Platz
+      clearTimeout(infoT);
+      infoT = setTimeout(function () {
+        if (root.classList.contains('is-info')) return;
+        if (tClone) { tClone.remove(); tClone = null; }
+        if (tOrig) { tOrig.style.visibility = ''; tOrig = null; }
+      }, CONFIG.infoMs + 50);
+    }
     function openInfo() {
+      if (!CONFIG.aboutSun) { openInfoPlain(); return; }
       if (desk || busy() || Math.abs(C - F) > 0.02) {
         // Audit 24.11.: wurde nach dem Tippen doch gewischt, das schon begonnene Eintauchen zurücknehmen (sonst blieb das Bild vergrössert)
         if (tapDive && !root.classList.contains('is-info')) { dive(tapDive, 0, 0, false); tapDive = null; }
@@ -2310,6 +2390,7 @@
       if (s.href && !s.pref) { s.pref = true; var l = document.createElement('link'); l.rel = 'prefetch'; l.href = s.href; document.head.appendChild(l); }   // Audit 24.11.: nur einmal pro Bereich (vorher bei jedem Öffnen ein weiteres <link>)
     }
     function closeInfo() {
+      if (!CONFIG.aboutSun) { closeInfoPlain(); return; }
       if (!root.classList.contains('is-info')) return;
       root.classList.remove('is-info'); setDialog(info, false);
       brandTopOn();
