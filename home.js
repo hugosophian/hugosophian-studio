@@ -1964,7 +1964,7 @@
       var top = null, li = -1, k = 0;
       words.forEach(function (W) {
         var t = W.el.offsetTop; if (top === null || Math.abs(t - top) > 2) { top = t; li++; k = 0; }
-        W.y = t; W.h = W.el.offsetHeight || 20; W.k = k++; W.line = li;
+        W.y = t; W.h = W.el.offsetHeight || 20; W.k = k++; W.line = li; W.x = W.el.offsetLeft;
       });
       lines = words;
       // Reihenfolge fürs Einlaufen: nur die beim Öffnen sichtbaren Wörter zählen (r = 0 … 1)
@@ -1990,8 +1990,10 @@
       var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(H2 * 0.18, rem), more = false;
       words.forEach(function (W) {
         var y = W.y - st, tin = 1;
-        var out = reduce ? 0 : eIOC(clamp((oS - y - 9 * W.k * g) / zT, 0, 1));
-        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 9 * W.k) / zB, 0, 1));
+        // Hugo 13:01: oben normal ausblenden (ganze Zeile gleich), unten die Treppe – stufenlos nach der Lage im Satz (x),
+        // so läuft eine weiche Welle durch die Zeichen wie bei perappelgren.de (dort: Wort-Reihenfolge über den ganzen Text)
+        var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
+        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 0.14 * (W.x || 0)) / zB, 0, 1));
         var inn = Math.min(tin, sin);
         var o = reduce ? Math.min(smooth(oE, oS, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
@@ -2918,7 +2920,7 @@
           list.forEach(function (w, i) { var sp = document.createElement('span'); sp.className = 'hp-w'; sp.textContent = w; p.appendChild(sp); if (i < list.length - 1) p.appendChild(document.createTextNode(' ')); ws.push({ el: sp }); });
         });
         var top = null, k = 0, br = box.getBoundingClientRect();
-        ws.forEach(function (W) { var r = W.el.getBoundingClientRect(), y = r.top - br.top; if (top === null || Math.abs(y - top) > 2) { top = y; k = 0; } W.y = y; W.h = r.height || 20; W.k = k++; });
+        ws.forEach(function (W) { var r = W.el.getBoundingClientRect(), y = r.top - br.top; if (top === null || Math.abs(y - top) > 2) { top = y; k = 0; } W.y = y; W.h = r.height || 20; W.k = k++; W.x = r.left - br.left; });
         s.sideWords = ws;
         if (!box.hpWords) { box.hpWords = true; box.addEventListener('scroll', function () { if (!box.hpRaf) box.hpRaf = requestAnimationFrame(function () { box.hpRaf = 0; sideWords(s, box); }); }, { passive: true }); }
         sideWords(s, box);
@@ -2966,7 +2968,7 @@
       var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.2, rem);
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y - 9 * W.k * g) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 9 * W.k) / zB);
+        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 0.14 * (W.x || 0)) / zB);
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
