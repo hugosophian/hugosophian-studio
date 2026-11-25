@@ -1990,15 +1990,18 @@
       var oE = topB - 4 + 20 * g, oS = topB + 130 * g, zT = Math.max(4, oS - oE);
       var tb = oE;
       // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
-      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.min(Math.max(H2 * 0.18, 1.75 * (oS - oE)), H2 * 0.3, rem), more = false;   // Appelgren: Hereinkommen .28 lang, Gehen .16 → 1.75×
+      // Hugo 13:09: unten «tauschte» es plötzlich – die Zone wurde zum Ende hin schmaler (an den Rest gekoppelt), dadurch sprangen
+      // Wörter auf voll. Jetzt bleibt die Zone gleich gross und gleitet zum Ende hin unter den Rand (shB), stetig. Breiter wie bei
+      // Appelgren (Hereinkommen über ~45 % der Höhe, easeOutQuart): die Zeilen rollen wie eine Welle herein.
+      var rem = Math.max(0, pn.scrollHeight - H2 - st), zB = Math.max(40, (botB - topB) * 0.45), shB = Math.max(0, zB + 70 - rem), more = false;
       words.forEach(function (W) {
         var y = W.y - st, tin = 1;
         // Hugo 13:01: oben normal ausblenden (ganze Zeile gleich), unten die Treppe – stufenlos nach der Lage im Satz (x),
         // so läuft eine weiche Welle durch die Zeichen wie bei perappelgren.de (dort: Wort-Reihenfolge über den ganzen Text)
         var out = reduce ? 0 : eIOC(clamp((oS - y) / zT, 0, 1));
-        var sin = (reduce || zB < 1) ? 1 : eOQ(clamp((botB - 24 - (y + W.h) - 0.14 * (W.x || 0)) / zB, 0, 1));
+        var sin = reduce ? 1 : eOQ(clamp((botB + shB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB, 0, 1));
         var inn = Math.min(tin, sin);
-        var o = reduce ? Math.min(smooth(oE, oS, y), zB < 1 ? 1 : smooth(botB, botB - zB, y + W.h)) : inn * (1 - out);
+        var o = reduce ? Math.min(smooth(oE, oS, y), smooth(botB + shB, botB + shB - zB, y + W.h)) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = o.toFixed(3);
@@ -2594,7 +2597,15 @@
     // Hugo 11:55 (Video): nach «close» sofort weitergewischt – der zurückfliegende Titel lag über dem Titel des nächsten Bilds.
     // Wischt man, solange der Titel noch zurückfliegt, bleibt er stehen und blendet in 0.15 s aus; das Original ist sofort da.
     function titleQuick() {
-      if (!tClone || root.classList.contains('is-info')) return;
+      if (root.classList.contains('is-info')) return;
+      // Hugo 13:11 (Video): während des Schliessens weitergewischt – das Bild klebte noch an der weissen Seite (applyInfo setzte
+      // seine Lage) und sprang erst danach weiter. Jetzt löst sich das Bild sofort, die Seite gleitet allein hinaus.
+      if (infoSlide) {
+        var s0 = infoSlide; iz.a = ix.a = null; iz.v = 0; ix.v = 0; infoClosing = false; infoSlide = null;
+        s0.el.style.transform = ''; if (s0.media) s0.media.style.transform = 'scale(' + CONFIG.imgBase + ')';
+        root.classList.remove('hp-info-anim'); kick();
+      }
+      if (!tClone) return;
       // Hugo 12:24 (Video, hoch wischen): ausblendende Kopie und Original standen kurz doppelt da. Jetzt nie zwei Titel:
       // die Kopie ist sofort weg, das Original (fährt mit seinem Bild mit) blendet in 0.22 s ein.
       var c = tClone, o = tOrig; tClone = null; tOrig = null; clearTimeout(infoT);
@@ -2971,10 +2982,10 @@
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
       var oE = -4 + 34 * g, oS = 140 * g, zT = Math.max(4, oS - oE);   // Welle wie am Handy (12:56)
-      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(Math.max(H2 * 0.2, 1.75 * (oS - oE)), H2 * 0.32, rem);
+      var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.max(40, H2 * 0.45), shB = Math.max(0, zB + 70 - rem);   // wie am Handy (13:09)
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 0.14 * (W.x || 0)) / zB);
+        var out = q((oS - y) / zT), inn = q((H2 + shB - 24 - (y + W.h) - 0.1 * (W.x || 0)) / zB);
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
