@@ -71,6 +71,11 @@
     // nur das Licht darauf ist zurückgenommen.
     waveLight:  0.4,    // Regenbogen-Licht auf der Welle (Ring, Halo)
     waveEdge:   0.2,    // Leuchten, wenn die Welle den Bildschirmrand erreicht (lief bis 5 s nach)
+    // Hugo 25.11. (08:10): langsam wischen = schmale, ruhige Welle; schnell = kräftige. Jeder Punkt der Fingerbahn merkt
+    // sich das Tempo dort, die Welle ist entlang der Bahn gemischt. Tempo in px pro ms (Finger/Maus):
+    waveSlow:   0.08,   // bis hier ruhigste Welle
+    waveFast:   1.2,    // ab hier volle Stärke (wie bisher)
+    waveCalm:   0.3,    // Stärke der ruhigsten Welle (1 = wie bisher)
     waveFlares: 0,      // Solar Flares auf der Fingerwelle (0 = keine)
     ldRim:      0.35,   // Ladeanimation: buntes Rand-Leuchten beim Andocken
     ldFlares:   0,      // Ladeanimation: Flares und Flare-Fäden beim Andocken
@@ -586,18 +591,20 @@
         // nicht einzelne Kreise; Alter und Einblendung laufen entlang des Abschnitts weich mit.
         // Weiches Minimum in einem Durchgang (laufend neu gewichtet), damit es auch in voller Schärfe flüssig bleibt.
         '    float w = mx * min(0.019 + 0.02 * age, 0.062) * (uB[k].w < 0.0 ? 1.25 : 1.0), sw = 1.0 / (w * 0.5);',   // Hugo 24.11. (14:00): Sonnenwelle breiter   // Andocken: breiter   // Andocken: breiter   // Hugo 23.11.: am Finger wieder grösser, beim Auslaufen kompakt (früher 0.016 + 0.028 · Alter, max. 0.085)
-        '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0; vec2 dir = vec2(0.0);',
+        '    float best = 1e9, ws = 0.0, sf = 0.0, sd = 0.0, sm = 0.0; vec2 dir = vec2(0.0);',
         '    for (int j = 0; j < ' + (PW - 1) + '; j++) {',
         '      vec4 pa = uP[k * ' + PW + ' + j]; if (pa.w <= 0.0) continue;',
         '      vec4 pb = uP[k * ' + PW + ' + j + 1]; if (pb.w <= 0.0) pb = pa;',
         '      vec2 dv; float d; float f = segF(fc, pa, pb, mx, uB[k].w, dv, d);',
-        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0);',
-        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; dir = dir * sc + un; best = f; }',
-        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; dir += q * un; }',
+        '      vec2 un = d > 0.5 ? dv / d : vec2(0.0); float mg = 0.5 * (pa.w + pb.w);',   // Hugo 25.11.: Stärke an dieser Stelle der Bahn (Fingertempo)
+        '      if (f < best) { float sc = best > 1e8 ? 0.0 : exp((f - best) * sw); ws = ws * sc + 1.0; sf = sf * sc + f; sd = sd * sc + d; sm = sm * sc + mg; dir = dir * sc + un; best = f; }',
+        '      else { float q = exp((best - f) * sw); ws += q; sf += q * f; sd += q * d; sm += q * mg; dir += q * un; }',
         '    }',
         '    if (ws <= 0.0) continue;',
-        '    best = sf / ws; dir /= ws; sd /= ws;',
-        '    float x = best / w;',
+        '    best = sf / ws; dir /= ws; sd /= ws; sm /= ws;',
+        // Hugo 25.11. (08:10): Fingerwelle je nach Tempo – langsam schmal und ruhig, schnell breit und kräftig (Andocken unverändert)
+        '    float gk = uB[k].w > 0.0 ? clamp(sm, 0.05, 1.0) : 1.0, wk = w * mix(0.5, 1.0, gk), gA = mix(0.3, 1.0, gk);',
+        '    float x = best / wk;',
         // Andock-Welle (uB.w < 0): setzt sofort mit voller Kraft ein und klingt schneller ab (Hugo 23.11.: Snap, Wow)
         '    bool dockW = uB[k].w < 0.0;',
         // Hugo 24.11. (10:13): die Fingerwelle wischt den Andock-Effekt entlang ihres Weges weg (Fingerwellen kommen in der
@@ -608,13 +615,13 @@
         '    float amp = exp(-age * (dockW ? 0.6 : 0.45));',   // Andocken: wirkt länger nach
         // Hugo 23.11.: keine Streifen in der Welle — die Verschiebung wächst mit der Wellenbreite, so dass sich das Foto
         // nie überschlägt (vorher wurde es in der Mitte der schmalen Welle über sich selbst gezogen)
-        '    off += dir * (-x * env * amp * smoothstep(0.0, w, sd)) * w * 0.7 * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
-        '    float r = env * amp; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
+        '    off += dir * (-x * env * amp * smoothstep(0.0, wk, sd)) * wk * 0.7 * gA * (uB[k].w > 0.0 ? 1.0 : 2.0 * (1.0 + 0.6 * uSoft));',   // Hugo 24.11. (18:26): Schimmer – Bild bewegt sich etwas mehr   // Hugo 24.11. (14:08): Sonnenwelle verzieht das Bild stärker   // Andocken: kräftiger
+        '    float r = env * amp * gA; ring = 1.0 - (1.0 - ring) * (1.0 - min(r, 1.0)); rs += r; ph += r * x;',
         '    rbA += r * (0.5 + 0.5 * cos(6.2832 * (sv * 1.6 + x * 0.06 + uHue[k] * 0.15 + vec3(0.0, 0.33, 0.67))));',
         // Hugo 23.11.: am Bildschirmrand stärker; hat die Welle den Rand erreicht, leuchtet er nach und verblasst nach rund 4 s
-        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? 1.0 : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
+        '    edge = max(edge, exp(-max(x, 0.0) * max(x, 0.0)) * exp(-max(-x, 0.0) * 0.12) * smoothstep(0.0, 0.35, age) * exp(-age * 0.3) * (1.0 - smoothstep(3.6, 5.6, age)) * exp(-max(e, 0.0) * max(e, 0.0) / 560.0) * (uB[k].w > 0.0 ? gA : 0.35) * kD);',   // Andock-Welle: Rand leuchtet nur leicht mit,
         '    float on = smoothstep(0.0, dockW ? 0.03 : 0.35, age) * (dockW ? exp(-age * 0.4) * (1.0 - smoothstep(3.2, 6.2, age)) : amp) * kD;',   // Hugo 24.11.: blendet weich bis ganz aus, bevor die Welle endet   // Flares gleiten am Rand langsam nach
-        '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on);',
+        '    halo = 1.0 - (1.0 - halo) * (1.0 - exp(-x * x / 9.0) * on * gA);',
         '    vec4 p0 = uP[k * ' + PW + ']; if (p0.w > 0.0) { vec2 d0 = (fc - p0.xy) / (mx * 0.22); org = max(org, exp(-dot(d0, d0)) * on); }',   // Hugo 24.11. (14:27): Start der Sonnenwelle nicht so wuchtig
         '    float fs = uHue[k] * 17.0;',
         '    float xo = max(x, 0.0);',
@@ -632,7 +639,7 @@
         // Andocken (Hugo 23.11.): weniger Flares, dafür kräftiger und weissgolden
         '    float fl = dockW ? pow(n2(cs * 0.6 + vec2(fs, uT * 0.3)), 5.0) * 1.7 : pow(n2(cs + vec2(fs, uT * 0.3)), 2.8);',   // Hugo 24.11.: schlanke, klare Zungen statt verschwommen
         '    float ln = (0.5 + fl * (4.2 + 2.6 * n2(cs * 1.7 + vec2(uT * 0.8, fs)))) * (dockW ? 1.35 : 1.0);',   // Hugo 24.11.: Andocken – weniger, dafür grösser   // Hugo 23.11.: kleinere Flares an der Welle
-        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? mix(0.06, 0.6, uSoft) : 0.25, age) * smoothstep(w * 0.3, w * 1.1, sd)',
+        '    float fv = 1.05 * (1.0 + 0.8 * exp(-age * 1.2)) * fl * smoothstep(-0.3, 0.5, x) * exp(-xo * xo / ln) * on * smoothstep(dockW ? 0.0 : 0.05, dockW ? mix(0.06, 0.6, uSoft) : 0.25, age) * smoothstep(wk * 0.3, wk * 1.1, sd) * gA',
         '      * (dockW ? 1.0 - smoothstep(0.1, 0.24, xo * w / min(uRes.x, uRes.y)) : 1.0);',   // Hugo 24.11.: die kleinen Flares bleiben am Rand; die grossen sind die Flare-Fäden (siehe unten)
         '    if (dockW) faD = max(faD, fv * uDF / max(uDA, 0.01) * (1.0 - 0.6 * uSoft)); else fa = max(fa, fv);',   // Flares des Andockens: uDF (Hugo 24.11., 15:16: Flares ja, Rand wenig)   // Hugo 23.11.: schon die erste Welle trägt Flares, sie reiten auf der Front (kein Stern am Startpunkt)
         '  }',
@@ -897,10 +904,18 @@
         // Hugo 24.11.: Punkte relativ zur Leinwand (zum Bild) – beim Wischen fährt die Welle mit ihrem Bild mit
         var cr = refRect(); x -= cr.left; y -= cr.top;
         var now = performance.now(), pts = wv.pts, last = pts[pts.length - 1];
-        if (!last) { pts.push({ x: x, y: y, t: now }); wv.sp = 14; }
+        // Hugo 25.11. (08:10): Tempo des Fingers (geglättet) → Stärke dieses Punkts (m): langsam ruhig, schnell kräftig
+        if (wv.px != null) {
+          var dtm = Math.max(4, now - wv.pt), v = Math.hypot(x - wv.px, y - wv.py) / dtm;
+          wv.v = wv.v == null ? v : wv.v * 0.65 + v * 0.35;
+        }
+        wv.px = x; wv.py = y; wv.pt = now;
+        var mStr = CONFIG.waveCalm + (1 - CONFIG.waveCalm) * sm01(CONFIG.waveSlow, CONFIG.waveFast, wv.v || 0);
+        if (wv.v != null && !wv.vk) { wv.vk = true; if (pts[0]) pts[0].m = mStr; }   // der erste Punkt kannte das Tempo noch nicht
+        if (!last) { pts.push({ x: x, y: y, t: now, m: mStr }); wv.sp = 14; }
         else {
           var fixed = last.tip ? pts[pts.length - 2] : last;
-          if (last.tip && Math.hypot(fixed.x - x, fixed.y - y) < wv.sp) { last.x = x; last.y = y; last.t = now; }
+          if (last.tip && Math.hypot(fixed.x - x, fixed.y - y) < wv.sp) { last.x = x; last.y = y; last.t = now; last.m = mStr; }
           else {
             if (last.tip) last.tip = false;
             if (pts.length >= PW) {
@@ -908,7 +923,7 @@
               for (var m = 1; m < pts.length - 1; m++) if (m % 2 === 0) keep.push(pts[m]);
               keep.push(pts[pts.length - 1]); wv.pts = pts = keep; wv.sp *= 2;
             }
-            pts.push({ x: x, y: y, t: now, tip: true });
+            pts.push({ x: x, y: y, t: now, tip: true, m: mStr });
           }
         }
         if (!raf) req();

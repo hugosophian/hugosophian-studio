@@ -9,8 +9,9 @@
   if (!matchMedia('(hover: hover) and (pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var SEL = '[data-menu-open],[data-menu-close]';
   // Hugo 25.11. (07:49): doppelt so stark, aber sehr weich (vorher PULL 0.4, RANGE 70, EASE 0.14)
-  var PULL = 0.8,     // Anteil des Mauswegs, den der Knopf mitgeht
-      RANGE = 140,    // Anziehung beginnt so weit ausserhalb des Knopfs (px)
+  // Hugo 25.11. (08:12): Zug noch etwas stärker (vorher PULL 0.8, RANGE 140)
+  var PULL = 0.95,    // Anteil des Mauswegs, den der Knopf mitgeht
+      RANGE = 170,    // Anziehung beginnt so weit ausserhalb des Knopfs (px)
       EASE = 0.075;   // Weichheit (Anteil pro Bild bei 60 fps; kleiner = weicher)
   var mx = -1e5, my = -1e5, raf = 0, last = 0, list = [];
   function collect() {
