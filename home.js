@@ -1993,7 +1993,7 @@
       // Hugo 12:56 (Video perappelgren Bild für Bild gemessen): beim Verlassen/Hereinkommen öffnet sich der Zeilenabstand über
       // etwa 4 Zeilen wellenförmig (bis ~5 px je Zeile) und Wörter weiter rechts in der Zeile sind später dran. Darum breitere Zonen
       // (oben ~115 px, unten 18 %) und 9 px Versatz pro Wort in der Zeile – die Zeile läuft schräg wie eine Welle aus und ein.
-      var oE = topB - 4 + 20 * g, oS = topB + 130 * g, zT = Math.max(4, oS - oE);
+      var oE = topB - 4 + 20 * g, oS = topB + 75 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: Ausblend-Rand oben halbiert (vorher 130)
       var tb = oE;
       // unten (wie 11:55, Hugo: perfekt): nur wenn wirklich noch Text darunter liegt, sonst alles ganz sichtbar
       // Hugo 13:09: unten «tauschte» es plötzlich – die Zone wurde zum Ende hin schmaler (an den Rest gekoppelt), dadurch sprangen
@@ -2010,11 +2010,22 @@
         var inn = Math.min(tin, sin);
         var o = reduce ? Math.min(smooth(oE, oS, y), zB ? smooth(botB, botB - zB, y + W.h) : 1) : inn * (1 - out);
         var ty = reduce ? 0 : 22 * (1 - inn) - 28 * out;
-        W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
+        W.el.style.transform = reduce ? '' : roller(ty, out, inn);
+        W.el.style.transformOrigin = out > 0.001 ? '50% 100%' : '50% 0';
         W.el.style.opacity = o.toFixed(3);
       });
       if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
       if (more) linesRaf = requestAnimationFrame(linesTick);
+    }
+    // Hugo 13:31: wie über eine Walze gezogen – oben kippt das Wort über die Kante nach hinten weg (Unterkante bleibt, oben weg,
+    // bis 38°), unten kommt es unter der Walze hervor (Oberkante bleibt, bis 32°); dabei dehnt es sich mitten im Übergang ganz
+    // dezent in die Länge (bis +7 %). Perspektive 420 px.
+    function roller(ty, out, inn) {
+      var up = 1 - inn;
+      if (out < 0.001 && up < 0.001) return '';
+      var rx = out > 0.001 ? 38 * out : -32 * up, ph = out > 0.001 ? out : up;
+      var sy = 1 + 0.07 * Math.sin(Math.PI * ph);
+      return 'perspective(420px) translate3d(0,' + ty.toFixed(2) + 'px,0) rotateX(' + rx.toFixed(2) + 'deg) scale(1,' + sy.toFixed(4) + ')';
     }
     function eOQ(t) { return 1 - Math.pow(1 - t, 4); }
     function eIOC(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
@@ -2989,7 +3000,7 @@
       var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
       // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
       // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
-      var oE = -4 + 34 * g, oS = 140 * g, zT = Math.max(4, oS - oE);   // Welle wie am Handy (12:56)
+      var oE = -4 + 34 * g, oS = 90 * g, zT = Math.max(4, oS - oE);   // Hugo 13:31: oben halbiert (vorher 140)
       var zB = s.sideZB || 0;
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
@@ -2997,7 +3008,8 @@
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
-        W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
+        W.el.style.transform = roller(ty, out, inn);
+        W.el.style.transformOrigin = out > 0.001 ? '50% 100%' : '50% 0';
         W.el.style.opacity = (inn * (1 - out)).toFixed(3);
       });
       if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
