@@ -1305,14 +1305,20 @@
     };
     // Hugo 25.11.: Linie spitz zulaufend (links und rechts wie eine Nadel), schillernd (Iridescence), zieht schwungvoll zur
     // Mitte bis zum Knall. Lichtpunkt und Knall auf der Galerie-Seite schillern in denselben Farben (galerie.js).
-    var IRI = 'linear-gradient(90deg, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #fff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%)';
-    var NEEDLE = 'polygon(0 50%, 50% 0, 100% 50%, 50% 100%)';
+    // Form (Hugo 25.11., 06:45): an den Enden eine feine Nadel, zur Mitte hin wächst ein geschwungener Rücken zum Kreis.
+    // Gezeichnet in 1000 × 20 und auf die Bildschirmbreite gezogen (preserveAspectRatio none).
+    var NEEDLE_D = 'M0 10 C 260 9.7, 400 8.6, 455 5.2 C 478 1.2, 522 1.2, 545 5.2 C 600 8.6, 740 9.7, 1000 10 C 740 10.3, 600 11.4, 545 14.8 C 522 18.8, 478 18.8, 455 14.8 C 400 11.4, 260 10.3, 0 10 Z';
+    var CORE_D = 'M40 10 C 300 9.85, 420 9.2, 465 7.4 C 484 5.6, 516 5.6, 535 7.4 C 580 9.2, 700 9.85, 960 10 C 700 10.15, 580 10.8, 535 12.6 C 516 14.4, 484 14.4, 465 12.6 C 420 10.8, 300 10.15, 40 10 Z';
+    var NEEDLE_SVG = '<svg viewBox="0 0 1000 20" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="hpCrtIri" x1="0" x2="1" y1="0" y2="0">'
+      + '<stop offset="0" stop-color="#ff6ad5"/><stop offset=".12" stop-color="#c774e8"/><stop offset=".22" stop-color="#ad8cff"/><stop offset=".32" stop-color="#8795e8"/>'
+      + '<stop offset=".42" stop-color="#94d0ff"/><stop offset=".5" stop-color="#ffffff"/><stop offset=".58" stop-color="#94d0ff"/><stop offset=".68" stop-color="#8ff7c8"/>'
+      + '<stop offset=".78" stop-color="#fff38a"/><stop offset=".88" stop-color="#ffb86b"/><stop offset="1" stop-color="#ff6ad5"/></linearGradient></defs>'
+      + '<path d="' + NEEDLE_D + '" fill="url(#hpCrtIri)"/><path d="' + CORE_D + '" fill="#fff"/></svg>';
     var crtCss = [
       '.hp-crt { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }',
       '.hp-crt > i { position: absolute; display: block; opacity: 0; }',
-      '.hp-crt-line { left: 0; top: 50%; width: 100%; height: 16px; margin-top: -8px; filter: drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 16px rgba(190,170,255,.7)); }',
-      '.hp-crt-line b { position: absolute; left: 0; right: 0; top: 0; bottom: 0; clip-path: ' + NEEDLE + '; -webkit-clip-path: ' + NEEDLE + '; background: ' + IRI + '; }',
-      '.hp-crt-line b + b { top: 34%; bottom: 34%; left: 3%; right: 3%; background: #fff; }',
+      '.hp-crt-line { left: 0; top: 50%; width: 100%; height: 18px; margin-top: -9px; filter: drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 16px rgba(190,170,255,.7)); }',
+      '.hp-crt-line svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }',
       '.hp-crt-streak { left: -30vw; top: 50%; width: 160vw; height: 90px; margin-top: -45px; background: radial-gradient(ellipse at center, rgba(255,255,255,.9) 0, rgba(225,205,255,.5) 18%, rgba(140,200,255,.14) 45%, rgba(0,0,0,0) 70%); }',
       '.hp-crt-dot { left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff;',
       '  box-shadow: 0 0 6px 2px #fff, 0 0 16px 5px rgba(255,110,220,.55), 0 0 30px 10px rgba(120,210,255,.45), 0 0 56px 18px rgba(255,230,120,.22); }',
@@ -1329,7 +1335,7 @@
       document.documentElement.classList.remove('hp-crt-on');
       var b = document.body;
       if (b.getAnimations) b.getAnimations().forEach(function (an) { if (an.id === 'hp-crt') an.cancel(); });
-      ['transform-origin', 'visibility'].forEach(function (p) { b.style.removeProperty(p); });
+      ['transform-origin', 'visibility', 'opacity'].forEach(function (p) { b.style.removeProperty(p); });
     }
     window.addEventListener('pageshow', function (e) { if (e.persisted) crtReset(); });
     // Hugo 25.11. (Video 06:04): Am iPhone blieb das Bild als dicker Streifen stehen, die Linie kam nie. Ursache: Die Schritte
@@ -1343,15 +1349,17 @@
       }
       var R = document.documentElement, b = document.body, A = CRT.squashMs, L = CRT.lineMs;
       crtFx = document.createElement('div'); crtFx.className = 'hp-crt'; crtFx.setAttribute('aria-hidden', 'true');
-      crtFx.innerHTML = '<i class="hp-crt-wash"></i><i class="hp-crt-streak"></i><i class="hp-crt-line"><b></b><b></b></i><i class="hp-crt-dot"></i>';
+      crtFx.innerHTML = '<i class="hp-crt-wash"></i><i class="hp-crt-streak"></i><i class="hp-crt-line">' + NEEDLE_SVG + '</i><i class="hp-crt-dot"></i>';
       R.appendChild(crtFx);
       R.classList.add('hp-crt-on');
       var wash = crtFx.children[0], streak = crtFx.children[1], line = crtFx.children[2], dotEl = crtFx.children[3];
       var IN = 'cubic-bezier(.55,0,.9,.4)', IN4 = 'cubic-bezier(.75,0,.95,.35)', o = { fill: 'both' };
       b.style.setProperty('transform-origin', '50% ' + (window.scrollY + window.innerHeight / 2) + 'px', 'important');
       // 1) Bild klappt senkrecht zusammen und wird heller
-      var sq = b.animate([{ transform: 'none' }, { transform: 'scale(1.05, .004)' }], { duration: A, easing: IN, fill: 'forwards', id: 'hp-crt' });
-      wash.animate([{ transform: 'scaleY(1)', opacity: 0 }, { transform: 'scaleY(.004)', opacity: .9 }], { duration: A, easing: IN, fill: 'forwards' });
+      // Hugo 25.11. (06:44): am Ende blendet die Seite ganz aus. Vorher blieb die zusammengeklappte Seite als dünne Linie stehen,
+      // weil visibility: hidden am body die Bilder mit visibility: visible (.hp-slide.is-vis) nicht versteckt; opacity schon.
+      var sq = b.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(1.04, .02)', opacity: 1, offset: .8 }, { transform: 'scale(1.05, .004)', opacity: 0 }], { duration: A, easing: IN, fill: 'forwards', id: 'hp-crt' });
+      wash.animate([{ transform: 'scaleY(1)', opacity: 0 }, { transform: 'scaleY(.02)', opacity: .9, offset: .8 }, { transform: 'scaleY(.004)', opacity: 0 }], { duration: A, easing: IN, fill: 'forwards' });   // blendet selbst aus (blieb sonst als 3-px-Strich stehen)
       streak.animate([{ opacity: 0 }, { opacity: 0, offset: .65 }, { opacity: 1 }], { duration: A, fill: 'forwards' });
       // 2) Blitz am Horizont: die Nadel leuchtet dick auf, holt kurz Schwung nach aussen und schlägt dann immer schneller
       //    zur Mitte zusammen. Die Farben drängen sich dabei zusammen (Schillern).
@@ -1360,16 +1368,19 @@
         { opacity: 0, transform: 'scaleX(1) scaleY(2.6)', easing: 'ease-out' },
         { opacity: 1, transform: 'scaleX(1) scaleY(2.6)', offset: .02, easing: 'cubic-bezier(.2,.7,.3,1)' },
         { opacity: 1, transform: 'scaleX(1.06) scaleY(1)', offset: .2, easing: SNAP },
-        { opacity: 1, transform: 'scaleX(.002) scaleY(1.2)' }
+        { opacity: 1, transform: 'scaleX(.03) scaleY(.8)', offset: .94 },
+        { opacity: 0, transform: 'scaleX(.002) scaleY(.6)' }   // verschwindet ganz im Punkt
       ], { duration: L, delay: A, fill: 'both' });
       streak.animate([
         { opacity: 1, transform: 'scaleX(1) scaleY(1.8)', easing: 'ease-out' },
         { opacity: .85, transform: 'scaleX(1.05) scaleY(1)', offset: .2, easing: SNAP },
-        { opacity: .4, transform: 'scaleX(.02) scaleY(.8)' }
+        { opacity: .4, transform: 'scaleX(.04) scaleY(.8)', offset: .9 },
+        { opacity: 0, transform: 'scaleX(.02) scaleY(.6)' }
       ], { duration: L, delay: A, fill: 'forwards' });
-      // Ankommen in der Mitte: kurzer Lichtblitz im Punkt
-      dotEl.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(.4)', offset: .82 }, { opacity: 1, transform: 'scale(2.2)', offset: .93 }, { opacity: 1, transform: 'scale(1)' }], { duration: L + 120, delay: A, fill: 'both' });
-      sq.onfinish = function () { if (crtFx) { b.style.setProperty('visibility', 'hidden', 'important'); wash.style.display = 'none'; } };
+      // Der Kreis in der Mitte gehört zur Nadel (ihr Rücken läuft in ihn hinein). Er bleibt stehen, während die Nadel in ihn
+      // hineinzieht, blitzt beim Ankommen kurz auf und bleibt als Lichtpunkt.
+      dotEl.animate([{ opacity: 0, transform: 'scale(1.5)' }, { opacity: 1, transform: 'scale(1.5)', offset: .03 }, { opacity: 1, transform: 'scale(1)', offset: .3 }, { opacity: 1, transform: 'scale(1)', offset: .8 }, { opacity: 1, transform: 'scale(2.1)', offset: .9 }, { opacity: 1, transform: 'scale(1)' }], { duration: L + 120, delay: A, fill: 'both' });
+      sq.onfinish = function () { if (crtFx) { b.style.setProperty('opacity', '0', 'important'); wash.style.display = 'none'; } };
       setTimeout(function () {
         if (!crtFx) return;
         // 3) Lichtpunkt bleibt, pulsiert und schillert, bis die Galerie da ist
