@@ -200,6 +200,20 @@
     '[data-hp] .hp-side-in.is-scroll .hp-side-box { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; pointer-events: auto; }',
     '[data-hp] .hp-side-in.is-scroll .hp-side-box::-webkit-scrollbar { display: none; }',
     '[data-hp] .hp-side-box .hp-w { display: inline-block; will-change: transform, opacity; }',
+    /* Hugo 12:21: Scroll-Leiste links vom Text, schillernd wie die Horizont-Linie der Fernseher-Animation (gleiche Farben,
+       feine Spitzen oben und unten, weicher Schein). Nur sichtbar, wenn der Text länger ist als sein Bereich; beim Scrollen kräftiger. */
+    '[data-hp] .hp-sbar-wrap { position: absolute; inset: 0; pointer-events: none; z-index: 3; }',
+    '[data-hp] .hp-sbar { position: absolute; width: 2px; border-radius: 2px; background: rgba(0,0,0,.07); opacity: 0; transition: opacity .5s ease; pointer-events: none; }',
+    '[data-hp] .hp-sbar.is-on { opacity: .7; }',
+    '[data-hp] .hp-sbar.is-on.is-active { opacity: 1; }',
+    '[data-hp] .hp-sbar i { position: absolute; left: -1.5px; width: 5px; top: 0; border-radius: 5px; will-change: transform;',
+    '  background: linear-gradient(to bottom, #ff6ad5 0%, #c774e8 12%, #ad8cff 22%, #8795e8 32%, #94d0ff 42%, #ffffff 50%, #94d0ff 58%, #8ff7c8 68%, #fff38a 78%, #ffb86b 88%, #ff6ad5 100%);',
+    '  background-size: 100% 260%; animation: hpSbarIri 7s linear infinite;',
+    '  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);',
+    '  filter: drop-shadow(0 0 3px rgba(173,140,255,.85)) drop-shadow(0 0 9px rgba(148,208,255,.6)); }',
+    '[data-hp] .hp-sbar i::after { content: ""; position: absolute; left: 1.5px; width: 2px; top: 30%; bottom: 30%; border-radius: 2px; background: #fff; opacity: .9; }',
+    '@keyframes hpSbarIri { from { background-position: 0 0; } to { background-position: 0 -260%; } }',
+    '@media (prefers-reduced-motion: reduce) { [data-hp] .hp-sbar i { animation: none; } }',
     /* Während About auf- und zugeht: Grund hinter dem Bild weiss statt schwarz.
        html und body bleiben schwarz, damit Safari oben und unten schwarz bleibt. */
     '[data-hp].hp-info-anim .hp-stage { background: var(--hp-info-bg, #fff); }',
@@ -1922,6 +1936,7 @@
     var infoScroll = document.createElement('div'); infoScroll.className = 'hp-info-scroll';
     infoScroll.appendChild(infoText);
     var infoFix = document.createElement('div'); infoFix.className = 'hp-info-fix'; infoFix.appendChild(infoBtns);
+    var infoSbW = document.createElement('div'), infoSb = null, infoSbSt = 0; infoSbW.className = 'hp-sbar-wrap';
     infoPanel.appendChild(infoScroll);
     // Weisser Verlauf über «Galerie öffnen» nur, solange darunter noch Text versteckt ist (Hugo 11:26)
     function stuckCheck() { var pn = infoPanel; infoBtns.classList.toggle('is-stuck', pn.scrollHeight - pn.clientHeight - pn.scrollTop > 4); }
@@ -1976,6 +1991,7 @@
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = o.toFixed(3);
       });
+      if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
       if (more) linesRaf = requestAnimationFrame(linesTick);
     }
     function eOQ(t) { return 1 - Math.pow(1 - t, 4); }
@@ -1985,7 +2001,7 @@
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
     window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); wordsT0 = 0; linesKick(); } });
     window.addEventListener('resize', stuckCheck);
-    info.appendChild(infoPanel); info.appendChild(infoFix); root.appendChild(info);
+    info.appendChild(infoPanel); info.appendChild(infoSbW); info.appendChild(infoFix); infoSb = makeSbar(infoSbW); root.appendChild(info);
     setDialog(info, false);
 
     // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
@@ -2376,6 +2392,7 @@
     function applyPanel() {
       infoPanel.style.transform = ip.v >= 1 ? '' : 'translate3d(' + (ip.v * 100).toFixed(3) + '%,0,0)';
       infoFix.style.transform = infoPanel.style.transform;   // fester Knopf fährt mit der Seite
+      infoSbW.style.transform = infoPanel.style.transform;
       if (sun) { sun.back.style.transform = sun.glow.style.transform = infoPanel.style.transform; sun.glow.style.visibility = ip.v < 1 ? 'visible' : ''; if (ip.v < 1) sun.start(); }
       // ohne Sonne (Mario): Schriftzug dunkel, sobald die weisse Seite ihn erreicht hat
       else if (brand) brand.classList.toggle('hp-on-white', ip.v < 1 && ip.v * W < brand.offsetLeft + brand.offsetWidth * 0.5);
@@ -2882,7 +2899,9 @@
         s.sideWords = null; box.scrollTop = 0;
         var over = box.scrollHeight > box.clientHeight + 2;
         sin.classList.toggle('is-scroll', over);
-        if (!over) return;
+        if (!s.sbar) s.sbar = makeSbar(sin);
+        if (!over) { s.sbar.hide(); return; }
+        s.sbarSt = 0;
         var ps = t.querySelectorAll('p'); if (!ps.length) ps = [t];
         var ws = [];
         [].forEach.call(ps, function (p) {
@@ -2897,20 +2916,40 @@
         sideWords(s, box);
       });
     }
+    // Scroll-Leiste (Hugo 12:21): host = Element, in dem die Leiste liegt; Lage in px relativ zu host
+    function makeSbar(host) {
+      var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
+      var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
+      var actT = 0, last = { };
+      return {
+        el: bar,
+        set: function (x, y, h, st, sh, ch, active) {
+          var on = sh > ch + 2 && h > 40; bar.classList.toggle('is-on', on); if (!on) return;
+          if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
+          var tl = Math.max(36, h * ch / sh), p = Math.max(0, Math.min(1, st / (sh - ch)));
+          th.style.height = tl.toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((h - tl) * p).toFixed(1) + 'px,0)';
+          if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
+        },
+        hide: function () { bar.classList.remove('is-on', 'is-active'); }
+      };
+    }
     function sideWords(s, box) {
       var ws = s.sideWords; if (!ws) return;
       var st = box.scrollTop, H2 = box.clientHeight, g = reduce ? 1 : Math.max(0, Math.min(1, st / 24));
-      var oE = -4 + 20 * g, oS = 70 * g, zT = Math.max(4, oS - oE);
+      // Hugo 12:22 (Foto Laptop): unten wurde eine Zeile am Kastenrand abgeschnitten. Wie am Handy: Wörter sind schon 24 px über
+      // dem Rand ganz weg (mit dem Absinken um 22 px bleiben sie im Kasten); oben ebenso 30 px unter der Kante weg (Aufsteigen 28 px).
+      var oE = -4 + 34 * g, oS = 90 * g, zT = Math.max(4, oS - oE);
       var rem = Math.max(0, box.scrollHeight - H2 - st), zB = Math.min(H2 * 0.16, rem);
       ws.forEach(function (W) {
         var y = W.y - st, q = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - (y + W.h) - 5 * W.k) / zB);
+        var out = q((oS - y) / zT), inn = zB < 1 ? 1 : q((H2 - 24 - (y + W.h) - 5 * W.k) / zB);
         if (reduce) { W.el.style.transform = ''; W.el.style.opacity = (Math.min(1 - out, inn)).toFixed(3); return; }
         out = out < .5 ? 4 * out * out * out : 1 - Math.pow(-2 * out + 2, 3) / 2; inn = 1 - Math.pow(1 - inn, 4);
         var ty = 22 * (1 - inn) - 28 * out;
         W.el.style.transform = ty ? 'translate3d(0,' + ty.toFixed(2) + 'px,0)' : '';
         W.el.style.opacity = (inn * (1 - out)).toFixed(3);
       });
+      if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
     }
     var fitSidesT = 0;
     function fitSidesSoon() { clearTimeout(fitSidesT); fitSidesT = setTimeout(fitSides, 150); }
