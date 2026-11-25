@@ -204,7 +204,11 @@
     '[data-hp] .hp-side-box .hp-w { display: inline-block; will-change: transform, opacity; }',
     /* Hugo 12:21: Scroll-Leiste links vom Text, schillernd wie die Horizont-Linie der Fernseher-Animation (gleiche Farben,
        feine Spitzen oben und unten, weicher Schein). Nur sichtbar, wenn der Text länger ist als sein Bereich; beim Scrollen kräftiger. */
-    '[data-hp] .hp-sbar-wrap { position: absolute; inset: 0; pointer-events: none; z-index: 3; }',
+    '[data-hp] .hp-sbar-wrap { position: absolute; inset: 0; pointer-events: none; }',
+    /* Hugo 14:50: Pille unter Seide (Konzept 09, Prototyp 7) live – Zeichenfläche liegt UNTER dem Text */
+    '[data-hp] .hp-silk { position: absolute; pointer-events: none; opacity: 0; transition: opacity .4s ease; z-index: 0; }',
+    '[data-hp] .hp-silk.is-on { opacity: 1; }',
+    '[data-hp].is-desk .hp-side-box { z-index: 1; }',
     /* Hugo 12:36: schlicht wie bei Apple – schmale Pille mit runden Enden, ohne Schiene, ohne Schein, ohne ausblendende Spitzen;
        der Griff stösst oben und unten genau an das Ende des Bereichs. Farben wie die Horizont-Linie, wandern nur mit dem Scrollen. */
     '[data-hp] .hp-sbar { position: absolute; width: 3px; opacity: 0; transition: opacity .4s ease; pointer-events: none; }',
@@ -1975,7 +1979,7 @@
       // der Rand bleibt also auch im Schwung genau stehen. Verlauf weicher (mehrere Stufen, smoothstep).
       var m = 'linear-gradient(to bottom, transparent 0, transparent ' + (topB - 2).toFixed(1) + 'px, ' + softStops(topB - 2, topB + fT, false) + ', ' + (rem > 0 ? softStops(botB - fB, botB + 1, true) + ', transparent 100%' : '#000 100%') + ')';
       if (pn.style.webkitMaskImage !== m) { pn.style.webkitMaskImage = m; pn.style.maskImage = m; }
-      if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 14), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
+      if (infoSb) { infoSb.set(Math.max(4, parseFloat(cs.paddingLeft) - 20), topB, Math.max(0, botB - topB), st, pn.scrollHeight, H2, st !== infoSbSt); infoSbSt = st; }
     }
     // ---------- Appelgren 1:1 auf ein festes Textfeld übertragen (Hugo 13:36) ----------
     // Sein Code (perappelgren.de, About): o = (vh − top)/(vh + Höhe) für die ganze Sektion (Sektion = 900 px = Bildschirm, Text 352 px
@@ -2016,7 +2020,7 @@
     infoPanel.addEventListener('scroll', linesKick, { passive: true });
     window.addEventListener('resize', function () { if (linesOrig && root.classList.contains('is-info')) { infoText.innerHTML = linesOrig; infoLines(); wordsT0 = 0; linesKick(); } });
     window.addEventListener('resize', stuckCheck);
-    info.appendChild(infoBg); info.appendChild(infoPanel); info.appendChild(infoSbW); info.appendChild(infoFix); infoSb = makeSbar(infoSbW); root.appendChild(info);
+    info.appendChild(infoBg); info.appendChild(infoSbW); info.appendChild(infoPanel); info.appendChild(infoFix); infoSb = makeSbar(infoSbW); root.appendChild(info);
     setDialog(info, false);
 
     // ---------- Sonnenstrahlen hinter und über dem About-Text (Hugo 22.11.) ----------
@@ -2937,34 +2941,85 @@
     var BUMP = 'linear-gradient(to right, rgba(255,255,255,0) 34%, rgba(255,255,255,.9) 43%, rgba(255,255,255,0) 52%),'   // Kamm im Licht
       + 'linear-gradient(to right, rgba(110,100,165,0) 50%, rgba(110,100,165,.2) 60%, rgba(110,100,165,.07) 78%, rgba(110,100,165,0) 100%),'   // Flanke rechts, Stoff zieht weit aus
       + 'linear-gradient(to right, rgba(110,100,165,0) 0%, rgba(110,100,165,.06) 20%, rgba(110,100,165,.1) 33%, rgba(110,100,165,0) 41%),';   // Stoff-Falte links am Fuss
+    // ---------- Scroll-Leiste «Pille unter Seide» (Hugo 14:50, Konzept 09 / Prototyp 7) ----------
+    // Eine Kapsel wie 💊 (16 × 40 px) gleitet unter einem seidigen Tuch. Vorne und in Ruhe wölbt sich das Tuch rund; hinten wird es
+    // in Bewegung seitlich gezogen (zwei Grate, dazwischen gespanntes Tuch, weiche Längsfalten). Licht flach von oben links, Satinglanz,
+    // milchiges Perlmutt an den Flanken, kräftigeres Perlmutt auf dem Kamm. Gezeichnet auf eine Canvas UNTER dem Text, nur beim Scrollen
+    // und solange das Tuch nachschwingt. Vorherige Leiste (Perlmutt-Wölbung): Commit 7a8c59a, Doku 08.
+    var SILK_PEARL = [[150,220,245],[195,178,250],[248,190,215],[250,228,180],[165,232,215]];
+    var SILK_MILK = [[218,242,248],[227,234,248],[229,225,244],[242,221,227],[250,235,229],[251,243,222]];
+    function silkPal(P, t) { t = ((t % 1) + 1) % 1 * P.length; var i = Math.floor(t), f = t - i, a = P[i], b = P[(i + 1) % P.length], s = f * f * (3 - 2 * f); return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s]; }
     function makeSbar(host) {
-      var bar = document.createElement('div'); bar.className = 'hp-sbar'; bar.setAttribute('aria-hidden', 'true');
-      var th = document.createElement('i'); bar.appendChild(th); host.appendChild(bar);
-      var actT = 0, last = { };
-      return {
-        el: bar,
-        set: function (x, y, h, st, sh, ch, active) {
-          var on = sh > ch + 2 && h > 40; bar.classList.toggle('is-on', on); if (!on) return;
-          if (last.x !== x || last.y !== y || last.h !== h) { bar.style.left = x.toFixed(1) + 'px'; bar.style.top = y.toFixed(1) + 'px'; bar.style.height = h.toFixed(1) + 'px'; last = { x: x, y: y, h: h }; }
-          var tl = Math.max(36, h * ch / sh), mx = sh - ch, p = Math.max(0, Math.min(1, st / mx));
-          // Hugo 12:48: zieht man über Anfang oder Ende hinaus (Gummiband am iPhone), dampft der Griff dezent ein (höchstens 40 %,
-          // weich auslaufend) und bleibt am Rand; beim Loslassen federt er mit dem Gummiband zurück in seine Grösse.
-          var ov = st < 0 ? -st : (st > mx ? st - mx : 0), len = tl * (1 - 0.4 * (1 - Math.exp(-ov / 90)));
-          th.style.height = (len + 16).toFixed(1) + 'px'; th.style.transform = 'translate3d(0,' + ((st > mx ? h - len : (h - tl) * p) - 8).toFixed(1) + 'px,0)';
-          // Hugo 12:55: Eindampfen perfekt, ohne Nachfedern (Gummiband bringt ihn von selbst zurück)
-          // Perlmutt-Wolken: vier blasse Wolken, jede wandert mit eigenem Tempo und eigener Richtung (über das Ende hinaus schneller)
-          var sv = st + (st > mx ? 1 : -1) * ov * 2.4, img = '';
-          for (var k = 0; k < 4; k++) {
-            var yy = (((30 + k * 25 + sv * PEARL_SP[k] * 0.25) % 140) + 140) % 140 - 20;
-            img += 'radial-gradient(ellipse 15% 40% at 47% ' + yy.toFixed(1) + '%, ' + PEARL[k] + ' 0%, rgba(255,255,255,0) 100%),';
+      var W = 84, CX = 42, PW = 8, PL = 40, PAD = 34;
+      var cv = document.createElement('canvas'); cv.className = 'hp-silk'; cv.setAttribute('aria-hidden', 'true'); cv.width = W; cv.height = 10;
+      host.appendChild(cv);
+      var ctx = cv.getContext('2d'), img = null, Dd = null, hb = null, Hc = 0;
+      var tgt = 0, cur = -1, vel = 0, fab = 0, fabV = 0, trail = 0, over = 0, raf = 0, actT = 0, on = false, regionH = 0, lastPos = '';
+      function g2(v, w) { return Math.exp(-(v * v) / (w * w)); }
+      function size(h) {
+        var nh = Math.max(20, Math.round(h + PAD * 2));
+        if (nh !== Hc) { Hc = nh; cv.height = Hc; cv.style.height = Hc + 'px'; cv.style.width = W + 'px'; img = ctx.createImageData(W, Hc); Dd = img.data; hb = new Float32Array(W * Hc); }
+      }
+      function draw() {
+        raf = 0;
+        if (cur < 0) { cur = tgt; fab = tgt; }
+        vel += (tgt - cur) * 0.35; vel *= 0.55; cur += vel;            // Pille folgt dem Scrollen fast direkt
+        fabV += (cur - fab) * 0.07; fabV *= 0.8; fab += fabV;            // Tuch läuft weich nach
+        var travel = Math.max(1, regionH - PL), sq = 1 - 0.4 * (1 - Math.exp(-over / 90)), len = PL * sq;
+        var c = PAD + (over > 0.5 && tgt >= 0.999 ? regionH - len / 2 : (over > 0.5 && tgt <= 0.001 ? len / 2 : PL / 2 + travel * cur));
+        var fc = PAD + PL / 2 + travel * fab, lag = fc - c;
+        var tTrail = reduce ? 0 : Math.min(1, Math.abs(lag) / 18); trail += (tTrail - trail) * 0.12;
+        var dir = lag > 0.5 ? -1 : (lag < -0.5 ? 1 : 0), rear = dir < 0 ? c + len / 2 : c - len / 2, tl = 10 + trail * 95;
+        var y1 = c - len / 2 + PW, y2 = c + len / 2 - PW, y1r = c - (len + 24) / 2 + 26, y2r = c + (len + 24) / 2 - 26;
+        var curPh = cur * 1000;
+        for (var y = 0; y < Hc; y++) {
+          var yy = Math.max(y1, Math.min(y2, y)), dyp = y - yy, yr = Math.max(y1r, Math.min(y2r, y)), dyr = y - yr;
+          var tt = dir < 0 ? (y - rear) : (rear - y), inT = dir !== 0 && trail > 0.01 && tt > -4;
+          var u = Math.max(0, tt), f = inT ? Math.exp(-u / tl) * Math.min(1, (u + 4) / 10) : 0, spread = PW + u * 0.38 * trail + 2, wv = Math.sin(u * 0.07 + curPh * 0.02) * 1.2 * trail;
+          for (var x = 0; x < W; x++) {
+            var dx = x - CX, dp2 = (dx * dx + dyp * dyp) / (PW * PW), dr2 = (dx * dx + dyr * dyr) / 676;
+            var h = 0.55 * Math.exp(-dp2 * 0.9) + 0.42 * Math.exp(-dr2 * 0.85);
+            if (inT) {
+              var ax = Math.abs(dx);
+              h += trail * f * (0.32 * g2(ax - spread, 4.5 + u * 0.06) + 0.15 * 0.45 * g2(ax, spread + 6) + 0.13 * g2(ax - spread * 0.42 - wv, 2.6 + u * 0.035) * Math.min(1, u / 14)
+                + 0.09 * g2(ax - spread * 1.45 + wv, 3.2 + u * 0.05) * Math.min(1, u / 22) + 0.07 * g2(dx + wv * 0.6, 2.2 + u * 0.03) * Math.min(1, u / 28));
+            }
+            hb[y * W + x] = h;
           }
-          // Seidenglanz: ein heller Streifen entlang des Kamms, der mit dem Scrollen wandert (Stoff gleitet über die Pille)
-          var gy = ((((sv * 0.6) % 160) + 160) % 160) - 30;
-          var silk = 'radial-gradient(ellipse 9% 22% at 42% ' + gy.toFixed(1) + '%, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 100%),';
-          th.style.backgroundImage = silk + BUMP + img.slice(0, -1);
-          if (active) { bar.classList.add('is-active'); clearTimeout(actT); actT = setTimeout(function () { bar.classList.remove('is-active'); }, 900); }
+        }
+        var lx = -0.66, ly = -0.6, lz = 0.45, ll = Math.hypot(lx, ly, lz), Lx = lx / ll, Ly = ly / ll, Lz = lz / ll, hx = Lx, hy = Ly, hz = Lz + 1, hl = Math.hypot(hx, hy, hz);
+        for (var yy2 = 0; yy2 < Hc; yy2++) for (var xx = 0; xx < W; xx++) {
+          var i = yy2 * W + xx, o = i * 4, hh = hb[i];
+          if (xx === 0 || yy2 === 0 || xx === W - 1 || yy2 === Hc - 1 || hh < 0.004) { Dd[o + 3] = 0; continue; }
+          var gx = (hb[i + 1] - hb[i - 1]) * 9, gy = (hb[i + W] - hb[i - W]) * 9, nl = Math.hypot(gx, gy, 1), nx = -gx / nl, ny = -gy / nl, nz = 1 / nl;
+          var dif = Math.max(0, nx * Lx + ny * Ly + nz * Lz), nh = Math.max(0, (nx * hx + ny * hy + nz * hz) / hl);
+          var satin = Math.pow(nh, 9) * 0.3 + Math.pow(nh, 40) * 0.2, slope = Math.min(1, Math.hypot(gx, gy) * 1.1);
+          var crest = Math.min(1, Math.pow(Math.max(0, hh - 0.45) / 0.55, 1.2)), flank = Math.min(1, slope) * Math.min(1, hh * 3) * (1 - crest * 0.6);
+          var milk = silkPal(SILK_MILK, (yy2 + curPh * 0.9) / 300 + nx * 0.4 + hh * 0.5), col = silkPal(SILK_PEARL, hh * 0.8 + (yy2 + curPh * 1.3) / 520 + nx * 0.12);
+          var r = 252, g = 251, b = 249, fb = flank * 0.8;
+          r += (milk[0] - r) * fb; g += (milk[1] - g) * fb; b += (milk[2] - b) * fb;
+          var sh = Math.min(1.03, 0.74 + 0.29 * (dif / Lz)); r *= sh; g *= sh * 0.995; b *= sh * 0.985;
+          var ct = crest * 0.5; r += (col[0] - r) * ct; g += (col[1] - g) * ct; b += (col[2] - b) * ct;
+          r += 255 * satin; g += 255 * satin; b += 255 * satin;
+          // auf Weiss gemischt: Deckkraft wächst mit der Höhe des Stoffs (flacher Stoff = durchsichtig, Text darüber bleibt sichtbar)
+          Dd[o] = Math.min(255, r); Dd[o + 1] = Math.min(255, g); Dd[o + 2] = Math.min(255, b); Dd[o + 3] = Math.round(255 * Math.min(1, hh * 4));
+        }
+        ctx.putImageData(img, 0, 0);
+        over *= 0.85;
+        if (Math.abs(tgt - cur) > 0.0004 || Math.abs(vel) > 0.0004 || Math.abs(cur - fab) > 0.0006 || Math.abs(fabV) > 0.0004 || trail > 0.004 || over > 0.5) raf = requestAnimationFrame(draw);
+      }
+      return {
+        el: cv,
+        set: function (x, y, h, st, sh, ch, active) {
+          on = sh > ch + 2 && h > PL + 20; cv.classList.toggle('is-on', on); if (!on) return;
+          var pos = (x - CX).toFixed(1) + '|' + (y - PAD).toFixed(1);
+          if (pos !== lastPos) { cv.style.left = (x - CX).toFixed(1) + 'px'; cv.style.top = (y - PAD).toFixed(1) + 'px'; lastPos = pos; }
+          regionH = h; size(h);
+          var mx = sh - ch; tgt = Math.max(0, Math.min(1, st / mx));
+          var ov = st < 0 ? -st : (st > mx ? st - mx : 0); if (ov > over) over = ov;
+          if (!raf) raf = requestAnimationFrame(draw);
         },
-        hide: function () { bar.classList.remove('is-on', 'is-active'); }
+        hide: function () { cv.classList.remove('is-on'); }
       };
     }
     // weicher Masken-Verlauf: 7 Stufen nach smoothstep zwischen a und b (px); down = von sichtbar zu unsichtbar
@@ -2979,7 +3034,7 @@
       var fT = Math.min(Math.max(0, st), 52), fB = Math.min(rem, 52);   // 14:00: oben länger, 14:07 weicher
       var m = 'linear-gradient(to bottom, ' + (fT > 0 ? softStops(0, fT, false) : '#000 0') + ', ' + (rem > 0 ? softStops(H2 - fB, H2, true) : '#000 100%') + ')';
       if (box.style.webkitMaskImage !== m) { box.style.webkitMaskImage = m; box.style.maskImage = m; }
-      if (s.sbar) s.sbar.set(box.offsetLeft - 14, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
+      if (s.sbar) s.sbar.set(box.offsetLeft - 20, box.offsetTop, box.clientHeight, st, box.scrollHeight, H2, st !== s.sbarSt); s.sbarSt = st;
     }
     var fitSidesT = 0;
     function fitSidesSoon() { clearTimeout(fitSidesT); fitSidesT = setTimeout(fitSides, 150); }
