@@ -25,6 +25,9 @@
     cell:      { desktop: 1.5, mobile: 1.4 },     // Rasterabstand als Vielfaches der mittleren Kartenbreite (kleiner = dichter, mehr Überlappen)
     jitter:    0.5,     // wie weit eine Karte von ihrem Rasterplatz abweicht (Anteil vom Raster)
     holes:     0.08,    // Anteil leerer Rasterplätze
+    // Wenige Projekte (Singer 2, Model 5): mehr Luft und mehr leere Plätze, damit es nicht wie eine Tapete aussieht.
+    // Bei fewFrom Projekten und weniger wächst das Raster um bis zu fewCell und die Lücken um bis zu fewHoles.
+    fewFrom:   7, fewCell: 0.5, fewHoles: 0.3, fewJitter: 0.3,
     depth:     [0.86, 1.14],   // Tempo beim Ziehen pro Karte (Tiefe): grössere Zahl = bewegt sich mehr und liegt vorne
     seed:      7,       // anderer Wert = andere Anordnung
     // Ziehen
@@ -40,7 +43,7 @@
     implodeMs:  150,    // Punkt fällt in sich zusammen
     silenceMs:  70,     // Stille vor dem Knall
     sphereMs:   260,    // Lichtkugel füllt den Bildschirm
-    fadeMs:     700,    // Licht blendet aus
+    fadeMs:     380,    // Licht blendet aus (Hugo 25.11.: 700 ms wirkte grau und matt)
     flyMs:      [1000, 1500],   // Flugdauer der Bilder
     flyDelay:   100,    // zufällige Verzögerung bis
     spin:       70,     // Drehung beim Start (Grad, ±)
@@ -245,7 +248,9 @@
       var avgW = 0, maxD = 0;
       projects.forEach(function (p) { avgW += p.w; maxD = Math.max(maxD, Math.hypot(p.w, p.h)); });
       avgW = avgW / projects.length * (sz[0] + sz[1]) / 2;
-      var cell = avgW * (mob ? CONFIG.cell.mobile : CONFIG.cell.desktop);
+      var few = clamp((CONFIG.fewFrom - projects.length) / (CONFIG.fewFrom - 2), 0, 1);
+      var cell = avgW * (mob ? CONFIG.cell.mobile : CONFIG.cell.desktop) * (1 + CONFIG.fewCell * few);
+      var holes = CONFIG.holes + CONFIG.fewHoles * few, jit = CONFIG.jitter + CONFIG.fewJitter * few;
       var rowH = cell * 1.05;
       PAD = maxD * sz[1] / 2 + 4;
       var cols = Math.max(3, Math.ceil((VW + 2 * PAD) / cell) + 1);
@@ -255,7 +260,7 @@
       var list = order(cols * rows, R), k = 0;
       for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
         var p = list[k++];
-        if (R() < CONFIG.holes) continue;
+        if (R() < holes) continue;
         var el;
         if (!p.used) { el = p.el; p.used = true; }
         else {
@@ -271,8 +276,8 @@
         slots.push({
           p: p, el: el, a: el.querySelector('a.lib-card') || el.querySelector('a'), img: el.querySelector('img'),
           s: s, d: d, w: p.w, h: p.h,
-          x: c * cell + cell / 2 + (R() - .5) * cell * CONFIG.jitter,
-          y: r * rowH + rowH / 2 + (R() - .5) * rowH * CONFIG.jitter,
+          x: c * cell + cell / 2 + (r % 2) * cell / 2 + (R() - .5) * cell * jit,   // Reihen versetzt (kein Raster sichtbar)
+          y: r * rowH + rowH / 2 + (R() - .5) * rowH * jit,
           rot: (R() - .5) * 2 * CONFIG.spin, dl: R() * CONFIG.flyDelay,
           dur: CONFIG.flyMs[0] + R() * (CONFIG.flyMs[1] - CONFIG.flyMs[0]), s0: .03 + R() * .05,
           off: false

@@ -1296,57 +1296,75 @@
       '.hp-crt-dot { left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 4px #fff, 0 0 40px 14px rgba(190,220,255,.8); }',
       '.hp-crt-dot.is-hold { opacity: 1; animation: hpCrtPulse 1.1s ease-in-out infinite; }',
       '@keyframes hpCrtPulse { 50% { transform: scale(.82); box-shadow: 0 0 8px 3px #fff, 0 0 30px 10px rgba(190,220,255,.6); } }',
+      '.hp-crt-wash { left: 0; top: 0; width: 100%; height: 100%; background: #fff; mix-blend-mode: screen; }',
+      'html.hp-crt-on .menu-toggle-wrap { opacity: 0 !important; transition: opacity .15s !important; }',
       'html.hp-crt-on, html.hp-crt-on body { background: #000 !important; }'
     ].join('\n');
     var crtFx = null;
     function crtReset() {
       if (crtFx) { crtFx.remove(); crtFx = null; }
       document.documentElement.classList.remove('hp-crt-on');
-      var b = document.body; ['transform', 'transform-origin', 'filter', 'visibility'].forEach(function (p) { b.style.removeProperty(p); });
+      var b = document.body;
+      if (b.getAnimations) b.getAnimations().forEach(function (an) { if (an.id === 'hp-crt') an.cancel(); });
+      ['transform-origin', 'visibility'].forEach(function (p) { b.style.removeProperty(p); });
     }
     window.addEventListener('pageshow', function (e) { if (e.persisted) crtReset(); });
+    // Hugo 25.11. (Video 06:04): Am iPhone blieb das Bild als dicker Streifen stehen, die Linie kam nie. Ursache: Die Schritte
+    // liefen pro Bild im Haupt-Thread (dort rechnet auch die Sonne) und filter: brightness auf der ganzen Seite ist teuer.
+    // Jetzt laufen alle Teile als Web-Animationen (Grafikchip, auch wenn der Haupt-Thread voll ist). Heller wird es über
+    // eine weisse Fläche mit Mischmodus «screen», die genau mit dem Bild zusammenklappt.
     function crtOff(done) {
       if (crtFx) return;
       if (!document.getElementById('hp-crt-css')) {
         var st = document.createElement('style'); st.id = 'hp-crt-css'; st.textContent = crtCss; document.head.appendChild(st);
       }
-      var R = document.documentElement, b = document.body;
+      var R = document.documentElement, b = document.body, A = CRT.squashMs, L = CRT.lineMs;
       crtFx = document.createElement('div'); crtFx.className = 'hp-crt'; crtFx.setAttribute('aria-hidden', 'true');
-      crtFx.innerHTML = '<i class="hp-crt-streak"></i><i class="hp-crt-line"></i><i class="hp-crt-dot"></i>';
+      crtFx.innerHTML = '<i class="hp-crt-wash"></i><i class="hp-crt-streak"></i><i class="hp-crt-line"></i><i class="hp-crt-dot"></i>';
       R.appendChild(crtFx);
       R.classList.add('hp-crt-on');
-      var streak = crtFx.children[0], line = crtFx.children[1], dotEl = crtFx.children[2];
+      var wash = crtFx.children[0], streak = crtFx.children[1], line = crtFx.children[2], dotEl = crtFx.children[3];
+      var IN = 'cubic-bezier(.55,0,.9,.4)', IN4 = 'cubic-bezier(.75,0,.95,.35)', o = { fill: 'both' };
       b.style.setProperty('transform-origin', '50% ' + (window.scrollY + window.innerHeight / 2) + 'px', 'important');
-      var t0 = performance.now(), A = CRT.squashMs, B = A + CRT.lineMs;
-      (function step(now) {
+      // 1) Bild klappt senkrecht zusammen und wird heller
+      var sq = b.animate([{ transform: 'none' }, { transform: 'scale(1.05, .004)' }], { duration: A, easing: IN, fill: 'forwards', id: 'hp-crt' });
+      wash.animate([{ transform: 'scaleY(1)', opacity: 0 }, { transform: 'scaleY(.004)', opacity: .9 }], { duration: A, easing: IN, fill: 'forwards' });
+      streak.animate([{ opacity: 0 }, { opacity: 0, offset: .65 }, { opacity: 1 }], { duration: A, fill: 'forwards' });
+      // 2) Blitz am Horizont, die Linie schlägt immer schneller zum Punkt zusammen
+      line.animate([{ opacity: 0, transform: 'scaleX(1) scaleY(2.5)' }, { opacity: 1, transform: 'scaleX(1) scaleY(2.5)', offset: .01 }, { opacity: 1, transform: 'scaleX(.9) scaleY(1)', offset: .15 }, { opacity: 1, transform: 'scaleX(.003) scaleY(1)' }],
+        { duration: L, delay: A, easing: IN4, fill: 'both' });
+      streak.animate([{ opacity: 1, transform: 'scaleX(1) scaleY(1.8)' }, { opacity: .35, transform: 'scaleX(.02) scaleY(1)' }], { duration: L, delay: A, easing: IN4, fill: 'forwards' });
+      dotEl.animate([{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 0, transform: 'scale(1.3)', offset: .7 }, { opacity: 1, transform: 'scale(1.3)' }], { duration: L, delay: A, fill: 'both' });
+      sq.onfinish = function () { if (crtFx) { b.style.setProperty('visibility', 'hidden', 'important'); wash.style.display = 'none'; } };
+      setTimeout(function () {
         if (!crtFx) return;
-        var t = now - t0;
-        if (t < A) {
-          // 1) Bild klappt senkrecht zusammen und wird heller
-          var e = Math.pow(t / A, 3);
-          b.style.setProperty('transform', 'scale(' + (1 + .05 * e).toFixed(4) + ',' + Math.max(.004, 1 - e).toFixed(4) + ')', 'important');
-          b.style.setProperty('filter', 'brightness(' + (1 + 4 * e).toFixed(2) + ') contrast(' + (1 + e).toFixed(2) + ')', 'important');
-          streak.style.opacity = Math.max(0, Math.min(1, (t / A - .7) * 3.3)).toFixed(3);
-        } else if (t < B) {
-          // 2) Blitz am Horizont, die Linie schlägt immer schneller zum Punkt zusammen
-          b.style.setProperty('visibility', 'hidden', 'important');
-          var p = (t - A) / CRT.lineMs, q = Math.pow(p, 4);
-          line.style.opacity = '1';
-          line.style.transform = 'scaleX(' + Math.max(.003, 1 - q).toFixed(4) + ')' + (p < .15 ? ' scaleY(' + (1 + 1.5 * (1 - p)).toFixed(3) + ')' : '');
-          var fl = p < .12 ? p / .12 : 1 - (p - .12) * .7;
-          streak.style.opacity = Math.max(0, Math.min(1, fl)).toFixed(3);
-          streak.style.transform = 'scaleX(' + Math.max(.02, 1 - q).toFixed(4) + ') scaleY(' + (1 + .8 * (1 - p)).toFixed(3) + ')';
-          dotEl.style.opacity = Math.max(0, Math.min(1, (p - .75) * 4)).toFixed(3);
-          dotEl.style.transform = 'scale(1.3)';
-        } else {
-          // 3) Lichtpunkt bleibt und pulsiert, bis die Galerie da ist
-          line.style.opacity = '0'; streak.style.opacity = '0';
-          dotEl.style.transform = ''; dotEl.style.opacity = ''; dotEl.classList.add('is-hold');
-          done();
-          return;
-        }
-        requestAnimationFrame(step);
-      })(t0);
+        // 3) Lichtpunkt bleibt und pulsiert, bis die Galerie da ist
+        line.style.display = streak.style.display = 'none';
+        dotEl.getAnimations().forEach(function (an) { an.cancel(); });
+        dotEl.classList.add('is-hold');
+        done();
+      }, A + L);
+    }
+    // Galerie vorladen (Hugo 25.11.: «muss die Galerie im Voraus laden»): sobald ein Bereich geöffnet wird,
+    // holt die Homepage die Galerie-Seite, ihr Skript und alle Titelbilder in derselben Grösse wie dort.
+    // Beim Tippen auf «Galerie öffnen» ist dann alles im Speicher, der Lichtpunkt steht nur noch kurz.
+    var warmed = {};
+    function warmGallery(href) {
+      if (!href || href === '#') return;
+      var to = ''; try { to = new URL(href, location.href).pathname.replace(/\/$/, '') || '/'; } catch (er) { return; }
+      if (CRT.paths.indexOf(to) < 0 || warmed[to]) return;
+      warmed[to] = true;
+      try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; document.head.appendChild(l); } catch (er) {}
+      fetch(href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (t) {
+        var x = new DOMParser().parseFromString(t, 'text/html');
+        [].forEach.call(x.querySelectorAll('script[src*="galerie"]'), function (sc) { fetch(sc.src, { mode: 'no-cors' }).catch(function () {}); });
+        [].slice.call(x.querySelectorAll('[data-lib] img.lib-img'), 0, 40).forEach(function (im) {
+          var p = new Image();
+          if (im.getAttribute('sizes')) p.sizes = im.getAttribute('sizes');
+          if (im.getAttribute('srcset')) p.srcset = im.getAttribute('srcset');
+          p.src = im.getAttribute('src');
+        });
+      }).catch(function () {});
     }
     function go(href) {
       if (!href) return;
@@ -1371,6 +1389,7 @@
       if (i === hov) return;
       dsunStop();
       hov = i;
+      if (i >= 0 && slides[i]) warmGallery(slides[i].href);
       slides.forEach(function (s, j) {
         s.el.classList.toggle('is-open', j === i);
         if (s.sideLink) s.sideLink.tabIndex = j === i ? 0 : -1;
@@ -2200,6 +2219,7 @@
       if (tOrig) tOrig.style.visibility = '';
       infoText.innerHTML = s.intro;
       infoOpen.setAttribute('href', s.href || '#'); infoGoLabel.textContent = s.btn || 'Galerie öffnen';
+      warmGallery(s.href);
       if (sun && !reduce) { goShadow(); if (!infoGoSh.parentNode) infoOpen.appendChild(infoGoSh); }
       infoOpen.style.display = s.href ? '' : 'none';
       infoPanel.scrollTop = 0;
