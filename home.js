@@ -534,7 +534,7 @@
       cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
       try { c = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false }); } catch (e) {}
       if (!c) return null;
-      var NW = 4, PW = 16, NP = NW * PW;   // bis zu 4 Wellen mit je 16 Bahnpunkten (Hugo 25.11., 19:27: vorher 3 – eine 4. Welle warf die älteste auf einen Schlag hinaus)
+      var NW = 6, PW = 16, NP = NW * PW;   // bis zu 6 Wellen mit je 16 Bahnpunkten (Hugo 25.11., 20:57: mit 4 Plätzen und laufender Andock-Welle warf jede neue Welle die älteste auf einen Schlag hinaus – das Bild sprang zurück)
       var FS = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' + [
         'uniform float uRim; uniform float uSoft; uniform float uEdgeOff; uniform float uTint; uniform float uDA; uniform float uDF; uniform float uFade; uniform float uWL; uniform float uWE; uniform float uWF; uniform vec2 uRes; uniform float uDpr; uniform vec4 uP[' + NP + ']; uniform float uAge[' + NW + ']; uniform float uHue[' + NW + ']; uniform vec4 uB[' + NW + ']; uniform float uT; uniform float uEdgeT; uniform float uSeed; uniform float uKeep; uniform float uImp; uniform float uDesk;',
         'float h2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }',
@@ -703,7 +703,40 @@
         '  vec2 nI = l2 > 0.01 ? vec2(-ab.y, ab.x) / sqrt(l2) : vec2(0.0, 1.0); nI *= dot(nI, uRes * 0.5 - a.xy) < 0.0 ? -1.0 : 1.0;',
         '  float ds = sp < 0.0 ? dot(fc - a.xy, nI) : d;',   // Andocken: Abstand zur Linie des Abschnitts (überall stetig, innen positiv)
         '  return ds - tr + (1.0 - smoothstep(0.0, 0.12, z)) * mx * 0.035; }',
-        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo; uniform vec4 uStrip; uniform float uWG[' + NW + '];',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
+        'uniform sampler2D uImg; uniform float uHas; uniform vec4 uRect; uniform vec4 uCrop; uniform float uCov; uniform float uGo; uniform float uWG[' + NW + '];',
+        // Hugo 25.11. (20:54): Bildtexturen – jedes Foto liegt einmal in voller Schärfe auf der Grafikkarte; der Shader sucht per Lage
+        // (Spalte bzw. Bild, uTE), welches Foto an dieser Stelle liegt, und liest es dort wie object-fit: cover (uTI, uTC).
+        // Computer: weisse Textspalte darüber (uTS, uTA). Nichts wird mehr pro Bild neu zusammengesetzt oder hochgeladen
+        'uniform float uTx; uniform sampler2D uT0, uT1, uT2, uT3; uniform vec4 uTE[4], uTI[4], uTC[4], uTS[4]; uniform float uTA[4];',
+        'vec3 txImg(vec2 q) {',
+        '  float sel = -1.0; vec4 ti = vec4(0.0, 0.0, 1.0, 1.0), tc = vec4(0.0, 0.0, 1.0, 1.0), ts = vec4(-9.0, -9.0, 0.0, 0.0); float ta = 0.0;',
+        // erst das Bild, in dessen Rahmen die Stelle liegt; sonst ein Bild, dessen Foto dort noch weitergeht (gezoomt, über den Rand
+        // hinaus – die Welle holt echtes Foto herein); erst ganz ausserhalb wird am Bühnenrand gespiegelt
+        '  for (int k = 0; k < 4; k++) {',
+        '    vec4 e = uTE[k];',
+        '    if (e.z > 0.0 && q.x >= e.x && q.x < e.x + e.z && q.y >= e.y && q.y < e.y + e.w) { sel = float(k); ti = uTI[k]; tc = uTC[k]; ts = uTS[k]; ta = uTA[k]; }',
+        '  }',
+        '  if (sel < 0.0) for (int k = 0; k < 4; k++) {',   // Haarspalt zwischen zwei Spalten (Bruchteile eines Pixels): nächstes Bild
+        '    vec4 e = uTE[k] + vec4(-1.0, -1.0, 2.0, 2.0);',
+        '    if (uTE[k].z > 0.0 && q.x >= e.x && q.x < e.x + e.z && q.y >= e.y && q.y < e.y + e.w) { sel = float(k); ti = uTI[k]; tc = uTC[k]; ts = uTS[k]; ta = uTA[k]; }',
+        '  }',
+        '  if (sel < 0.0) for (int k = 0; k < 4; k++) {',
+        '    vec4 e = uTI[k];',
+        '    if (uTE[k].z > 0.0 && q.x >= e.x && q.x < e.x + e.z && q.y >= e.y && q.y < e.y + e.w) { sel = float(k); ti = uTI[k]; tc = uTC[k]; ts = uTS[k]; ta = uTA[k]; }',
+        '  }',
+        '  if (sel < 0.0) {',
+        '    q = uRect.zw - abs(uRect.zw - abs(q));',
+        '    for (int k = 0; k < 4; k++) {',
+        '      vec4 e = uTE[k];',
+        '      if (e.z > 0.0 && q.x >= e.x && q.x < e.x + e.z && q.y >= e.y && q.y < e.y + e.w) { sel = float(k); ti = uTI[k]; tc = uTC[k]; ts = uTS[k]; ta = uTA[k]; }',
+        '    }',
+        '  }',
+        '  if (sel < 0.0) return vec3(0.0);',
+        '  vec2 uv = tc.xy + clamp((q - ti.xy) / ti.zw, 0.0, 1.0) * tc.zw;',
+        '  vec3 r = sel < 0.5 ? texture2D(uT0, uv).rgb : sel < 1.5 ? texture2D(uT1, uv).rgb : sel < 2.5 ? texture2D(uT2, uv).rgb : texture2D(uT3, uv).rgb;',
+        '  if (q.x >= ts.x && q.x < ts.x + ts.z && q.y >= ts.y && q.y < ts.y + ts.w) r = mix(r, vec3(1.0), ta);',
+        '  return r;',
+        '}',   // Hugo 25.11. (16:58): eine deckende Fläche (uCov) · Effekt klingt als Ganzes aus (uGo)   // Bildlage (px, y oben) · Ausschnitt (uv)
         'void main() {',
         '  vec2 fc = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;',   // in CSS-Pixeln, gerechnet in voller Bildschirmschärfe
         '  float mx = max(uRes.x, uRes.y);',
@@ -916,15 +949,7 @@
         '    u = 1.0 - abs(1.0 - abs(u));',
         '    float inside = 1.0;',
         '    vec2 iu = uCrop.xy + clamp(u, 0.0, 1.0) * uCrop.zw;',
-        // Hugo 25.11. (18:24, Umbau 2): Handy – die Bilder liegen als feste Streifen-Textur vor (zwei Bilder übereinander, in
-        // Grösse 1); Lage und Zoom kommen als Zahlen. Beim Wischen muss so nichts neu hochgeladen werden
-        '    if (uStrip.x > 0.5) {',
-        '      float sH = uStrip.w, sy = sp.y - uStrip.y, kS = clamp(floor(sy / sH), 0.0, 1.0);',
-        '      vec2 cS = vec2(uRes.x * 0.5, sH * 0.5), bS = cS + (vec2(sp.x, sy - kS * sH) - cS) / uStrip.z;',
-        '      bS.x = uRes.x - abs(uRes.x - abs(bS.x)); bS.y = clamp(bS.y, 0.5, sH - 0.5);',
-        '      iu = vec2(bS.x / uRes.x, (kS * sH + bS.y) / (2.0 * sH));',
-        '    }',
-                '    vec3 img = texture2D(uImg, iu).rgb;',   // Hugo 25.11. (18:00): keine Farbtrennung mehr – sie legte neben Kanten (Sattelstütze) graue Geisterlinien; nur noch ein Bild
+        '    vec3 img = uTx > 0.5 ? txImg(sp - uRect.xy) : texture2D(uImg, iu).rgb;',   // Hugo 25.11. (18:00): keine Farbtrennung mehr – sie legte neben Kanten (Sattelstütze) graue Geisterlinien; nur noch ein Bild
         '    float u0 = (fc.x - uRect.x) / uRect.z, v0 = (fc.y - uRect.y) / uRect.w;',
         '    vec2 bh = min(vec2(u0, v0), 1.0 - vec2(u0, v0)) * uRect.zw;',
         '    here = step(0.0, min(bh.x, bh.y)) * inside; base = img;',   // Hugo 24.11.: kein Ausblenden am Bildschirmrand mehr (sonst dunkler Rahmen mit dem unverzerrten Foto)
@@ -1016,12 +1041,12 @@
       c.useProgram(p);
       var b = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, b); c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), c.STATIC_DRAW);
       var al = c.getAttribLocation(p, 'aPos'); c.enableVertexAttribArray(al); c.vertexAttribPointer(al, 2, c.FLOAT, false, 0, 0);
-      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop', 'uCov', 'uGo', 'uStrip', 'uWG'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
+      var U = {}; ['uRim', 'uSoft', 'uEdgeOff', 'uTint', 'uDA', 'uDF', 'uFade', 'uWL', 'uWE', 'uWF', 'uRes', 'uDpr', 'uP', 'uAge', 'uHue', 'uB', 'uT', 'uEdgeT', 'uSeed', 'uKeep', 'uImp', 'uDesk', 'uImg', 'uHas', 'uRect', 'uCrop', 'uCov', 'uGo', 'uWG', 'uTx', 'uT0', 'uT1', 'uT2', 'uT3', 'uTE', 'uTI', 'uTC', 'uTS', 'uTA'].forEach(function (k) { U[k] = c.getUniformLocation(p, k); });
       c.enable(c.BLEND); c.blendFunc(c.ONE, c.ONE_MINUS_SRC_ALPHA);
       var tex = c.createTexture(); c.bindTexture(c.TEXTURE_2D, tex);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
       c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
-      c.uniform1i(U.uImg, 0);
+      c.uniform1i(U.uImg, 0); c.uniform1i(U.uT0, 1); c.uniform1i(U.uT1, 2); c.uniform1i(U.uT2, 3); c.uniform1i(U.uT3, 4); c.uniform1f(U.uTx, 0);
       // Hugo 25.11. (17:19): beim ersten Start von Safari ruckelte der Aufprall (~0.2 s Stillstand, Video 17:18). Safari übersetzt
       // das Effekt-Programm erst beim ersten Zeichnen – jetzt sofort beim Laden (schwarzer Bildschirm), einmal 1 × 1 Pixel
       try { c.viewport(0, 0, 1, 1); c.uniform1f(U.uHas, 0); c.drawArrays(c.TRIANGLE_STRIP, 0, 4); c.readPixels(0, 0, 1, 1, c.RGBA, c.UNSIGNED_BYTE, new Uint8Array(4)); c.clearColor(0, 0, 0, 0); c.clear(c.COLOR_BUFFER_BIT); c.viewport(0, 0, cv.width, cv.height); } catch (er) {}
@@ -1046,6 +1071,7 @@
             function mk() {
               try { var nw = e.im.naturalWidth, nh = e.im.naturalHeight, k = Math.min(1, (weak ? 1400 : 1800) / Math.max(nw, nh)); var sc0 = document.createElement('canvas'); sc0.width = Math.round(nw * k); sc0.height = Math.round(nh * k); sc0.getContext('2d').drawImage(e.im, 0, 0, sc0.width, sc0.height); e.sm = sc0; } catch (er) {}
               e.ok = true; compSig = '';
+              idle(function () { upHi(e); });   // Hugo 25.11. (20:54): danach das Foto in voller Schärfe auf die Grafikkarte (eigene ruhige Lücke)
             }
             var dp = e.im.decode ? e.im.decode() : null;
             if (dp && dp.then) dp.then(function () { idle(mk); }, function () { idle(mk); }); else idle(mk);
@@ -1054,49 +1080,63 @@
       }
       // alle sichtbaren Spalten (object-fit: cover, wie im Browser) in ein Bild zeichnen und als Textur hochladen;
       // neu nur, wenn sich etwas bewegt hat (Aufprall, Hover am Rand)
-      // Hugo 25.11. (18:24, Umbau 2): Handy im Normalzustand – Streifen-Textur aus dem aktuellen Bild und dem Nachbarn, der beim
-      // Wischen hereinkommt, beide in Grösse 1 (Zoom und Lage rechnet der Shader). Neu hochgeladen wird nur, wenn sich das Paar ändert
-      var stripOn = false, stripTop = 0, stripPair = null, maxTex = 4096;
+      // Hugo 25.11. (20:54): «immer scharf» – jedes Foto liegt einmal als eigene Textur auf der Grafikkarte, so scharf wie es der
+      // Bildschirm braucht (Bildschirmgrösse × Pixeldichte, höchstens die Originaldatei). Der Shader liest es direkt (uT0–uT3, Lage
+      // als Zahlen). Ersetzt die Streifen-Textur (Handy) und das Zusammensetzen pro Bild (Computer, beim Auf- und Zugehen der Spalten
+      // wurde dort jedes Bild neu gezeichnet und hochgeladen – das war das Ruckeln von Bild zu Bild)
+      var maxTex = 4096, txOn = false, txPend = false, TXE = new Float32Array(16), TXI = new Float32Array(16), TXC = new Float32Array(16), TXS = new Float32Array(16), TXA = new Float32Array(4);
       try { maxTex = c.getParameter(c.MAX_TEXTURE_SIZE) || 4096; } catch (er) {}
-      function stripOk() {
-        if (desk || introOn || lightMode || infoSlide || root.classList.contains('hp-info-anim')) return false;
-        for (var j = 0; j < slides.length; j++) if (slides[j].dive || (slides[j].dv && slides[j].dv.k > 1.0001)) return false;
+      function upHi(e) {
+        if (e.tx || e.txFail || !e.ok) return;
+        try {
+          var nw = e.im.naturalWidth, nh = e.im.naturalHeight; if (!nw || !nh) return;
+          var dm = Math.min(weak ? 2 : 3, window.devicePixelRatio || 1), sW = Math.max(screen.width || 0, W) * dm * 1.15, sH = Math.max(screen.height || 0, H) * dm * 1.15;
+          var cap = Math.min(maxTex, desk ? 4096 : (weak ? 1600 : 2560));
+          var k = Math.min(1, Math.max(sW / nw, sH / nh), cap / Math.max(nw, nh)), src = e.im;
+          if (k < 0.999) { src = document.createElement('canvas'); src.width = Math.max(1, Math.round(nw * k)); src.height = Math.max(1, Math.round(nh * k)); var x2 = src.getContext('2d'); x2.imageSmoothingQuality = 'high'; x2.drawImage(e.im, 0, 0, src.width, src.height); }
+          var t = c.createTexture(); c.bindTexture(c.TEXTURE_2D, t);
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.LINEAR); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.LINEAR);
+          c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE); c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
+          c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, src);
+          if (src !== e.im) { src.width = src.height = 0; }   // Kopie gleich wieder freigeben (Speicher am iPhone)
+          e.tx = t; c.bindTexture(c.TEXTURE_2D, tex);
+        } catch (er) { e.txFail = true; try { c.bindTexture(c.TEXTURE_2D, tex); } catch (er2) {} }
+      }
+      function txOk() {
+        if (introOn || lightMode || infoSlide || root.classList.contains('hp-info-anim')) return false;
         return true;
       }
-      function stripTex(sr) {
-        var ci = current(), cur = slides[ci], dn = F >= ci;
-        var nb = slides[(ci + (dn ? 1 : -1) + n) % n], top = dn ? cur : nb, bot = dn ? nb : cur;
-        stripPair = [top, bot];
-        var ry = rel(slides.indexOf(top)) * H; stripTop = Math.abs(ry) < 0.75 ? 0 : ry;
-        var sc = Math.min(weak ? 1.5 : 2, window.devicePixelRatio || 1, maxTex / (2 * sr.height)), cw2 = Math.round(sr.width * sc), sh1 = Math.round(sr.height * sc), ch2 = sh1 * 2;
-        var sig = 'S|' + cw2 + 'x' + ch2 + '|' + slides.indexOf(top) + ',' + slides.indexOf(bot);
-        var ok = true;
-        [top, bot].forEach(function (sl) { var e = cache[srcOf(sl.img)]; if (!e || !e.ok) ok = false; });
-        sig += ok ? '' : '|-';
-        if (sig === compSig) return compOk;
-        compSig = sig; compFull = ok; compCrop = null;
-        if (comp.width !== cw2 || comp.height !== ch2) { comp.width = cw2; comp.height = ch2; }
-        cctx.fillStyle = '#000'; cctx.fillRect(0, 0, cw2, ch2);
-        [top, bot].forEach(function (sl, k) {
-          var e = cache[srcOf(sl.img)]; if (!e || !e.ok) return;
-          var er = sl.el.getBoundingClientRect(), ir = sl.img.getBoundingClientRect();
-          var zt = 1, mt = sl.media && sl.media.style.transform; var mm = mt && /scale\(([\d.]+)\)/.exec(mt); if (mm) zt = parseFloat(mm[1]) || 1;
-          var cx = er.left + er.width / 2, cy = er.top + er.height / 2;
-          var r1 = { left: cx + (ir.left - cx) / zt, top: cy + (ir.top - cy) / zt, width: ir.width / zt, height: ir.height / zt };   // Bild in Grösse 1
-          var srcI = e.sm || e.im, iw = e.sm ? e.sm.width : (e.im.naturalWidth || 1), ih = e.sm ? e.sm.height : (e.im.naturalHeight || 1), ra = r1.width / Math.max(1, r1.height), ia = iw / ih;
-          var sw = iw, sh = ih; if (ia > ra) sw = ih * ra; else sh = iw / ra;
-          var op = objPos(sl.img), sx = (iw - sw) * op[0], sy = (ih - sh) * op[1];
-          cctx.save(); cctx.beginPath(); cctx.rect(0, k * sh1, cw2, sh1); cctx.clip();
-          cctx.drawImage(srcI, sx, sy, sw, sh, (r1.left - er.left) * sc, k * sh1 + (r1.top - er.top) * sc, r1.width * sc, r1.height * sc);
-          cctx.restore();
-        });
-        try { c.bindTexture(c.TEXTURE_2D, tex); c.texImage2D(c.TEXTURE_2D, 0, c.RGB, c.RGB, c.UNSIGNED_BYTE, comp); compOk = true; }
-        catch (er) { compOk = false; }
-        return compOk;
+      function txSet(sr) {
+        var list = [];
+        for (var j = 0; j < slides.length; j++) {
+          var sl = slides[j]; if (!desk && !sl.vis) continue;
+          var e = cache[srcOf(sl.img)]; if (!e || !e.tx) { if (!txPend) { txPend = true; idle(function () { txPend = false; loadAll(); slides.forEach(function (q) { var eq = cache[srcOf(q.img)]; if (eq) upHi(eq); }); }); } return false; }
+          list.push({ sl: sl, e: e, z: parseFloat(sl.el.style.zIndex) || 0, i: j });
+        }
+        if (!list.length || list.length > 4) return false;
+        list.sort(function (a, b) { return a.z - b.z || a.i - b.i; });
+        TXE.fill(0); TXS.fill(-9); TXA.fill(0);
+        for (var k = 0; k < list.length; k++) {
+          var q = list[k], sl2 = q.sl, im = sl2.img, er = sl2.el.getBoundingClientRect(), ir = im.getBoundingClientRect();
+          var nw = im.naturalWidth || q.e.im.naturalWidth || 1, nh = im.naturalHeight || q.e.im.naturalHeight || 1, ra = ir.width / Math.max(1, ir.height), ia = nw / nh;
+          var cw = 1, ch = 1; if (ia > ra) cw = ra / ia; else ch = ia / ra;   // object-fit: cover (beim Computer-Foto von Hand: Seitenverhältnis gleich, alles)
+          if (!sl2.objP0 || sl2.objPi !== im) { sl2.objP0 = objPos(im); sl2.objPi = im; }
+          var o = k * 4;
+          TXE[o] = er.left - sr.left; TXE[o + 1] = er.top - sr.top; TXE[o + 2] = er.width; TXE[o + 3] = er.height;
+          TXI[o] = ir.left - sr.left; TXI[o + 1] = ir.top - sr.top; TXI[o + 2] = Math.max(1, ir.width); TXI[o + 3] = Math.max(1, ir.height);
+          TXC[o] = (1 - cw) * sl2.objP0[0]; TXC[o + 1] = (1 - ch) * sl2.objP0[1]; TXC[o + 2] = cw; TXC[o + 3] = ch;
+          if (desk && sl2.side && sl2.side.offsetWidth > 0) { var sd = sl2.side.getBoundingClientRect(); TXS[o] = sd.left - sr.left; TXS[o + 1] = sd.top - sr.top; TXS[o + 2] = sd.width; TXS[o + 3] = sd.height; TXA[k] = sl2.sideA == null ? 1 : sl2.sideA; }
+          c.activeTexture(c.TEXTURE1 + k); c.bindTexture(c.TEXTURE_2D, q.e.tx);
+        }
+        for (k = list.length; k < 4; k++) { c.activeTexture(c.TEXTURE1 + k); c.bindTexture(c.TEXTURE_2D, list[0].e.tx); }
+        c.activeTexture(c.TEXTURE0);
+        c.uniform4fv(U.uTE, TXE); c.uniform4fv(U.uTI, TXI); c.uniform4fv(U.uTC, TXC); c.uniform4fv(U.uTS, TXS); c.uniform1fv(U.uTA, TXA);
+        compFull = true; compCrop = null;
+        return true;
       }
       function compTex(sr) {
-        stripOn = !!(cctx && stripOk());
-        if (stripOn) { loadAll(); return stripTex(sr); }
+        txOn = txOk() && txSet(sr);
+        if (txOn) return true;
         // Hugo 24.11. (15:37): beim Eintauchen folgt die Textur dem gezoomten Bild (eingefroren zeigte die Welle das Bild in
         // alter Grösse über dem gezoomten – doppeltes Bild).
         // Audit 24.11. (Akku): dafür wird das Bild nicht mehr in jedem Bild neu gezeichnet und hochgeladen, sondern einmal
@@ -1159,7 +1199,13 @@
       var waves = [], buf = new Float32Array(NP * 4), ages = new Float32Array(NW), wgs = new Float32Array(NW), wgOne = new Float32Array(NW).fill(1), hues = new Float32Array(NW), bnd = new Float32Array(NW * 4), raf = 0, regAt = -1, LIFE = 6.5, edgeT0 = 0, edgeSeed = 0, killT0 = 0, slowEma = 16, lastT = 0, covV = 0, covT = 0;
       // Schärfe nach Gerät: schwache Handys (wenig Kerne/Speicher) starten gröber; jedes Gerät regelt bei Ruckeln selbst nach
       var weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 3);
-      var dprCap = weak ? 1 : (desk ? 1 : 2);   // Hugo 25.11. (19:27): Computer wieder 1 (1.5 liess das Wechseln von Bild zu Bild ruckeln); scharf bleibt es, weil die Fläche nur noch dort deckt, wo die Welle ist   // Hugo 24.11.: Computer rechnet die ganze Bildschirmfläche – startet mit 1 (sonst ruckelt der Aufprall)
+      // Hugo 25.11. (20:54): «immer scharf, nur drosseln, wenn es nicht geht» – die Welle rechnet in voller Pixeldichte des Geräts
+      // (höchstens 3, schwache Geräte 2). Werden die Bilder zu langsam, geht sie stufenweise herunter; läuft es wieder mehrere Sekunden
+      // flüssig, wieder hinauf. Die gefundene Stufe merkt sich der Browser (nächster Besuch startet dort, kein Ruckeln beim Aufprall)
+      var dprMax = Math.min(weak ? 2 : 3, window.devicePixelRatio || 1), qKey = 'hp-q-' + (desk ? 'd' : 'm') + dprMax;
+      var dprCap = desk ? dprMax : Math.min(2, dprMax), dprBad = 99, dprDown = 0, goodN = 0;
+      try { var qS = parseFloat(localStorage.getItem(qKey)); if (qS >= 0.6 && qS <= dprMax) { dprCap = qS; dprBad = qS + 0.5; } } catch (er) {}
+      function qSave() { try { localStorage.setItem(qKey, String(dprCap)); } catch (er) {} }
       function add(x, y) {
         var wv = waves[waves.length - 1]; if (!wv) return;
         // Hugo 23.11.: die Welle folgt dem Finger ohne Verzögerung — der letzte Punkt ("Spitze") sitzt immer genau unter
@@ -1198,12 +1244,12 @@
         }
         if (!raf) req();
       }
+      function lastAct(wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; return la; }
       function draw(now) {
         raf = 0; tickNow = now;
         // Hugo 25.11. (19:10): eine Welle lebt ab ihrer letzten Bewegung (vorher ab ihrem Start – eine lange Mauswelle verschwand
         // nach 6.5 s auf einen Schlag, die Ecken sprangen zurück); jede klingt mit eigenem Wert weich aus (uWG)
-        function lastAct(wv) { var la = wv.t0, lp = wv.pts[wv.pts.length - 1]; if (lp && lp.t > la) la = lp.t; return la; }
-        waves = waves.filter(function (wv) { return now - lastAct(wv) < LIFE * 1000 && !(wv.fade0 && now - wv.fade0 > 320); });
+        waves = waves.filter(function (wv) { return now - lastAct(wv) < LIFE * 1000 && !(wv.fade0 && now - wv.fade0 > WFADE + 20); });
         // Hugo 24.11.: der Effekt steht fest auf dem Bildschirm, die Bilder wischen darunter durch. Gerechnet wird über die
         // ganze Bühne mit allen sichtbaren Bildern als Textur; Computer: Leinwand liegt über der Bühne. Handy: die
         // Leinwand ist unsichtbar, jedes sichtbare Bild zeigt seinen Ausschnitt davon (unter seinem Titel)
@@ -1218,16 +1264,20 @@
         // passt sich an: wird ein Gerät zu langsam, rechnet die Welle etwas gröber (flüssig geht vor)
         if (lastT && now - lastT < 200) {
           slowEma = slowEma * 0.85 + (now - lastT) * 0.15;
-          if (slowEma > 21 && dprCap > 0.6) { dprCap = Math.max(0.6, dprCap - (dprCap > 1 ? 0.5 : 0.2)); slowEma = 16; }
+          if (slowEma > 21 && dprCap > 0.6) { dprBad = dprCap; dprCap = Math.max(0.6, dprCap - (dprCap > 1.25 ? 0.5 : 0.2)); slowEma = 16; dprDown = now; goodN = 0; qSave(); }
+          else if (slowEma < 17.5 && dprCap < dprMax) {
+            // erst nach 1.5 s flüssig und frühestens 5 s nach dem letzten Herunterschalten; die Stufe, die ruckelte, erst nach 30 s wieder versuchen
+            if (++goodN > 90 && now - dprDown > 5000 && (dprCap + 0.5 < dprBad || now - dprDown > 30000)) { dprCap = Math.min(dprMax, dprCap + 0.5); goodN = 0; if (dprCap >= dprBad) dprBad = 99; qSave(); }
+          } else goodN = 0;
         }
         lastT = now;
-        var dpr = Math.min(window.devicePixelRatio || 1, dprCap), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+        var dpr = Math.min(dprMax, dprCap), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
         if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; c.viewport(0, 0, pw, ph); }
         var ord = waves.filter(function (q) { return !(q.sp2 < 0); }).concat(waves.filter(function (q) { return q.sp2 < 0; }));
         for (var k = 0; k < NW; k++) {
           var wv = ord[k];
           ages[k] = wv ? (now - wv.t0) / 1000 : -1;
-          if (wv) { var laW = lastAct(wv), enW = laW + (wv.sp2 < 0 ? 5600 : 5000); wgs[k] = (1 - sm01(enW - 1400, enW, now)) * (wv.fade0 ? 1 - sm01(wv.fade0, wv.fade0 + 300, now) : 1); } else wgs[k] = 0;
+          if (wv) { var laW = lastAct(wv), enW = laW + (wv.sp2 < 0 ? 5600 : 5000); wgs[k] = (1 - sm01(enW - 1400, enW, now)) * (wv.fade0 ? 1 - sm01(wv.fade0, wv.fade0 + WFADE, now) : 1); } else wgs[k] = 0;
           // Farbe je nach Auslösung (Hugo 23.11.): Tippen → Ort, Ziehen → Richtung und Länge der Bahn
           if (wv && wv.pts.length) {
             var a0 = wv.pts[0], a1 = wv.pts[wv.pts.length - 1], dl = Math.hypot(a1.x - a0.x, a1.y - a0.y);
@@ -1247,7 +1297,7 @@
         }
         // Textur = alle sichtbaren Bilder zusammen, wie sie gerade auf dem Bildschirm stehen
         if ((!lightMode || lf > 0.001) && compTex(sr)) {   // Licht-Modus: die Welle zeigt nur Licht, keine Bildtextur nötig (weniger Rechenarbeit)
-          c.uniform4f(U.uStrip, stripOn ? 1 : 0, stripTop, mobZ, h);
+          c.uniform1f(U.uTx, txOn ? 1 : 0);
           c.uniform4f(U.uRect, 0, 0, w, h); if (compCrop) c.uniform4f(U.uCrop, compCrop[0], compCrop[1], compCrop[2], compCrop[3]); else c.uniform4f(U.uCrop, 0, 0, 1, 1); c.uniform1f(U.uHas, 1);
         } else c.uniform1f(U.uHas, 0);
         c.uniform2f(U.uRes, w, h); c.uniform1f(U.uDpr, pw / w); c.uniform4fv(U.uP, buf); c.uniform1fv(U.uAge, ages); c.uniform1fv(U.uHue, hues); c.uniform4fv(U.uB, bnd); c.uniform1f(U.uT, (now / 1000) % 1000);
@@ -1314,13 +1364,29 @@
       }
       function refRect() { return desk ? cv.getBoundingClientRect() : stage.getBoundingClientRect(); }
       function ok() { return !desk && !root.classList.contains('is-info'); }
-      function dropOld() { for (var q = 0; q < waves.length; q++) if (!(waves[q].sp2 < 0)) { waves.splice(q, 1); return; } waves.shift(); }
-      // Hugo 25.11. (19:27, Video): beim Starten einer neuen Welle sprangen die Bilder zurück – war kein Platz mehr frei, wurde die
-      // älteste Welle sofort entfernt. Jetzt: sind alle Plätze belegt, klingt die älteste schon vorher in 0.3 s aus (eine neue
-      // Mauswelle beginnt erst nach 350 ms Pause), beim nächsten Start ist sie längst unsichtbar
+      // Hugo 25.11. (20:57, Video): auf dem Handy und am Computer sprang das Bild zurück, sobald eine neue Welle begann. Ursache: lief
+      // noch die Andock-Welle (Laden, Schliessen), belegte sie einen der 4 Plätze, und jede neue Welle warf die älteste Fingerwelle
+      // ohne Ausblenden hinaus – auch wenn diese noch das halbe Bild verzog. Jetzt: 6 Plätze, einer bleibt immer frei. Sind 5 belegt,
+      // blendet die am wenigsten sichtbare Welle weich aus (WFADE). Hart entfernt wird nur, wenn sehr schnell hintereinander mehr Wellen
+      // kommen, als Plätze da sind – dann die schwächste, meist die schon ausblendende
+      var WFADE = 600;
+      function wVis(w, now) {
+        var la = lastAct(w), en = la + 5000, v = (1 - sm01(en - 1400, en, now)) * Math.exp(-0.45 * Math.max(0, now - la) / 1000);
+        return w.fade0 ? v * (1 - sm01(w.fade0, w.fade0 + WFADE, now)) : v;
+      }
+      function weakest(now, skip, fresh) {
+        var iMin = -1, vMin = 9;
+        for (var q = 0; q < waves.length; q++) {
+          var w = waves[q]; if (w.sp2 < 0 || w === skip || (fresh && w.fade0)) continue;
+          var v = wVis(w, now); if (v < vMin) { vMin = v; iMin = q; }
+        }
+        return iMin;
+      }
       function pushWave(wv) {
-        waves.push(wv); if (waves.length > NW) dropOld();
-        if (waves.length >= NW) for (var q = 0; q < waves.length - 1; q++) if (!(waves[q].sp2 < 0)) { if (!waves[q].fade0) waves[q].fade0 = performance.now(); break; }
+        var now = performance.now();
+        waves.push(wv);
+        while (waves.length > NW) { var iD = weakest(now, wv, false); waves.splice(iD < 0 ? 0 : iD, 1); }
+        if (waves.length >= NW - 1) { var iF = weakest(now, wv, true); if (iF >= 0) waves[iF].fade0 = now; }   // ein Platz bleibt frei
       }
       // Computer (Hugo 24.11.): die Maus zieht immer eine Welle wie der Finger am Handy und wischt den Andock-Effekt weg
       var mWave = 0, mAcc = 0, mLast = 0;

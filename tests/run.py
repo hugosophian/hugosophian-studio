@@ -6,8 +6,8 @@ Aufruf (im Repo-Ordner):   python3 tests/run.py            prüfen
 
 Was geprüft wird (Handy 390 × 780, doppelte Auflösung, fester Zufall, virtuelle Uhr = jedes Mal genau gleich):
   1. keine JavaScript-Fehler, beide Shader übersetzen
-  2. Andocken: Effekt-Leinwand sitzt direkt im Bild (keine Kopie), wenige Textur-Uploads
-  3. Wischen: kein neuer Textur-Upload pro Bild (Streifen-Textur)
+  2. Andocken: Effekt-Leinwand sitzt direkt im Bild (keine Kopie), jedes Foto wird nur einmal hochgeladen
+  3. Wischen: kein neuer Textur-Upload pro Bild (Bildtexturen)
   4. Tippen öffnet About, Schliessen: weisse Seite springt nicht zurück (kein Blitz)
   5. Bildvergleich mit Gitterbild (Andocken, Welle): Falten, Linien, Doppelkanten fallen als Abweichung auf
   6. Bildtakt mit 4-fach gebremster CPU (Hinweis, kein Abbruch)
@@ -81,7 +81,8 @@ async def main():
             if 'hp-slide' in pk: par = pk
         check('Andocken: Leinwand direkt im Bild', par is not None and 'hp-slide' in par, str(par))
         up0, cp0 = await pg.evaluate('[__up,__copy]')
-        check('Andocken: wenige Textur-Uploads', up0 <= 3, 'Uploads %d, Kopien %d' % (up0, cp0))
+        nimg = await pg.evaluate("document.querySelectorAll('.hp-slide img').length")
+        check('Andocken: Uploads nur einmal je Foto', up0 <= nimg + 3, 'Uploads %d bei %d Fotos, Kopien %d' % (up0, nimg, cp0))   # Bildtexturen: jedes Foto einmal (20:54), sonst wenige
         await frames(pg, 5500)
         # Welle beim Wischen
         # Finger im Takt der virtuellen Uhr (Ereignisse direkt in der Seite – so jedes Mal genau gleich)
