@@ -20,6 +20,8 @@
   // ---------- Werte ----------
   var AK = {
     seed: 7,              // fester Zufall: andere Zahl = anderer Wald
+    style: 'eldorado',    // Hugo 26.11. (23:58): 'eldorado' = nach den Referenzen; 'aquarell' = erster Wald (für den Übergang aufheben)
+    wash: .34,            // Perlmutt-Schleier über den El-Dorado-Farben (0 = volle Farben, .6 = sehr pastellig)
     rowsVisible: 5,       // sichtbare Zeilen im Rad
     rowDeg: 21,           // Grad pro Zeile auf dem Zylinder (Apple ~ 20)
     drift: 1,             // ruhige Eigenbewegung der Kamera (0 = aus)
@@ -293,6 +295,268 @@
     x.fillStyle = g; x.fillRect(0, 0, w, h); x.restore();
   }
 
+  // ---------- Malstil «El Dorado» (Hugo 26.11.2026, 23:58: Referenzbilder) ----------
+  // Eigene Szene im Stil der Referenzen, nichts davon kopiert: flache, satte Farben mit dunkler Kontur, Ornamente
+  // (Spiralen, Stufen-Mäander, Punkte), Farnschnecken, ein Goldfluss mit fliessenden Bändern, Stufenwolken, eine
+  // ornamentale Sonne und Stufentempel im Dunst. Darüber ein Perlmutt-Schleier (AK.wash), damit es zur Website passt.
+  var ED = {
+    out: '#1b1640', gold: '#f2c230', goldL: '#ffe27a', teal: '#0f6b6e', tealD: '#0b4a55', em: '#1f9a5a', lime: '#8fd14f',
+    mag: '#c2187a', pur: '#7a2fbf', vio: '#5b3fd1', ora: '#f07a2a', blue: '#2f5fd0'
+  };
+  var ED_LEAF = ['#1f9a5a', '#2bb673', '#0f8a7a', '#8fd14f', '#1f7fa8', '#7a2fbf', '#5b3fd1', '#c2187a'];
+  var ED_FLOWER = ['#c2187a', '#e0409a', '#7a2fbf', '#f07a2a', '#ff5a8a', '#9b3fe0'];
+  function ol(x, w, col) { x.lineJoin = 'round'; x.lineCap = 'round'; x.strokeStyle = col || ED.out; x.lineWidth = w; x.stroke(); }
+
+  function edLeaf(x, o) {
+    var lw = o.lw || 2, b = o.bend || 0;
+    x.save(); x.translate(o.x, o.y); x.rotate(o.a);
+    leafPath(x, o.len, o.wid, b, 0); x.fillStyle = o.col; x.fill();
+    x.save(); leafPath(x, o.len, o.wid, b, 0); x.clip();
+    x.save(); x.translate(o.len * .06, -o.wid * .28); x.scale(.86, .46); leafPath(x, o.len, o.wid, b, 0);   // flaches Licht zur Oberseite
+    x.fillStyle = o.hi || mix(o.col, '#ffffff', .2); x.fill(); x.restore();
+    if (o.stripes) {
+      var n = o.stripes;
+      for (var i = 1; i < n; i++) {
+        var t = i / n, p = midPoint(o.len, b, t), q = midPoint(o.len, b, Math.min(1, t + .14));
+        for (var s = -1; s <= 1; s += 2) { x.beginPath(); x.moveTo(p[0], p[1]); x.quadraticCurveTo(q[0], p[1] + s * o.wid * .4, q[0] + o.len * .06, p[1] + s * o.wid * 1.2); ol(x, lw * .5, rgba(ED.out, .55)); }
+      }
+    }
+    x.restore();
+    x.beginPath(); x.moveTo(0, 0); x.bezierCurveTo(o.len * .2, b * o.len * .04, o.len * .72, b * o.len * .56, o.len * .96, b * o.len * .96); ol(x, lw * .7);
+    leafPath(x, o.len, o.wid, b, 0); ol(x, lw);
+    x.restore();
+  }
+  function edFan(x, o) {   // Palmfächer: lange schmale Blätter aus einem Punkt
+    for (var i = 0; i < o.n; i++) {
+      var t = o.n > 1 ? i / (o.n - 1) - .5 : 0;
+      edLeaf(x, { x: o.x, y: o.y, a: o.a + t * o.spread, len: o.len * rr(.8, 1.05), wid: o.len * (o.wf || .07), bend: t * .3 + rr(-.08, .08),
+        col: pick(o.cols), lw: o.lw, stripes: o.stripes });
+    }
+  }
+  function spiralPts(cx, cy, r, turns, a0, dir) {
+    var pts = [], n = Math.round(turns * 28);
+    for (var i = 0; i <= n; i++) { var t = i / n, a = a0 + dir * t * turns * Math.PI * 2, rr2 = r * (1 - t * .85); pts.push([cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2]); }
+    return pts;
+  }
+  function polyline(x, pts) { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) x.lineTo(pts[i][0], pts[i][1]); }
+  function edFern(x, o) {   // Farnschnecke: Stiel, der oben einrollt, mit kleinen Fiedern
+    var dir = o.dir || 1, L = o.len, r = L * .22, pts = [];
+    for (var i = 0; i <= 20; i++) { var t = i / 20; pts.push([o.x + Math.sin(t * 2.4) * dir * L * .28, o.y - t * L]); }
+    var top = pts[pts.length - 1];
+    var sp = spiralPts(top[0] + dir * r, top[1], r, 1.25, Math.PI, dir);
+    pts = pts.concat(sp);
+    for (var k = 3; k < 18; k += 2) {
+      var p = pts[k], s = (k % 4 === 1 ? 1 : -1), ll = L * .16 * (1 - k / 22);
+      edLeaf(x, { x: p[0], y: p[1], a: -Math.PI / 2 + s * 1.1, len: ll, wid: ll * .3, bend: s * .2, col: mix(o.col, '#ffffff', .12), lw: o.lw * .7 });
+    }
+    polyline(x, pts); ol(x, o.lw * 2 + L * .035); polyline(x, pts); ol(x, L * .035, o.col);
+  }
+  function edFlower(x, o) {
+    x.save(); x.translate(o.x, o.y); x.rotate(o.a || 0);
+    var n = o.n || 7;
+    for (var i = 0; i < n; i++) { x.save(); x.rotate(i / n * Math.PI * 2); edLeaf(x, { x: 0, y: 0, a: 0, len: o.r, wid: o.r * .26, bend: .05, col: o.col, lw: o.lw }); x.restore(); }
+    x.beginPath(); x.arc(0, 0, o.r * .3, 0, 7); x.fillStyle = ED.gold; x.fill(); ol(x, o.lw);
+    for (var d = 0; d < 8; d++) { var a = d / 8 * Math.PI * 2; x.beginPath(); x.arc(Math.cos(a) * o.r * .18, Math.sin(a) * o.r * .18, o.r * .035, 0, 7); x.fillStyle = ED.ora; x.fill(); }
+    x.restore();
+  }
+  function edColumn(x, o) {   // Urwald-Säule: gewellt, oben abgerundet, mit Ornamenten (Stufen-Mäander, Kreise, Spiralen)
+    var lw = o.lw, top = o.top, amp = o.w * .12, f = rr(.01, .02), ph = rr(0, 6), n = 24;
+    x.beginPath(); x.moveTo(o.x, top + o.w * .5);
+    for (var i = 0; i <= n; i++) { var yy = top + o.w * .5 + (o.h - top) * i / n; x.lineTo(o.x + Math.sin(yy * f + ph) * amp, yy); }
+    for (var j = n; j >= 0; j--) { var y2 = top + o.w * .5 + (o.h - top) * j / n; x.lineTo(o.x + o.w + Math.sin(y2 * f + ph + .8) * amp, y2); }
+    x.arc(o.x + o.w / 2, top + o.w * .5, o.w / 2, 0, Math.PI, true);
+    x.closePath(); x.fillStyle = o.col; x.fill(); ol(x, lw);
+    var y = top + o.w * .35, c2 = o.col2;
+    while (y < o.h - o.w) {
+      var kind = Math.floor(R() * 4), dx = Math.sin(y * f + ph) * amp, cx = o.x + o.w / 2 + dx;
+      if (kind === 0) {   // Stufen-Mäander
+        var st = o.w / 5, pts = [], yy2 = y;
+        for (var s = 0; s < 6; s++) { pts.push([o.x + dx + st * .5 + s * st * .8, yy2]); yy2 += (s % 2 ? -st : st) * .9; pts.push([o.x + dx + st * .5 + s * st * .8, yy2]); }
+        polyline(x, pts); ol(x, lw * 1.4, c2); y += o.w * .9;
+      } else if (kind === 1) {   // Kreis mit Punkt
+        x.beginPath(); x.arc(cx, y + o.w * .35, o.w * .28, 0, 7); x.fillStyle = c2; x.fill(); ol(x, lw * .8);
+        x.beginPath(); x.arc(cx, y + o.w * .35, o.w * .08, 0, 7); x.fillStyle = ED.goldL; x.fill(); y += o.w * .9;
+      } else if (kind === 2) {   // Spirale
+        polyline(x, spiralPts(cx, y + o.w * .35, o.w * .32, 1.6, 0, R() < .5 ? 1 : -1)); ol(x, lw * 1.2, c2); y += o.w * .9;
+      } else {   // Punktreihe
+        for (var d = 0; d < 3; d++) { x.beginPath(); x.arc(cx, y + d * o.w * .26, o.w * .07, 0, 7); x.fillStyle = c2; x.fill(); }
+        y += o.w * .8;
+      }
+      y += rr(o.w * .2, o.w * .6);
+    }
+  }
+  function edBlob(x, lobes, col, lw, hi) {   // mehrere Kugeln als eine Form: zuerst alle Konturen, dann alle Flächen darüber
+    lobes.forEach(function (l) { x.beginPath(); x.ellipse(l[0], l[1], l[2], l[3], 0, 0, 7); ol(x, lw * 2); });
+    lobes.forEach(function (l) { x.beginPath(); x.ellipse(l[0], l[1], l[2], l[3], 0, 0, 7); x.fillStyle = col; x.fill(); });
+    if (hi !== false) lobes.forEach(function (l) { x.beginPath(); x.ellipse(l[0] - l[2] * .25, l[1] - l[3] * .35, l[2] * .4, l[3] * .18, -.3, 0, 7); x.fillStyle = 'rgba(255,255,255,.2)'; x.fill(); });
+  }
+  function edBush(x, cx, cy, r, col, lw) {
+    var lobes = [], n = 4 + Math.floor(R() * 3);
+    for (var i = 0; i < n; i++) { var a = Math.PI + (i / (n - 1)) * Math.PI; lobes.push([cx + Math.cos(a) * r * .7, cy + Math.sin(a) * r * .45, r * rr(.38, .55), r * rr(.3, .42)]); }
+    lobes.push([cx, cy, r * .8, r * .35]);
+    edBlob(x, lobes, col, lw);
+  }
+  function rrect(x, a, b, w, h, r) { r = Math.min(r, w / 2, h / 2); x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+  function edCloud(x, o) {   // Stufenwolke aus abgerundeten Blöcken, innen feine Linien
+    var bx = o.x, n = 3 + Math.floor(R() * 3);
+    var bl = [];
+    for (var i = 0; i < n; i++) { var bw = o.s * rr(.5, .9), bh = o.s * rr(.45, 1.1); bl.push([bx, o.y - bh, bw, bh + o.s * .2]); bx += bw * rr(.55, .8); }
+    bl.forEach(function (q) { rrect(x, q[0], q[1], q[2], q[3], o.s * .22); ol(x, o.lw * 2, o.line); });
+    bl.forEach(function (q) { rrect(x, q[0], q[1], q[2], q[3], o.s * .22); x.fillStyle = o.col; x.fill(); });
+    bl.forEach(function (q) { rrect(x, q[0] + q[2] * .18, q[1] + q[3] * .18, q[2] * .5, q[3] * .3, o.s * .1); ol(x, o.lw * .7, o.line); });
+  }
+  function edTemple(x, o) {   // Stufentempel als flache Silhouette im Dunst
+    var w = o.w, sh = o.h / o.n;
+    for (var i = 0; i < o.n; i++) {
+      var ww = w * (1 - i / (o.n + 1));
+      x.fillStyle = o.col; x.fillRect(o.x - ww / 2, o.y - sh * (i + 1), ww, sh + 1);
+    }
+    x.fillStyle = mix(o.col, '#1b1640', .25);
+    x.fillRect(o.x - w * .06, o.y - sh * o.n - sh * .8, w * .12, sh * .8);
+  }
+  function edSun(x, o) {   // ornamentale Sonne (eigene Gestaltung)
+    var r = o.r; x.save(); x.translate(o.x, o.y);
+    for (var i = 0; i < 16; i++) {   // Strahlen als Tropfen
+      var a = i / 16 * Math.PI * 2; x.save(); x.rotate(a);
+      x.beginPath(); x.moveTo(r * 1.18, 0); x.quadraticCurveTo(r * 1.45, -r * .12, r * 1.7, 0); x.quadraticCurveTo(r * 1.45, r * .12, r * 1.18, 0);
+      x.fillStyle = i % 2 ? ED.ora : ED.gold; x.fill(); ol(x, o.lw * .8); x.restore();
+    }
+    x.beginPath(); for (var k = 0; k <= 120; k++) { var t = k / 120 * Math.PI * 2, rr2 = r * (1.02 + .09 * (Math.sin(t * 12) > 0 ? 1 : 0)); x.lineTo(Math.cos(t) * rr2, Math.sin(t) * rr2); }
+    x.closePath(); x.fillStyle = '#e0582a'; x.fill(); ol(x, o.lw);
+    x.beginPath(); x.arc(0, 0, r * .86, 0, 7); x.fillStyle = ED.ora; x.fill(); ol(x, o.lw);
+    for (var d = 0; d < 14; d++) { var b = d / 14 * Math.PI * 2; x.beginPath(); x.arc(Math.cos(b) * r * .7, Math.sin(b) * r * .7, r * .05, 0, 7); x.fillStyle = '#3fbf7a'; x.fill(); }
+    x.beginPath(); x.arc(0, 0, r * .55, 0, 7); x.fillStyle = ED.gold; x.fill(); ol(x, o.lw);
+    x.beginPath(); x.arc(0, 0, r * .3, 0, 7); x.fillStyle = ED.goldL; x.fill(); ol(x, o.lw * .8);
+    polyline(x, spiralPts(0, 0, r * .22, 1.4, 0, 1)); ol(x, o.lw * .8, ED.ora);
+    x.restore();
+  }
+  function edRiver(x, w, h, top, lw) {   // Goldfluss: dunkles Wasser, fliessende Goldbänder und Schlaufen
+    var pts = [];
+    x.beginPath(); x.moveTo(-10, h + 10);
+    for (var i = 0; i <= 40; i++) { var px = -10 + (w + 20) * i / 40; x.lineTo(px, top + Math.sin(px * .012 + 1) * h * .012 + Math.sin(px * .031) * h * .006); }
+    x.lineTo(w + 10, h + 10); x.closePath(); x.fillStyle = ED.tealD; x.fill(); ol(x, lw);
+    var rows = 9;
+    for (var k = 0; k < rows; k++) {
+      var t = (k + .6) / rows, y0 = top + (h - top) * Math.pow(t, 1.25), amp = (h - top) * .035 * (.4 + t),
+          th = (h - top) * .12 * (.35 + t * 1.1), f = rr(.004, .009), ph = rr(0, 6), f3 = rr(.006, .014), ph3 = rr(0, 6);
+      var up = [], dn = [];
+      for (var j = 0; j <= 60; j++) {
+        var xx = -20 + (w + 40) * j / 60, yy = y0 + Math.sin(xx * f + ph) * amp + Math.sin(xx * f * 2.3 + ph) * amp * .35,
+            tt = th * Math.max(0, Math.sin(xx * f3 + ph3)) ;
+        up.push([xx, yy - tt / 2]); dn.push([xx, yy + tt / 2]);
+      }
+      x.beginPath(); x.moveTo(up[0][0], up[0][1]);
+      for (var u = 1; u < up.length; u++) x.lineTo(up[u][0], up[u][1]);
+      for (var v = dn.length - 1; v >= 0; v--) x.lineTo(dn[v][0], dn[v][1]);
+      x.closePath();
+      var g = x.createLinearGradient(0, y0 - th, 0, y0 + th); g.addColorStop(0, ED.goldL); g.addColorStop(1, ED.gold);
+      x.fillStyle = g; x.fill(); ol(x, lw * .6, '#fff4b8');
+    }
+    for (var l = 0; l < 5; l++) {   // Schlaufen
+      var lx = rr(w * .15, w * .85), ly = rr(top + (h - top) * .3, h * .97), lr = rr(w * .03, w * .07);
+      x.beginPath(); x.ellipse(lx, ly, lr * 2, lr * .45, rr(-.15, .15), 0, 7); ol(x, lr * .35, ED.gold); x.beginPath(); x.ellipse(lx, ly, lr * 2, lr * .45, 0, 0, 7); ol(x, lw * .5, '#fff4b8');
+    }
+  }
+  function edRock(x, cx, cy, r, col, lw) {
+    x.beginPath(); x.moveTo(cx - r, cy);
+    x.bezierCurveTo(cx - r, cy - r * .9, cx - r * .2, cy - r * 1.1, cx + r * .3, cy - r * .8); x.bezierCurveTo(cx + r, cy - r * .7, cx + r * 1.1, cy - r * .1, cx + r, cy);
+    x.closePath(); x.fillStyle = col; x.fill(); ol(x, lw);
+    x.beginPath(); x.ellipse(cx - r * .2, cy - r * .55, r * .35, r * .12, -.3, 0, 7); x.fillStyle = mix(col, '#ffffff', .25); x.fill();
+  }
+  var paperTile = null;
+  function paper(x, w, h, a) {   // Papierstruktur wie gemalt
+    if (!paperTile) {
+      var t = canvas(160, 160, 1), P = rng(99), id = t.x.getImageData(0, 0, 160, 160), d = id.data;
+      for (var i = 0; i < d.length; i += 4) { var v = 128 + (P() - .5) * 90; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      t.x.putImageData(id, 0, 0); paperTile = t.c;
+    }
+    x.save(); x.globalCompositeOperation = 'overlay'; x.globalAlpha = a; x.fillStyle = x.createPattern(paperTile, 'repeat'); x.fillRect(0, 0, w, h); x.restore();
+  }
+  function pearlWash(x, w, h, a) {   // Perlmutt-Schleier (wie das helle Referenzbild): Farben bleiben, werden pastellig
+    x.save(); x.globalCompositeOperation = 'source-atop';
+    var g = x.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, rgba('#eceff7', a)); g.addColorStop(.3, rgba('#f2dde3', a)); g.addColorStop(.55, rgba('#daf2f8', a)); g.addColorStop(.8, rgba('#fbf3de', a)); g.addColorStop(1, rgba('#e5e1f4', a));
+    x.fillStyle = g; x.fillRect(0, 0, w, h); x.restore();
+  }
+
+  var ED_SKY = 'linear-gradient(to bottom, #cdeeea 0%, #c4dcf3 34%, #d3c9f0 62%, #c9e6dc 100%)';
+  function edLayers(layer, mob) {
+    var wa = AK.wash;
+    // 0 · Himmel mit Stufenwolken, ornamentaler Sonne (Quelle der Strahlen) und Stufentempeln im Dunst
+    layer(0, .75, function (x, w, h) {
+      var lw = 2.4;
+      edSun(x, { x: w * .66, y: h * .1, r: Math.min(w, h) * (mob ? .1 : .075), lw: lw });
+      for (var c = 0; c < (mob ? 4 : 6); c++) {
+        var cx = c % 2 ? rr(w * .55, w * .95) : rr(-w * .05, w * .4);
+        edCloud(x, { x: cx, y: rr(h * .14, h * .32), s: Math.min(w, h) * rr(.07, .11), col: '#a9e6f2', line: '#effcff', lw: lw });
+      }
+      for (var t = 0; t < (mob ? 4 : 7); t++) edTemple(x, { x: rr(0, w), y: h * rr(.5, .6), w: rr(w * .12, w * .28), h: h * rr(.12, .22), n: 4 + Math.floor(R() * 3), col: pick(['#4a67c9', '#5a52c2', '#3f7fbf']) });
+      for (var b = 0; b < (mob ? 10 : 18); b++)   // ferne Baumkronen als bunte Reihe am Horizont
+        edBush(x, rr(-w * .05, w * 1.05), h * rr(.6, .68), rr(w * .06, w * .12), pick(['#7a2fbf', '#c2187a', '#1f9a5a', '#2f5fd0', '#8fd14f', '#0f8a7a']), lw * .8);
+      paper(x, w, h, .18); pearlWash(x, w, h, wa + .2);
+    });
+    // 1 · Urwald-Wand: Ornament-Säulen, Fächer, Büsche (Violett, Türkis, Grün, Magenta)
+    layer(1, mob ? 1 : .85, function (x, w, h) {
+      var lw = 2;
+      var cols = mob ? 7 : 12;
+      for (var i = 0; i < cols; i++) {
+        var cw = rr(w * .04, w * .08), cxp = (i + rr(-.3, .3)) / cols * w;
+        var mid = cxp > w * .28 && cxp < w * .72;
+        if (mid && R() < .55) continue;   // in der Mitte lichter, oben bleibt der Himmel frei
+        edColumn(x, { x: cxp, w: cw, top: h * (mid ? rr(.32, .45) : rr(.08, .3)), h: h * rr(.62, .78), col: pick(['#7a2fbf', '#0f8a7a', '#1f9a5a', '#5b3fd1', '#2f5fd0']), col2: pick(['#8fd14f', '#f2c230', '#e0409a', '#57d6c8']), lw: lw });
+      }
+      for (var f = 0; f < (mob ? 7 : 12); f++) {
+        var left = R() < .5;
+        edFan(x, { x: left ? rr(0, w * .3) : rr(w * .7, w), y: h * rr(.55, .78), a: -Math.PI / 2 + rr(-.5, .5), spread: rr(1.6, 2.4), n: 6 + Math.floor(R() * 4), len: h * rr(.14, .24), cols: ED_LEAF, lw: lw, wf: .08 });
+      }
+      for (var b = 0; b < (mob ? 8 : 14); b++)
+        edBush(x, rr(-w * .05, w * 1.05), h * rr(.72, .8), rr(w * .06, w * .11) * (mob ? 1.3 : 1), pick(['#7a2fbf', '#c2187a', '#1f9a5a', '#2bb673', '#0f8a7a', '#5b3fd1']), lw);
+      paper(x, w, h, .16); pearlWash(x, w, h, wa + .08);
+    });
+    // 2 · vorne am Fluss: Goldfluss, Steine, Bananenblätter, Farnschnecken, Blüten; die Mitte bleibt frei
+    layer(2, Math.min(DPR, 1.5), function (x, w, h) {
+      var lw = 2.6, top = h * (mob ? .72 : .7);
+      edRiver(x, w, h, top, lw);
+      for (var r = 0; r < 4; r++) edRock(x, r % 2 ? rr(w * .78, w * .98) : rr(w * .02, w * .22), rr(top + 10, h * .95), rr(w * .04, w * .07) * (mob ? 1.4 : 1), pick(['#c2187a', '#a0146a', '#7a2fbf']), lw);
+      for (var b = 0; b < (mob ? 6 : 10); b++) {
+        var left = b % 2 === 0;
+        edLeaf(x, { x: left ? rr(-w * .06, w * .03) : rr(w * .97, w * 1.06), y: rr(h * .18, h * .85), a: (left ? 0 : Math.PI) + (left ? 1 : -1) * rr(-.6, .3),
+          len: rr(w * .26, w * .4) * (mob ? 1 : .75), wid: rr(h * .035, h * .05), bend: (left ? 1 : -1) * rr(.08, .22), col: pick(ED_LEAF), lw: lw, stripes: 9 });
+      }
+      for (var f = 0; f < (mob ? 5 : 8); f++) {
+        var lf = R() < .5;
+        edFern(x, { x: lf ? rr(w * .02, w * .2) : rr(w * .8, w * .98), y: top + rr(-10, 30), len: h * rr(.08, .13) * (mob ? .85 : 1), col: pick(['#8fd14f', '#2bb673', '#57d6c8']), dir: lf ? 1 : -1, lw: lw * .8 });
+      }
+      for (var fl = 0; fl < (mob ? 6 : 9); fl++) {
+        var fx = R() < .5 ? rr(w * .02, w * .24) : rr(w * .76, w * .98);
+        edFlower(x, { x: fx, y: rr(h * .45, h * .85), r: rr(w * .025, w * .045) * (mob ? 1.4 : 1), a: rr(0, 6), col: pick(ED_FLOWER), lw: lw * .8 });
+      }
+      paper(x, w, h, .14); pearlWash(x, w, h, wa);
+    });
+  }
+  function edSprites(sprite, S, mob) {
+    var lw = 3, wa = AK.wash * .55;
+    sprite(S * .62, S * .62, 0, 0, [-W * (mob ? .22 : .04), -H * (mob ? .07 : .03)], function (x, w, h) {
+      edFan(x, { x: w * .04, y: h * .04, a: mob ? 1.3 : .75, spread: mob ? .9 : 1.4, n: 7, len: w * .82, cols: ['#5b3fd1', '#7a2fbf', '#0f8a7a', '#1f7fa8'], lw: lw, wf: .06, stripes: 7 });
+      edFlower(x, { x: w * .3, y: h * .22, r: w * .08, a: .3, col: '#c2187a', lw: lw * .8 });
+      pearlWash(x, w, h, wa);
+    });
+    sprite(S * .6, S * .55, 1, 0, [W * (mob ? 1.12 : 1.04), -H * (mob ? .05 : .02)], function (x, w, h) {
+      for (var i = 0; i < 3; i++) edLeaf(x, { x: w * .98, y: h * rr(.02, .2), a: Math.PI * rr(.62, .82), len: w * rr(.6, .85), wid: w * .08, bend: -.2, col: pick(['#1f9a5a', '#0f8a7a', '#7a2fbf']), lw: lw, stripes: 9 });
+      pearlWash(x, w, h, wa);
+    });
+    sprite(S * .55, S * .8, 0, 1, [-W * .05, H * 1.03], function (x, w, h) {
+      for (var i = 0; i < 3; i++) edLeaf(x, { x: w * .05 + i * w * .08, y: h, a: -Math.PI / 2 + rr(.15, .7), len: h * rr(.7, .92), wid: w * .11, bend: rr(.12, .28), col: pick(['#1f9a5a', '#2bb673', '#0f8a7a']), lw: lw, stripes: 11 });
+      edFern(x, { x: w * .42, y: h, len: h * .36, col: '#8fd14f', dir: -1, lw: lw });
+      pearlWash(x, w, h, wa);
+    });
+    sprite(S * .58, S * .6, 1, 1, [W * 1.05, H * 1.03], function (x, w, h) {
+      edFan(x, { x: w * .95, y: h, a: -Math.PI / 2 - .55, spread: 1.6, n: 7, len: h * .8, cols: ['#c2187a', '#7a2fbf', '#5b3fd1', '#1f9a5a'], lw: lw, wf: .07, stripes: 7 });
+      edFlower(x, { x: w * .48, y: h * .7, r: w * .08, a: .4, col: '#f07a2a', lw: lw * .8 });
+      pearlWash(x, w, h, wa);
+    });
+  }
+
   // ---------- Szene ----------
   var world, layers = [], sprites = [], rays, flare, sheen, fxC, fxX, W = 0, H = 0, PANS = [0.02, 0.05, 0.09, 0.15];
   var DEPTH = [0.18, 0.38, 0.62, 1];
@@ -315,6 +579,7 @@
       layers.push({ el: c.c, d: DEPTH[i], ox: -W * mg, oy: -H * mg - pan, pan: pan });
     }
 
+    if (AK.style === 'eldorado') { sky.style.background = ED_SKY; edLayers(layer, mob); } else {
     // 0 · ferne Bäume im Dunst (Flieder, Periwinkel)
     layer(0, .5, function (x, w, h, mob) {
       for (var i = 0; i < (mob ? 7 : 11); i++) trunk(x, { x: rr(0, w), w: rr(6, 16), h: h, lean: rr(-20, 20), col: pick(['#b5b3e6', '#c2bfee', '#a9b4e2']) });
@@ -369,6 +634,7 @@
       }
       haze(x, w, h, '#e6ecfa', .1);
     });
+    }
 
     // Lichtung
     var glow = document.createElement('div'); glow.className = 'ak-glow'; world.appendChild(glow);
@@ -384,6 +650,7 @@
         amp: rr(.8, 1.8), f: rr(.00028, .00048), ph: rr(0, 6) });
     }
     var S = mob ? W * .82 : Math.max(W, H * .6);
+    if (AK.style === 'eldorado') edSprites(sprite, mob ? S : Math.min(W * .52, H * .95), mob); else {
     // oben links: hängende Wedel
     sprite(S * .62, S * .62, 0, 0, [-W * (mob ? .12 : .04), -H * (mob ? .06 : .03)], function (x, w, h) {
       for (var i = 0; i < 4; i++) frond(x, { x: w * .02, y: h * .02, a: rr(.2, 1.05), len: rr(w * .6, w * .85), col: pick(['#0f5a5c', '#14505f', '#1b6a5a']), alt: ['#1f7a66', '#20465f'], n: 16, bend: rr(.25, .45), rim: pick(PEARL_STRONG), rimA: .55 });
@@ -404,6 +671,7 @@
       for (var i = 0; i < 3; i++) frond(x, { x: w * rr(.7, 1), y: h, a: -Math.PI / 2 - rr(.2, .9), len: h * rr(.55, .8), col: pick(['#0f5a5c', '#1b6a5a']), alt: ['#20465f'], n: 15, rim: pick(PEARL_STRONG), rimA: .5 });
       flower(x, { x: w * .45, y: h * .72, r: w * .07, a: .4, col: '#f48fb8' });
     });
+    }
     // Schatten liegen über der Mitte (unter dem Text), die Blätter ganz vorne
     sprites.forEach(function (s) { world.appendChild(s.sh); });
 
