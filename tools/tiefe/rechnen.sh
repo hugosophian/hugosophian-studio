@@ -5,7 +5,8 @@
 # Ergebnis: tiefe/<name>/maske.png, rand.webp, dahinter.webp, netz.png  (dazu zum Anschauen in tiefe/.arbeit/<name>/: panel.jpg,
 # plate_view.jpg). Das Foto selbst kommt nicht ins Repo – die Seite nimmt ihr eigenes <img>. Wichtig: dasselbe Foto mit demselben
 # Ausschnitt wie im CMS (gleiches Seitenverhältnis), sonst lässt home.js die Tiefe für dieses Bild weg.
-# Braucht: Python 3 mit opencv-contrib-python, numpy, onnxruntime · Modell: Depth Anything V2 Small als ONNX (Eingang 518 × 518)
+# Braucht: Python 3 mit opencv-contrib-python, numpy, onnxruntime · Modell: Depth Anything V2 Small als ONNX (Eingang 518 × 518,
+# Apache 2.0): depth_anything_v2_vits.onnx aus den GitHub-Releases von fabio-sim/Depth-Anything-ONNX (v2.0.0), rund 99 MB, nicht im Repo
 set -e
 [ $# -ge 3 ] || { echo "Aufruf: sh tools/tiefe/rechnen.sh <foto> <name> <modell.onnx>"; exit 1; }
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
