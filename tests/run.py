@@ -138,8 +138,8 @@ async def main():
             if '-' not in got: break
         check('Tiefe: jedes Bild hat seine Leinwand', '-' not in got, str(got))
         check('Tiefe: eingerastet unsichtbar (man sieht das <img>)', got[0] == '0', str(got))
-        nsw = await pg.evaluate("document.querySelectorAll('.hp-tiefe-sw button').length")
-        check('Tiefe: Schalter mit drei Stufen auf der Testseite', nsw == 3, str(nsw))
+        nsw = await pg.evaluate("document.querySelectorAll('.hp-tiefe-box input[type=range]').length")
+        check('Tiefe: Regler (Tiefe, Fixpunkt, Kippen, Halten) auf der Testseite', nsw == 4, str(nsw))
         await pg.evaluate("""window.__t=function(tp,x,y){var el=document.elementFromPoint(x,y)||document.body,o={bubbles:true,cancelable:true,composed:true};
           var pm={touchStart:'pointerdown',touchMove:'pointermove',touchEnd:'pointerup'}[tp],tm={touchStart:'touchstart',touchMove:'touchmove',touchEnd:'touchend'}[tp];
           var tg=window.__tg||(window.__tg=el);if(tp==='touchStart')window.__tg=tg=el;

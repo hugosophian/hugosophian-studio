@@ -137,10 +137,17 @@
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
-      strength: 0.8,    // Stärke (Hugo 26.11., nach dem Test am iPhone: mindestens 80 %, mehr, wenn es sauber aussieht)
-      levels:  [0.8, 1.0, 1.2],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar. Die Tiefen-Dateien reichen bis 1.2
+      // Hugo 26.11. (12:05, nach dem zweiten Video): stärker, «hinten bewegt sich stark, vorne weniger», dazu leicht kippen.
+      // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 1.2 gerechnet,
+      // darüber kann neben Kanten wieder das Original durchscheinen.
+      strength: 1.2,    // Stärke
+      focus:   0.8,     // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
+      tilt:    6,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
+      persp:   0.6,     // Perspektive beim Kippen (0 = keine)
+      zDepth:  0.25,    // Tiefe des Raums beim Kippen, Anteil der Bildhöhe
       fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
-      wall:    0.13,    // Tiefensprung, ab dem das vordere Netz offen bleibt
+      wall:    0.2,     // Tiefensprung, ab dem das vordere Netz offen bleibt. Muss über der Kanten-Schwelle des Filters (0.18) liegen:
+                        // sonst reisst das Netz an kleinen Stufen (Hals gegen Kragen) auf und zeigt die Auffüllung dahinter als Zacken
       maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
       maxTex:  3700000     // Obergrenze für das Foto auf der Grafikkarte (Bildpunkte; die 1600er-Variante von Webflow passt unverkleinert)
     }
@@ -161,10 +168,13 @@
     '[data-hp] .hp-tiefe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }',
     '[data-hp].is-desk .hp-tiefe { display: none; }',
     /* Schalter 40 / 60 / 80 % (nur Test auf webflow.io) */
-    '[data-hp] .hp-tiefe-sw { position: absolute; z-index: 6; top: 3vw; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }',
+    '[data-hp] .hp-tiefe-sw { position: absolute; z-index: 6; top: 3vw; left: 50%; transform: translateX(-50%); width: min(78vw, 340px); color: #fff; font-size: 13px; letter-spacing: .04em; text-align: center; }',
     '[data-hp].is-desk .hp-tiefe-sw, [data-hp].is-info .hp-tiefe-sw, [data-hp].hp-run .hp-tiefe-sw { display: none; }',
-    '[data-hp] .hp-tiefe-sw button { min-width: 44px; min-height: 40px; padding: 0 10px; border: 1px solid rgba(255,255,255,.55); border-radius: 100vw; background: rgba(0,0,0,.45); color: #fff; font: inherit; font-size: 13px; letter-spacing: .06em; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }',
-    '[data-hp] .hp-tiefe-sw button[aria-pressed="true"] { background: #fff; color: #000; }',
+    '[data-hp] .hp-tiefe-tog { min-height: 40px; padding: 0 14px; border: 1px solid rgba(255,255,255,.55); border-radius: 100vw; background: rgba(0,0,0,.55); color: #fff; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }',
+    '[data-hp] .hp-tiefe-box { margin-top: 6px; padding: 10px 14px; border-radius: 14px; background: rgba(0,0,0,.72); text-align: left; }',
+    '[data-hp] .hp-tiefe-box label { display: block; margin-bottom: 6px; }',
+    '[data-hp] .hp-tiefe-box input { display: block; width: 100%; height: 34px; margin: 0; touch-action: none; }',
+    '[data-hp] .hp-tiefe-ft { opacity: .8; }',
     // Hugo 25.11. (11:03): Titel und Logo rasten mit dem Aufprall ein – kurz, schneller Start, weicher Auslauf, Handy und Computer gleich (vorher .8s ease .1s)
     '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .45s var(--hp-ease-out); }',
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',
@@ -2296,15 +2306,18 @@
       var T = CONFIG.tiefe;
       // data-hp-tiefe am Abschnitt: anderer Ordner für die Dateien (Testseiten) oder «aus»
       if (!T || !T.on || reduce || !window.WebGLRenderingContext || !window.Promise || root.getAttribute('data-hp-tiefe') === 'aus') return null;
-      var base = root.getAttribute('data-hp-tiefe') || T.base, strength = T.strength, job = false;
-      // im Test gewählte Stärke über das Neuladen behalten (nur, wenn es den Knopf noch gibt)
-      try { var sv = parseFloat(sessionStorage.getItem('hp-tiefe')); if (T.levels.some(function (v) { return Math.abs(v - sv) < 0.001; })) strength = sv; } catch (e) {}
+      var base = root.getAttribute('data-hp-tiefe') || T.base, strength = T.strength, focus = T.focus, tilt = T.tilt, hold = 0, job = false;
+      var ft = [], ftLast = 0, ftOut = null;                     // Bildtakt beim Wischen (nur für die Anzeige im Test)
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
-      var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK;uniform vec2 uS,uO;varying vec2 vUV;' +
-        'void main(){float d=mix(aD.x,aD.y,uLayer);vec2 p=vec2(aUV.x,aUV.y+uK*d)*uS+uO;gl_Position=vec4(p.x*2.-1.,1.-p.y*2.,0.,1.);vUV=aUV;}';
+      // Pro Netzpunkt: Tiefe d gegenüber dem Fixpunkt uF (0 = ganz hinten steht still, 1 = ganz vorne steht still).
+      // 1. Verschieben: uK * d (auf und ab).  2. Kippen um die Querachse durch die Bildmitte um den Winkel uT, mit Perspektive
+      // (uP): Nahes wird grösser, Fernes kleiner.  uG = so viel grösser, dass am Rand nie eine Lücke entsteht.
+      var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK,uF,uT,uA,uP,uZ,uG;uniform vec2 uS,uO;varying vec2 vUV;' +
+        'void main(){float d=mix(aD.x,aD.y,uLayer)-uF;vec2 p=vec2(aUV.x,aUV.y+uK*d)*uS+uO;float Y=p.y-.5,Z=d*uZ,c=cos(uT),s=sin(uT);' +
+        'gl_Position=vec4((p.x-.5)*2.*uG,-(Y*c-Z*s)*2.*uG,0.,1.-(Y*s+Z*c)*uP);vUV=aUV;}';
       // die Auflagen sind «vormultipliziert» hochgeladen: Foto * (1 - Deckkraft) + Auflage
-      var FRAG_V = HEAD + 'uniform sampler2D uP,uM,uR;varying vec2 vUV;void main(){float a=texture2D(uM,vUV).r;if(a<.012)discard;vec4 o=texture2D(uR,vUV);gl_FragColor=vec4((texture2D(uP,vUV).rgb*(1.-o.a)+o.rgb)*a,a);}';
-      var FRAG_H = HEAD + 'uniform sampler2D uP,uB;varying vec2 vUV;void main(){vec4 o=texture2D(uB,vUV);gl_FragColor=vec4(texture2D(uP,vUV).rgb*(1.-o.a)+o.rgb,1.);}';
+      var FRAG_V = HEAD + 'uniform sampler2D uPh,uM,uR;varying vec2 vUV;void main(){float a=texture2D(uM,vUV).r;if(a<.012)discard;vec4 o=texture2D(uR,vUV);gl_FragColor=vec4((texture2D(uPh,vUV).rgb*(1.-o.a)+o.rgb)*a,a);}';
+      var FRAG_H = HEAD + 'uniform sampler2D uPh,uB;varying vec2 vUV;void main(){vec4 o=texture2D(uB,vUV);gl_FragColor=vec4(texture2D(uPh,vUV).rgb*(1.-o.a)+o.rgb,1.);}';
 
       function folder(s) { var k = (s.label || '').toLowerCase().replace(/[^a-z]/g, ''); return T.names[k] || T.names[s.name] || ''; }
       function load(src) {
@@ -2363,7 +2376,7 @@
         gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, frag));
         gl.bindAttribLocation(p, 0, 'aUV'); gl.bindAttribLocation(p, 1, 'aD'); gl.linkProgram(p);
         if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-        var u = {}; ['uLayer', 'uK', 'uS', 'uO', 'uP', 'uM', 'uR', 'uB'].forEach(function (n) { u[n] = gl.getUniformLocation(p, n); });
+        var u = {}; ['uLayer', 'uK', 'uF', 'uT', 'uA', 'uP', 'uZ', 'uG', 'uS', 'uO', 'uPh', 'uM', 'uR', 'uB'].forEach(function (n) { u[n] = gl.getUniformLocation(p, n); });
         return { p: p, u: u };
       }
 
@@ -2399,8 +2412,8 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           });
           if (pic !== im[0]) pic.width = pic.height = 0;   // Zwischenbild gleich wieder freigeben
-          gl.useProgram(tf.pv.p); gl.uniform1i(tf.pv.u.uP, 0); gl.uniform1i(tf.pv.u.uM, 1); gl.uniform1i(tf.pv.u.uR, 2);
-          gl.useProgram(tf.ph.p); gl.uniform1i(tf.ph.u.uP, 0); gl.uniform1i(tf.ph.u.uB, 3);
+          gl.useProgram(tf.pv.p); gl.uniform1i(tf.pv.u.uPh, 0); gl.uniform1i(tf.pv.u.uM, 1); gl.uniform1i(tf.pv.u.uR, 2);
+          gl.useProgram(tf.ph.p); gl.uniform1i(tf.ph.u.uPh, 0); gl.uniform1i(tf.ph.u.uB, 3);
           gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
         } catch (e) { tf.st = -1; tf.im = null; return; }
         var op = (getComputedStyle(s.img || s.media).objectPosition || '50% 50%').split(' ');
@@ -2436,19 +2449,28 @@
       function paint(s, r) {
         var tf = s.tf, gl = tf.gl, cv = tf.cv, z = size(s);
         if (!z) return;
-        var cw = z[0], ch = z[1], k = clamp(r, -1, 1) * T.travel * 0.5 * strength;
+        var rc = clamp(r, -1, 1), cw = z[0], ch = z[1], k = rc * T.travel * 0.5 * strength, a = rc * tilt * Math.PI / 180;
         if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; tf.k = NaN; }
-        if (k === tf.k) return;
-        tf.k = k;
+        var key = k + a * 7 + focus * 1e3;
+        if (key === tf.k) return;
+        tf.k = key;
+        // So viel grösser zeichnen, dass oben und unten nie eine Lücke entsteht: die Bildkante (ganz nah oder ganz fern)
+        // verschieben, kippen, und schauen, wo sie landet
+        var g = 1, ca = Math.cos(a), sa = Math.sin(a);
+        [-0.5, 0.5].forEach(function (y0) { [-focus, 1 - focus].forEach(function (dd) {
+          var y = y0 + k * dd, zz = dd * T.zDepth, yp = (y * ca - zz * sa) / (1 - (y * sa + zz * ca) * T.persp);
+          g = Math.max(g, 0.5 / Math.max(0.05, yp * (y0 < 0 ? -1 : 1)), 1 - (y * sa + zz * ca) * T.persp);
+        }); });
         // wie object-fit: cover des <img>
         var ab = z[2], sx = 1, sy = 1, ox = 0, oy = 0;
         if (ab < tf.ai) { sx = tf.ai / ab; ox = (1 - sx) * tf.pos[0]; } else { sy = ab / tf.ai; oy = (1 - sy) * tf.pos[1]; }
         gl.viewport(0, 0, cw, ch); gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.disable(gl.BLEND); layer(gl, tf.ph, 1, tf.bb, tf.nb, k, sx, sy, ox, oy);      // Ebene dahinter
-        gl.enable(gl.BLEND); layer(gl, tf.pv, 0, tf.fb, tf.nf, k, sx, sy, ox, oy);       // Foto mit weichen Kanten
+        gl.disable(gl.BLEND); layer(gl, tf.ph, 1, tf.bb, tf.nb, k, sx, sy, ox, oy, a, g);      // Ebene dahinter
+        gl.enable(gl.BLEND); layer(gl, tf.pv, 0, tf.fb, tf.nf, k, sx, sy, ox, oy, a, g);       // Foto mit weichen Kanten
       }
-      function layer(gl, p, l, buf, n2, k, sx, sy, ox, oy) {
+      function layer(gl, p, l, buf, n2, k, sx, sy, ox, oy, a, g) {
         gl.useProgram(p.p); gl.uniform1f(p.u.uLayer, l); gl.uniform1f(p.u.uK, k); gl.uniform2f(p.u.uS, sx, sy); gl.uniform2f(p.u.uO, ox, oy);
+        gl.uniform1f(p.u.uF, focus); gl.uniform1f(p.u.uT, a); gl.uniform1f(p.u.uP, T.persp); gl.uniform1f(p.u.uZ, T.zDepth); gl.uniform1f(p.u.uG, g);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf); gl.drawElements(gl.TRIANGLES, n2, gl.UNSIGNED_SHORT, 0);
       }
 
@@ -2482,26 +2504,41 @@
           if (!on) { if (!tf.off) { tf.off = true; tf.cv.style.display = 'none'; } continue; }
           if (tf.off) { tf.off = false; tf.cv.style.display = ''; tf.k = NaN; }
           var r = rel(j);
+          if (hold && Math.abs(r) < 0.02) r = hold;           // Test: «Halten» zeigt das eingerastete Bild so, als wäre es so weit gewischt
           if (Math.abs(r) < 1) show(s, r);
+        }
+        if (ftOut && on) {
+          var now = performance.now(), mv = Math.abs(C - F) > 0.002 || down;
+          if (mv) { if (ftLast) ft.push(now - ftLast); ftLast = now; }
+          else { if (ft.length > 12) { ft.sort(function (x, y) { return x - y; }); var md = ft[ft.length >> 1], p9 = ft[Math.floor(ft.length * 0.95)]; ftOut.textContent = 'Bildtakt ' + md.toFixed(1) + ' ms (' + Math.round(1000 / md) + ' pro s), langsamste ' + p9.toFixed(0) + ' ms'; } ft = []; ftLast = 0; }
         }
         if (on) plan();
       }
 
-      // Test auf der Staging-Adresse (Hugo 26.11.): Schalter 40 / 60 / 80 % zum Vergleichen. Nicht auf der Live-Domain
+      // Test auf der Staging-Adresse (Hugo 26.11.): Regler für Stärke, Fixpunkt und Kippen, «Halten» und der Bildtakt.
+      // Nicht auf der Live-Domain. Hugo stellt am iPhone ein und schickt die Zahlen; danach kommen sie fest in CONFIG.tiefe.
       if (/(^|\.)webflow\.io$/.test(location.hostname) || root.hasAttribute('data-hp-tiefe-test')) {
-        var sw = document.createElement('div'); sw.className = 'hp-tiefe-sw'; sw.setAttribute('role', 'group'); sw.setAttribute('aria-label', 'Tiefe: Stärke');
-        T.levels.forEach(function (v) {
-          var b = document.createElement('button'); b.type = 'button'; b.textContent = Math.round(v * 100);
-          b.setAttribute('aria-label', 'Tiefe ' + Math.round(v * 100) + ' %'); b.setAttribute('aria-pressed', String(Math.abs(v - strength) < 0.001));
-          b.addEventListener('click', function (e) {
-            e.stopPropagation(); strength = v;
-            try { sessionStorage.setItem('hp-tiefe', String(v)); } catch (er) {}
-            [].forEach.call(sw.children, function (o) { o.setAttribute('aria-pressed', String(o === b)); });
-            kick();
-          });
-          sw.appendChild(b);
+        try { var sv = JSON.parse(sessionStorage.getItem('hp-tiefe2') || '{}'); if (sv.s >= 0) strength = sv.s; if (sv.f >= 0) focus = sv.f; if (sv.t > -99) tilt = sv.t; } catch (e) {}
+        var sw = document.createElement('div'); sw.className = 'hp-tiefe-sw';
+        var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'hp-tiefe-tog'; tog.setAttribute('aria-expanded', 'false');
+        var box = document.createElement('div'); box.className = 'hp-tiefe-box'; box.hidden = true;
+        var label = function () { tog.textContent = 'Tiefe ' + Math.round(strength * 100) + ' | Fix ' + Math.round(focus * 100) + ' | Kippen ' + tilt.toFixed(0); };
+        var redraw = function () { for (var q = 0; q < n; q++) if (slides[q].tf) slides[q].tf.k = NaN; label(); try { sessionStorage.setItem('hp-tiefe2', JSON.stringify({ s: strength, f: focus, t: tilt })); } catch (e) {} kick(); };
+        [['Tiefe (%)', 0, 250, 5, function () { return strength * 100; }, function (v) { strength = v / 100; }],
+         ['Fixpunkt (0 hinten, 100 vorne)', 0, 100, 5, function () { return focus * 100; }, function (v) { focus = v / 100; }],
+         ['Kippen (Grad)', -15, 15, 1, function () { return tilt; }, function (v) { tilt = v; }],
+         ['Halten (0 = aus)', -90, 90, 5, function () { return hold * 100; }, function (v) { hold = v / 100; }]].forEach(function (d) {
+          var l = document.createElement('label'), sp = document.createElement('span'), inp = document.createElement('input');
+          inp.type = 'range'; inp.min = d[1]; inp.max = d[2]; inp.step = d[3]; inp.value = d[4]();
+          var txt = function () { sp.textContent = d[0] + ': ' + Math.round(d[4]()); };
+          inp.addEventListener('input', function () { d[5](parseFloat(inp.value)); txt(); redraw(); });
+          txt(); l.appendChild(sp); l.appendChild(inp); box.appendChild(l);
         });
-        root.appendChild(sw);
+        ftOut = document.createElement('div'); ftOut.className = 'hp-tiefe-ft'; ftOut.textContent = 'Bildtakt: einmal wischen'; box.appendChild(ftOut);
+        tog.addEventListener('click', function () { box.hidden = !box.hidden; tog.setAttribute('aria-expanded', String(!box.hidden)); });
+        // Finger auf den Reglern soll nicht wischen und keine Welle auslösen
+        ['pointerdown', 'touchstart', 'touchmove', 'click'].forEach(function (ev) { sw.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true }); });
+        label(); sw.appendChild(tog); sw.appendChild(box); root.appendChild(sw);
       }
       return { frame: frame };
     })();

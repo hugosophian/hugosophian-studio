@@ -13,10 +13,13 @@
     '[data-hp] .hp-tiefe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }',
     '[data-hp].is-desk .hp-tiefe { display: none; }',
     /* Schalter 40 / 60 / 80 % (nur Test auf webflow.io) */
-    '[data-hp] .hp-tiefe-sw { position: absolute; z-index: 6; top: 3vw; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }',
+    '[data-hp] .hp-tiefe-sw { position: absolute; z-index: 6; top: 3vw; left: 50%; transform: translateX(-50%); width: min(78vw, 340px); color: #fff; font-size: 13px; letter-spacing: .04em; text-align: center; }',
     '[data-hp].is-desk .hp-tiefe-sw, [data-hp].is-info .hp-tiefe-sw, [data-hp].hp-run .hp-tiefe-sw { display: none; }',
-    '[data-hp] .hp-tiefe-sw button { min-width: 44px; min-height: 40px; padding: 0 10px; border: 1px solid rgba(255,255,255,.55); border-radius: 100vw; background: rgba(0,0,0,.45); color: #fff; font: inherit; font-size: 13px; letter-spacing: .06em; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }',
-    '[data-hp] .hp-tiefe-sw button[aria-pressed="true"] { background: #fff; color: #000; }',
+    '[data-hp] .hp-tiefe-tog { min-height: 40px; padding: 0 14px; border: 1px solid rgba(255,255,255,.55); border-radius: 100vw; background: rgba(0,0,0,.55); color: #fff; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }',
+    '[data-hp] .hp-tiefe-box { margin-top: 6px; padding: 10px 14px; border-radius: 14px; background: rgba(0,0,0,.72); text-align: left; }',
+    '[data-hp] .hp-tiefe-box label { display: block; margin-bottom: 6px; }',
+    '[data-hp] .hp-tiefe-box input { display: block; width: 100%; height: 34px; margin: 0; touch-action: none; }',
+    '[data-hp] .hp-tiefe-ft { opacity: .8; }',
     // Hugo 25.11. (11:03): Titel und Logo rasten mit dem Aufprall ein – kurz, schneller Start, weicher Auslauf, Handy und Computer gleich (vorher .8s ease .1s)
     '[data-hp] .hp-title { will-change: transform; pointer-events: none; transition: opacity .45s var(--hp-ease-out); }',
     '[data-hp].hp-run .hp-title { opacity: 0; transition: none; }',

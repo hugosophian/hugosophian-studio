@@ -103,10 +103,17 @@
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
-      strength: 0.8,    // Stärke (Hugo 26.11., nach dem Test am iPhone: mindestens 80 %, mehr, wenn es sauber aussieht)
-      levels:  [0.8, 1.0, 1.2],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar. Die Tiefen-Dateien reichen bis 1.2
+      // Hugo 26.11. (12:05, nach dem zweiten Video): stärker, «hinten bewegt sich stark, vorne weniger», dazu leicht kippen.
+      // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 1.2 gerechnet,
+      // darüber kann neben Kanten wieder das Original durchscheinen.
+      strength: 1.2,    // Stärke
+      focus:   0.8,     // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
+      tilt:    6,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
+      persp:   0.6,     // Perspektive beim Kippen (0 = keine)
+      zDepth:  0.25,    // Tiefe des Raums beim Kippen, Anteil der Bildhöhe
       fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
-      wall:    0.13,    // Tiefensprung, ab dem das vordere Netz offen bleibt
+      wall:    0.2,     // Tiefensprung, ab dem das vordere Netz offen bleibt. Muss über der Kanten-Schwelle des Filters (0.18) liegen:
+                        // sonst reisst das Netz an kleinen Stufen (Hals gegen Kragen) auf und zeigt die Auffüllung dahinter als Zacken
       maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
       maxTex:  3700000     // Obergrenze für das Foto auf der Grafikkarte (Bildpunkte; die 1600er-Variante von Webflow passt unverkleinert)
     }
