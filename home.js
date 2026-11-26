@@ -145,7 +145,8 @@
       tilt:    0,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
       persp:   0.6,     // Perspektive beim Kippen (0 = keine)
       zDepth:  0.25,    // Tiefe des Raums beim Kippen, Anteil der Bildhöhe
-      fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
+      fade:    0.004,   // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>).
+                        // War 0.03: bei Stärke 2.5 ist Nahes dort schon 13 Bildpunkte verschoben, beim Loslassen sprang das Bild (Hugo 26.11., 13:27)
       wall:    0.2,     // Tiefensprung, ab dem das vordere Netz offen bleibt. Muss über der Kanten-Schwelle des Filters (0.18) liegen:
                         // sonst reisst das Netz an kleinen Stufen (Hals gegen Kragen) auf und zeigt die Auffüllung dahinter als Zacken
       maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
