@@ -9,10 +9,10 @@
 # behind = photo under dahinter.
 import sys, os, cv2, numpy as np
 src, out = sys.argv[1], sys.argv[2]
-NX, R = 208, 80                    # mesh grid, reach of the fill (half-res px)
+NX, R = 208, 130                    # mesh grid, reach of the fill (half-res px)
 S2 = 0.6                            # size of the two overlays relative to the working size (they hold no fine detail)
 BW = 0.05                           # mirror fill: depth step that separates surfaces behind
-REACH = 76                          # largest shift between near and far on the page (half-res px; strength 120 %, whole swipe)
+REACH = 130                          # largest shift between near and far on the page (half-res px; strength 250 %, most of a swipe)
 # JUMP: depth step that counts as a real edge (two layers, something gets uncovered). Smaller steps (jaw against hair, an arm
 #       in front of the body) are not cut: the picture just stretches a few pixels there. Was 0.10: cut inside faces, light
 #       crescents at the jaw (Hugo's recording 26.11.).
