@@ -133,12 +133,12 @@
     fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
     tiefe: {
       on:      true,
-      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@64469be19d3a2dc2e1336a85d7a0556c36e9f657/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
+      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@8337c49e2a052b3a691c3a9abf1077855860af2d/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
-      strength: 0.6,    // Stärke (Hugo 26.11.: 60 % als Start; im Prototyp war 1 = 100 %)
-      levels:  [0.4, 0.6, 0.8],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar
+      strength: 0.8,    // Stärke (Hugo 26.11., nach dem Test am iPhone: mindestens 80 %, mehr, wenn es sauber aussieht)
+      levels:  [0.8, 1.0, 1.2],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar. Die Tiefen-Dateien reichen bis 1.2
       fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
       wall:    0.13,    // Tiefensprung, ab dem das vordere Netz offen bleibt
       maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
@@ -2297,7 +2297,8 @@
       // data-hp-tiefe am Abschnitt: anderer Ordner für die Dateien (Testseiten) oder «aus»
       if (!T || !T.on || reduce || !window.WebGLRenderingContext || !window.Promise || root.getAttribute('data-hp-tiefe') === 'aus') return null;
       var base = root.getAttribute('data-hp-tiefe') || T.base, strength = T.strength, job = false;
-      try { var sv = parseFloat(sessionStorage.getItem('hp-tiefe')); if (sv > 0 && sv <= 1) strength = sv; } catch (e) {}
+      // im Test gewählte Stärke über das Neuladen behalten (nur, wenn es den Knopf noch gibt)
+      try { var sv = parseFloat(sessionStorage.getItem('hp-tiefe')); if (T.levels.some(function (v) { return Math.abs(v - sv) < 0.001; })) strength = sv; } catch (e) {}
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
       var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK;uniform vec2 uS,uO;varying vec2 vUV;' +
         'void main(){float d=mix(aD.x,aD.y,uLayer);vec2 p=vec2(aUV.x,aUV.y+uK*d)*uS+uO;gl_Position=vec4(p.x*2.-1.,1.-p.y*2.,0.,1.);vUV=aUV;}';

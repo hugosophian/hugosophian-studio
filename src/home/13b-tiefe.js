@@ -20,7 +20,8 @@
       // data-hp-tiefe am Abschnitt: anderer Ordner für die Dateien (Testseiten) oder «aus»
       if (!T || !T.on || reduce || !window.WebGLRenderingContext || !window.Promise || root.getAttribute('data-hp-tiefe') === 'aus') return null;
       var base = root.getAttribute('data-hp-tiefe') || T.base, strength = T.strength, job = false;
-      try { var sv = parseFloat(sessionStorage.getItem('hp-tiefe')); if (sv > 0 && sv <= 1) strength = sv; } catch (e) {}
+      // im Test gewählte Stärke über das Neuladen behalten (nur, wenn es den Knopf noch gibt)
+      try { var sv = parseFloat(sessionStorage.getItem('hp-tiefe')); if (T.levels.some(function (v) { return Math.abs(v - sv) < 0.001; })) strength = sv; } catch (e) {}
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
       var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK;uniform vec2 uS,uO;varying vec2 vUV;' +
         'void main(){float d=mix(aD.x,aD.y,uLayer);vec2 p=vec2(aUV.x,aUV.y+uK*d)*uS+uO;gl_Position=vec4(p.x*2.-1.,1.-p.y*2.,0.,1.);vUV=aUV;}';

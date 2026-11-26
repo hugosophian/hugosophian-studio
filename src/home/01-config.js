@@ -99,12 +99,12 @@
     fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
     tiefe: {
       on:      true,
-      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@64469be19d3a2dc2e1336a85d7a0556c36e9f657/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
+      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@8337c49e2a052b3a691c3a9abf1077855860af2d/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
-      strength: 0.6,    // Stärke (Hugo 26.11.: 60 % als Start; im Prototyp war 1 = 100 %)
-      levels:  [0.4, 0.6, 0.8],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar
+      strength: 0.8,    // Stärke (Hugo 26.11., nach dem Test am iPhone: mindestens 80 %, mehr, wenn es sauber aussieht)
+      levels:  [0.8, 1.0, 1.2],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar. Die Tiefen-Dateien reichen bis 1.2
       fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
       wall:    0.13,    // Tiefensprung, ab dem das vordere Netz offen bleibt
       maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild

@@ -33,8 +33,8 @@ Am Handy bekommt jedes Startbild beim Wischen Tiefe: Nahes verschiebt sich stär
 
 - **Code:** `src/home/13b-tiefe.js`, Werte in `src/home/01-config.js` unter `tiefe` (Stärke, Weg, Ordner).
 - **Dateien pro Foto:** `tiefe/<name>/` mit `maske.png`, `rand.webp`, `dahinter.webp`, `netz.png` (zusammen rund 300 KB). Das Foto selbst liegt nicht im Repo, die Seite nimmt ihr eigenes `<img>`.
-- **Neues oder geändertes Startbild:** einmal rechnen mit `sh tools/tiefe/rechnen.sh <foto> <name> <modell.onnx>` (rund 10 Sekunden), committen, die Commit-Nummer in `tiefe.base` eintragen, bauen. Welcher Titel zu welchem Ordner gehört, steht in `tiefe.names`. Ohne passende Dateien (oder bei anderem Seitenverhältnis) bleibt das Bild einfach ohne Tiefe.
-- **Schalter 40 / 60 / 80 %:** erscheint nur auf webflow.io, zum Vergleichen. Auf hugosophian.studio gilt `tiefe.strength`.
+- **Neues oder geändertes Startbild:** einmal rechnen mit `sh tools/tiefe/rechnen.sh <foto> <name> <tiefe.onnx> <auffuellen.pt>` (rund 1 Minute, die Modelle stehen im Kopf des Skripts), committen, die Commit-Nummer in `tiefe.base` eintragen, bauen. Welcher Titel zu welchem Ordner gehört, steht in `tiefe.names`. Ohne passende Dateien (oder bei anderem Seitenverhältnis) bleibt das Bild einfach ohne Tiefe.
+- **Schalter 80 / 100 / 120 %:** erscheint nur auf webflow.io, zum Vergleichen. Auf hugosophian.studio gilt `tiefe.strength` (0.8). Die Dateien sind bis 120 % gerechnet.
 - **Fingerwelle:** am Handy aus (`fingerWave: false`), das Andocken der Ladeanimation bleibt.
 
 ### Ordner
