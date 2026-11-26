@@ -106,7 +106,8 @@
       // Hugo 26.11. (12:05, nach dem zweiten Video): stärker, «hinten bewegt sich stark, vorne weniger», dazu leicht kippen.
       // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 2.5 gerechnet,
       // darüber kann neben Kanten wieder das Original durchscheinen.
-      strength: 2.5,    // Stärke (Hugo 26.11., 12:59 am iPhone eingestellt: 250, Fixpunkt 0, Kippen 0)
+      strength: 1.5,    // Stärke (Hugo 26.11.: am iPhone erst 250 eingestellt, um 13:59 auf 150 gesenkt; Fixpunkt 0, Kippen 0)
+      settle:  0.28,    // Sekunden: so weich läuft die Tiefe nach dem Loslassen aus (Zeitkonstante)
       focus:   0,       // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
       tilt:    0,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
       persp:   0.6,     // Perspektive beim Kippen (0 = keine)

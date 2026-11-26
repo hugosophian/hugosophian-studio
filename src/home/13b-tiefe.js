@@ -20,7 +20,7 @@
       // data-hp-tiefe am Abschnitt: anderer Ordner für die Dateien (Testseiten) oder «aus»
       if (!T || !T.on || reduce || !window.WebGLRenderingContext || !window.Promise || root.getAttribute('data-hp-tiefe') === 'aus') return null;
       var base = root.getAttribute('data-hp-tiefe') || T.base, strength = T.strength, focus = T.focus, tilt = T.tilt, hold = 0, job = false;
-      var ft = [], ftLast = 0, ftOut = null;                     // Bildtakt beim Wischen (nur für die Anzeige im Test)
+      var tPrev = 0, ft = [], ftLast = 0, ftOut = null;                     // Bildtakt beim Wischen (nur für die Anzeige im Test)
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
       // Pro Netzpunkt: Tiefe d gegenüber dem Fixpunkt uF (0 = ganz hinten steht still, 1 = ganz vorne steht still).
       // 1. Verschieben: uK * d (auf und ab). Nur an der Bildkante, von der sich der Inhalt wegbewegt, läuft das über ein Viertel
@@ -212,6 +212,7 @@
 
       // jedes Bild nach dem Verschieben (aus render): zeichnet nur, wenn sich die Lage eines sichtbaren Bilds geändert hat
       function frame(on) {
+        var tNow = performance.now(), dtS = Math.min(0.05, (tNow - tPrev) / 1000), settling = false; tPrev = tNow;
         for (var j = 0; j < n; j++) {
           var s = slides[j], tf = s.tf;
           if (!tf || tf.st !== 3) continue;
@@ -219,8 +220,13 @@
           if (tf.off) { tf.off = false; tf.cv.style.display = ''; tf.k = NaN; }
           var r = rel(j);
           if (hold && Math.abs(r) < 0.02) r = hold;           // Test: «Halten» zeigt das eingerastete Bild so, als wäre es so weit gewischt
-          if (Math.abs(r) < 1) show(s, r);
+          // Unter dem Finger folgt die Tiefe direkt. Nach dem Loslassen rastet das Bild schnell ein; die Tiefe geht dann nicht
+          // im selben Ruck auf null, sondern läuft weich aus (Hugo 26.11., 13:59: «soll nicht zurückspringen»).
+          if (tf.rs === undefined || down || Math.abs(r - tf.rs) > 0.9) tf.rs = r;
+          else { tf.rs += (r - tf.rs) * (1 - Math.exp(-dtS / T.settle)); if (Math.abs(r - tf.rs) < 0.0015) tf.rs = r; else settling = true; }
+          if (Math.abs(r) < 1 || Math.abs(tf.rs) < 1) show(s, tf.rs);
         }
+        if (settling) kick();
         if (ftOut && on) {
           var now = performance.now(), mv = Math.abs(C - F) > 0.002 || down;
           if (mv) { if (ftLast) ft.push(now - ftLast); ftLast = now; }
