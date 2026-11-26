@@ -40,4 +40,4 @@ Die Skripte werden nicht mehr mit einem festen `<script src>` eingebunden, sonde
 
 | Was | Wo |
 |---|---|
-| Tiefe beim Wischen auf der Startseite (26.11.2026, von Hugo verworfen) | Git-Tag `archiv/tiefe-2026-11-26`: Code, Tiefen-Dateien der vier Fotos und Rechenskripte. Nicht in `main`, wird nicht ausgeliefert. |
+| Tiefe beim Wischen auf der Startseite (26.11.2026, von Hugo verworfen) | Branch `archiv/tiefe-2026-11-26`: Code, Tiefen-Dateien der vier Fotos und Rechenskripte. Nicht in `main`, wird nicht ausgeliefert. |
