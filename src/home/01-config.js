@@ -99,16 +99,16 @@
     fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
     tiefe: {
       on:      true,
-      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@8337c49e2a052b3a691c3a9abf1077855860af2d/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
+      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@b25e3bd520af6794cd44d525c821442097b48e1e/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
       // Hugo 26.11. (12:05, nach dem zweiten Video): stärker, «hinten bewegt sich stark, vorne weniger», dazu leicht kippen.
-      // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 1.2 gerechnet,
+      // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 2.5 gerechnet,
       // darüber kann neben Kanten wieder das Original durchscheinen.
-      strength: 1.2,    // Stärke
-      focus:   0.8,     // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
-      tilt:    6,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
+      strength: 2.5,    // Stärke (Hugo 26.11., 12:59 am iPhone eingestellt: 250, Fixpunkt 0, Kippen 0)
+      focus:   0,       // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
+      tilt:    0,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
       persp:   0.6,     // Perspektive beim Kippen (0 = keine)
       zDepth:  0.25,    // Tiefe des Raums beim Kippen, Anteil der Bildhöhe
       fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
