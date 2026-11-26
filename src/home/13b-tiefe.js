@@ -23,10 +23,11 @@
       var ft = [], ftLast = 0, ftOut = null;                     // Bildtakt beim Wischen (nur für die Anzeige im Test)
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
       // Pro Netzpunkt: Tiefe d gegenüber dem Fixpunkt uF (0 = ganz hinten steht still, 1 = ganz vorne steht still).
-      // 1. Verschieben: uK * d (auf und ab).  2. Kippen um die Querachse durch die Bildmitte um den Winkel uT, mit Perspektive
+      // 1. Verschieben: uK * d (auf und ab); zur oberen und unteren Bildkante hin läuft das aus, so bleibt die Kante am Rahmen
+      //    und das Bild muss dafür nicht grösser werden (Hugo 26.11., 12:59: kein Heranzoomen beim Hinauswischen).  2. Kippen um die Querachse durch die Bildmitte um den Winkel uT, mit Perspektive
       // (uP): Nahes wird grösser, Fernes kleiner.  uG = so viel grösser, dass am Rand nie eine Lücke entsteht.
       var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK,uF,uT,uA,uP,uZ,uG;uniform vec2 uS,uO;varying vec2 vUV;' +
-        'void main(){float d=mix(aD.x,aD.y,uLayer)-uF;vec2 p=vec2(aUV.x,aUV.y+uK*d)*uS+uO;float Y=p.y-.5,Z=d*uZ,c=cos(uT),s=sin(uT);' +
+        'void main(){float d=mix(aD.x,aD.y,uLayer)-uF;vec2 p=vec2(aUV.x,aUV.y+uK*d*smoothstep(0.,.12,aUV.y)*smoothstep(0.,.12,1.-aUV.y))*uS+uO;float Y=p.y-.5,Z=d*uZ,c=cos(uT),s=sin(uT);' +
         'gl_Position=vec4((p.x-.5)*2.*uG,-(Y*c-Z*s)*2.*uG,0.,1.-(Y*s+Z*c)*uP);vUV=aUV;}';
       // die Auflagen sind «vormultipliziert» hochgeladen: Foto * (1 - Deckkraft) + Auflage
       var FRAG_V = HEAD + 'uniform sampler2D uPh,uM,uR;varying vec2 vUV;void main(){float a=texture2D(uM,vUV).r;if(a<.012)discard;vec4 o=texture2D(uR,vUV);gl_FragColor=vec4((texture2D(uPh,vUV).rgb*(1.-o.a)+o.rgb)*a,a);}';
@@ -167,11 +168,10 @@
         var key = k + a * 7 + focus * 1e3;
         if (key === tf.k) return;
         tf.k = key;
-        // So viel grösser zeichnen, dass oben und unten nie eine Lücke entsteht: die Bildkante (ganz nah oder ganz fern)
-        // verschieben, kippen, und schauen, wo sie landet
+        // Nur fürs Kippen: so viel grösser zeichnen, dass oben und unten keine Lücke entsteht (ohne Kippen bleibt es bei 1)
         var g = 1, ca = Math.cos(a), sa = Math.sin(a);
         [-0.5, 0.5].forEach(function (y0) { [-focus, 1 - focus].forEach(function (dd) {
-          var y = y0 + k * dd, zz = dd * T.zDepth, yp = (y * ca - zz * sa) / (1 - (y * sa + zz * ca) * T.persp);
+          var y = y0, zz = dd * T.zDepth, yp = (y * ca - zz * sa) / (1 - (y * sa + zz * ca) * T.persp);
           g = Math.max(g, 0.5 / Math.max(0.05, yp * (y0 < 0 ? -1 : 1)), 1 - (y * sa + zz * ca) * T.persp);
         }); });
         // wie object-fit: cover des <img>
