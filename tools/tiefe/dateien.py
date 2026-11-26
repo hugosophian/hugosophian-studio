@@ -12,7 +12,7 @@ src, out = sys.argv[1], sys.argv[2]
 NX, R = 208, 130                    # mesh grid, reach of the fill (half-res px)
 S2 = 0.6                            # size of the two overlays relative to the working size (they hold no fine detail)
 BW = 0.05                           # mirror fill: depth step that separates surfaces behind
-REACH = 130                          # largest shift between near and far on the page (half-res px; strength 250 %, most of a swipe)
+REACH = 130                          # largest shift between near and far on the page (half-res px; strength 120 %, whole swipe)
 # JUMP: depth step that counts as a real edge (two layers, something gets uncovered). Smaller steps (jaw against hair, an arm
 #       in front of the body) are not cut: the picture just stretches a few pixels there. Was 0.10: cut inside faces, light
 #       crescents at the jaw (Hugo's recording 26.11.).
@@ -25,6 +25,13 @@ raw = np.clip(np.load(src + '/depth_raw.npy').astype(np.float32), 0, 1)
 # depth curve: spread middle and far, hold the nearest things back (no "runaway" foreground)
 dr = np.tanh(1.3 * raw ** 0.65) / np.tanh(1.3)
 q0 = float(np.quantile(dr, 0.05)); dr = np.clip((dr - q0) / (1 - q0), 0, 1)   # the far background sits at 0, so it stays put
+# Near things move together (Hugo 26.11.: strength 2.5). With two layers only one surface can lie behind an edge. At this strength
+# a shoulder in front of a neck in front of the background tore open in black. So the near half of the depth range is pressed
+# together: shoulder, neck and face become one layer that moves as a whole in front of what is far.
+# Per photo (environment variable TIEFE_NAH, 0 = off): good for one subject in front of a plain background (Alchemist, Model 2.5).
+# In a scene with much in the middle distance (Creator, Singer) it makes walls and furniture move too much, so it stays off there.
+NEAR = float(os.environ.get('TIEFE_NAH', '0'))
+if NEAR > 0: dr = np.tanh(NEAR * dr) / np.tanh(NEAR)
 dr = cv2.GaussianBlur(dr, (0, 0), 1.0)
 hw, hh = W // 2, H // 2
 ds = cv2.resize(dr, (hw, hh), interpolation=cv2.INTER_AREA)
@@ -136,9 +143,9 @@ if LAMA and near.any():
     nb = int(1 / BW) + 1
     lb = np.clip(np.floor(lo_s / BW).astype(int), 0, nb - 1)
     cnt = np.bincount(lb[near], minlength=nb)
-    used = sorted(int(j) for j in np.argsort(-cnt)[:8] if cnt[j] > 150)
+    used = sorted(int(j) for j in np.argsort(-cnt)[:14] if cnt[j] > 150)
     if used:
-        lut = np.array([min(used, key=lambda u: abs(u - j)) for j in range(nb)])        # levels without their own run use the closest one
+        lut = np.array([min(used, key=lambda u: (abs(u - j), -u)) for j in range(nb)])        # levels without their own run use the closest one
         _, labn = cv2.distanceTransformWithLabels((~near).astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
         lutb = np.zeros(labn.max() + 1, np.int32); lutb[labn[near]] = lut[lb[near]]; lev = lutb[labn]   # the rim takes the level next to it
         reach = cv2.dilate(M0, E(12)) > 0                    # the rim outside gets a fill too (24 px)

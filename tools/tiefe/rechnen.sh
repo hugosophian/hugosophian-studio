@@ -10,6 +10,8 @@
 # Auffüllen (empfohlen, viertes Argument): LaMa (Apache 2.0), big-lama.pt aus den GitHub-Releases von Sanster/models
 # (add_big_lama), rund 206 MB, braucht zusätzlich PyTorch. Damit führt eine KI weiter, was hinter Personen und Dingen liegt
 # (rund 1 Minute pro Foto). Ohne das Modell wird gespiegelt aufgefüllt: schneller, aber an Linien und Mustern sichtbar.
+# Ein Motiv vor ruhigem Hintergrund (Alchemist, Model): mit TIEFE_NAH=2.5 davor aufrufen, dann bewegt sich die Person als eine
+# Ebene. Szenen mit viel Mittelgrund (Creator, Singer): ohne.   Beispiel: TIEFE_NAH=2.5 sh tools/tiefe/rechnen.sh ...
 set -e
 [ $# -ge 3 ] || { echo "Aufruf: sh tools/tiefe/rechnen.sh <foto> <name> <tiefe.onnx> [auffuellen.pt]"; exit 1; }
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
