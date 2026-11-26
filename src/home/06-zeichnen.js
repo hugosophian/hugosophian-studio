@@ -5,6 +5,7 @@
       if (introOn) renderIntro();
       else if (desk) renderDesk();
       else { renderMob(dt || 0); applyInfo(); }
+      if (TIEFE) TIEFE.frame(!introOn && !desk);   // Tiefe: nach dem Verschieben der Bilder (Hugo 26.11.)
     }
 
     // Einflug: kleine Vorschau (Säule bzw. Reihe) → Vollbild

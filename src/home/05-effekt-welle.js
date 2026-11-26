@@ -788,6 +788,9 @@
         var endT = 0;
         waves.forEach(function (wv) { endT = Math.max(endT, lastAct(wv) + (wv.sp2 < 0 ? 5600 : 5000)); });
         if (edgeT0) endT = Math.max(endT, edgeT0 + 6000);
+        // Hugo 26.11.: ohne Fingerwelle – ist das Andocken weggewischt (nach 3 s unsichtbar), endet der Effekt gleich danach auf dem
+        // üblichen Weg (Fläche blendet zum Foto). Sonst läge die Leinwand noch bis zu 6 s leer über dem Bild und verdeckte die Tiefe
+        if (!CONFIG.fingerWave && !desk && !lightMode && killT0) endT = Math.min(endT, killT0 + 3000);
         var cdt = covT ? Math.min(100, now - covT) : 16; covT = now;
         if (lightMode || !compFull || !(waves.length || edgeT0)) covV = 0;
         else covV = now < endT ? Math.min(1, covV + cdt / 120) : Math.max(0, covV - cdt / 350);
@@ -978,9 +981,12 @@
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         if (!tDown.on) {
           if (Math.abs(x - tDown.x) < 6 && Math.abs(y - tDown.y) < 6) return;
-          tDown.on = true; startWave(tDown.x, tDown.y, tDown.t);
+          tDown.on = true;
+          // Hugo 26.11.: Fingerwelle am Handy aus (Tiefe statt Welle). Das Wischen wischt das Andocken weiterhin weg (1,5–3 s Ausklang)
+          if (!CONFIG.fingerWave) { if (edgeT0 && !killT0) { killT0 = performance.now(); if (!raf) req(); } }
+          else startWave(tDown.x, tDown.y, tDown.t);
         }
-        add(x, y);
+        if (CONFIG.fingerWave) add(x, y);
       }, { passive: true });
       stage.addEventListener('touchend', function (e) { if (!e.touches.length) tDown = null; }, { passive: true });
       stage.addEventListener('touchcancel', function () { tDown = null; }, { passive: true });

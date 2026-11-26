@@ -93,6 +93,22 @@
     diveMs:     1300,   // Dauer des Eintauchens (startet am Handy schon beim Tippen); gleichmässig ohne Abbremsen, bis das Bild ganz unter dem Licht ist
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
-    shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
+    shimAmt:    0.5,   // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
+    // Hugo 26.11.: Foto mit Tiefe statt Fingerwelle (Handy, Test auf webflow.io). Zwei grosse Effekte gleichzeitig auf einem Bild
+    // widersprechen Regel 1 im Bewegungssystem – darum ist die Fingerwelle am Handy aus. Das Andocken der Ladeanimation bleibt.
+    fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
+    tiefe: {
+      on:      true,
+      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@64469be19d3a2dc2e1336a85d7a0556c36e9f657/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
+      names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
+                 mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
+      travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
+      strength: 0.6,    // Stärke (Hugo 26.11.: 60 % als Start; im Prototyp war 1 = 100 %)
+      levels:  [0.4, 0.6, 0.8],   // Schalter zum Vergleichen, nur auf webflow.io sichtbar
+      fade:    0.03,    // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>)
+      wall:    0.13,    // Tiefensprung, ab dem das vordere Netz offen bleibt
+      maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
+      maxTex:  3700000     // Obergrenze für das Foto auf der Grafikkarte (Bildpunkte; die 1600er-Variante von Webflow passt unverkleinert)
+    }
   };
 
