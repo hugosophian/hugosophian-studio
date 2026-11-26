@@ -85,7 +85,7 @@
     goScrollDelay: 280, // Hugo 11:09: beim Hineinscrollen schreibt sich der Knopf so viel später ein (ms)
     goDelay:    0,      // zusätzliche Verzögerung (ms). Hugo 11:06: zeitlich wieder wie ursprünglich, dafür erst wenn sichtbar (vorher 200, 350)
     mouseMin:   24,     // Computer: so viele px muss die Maus in einem Zug machen, bevor eine Welle beginnt (Hugo 19:10: kleine Bewegungen ohne Welle)
-    goAnim:     false,  // Hugo 25.11. (18:25): «Galerie öffnen» / «Werkstatt betreten» ohne Einschreiben und Schimmer, überall (true = wieder an)
+    goAnim:     true,   // Hugo 26.11. (23:37): wieder an, jetzt wie der Hinweis in der Galerie (Unschärfe + Perlmutt, goIn). 25.11. (18:25): aus
     infoMs:     MOTION.pageMs,   // About: Dauer (Mario: 1.5 s, Kurve 0.6, 0, 0.1, 1)
     // Hugo 25.11.: About wieder wie am 21.11. (Mario pur: weisse Seite von rechts, Bild zoomt hinein, kein Licht), Handy und Computer.
     // true = Sonne mit Welle (Stand 24.11., siehe effekt-bibliothek/06-sonne-welle.md). Die Sonnenstrahlen sollen später woanders hin.
@@ -383,13 +383,16 @@
       if (!CONFIG.goAnim || reduce || !a || !a.animate) return;
       [].forEach.call(a.querySelectorAll('.lib-sort-label .hp-ch, .lib-sort-arrow'), function (c, i) {
         if (c.closest('.hp-go-sh')) return;
-        var bl = [];   // Hugo 11:17: am Computer ohne Unschärfe (Ruckeln) · Hugo 25.11. (18:19, Video): auch am Handy – die Unschärfe auf jedem Buchstaben liess das Öffnen von About ruckeln (Bilder fielen aus, sobald «Galerie öffnen» sich einschrieb)
-        try { c.animate([{ opacity: 0, transform: 'translateY(.35em)', filter: bl[0] ? bl[0].filter : 'none' }, { opacity: 1, transform: 'translateY(0)', filter: bl[1] ? bl[1].filter : 'none' }],
-          { duration: MOTION.ui, delay: base + i * 18, easing: MOTION.out, fill: 'backwards' }); } catch (er) {}
-        // Hugo 15:47: jeder Buchstabe schimmert beim Einschreiben kurz in Hirsch-Perlmutt und setzt sich dann in seiner Farbe
-        try { var fin = getComputedStyle(c).color, pc = HP_PEARL[i % HP_PEARL.length];
-          c.animate([{ color: pc, textShadow: '0 0 .5em ' + pc }, { color: pc, textShadow: '0 0 .35em ' + pc, offset: 0.35 }, { color: fin, textShadow: '0 0 0 transparent' }],
-            { duration: 900, delay: base + i * 18, easing: 'ease-out', fill: 'backwards' }); } catch (er) {}
+        // Hugo 26.11. (23:37): wie der Hinweis in der Galerie (galerie.js setHint) – jeder Buchstabe kommt aus der Unschärfe
+        // von unten (0.42 s, .22,1,.36,1, 18 ms versetzt) und schimmert dabei 1 s in Hirsch-Perlmutt mit Schein (.6em → .4em).
+        // Die Unschärfe ist ein Schein der Buchstabenfarbe statt filter: blur (filter auf jedem Buchstaben liess das About am
+        // Handy ruckeln, 25.11. 18:19). Vorher: ohne Unschärfe, 0.9 s, Schein .5em.
+        var pc = HP_PEARL[i % HP_PEARL.length], d = base + i * 18, fin = getComputedStyle(c).color;
+        try { c.animate([{ opacity: 0, transform: 'translateY(.35em)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 420, delay: d, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }); } catch (er) {}
+        try { c.animate([{ color: 'rgba(255,255,255,0)', textShadow: '0 0 4px ' + pc }, { color: pc, textShadow: '0 0 .6em ' + pc, offset: 0.25 },
+            { color: pc, textShadow: '0 0 .4em ' + pc, offset: 0.4 }, { color: fin, textShadow: '0 0 0 transparent' }],
+          { duration: 1000, delay: d, easing: 'ease-out', fill: 'backwards' }); } catch (er) {}
       });
     }
     var deskMQ = window.matchMedia('(min-width: ' + CONFIG.desk + 'px) and (hover: hover) and (pointer: fine)');
