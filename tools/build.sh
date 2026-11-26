@@ -6,11 +6,11 @@
 set -e
 cd "$(dirname "$0")/.."
 cat src/home/*.js > home.js
-for f in home galerie; do   # die anderen Dateien stecken als Inline-Skripte in Webflow (dort von Hand aktualisieren)
+for f in home galerie alchemist-kurz; do   # die anderen Dateien stecken als Inline-Skripte in Webflow (dort von Hand aktualisieren)
   [ -f "$f.js" ] && npx --yes terser "$f.js" -c -m -f ascii_only=true -o "$f.min.js"
 done
 echo "Prüfsummen (I im Lader):"
-for f in home.min.js galerie.min.js; do
+for f in home.min.js galerie.min.js alchemist-kurz.min.js; do
   echo "  $f  sha384-$(openssl dgst -sha384 -binary "$f" | openssl base64 -A)"
 done
 [ "$1" = "--test" ] && python3 tests/run.py
