@@ -23,11 +23,12 @@
       var ft = [], ftLast = 0, ftOut = null;                     // Bildtakt beim Wischen (nur für die Anzeige im Test)
       var HEAD = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
       // Pro Netzpunkt: Tiefe d gegenüber dem Fixpunkt uF (0 = ganz hinten steht still, 1 = ganz vorne steht still).
-      // 1. Verschieben: uK * d (auf und ab); zur oberen und unteren Bildkante hin läuft das aus, so bleibt die Kante am Rahmen
-      //    und das Bild muss dafür nicht grösser werden (Hugo 26.11., 12:59: kein Heranzoomen beim Hinauswischen).  2. Kippen um die Querachse durch die Bildmitte um den Winkel uT, mit Perspektive
+      // 1. Verschieben: uK * d (auf und ab). Nur an der Bildkante, von der sich der Inhalt wegbewegt, läuft das über ein Viertel
+      //    der Höhe aus: so entsteht dort keine Lücke, und das Bild muss nicht grösser werden (Hugo 26.11., 12:59: kein
+      //    Heranzoomen). An der anderen Kante schiebt sich der Inhalt einfach aus dem Bild, ohne gestaucht zu werden.  2. Kippen um die Querachse durch die Bildmitte um den Winkel uT, mit Perspektive
       // (uP): Nahes wird grösser, Fernes kleiner.  uG = so viel grösser, dass am Rand nie eine Lücke entsteht.
       var VERT = 'attribute vec2 aUV;attribute vec2 aD;uniform float uLayer,uK,uF,uT,uA,uP,uZ,uG;uniform vec2 uS,uO;varying vec2 vUV;' +
-        'void main(){float d=mix(aD.x,aD.y,uLayer)-uF;vec2 p=vec2(aUV.x,aUV.y+uK*d*smoothstep(0.,.12,aUV.y)*smoothstep(0.,.12,1.-aUV.y))*uS+uO;float Y=p.y-.5,Z=d*uZ,c=cos(uT),s=sin(uT);' +
+        'void main(){float d=mix(aD.x,aD.y,uLayer)-uF;float sh=uK*d;sh*=sh>0.?smoothstep(0.,.25,aUV.y):smoothstep(0.,.25,1.-aUV.y);vec2 p=vec2(aUV.x,aUV.y+sh)*uS+uO;float Y=p.y-.5,Z=d*uZ,c=cos(uT),s=sin(uT);' +
         'gl_Position=vec4((p.x-.5)*2.*uG,-(Y*c-Z*s)*2.*uG,0.,1.-(Y*s+Z*c)*uP);vUV=aUV;}';
       // die Auflagen sind «vormultipliziert» hochgeladen: Foto * (1 - Deckkraft) + Auflage
       var FRAG_V = HEAD + 'uniform sampler2D uPh,uM,uR;varying vec2 vUV;void main(){float a=texture2D(uM,vUV).r;if(a<.012)discard;vec4 o=texture2D(uR,vUV);gl_FragColor=vec4((texture2D(uPh,vUV).rgb*(1.-o.a)+o.rgb)*a,a);}';
@@ -229,8 +230,9 @@
       }
 
       // Test auf der Staging-Adresse (Hugo 26.11.): Regler für Stärke, Fixpunkt und Kippen, «Halten» und der Bildtakt.
-      // Nicht auf der Live-Domain. Hugo stellt am iPhone ein und schickt die Zahlen; danach kommen sie fest in CONFIG.tiefe.
-      if (/(^|\.)webflow\.io$/.test(location.hostname) || root.hasAttribute('data-hp-tiefe-test')) {
+      // Hugo hat am iPhone eingestellt (250 / 0 / 0), die Werte stehen fest in CONFIG.tiefe. Die Regler erscheinen nur noch
+      // mit ?tiefe-regler in der Adresse (oder data-hp-tiefe-test auf Testseiten).
+      if (root.hasAttribute('data-hp-tiefe-test') || /[?&]tiefe-regler/.test(location.search)) {
         try { var sv = JSON.parse(sessionStorage.getItem('hp-tiefe2') || '{}'); if (sv.s >= 0) strength = sv.s; if (sv.f >= 0) focus = sv.f; if (sv.t > -99) tilt = sv.t; } catch (e) {}
         var sw = document.createElement('div'); sw.className = 'hp-tiefe-sw';
         var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'hp-tiefe-tog'; tog.setAttribute('aria-expanded', 'false');

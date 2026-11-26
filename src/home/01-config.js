@@ -99,7 +99,7 @@
     fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
     tiefe: {
       on:      true,
-      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@b25e3bd520af6794cd44d525c821442097b48e1e/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
+      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@a8928b3412153655c8df0b308d6eb4a356bbd3ae/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
       names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
                  mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
       travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
