@@ -93,31 +93,6 @@
     diveMs:     1300,   // Dauer des Eintauchens (startet am Handy schon beim Tippen); gleichmässig ohne Abbremsen, bis das Bild ganz unter dem Licht ist
     closeBeam:  400,    // Hugo 24.11. (13:51): beim Schliessen schwingt ein Sonnenstrahl aufs Display und blendet (ms)
     closeHold:  160,    // Hugo 24.11. (14:23): so lange nach dem Start des Strahls beginnt schon das Ausblenden (die Seite taucht im Licht auf)
-    shimAmt:    0.5,   // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
-    // Hugo 26.11.: Foto mit Tiefe statt Fingerwelle (Handy, Test auf webflow.io). Zwei grosse Effekte gleichzeitig auf einem Bild
-    // widersprechen Regel 1 im Bewegungssystem – darum ist die Fingerwelle am Handy aus. Das Andocken der Ladeanimation bleibt.
-    fingerWave: false,  // Fingerwelle am Handy (true = wieder an). Die Maus-Welle am Computer bleibt unverändert
-    tiefe: {
-      on:      true,
-      base:    'https://cdn.jsdelivr.net/gh/hugosophian/hugosophian-studio@a8928b3412153655c8df0b308d6eb4a356bbd3ae/tiefe/',   // Ordner mit den Tiefen-Dateien (feste Commit-Nummer)
-      names:   { alchemist: 'alchemist', creator: 'creator', singer: 'singer', model: 'model',     // Titel des Bilds (klein) → Ordner
-                 mechanic: 'alchemist', kunst: 'creator', musik: 'singer', persona: 'model' },      // oder Feld Name
-      travel:  0.14,    // Weg zwischen ganz nah und ganz fern über einen ganzen Bildwechsel bei Stärke 1 (Anteil der Bildhöhe)
-      // Hugo 26.11. (12:05, nach dem zweiten Video): stärker, «hinten bewegt sich stark, vorne weniger», dazu leicht kippen.
-      // Startwerte für den Test; auf webflow.io gibt es Regler dafür. Die Tiefen-Dateien sind bis Stärke 2.5 gerechnet,
-      // darüber kann neben Kanten wieder das Original durchscheinen.
-      strength: 1.5,    // Stärke (Hugo 26.11.: am iPhone erst 250 eingestellt, um 13:59 auf 150 gesenkt; Fixpunkt 0, Kippen 0)
-      settle:  0.28,    // Sekunden: so weich läuft die Tiefe nach dem Loslassen aus (Zeitkonstante)
-      focus:   0,       // Fixpunkt: diese Tiefe steht still. 0 = ganz hinten (alt), 1 = ganz vorne
-      tilt:    0,       // Kippen in Grad am Ende eines Bildwechsels (0 = aus; Vorzeichen dreht die Richtung)
-      persp:   0.6,     // Perspektive beim Kippen (0 = keine)
-      zDepth:  0.25,    // Tiefe des Raums beim Kippen, Anteil der Bildhöhe
-      fade:    0.004,   // so viele Bildhöhen Weg, bis die Tiefen-Leinwand das <img> ganz abgelöst hat (eingerastet sieht man das <img>).
-                        // War 0.03: bei Stärke 2.5 ist Nahes dort schon 13 Bildpunkte verschoben, beim Loslassen sprang das Bild (Hugo 26.11., 13:27)
-      wall:    0.2,     // Tiefensprung, ab dem das vordere Netz offen bleibt. Muss über der Kanten-Schwelle des Filters (0.18) liegen:
-                        // sonst reisst das Netz an kleinen Stufen (Hals gegen Kragen) auf und zeigt die Auffüllung dahinter als Zacken
-      maxPixels: 2000000,  // Obergrenze gezeichneter Bildpunkte pro Bild
-      maxTex:  3700000     // Obergrenze für das Foto auf der Grafikkarte (Bildpunkte; die 1600er-Variante von Webflow passt unverkleinert)
-    }
+    shimAmt:    0.5    // Hugo 24.11. (16:09): Schimmer bei Öffnen und Schliessen = Aufprall der Ladeanimation in halber Stärke
   };
 

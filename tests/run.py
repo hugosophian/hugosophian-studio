@@ -9,11 +9,8 @@ Was geprüft wird (Handy 390 × 780, doppelte Auflösung, fester Zufall, virtuel
   2. Andocken: Effekt-Leinwand sitzt direkt im Bild (keine Kopie), jedes Foto wird nur einmal hochgeladen
   3. Wischen: kein neuer Textur-Upload pro Bild (Bildtexturen)
   4. Tippen öffnet About, Schliessen: weisse Seite springt nicht zurück (kein Blitz)
-  5. Bildvergleich mit Gitterbild (Andocken, Wischen): Falten, Linien, Doppelkanten fallen als Abweichung auf
-  6. Fingerwelle aus (seit 26.11.2026): beim Wischen entsteht keine Welle, die Effekt-Leinwand liegt danach nicht mehr im Bild
-  7. Tiefe (seit 26.11.2026, eigene Testseite mit den Dateien aus tiefe/): alle Bilder bekommen ihre Leinwand, eingerastet ist
-     sie unsichtbar (man sieht das <img>), beim Wischen sichtbar; Schalter 40/60/80; Bildvergleich
-  8. Bildtakt mit 4-fach gebremster CPU (Hinweis, kein Abbruch)
+  5. Bildvergleich mit Gitterbild (Andocken, Welle): Falten, Linien, Doppelkanten fallen als Abweichung auf
+  6. Bildtakt mit 4-fach gebremster CPU (Hinweis, kein Abbruch)
 Braucht: pip install playwright pillow numpy  ·  Chrome unter /usr/bin/google-chrome (oder Umgebungsvariable CHROME)
 """
 import asyncio, functools, http.server, math, os, socketserver, sys, threading
@@ -103,11 +100,9 @@ async def main():
         await touch('touchStart', [{'x': 120, 'y': 500}])
         for i in range(1, 25):
             await touch('touchMove', [{'x': 120 + 6 * i, 'y': 500 - 9 * i}]); await frames(pg, 16)
-        path = os.path.join(OUT, 'wischen.png'); await pg.screenshot(path=path); compare('wischen', path)
+        path = os.path.join(OUT, 'welle.png'); await pg.screenshot(path=path); compare('welle', path)
         u2 = await pg.evaluate('__up')
         check('Wischen: kein Upload pro Bild', u2 - u1 <= 2, '%d Uploads in 24 Bildern' % (u2 - u1))
-        rp = await pg.evaluate("(()=>{var c=document.querySelector('.hp-ripple');return !!(c&&c.parentNode)})()")
-        check('Fingerwelle aus: keine Effekt-Leinwand beim Wischen', not rp)
         await touch('touchEnd', []); await frames(pg, 6500)
         # Tippen → About, Schliessen ohne Blitz
         await touch('touchStart', [{'x': 200, 'y': 350}]); await frames(pg, 48); await touch('touchEnd', [])
@@ -123,50 +118,6 @@ async def main():
             if seen >= 380 and x < 380: jumped = True
         check('Schliessen ohne Blitz', not jumped and seen >= 380, 'weisse Seite zuletzt bei %d px' % x)
         check('keine JavaScript-Fehler', not errs, '; '.join(errs)[:300])
-        await b.close()
-
-        # Tiefe: eigene Testseite, die Bild-Dateien kommen aus dem Ordner tiefe/ im Repo (echte Uhr: Laden und Aufbau in ruhigen Lücken)
-        b = await p.chromium.launch(executable_path=CHROME, args=['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
-        ctx = await b.new_context(viewport={'width': 390, 'height': 780}, is_mobile=True, has_touch=True, device_scale_factor=2)
-        pg = await ctx.new_page(); errs = []
-        pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto(url.replace('homepage.html', 'homepage-tiefe.html'))
-        st = "(()=>[...document.querySelectorAll('.hp-slide')].map(s=>{var c=s.querySelector('.hp-tiefe');return c?(c.style.opacity||'0'):'-'}))()"
-        got = []
-        for _ in range(40):
-            await pg.wait_for_timeout(500); got = await pg.evaluate(st)
-            if '-' not in got: break
-        check('Tiefe: jedes Bild hat seine Leinwand', '-' not in got, str(got))
-        check('Tiefe: eingerastet unsichtbar (man sieht das <img>)', got[0] == '0', str(got))
-        nsw = await pg.evaluate("document.querySelectorAll('.hp-tiefe-box input[type=range]').length")
-        check('Tiefe: Regler (Tiefe, Fixpunkt, Kippen, Halten) auf der Testseite', nsw == 4, str(nsw))
-        await pg.evaluate("""window.__t=function(tp,x,y){var el=document.elementFromPoint(x,y)||document.body,o={bubbles:true,cancelable:true,composed:true};
-          var pm={touchStart:'pointerdown',touchMove:'pointermove',touchEnd:'pointerup'}[tp],tm={touchStart:'touchstart',touchMove:'touchmove',touchEnd:'touchend'}[tp];
-          var tg=window.__tg||(window.__tg=el);if(tp==='touchStart')window.__tg=tg=el;
-          var t=new Touch({identifier:1,target:tg,clientX:x,clientY:y}),L=tp==='touchEnd'?[]:[t];
-          tg.dispatchEvent(new TouchEvent(tm,Object.assign({touches:L,targetTouches:L,changedTouches:[t]},o)));
-          tg.dispatchEvent(new PointerEvent(pm,Object.assign({pointerId:1,pointerType:'touch',isPrimary:true,clientX:x,clientY:y,button:0,buttons:tp==='touchEnd'?0:1},o)));};0""")
-        await pg.evaluate("__t('touchStart',200,420)")
-        for i in range(1, 13):
-            await pg.evaluate("__t('touchMove',200,%d)" % (420 - 10 * i)); await pg.wait_for_timeout(16)
-        await pg.wait_for_timeout(2500)   # Finger hält: das Bild steht knapp halb verschoben
-        held = await pg.evaluate(st)
-        check('Tiefe: beim Wischen sichtbar', held[0] == '1' and held[1] == '1', str(held))
-        path = os.path.join(OUT, 'tiefe.png'); await pg.screenshot(path=path)
-        await pg.add_style_tag(content='.hp-tiefe{visibility:hidden!important}')   # dasselbe Bild ohne Tiefe (nur das <img>)
-        flat = os.path.join(OUT, 'tiefe-ohne.png'); await pg.screenshot(path=flat)
-        da = np.asarray(Image.open(path).convert('L'), float); db = np.asarray(Image.open(flat).convert('L'), float)
-        dd = np.abs(da - db).mean()
-        # gleich wie das <img> = keine Tiefe (0); leere oder falsche Leinwand = weit über 40
-        check('Tiefe: Leinwand zeigt das Foto, in sich verschoben (nicht leer, nicht gleich wie das <img>)', 0.15 < dd < 40, 'Unterschied %.2f' % dd)
-        await pg.evaluate("document.head.lastElementChild.remove()")
-        compare('tiefe', path)
-        await pg.evaluate("__t('touchEnd',200,300)")
-        for _ in range(24):   # Einrasten dauert im Test-Browser (Software-Grafik) länger als am Handy
-            await pg.wait_for_timeout(500); back = await pg.evaluate(st)
-            if '0' in (back[0], back[1]): break
-        check('Tiefe: nach dem Einrasten wieder unsichtbar', '0' in (back[0], back[1]), str(back))
-        check('Tiefe: keine JavaScript-Fehler', not errs, '; '.join(errs)[:300])
         await b.close()
 
         # Bildtakt mit gebremster CPU (echte Zeit, nur Hinweis)
