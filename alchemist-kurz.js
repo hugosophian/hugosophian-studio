@@ -1821,8 +1821,9 @@
   // iPhone fast eine Sekunde, Video 19:56 – «wieso wird der Text vor der Animation blass und macht erst später die Animation?»).
   // Dann schreibt er sich um wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie (home.js goIn, galerie.js setHint): Die alten
   // Buchstaben werden von links nach rechts unscharf und gehen nach oben weg; die neuen kommen von unten aus der Unschärfe, leuchten in einer
-  // Hirsch-Perlmutt-Farbe und setzen sich dann schwarz. Gleiche Zeiten wie dort (14 und 18 ms je Buchstabe versetzt, 0.42 s Kommen, 1 s Farbe);
-  // die Zeilen laufen nebeneinander, jede 90 ms später.
+  // Hirsch-Perlmutt-Farbe und setzen sich dann schwarz. Der Ablauf folgt den Vorbildern (18 ms je Buchstabe versetzt, von unten aus der Unschärfe),
+  // ist aber weicher und etwas länger (20:05): Die Farbe geht in 0.9 s sanft in Schwarz über, der alte Text wird erst unscharf und löst sich dann auf.
+  // Die Zeilen laufen nebeneinander, jede 70 ms später.
   //
   // Warum Ebenen auf einer Zeichenfläche und nicht wie dort einzelne Buchstaben im Dokument: Die erste Fassung animierte Farbe und Schein von
   // rund 70 Buchstaben einzeln. Auf Hugos iPhone malte Safari den Text dabei nur rund 12-mal pro Sekunde neu (Video 19:37), es ruckelte.
@@ -1918,34 +1919,40 @@
     T.G = G.c;
     return T;
   }
+  function sm(v) { return v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v); }   // sanft anlaufen, sanft enden
+  function capPearl(l) {   // Perlmutt fliesst von Buchstabe zu Buchstabe weich durch die fünf Farben (vorher sprang die Farbe bei jedem Buchstaben)
+    var f = l.k * .5 + l.line * 1.7, a = Math.floor(f);
+    return mix(PEARL[a % PEARL.length], PEARL[(a + 1) % PEARL.length], f - a);
+  }
   function capBlit(A, i, l, a, dy) {
     if (a <= .004) return;
     var q = A.cells[i], k = A.k; capX.globalAlpha = a > 1 ? 1 : a;
     capX.drawImage(A.c, q[0] * k, q[1] * k, q[2] * k, q[3] * k, l.dx - A.pad, l.dy - A.pad + (dy || 0), q[2], q[3]);
   }
   function capDraw(now) {
-    var A = capA, T = capT, X = capX, i, l, t, x, e, sh, cf, p;
+    var A = capA, T = capT, X = capX, i, l, t, x, e, sh, cf, p, dy;
     if (!X || !T) return;
     X.globalAlpha = 1; X.clearRect(0, 0, capW, capH);
     if (!A) { X.drawImage(T.G, 0, 0, capW, capH); for (i = 0; i < T.q.length; i++) capBlit(T.F, i, T.q[i], 1); X.globalAlpha = 1; return; }
     t = now - A.t0;
-    X.globalAlpha = 1 - clamp(t / 400, 0, 1); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
-    X.globalAlpha = clamp((t - 500) / Math.max(1, A.dur - 500), 0, 1); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);
-    for (i = 0; i < A.O.q.length; i++) {   // alter Text: wird unscharf, blasser und geht ein Stück nach oben weg
-      l = A.O.q[i]; p = (t - l.line * 90 - l.k * 14) / 420; if (p >= 1) continue;
-      p = p < 0 ? 0 : p * p * (3 - 2 * p);
-      capBlit(A.O.F, i, l, (1 - p) * (1 - p), -.35 * l.em * p);
-      capBlit(A.O.B, i, l, (1 - p) * p * 2.8, -.35 * l.em * p);
+    X.globalAlpha = 1 - sm(t / 400); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
+    X.globalAlpha = sm((t - 600) / Math.max(1, A.dur - 600)); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);
+    // Weiche Übergänge (Hugo 27.11., 20:05: «Farbwechsel und Übergang noch smoother»): Keine Ebene blendet aus, bevor die nächste ganz da ist –
+    // sonst entsteht dazwischen ein dünner, grauer Moment. Alle Kurven beginnen und enden sanft (sm).
+    for (i = 0; i < A.O.q.length; i++) {   // alter Text: wird zuerst weich unscharf (alle fast zugleich), dann löst er sich von links nach rechts nach oben auf
+      l = A.O.q[i]; p = (t - l.line * 50 - l.k * 6) / 600; if (p >= 1) continue; if (p < 0) p = 0;
+      dy = -.35 * l.em * sm(p);
+      capBlit(A.O.F, i, l, 1 - sm(p / .4), dy);
+      capBlit(A.O.B, i, l, sm(p / .3) * (1 - sm((p - .35) / .65)), dy);
     }
-    for (i = 0; i < T.q.length; i++) {   // neuer Text: von unten aus der Unschärfe, Perlmutt, dann schwarz
-      l = T.q[i]; x = t - 120 - l.line * 90 - l.k * 18; if (x <= 0) continue;
-      if (x >= 1000) { capBlit(T.F, i, l, 1); continue; }
-      p = Math.min(1, x / 420); e = 1 - Math.pow(1 - p, 4); sh = p * p * (3 - 2 * p);
-      cf = x < 400 ? 0 : (x - 400) / 600; cf = 1 - (1 - cf) * (1 - cf);
-      var dy = .35 * l.em * (1 - e);
-      capBlit(T.B, i, l, e * (1 - sh) * 1.25, dy);
-      capBlit(T.S, i, l, e * sh * (1 - cf), dy);
-      capBlit(T.F, i, l, sh * cf, dy);
+    for (i = 0; i < T.q.length; i++) {   // neuer Text: von unten aus der Unschärfe, Perlmutt, dann langsam schwarz
+      l = T.q[i]; x = t - 100 - l.line * 70 - l.k * 18; if (x <= 0) continue;
+      if (x >= 1300) { capBlit(T.F, i, l, 1); continue; }
+      p = Math.min(1, x / 480); e = 1 - Math.pow(1 - p, 3); sh = sm((x - 60) / 420); cf = sm((x - 380) / 900);
+      dy = .35 * l.em * (1 - e);
+      capBlit(T.B, i, l, e * (1 - sm((x - 200) / 380)) * 1.2, dy);   // unscharf: bleibt, bis der scharfe Buchstabe da ist
+      capBlit(T.S, i, l, e * sh * (1 - sm((cf - .7) / .3)), dy);     // Perlmutt: liegt unter dem schwarzen Buchstaben und geht erst ganz am Schluss
+      capBlit(T.F, i, l, sh * cf, dy);                                // Schwarz legt sich langsam darüber: die Farbe mischt sich, statt umzuspringen
     }
     X.globalAlpha = 1;
     if (t >= A.dur) { capFree(A.O); capA = null; T.B.c.width = T.S.c.width = 0; T.B = T.S = null; capDraw(now); }   // fertig: Hilfsbilder freigeben, Ruhebild malen
@@ -1963,10 +1970,10 @@
     if (!fx) { capFree(O); capDraw(0); return; }
     var T = capT, dur = 0;
     var bd = CAPSH ? Math.min(capD, 1.5) : .3;
-    T.B = capAtlas(T, bd, 12, function (g, l, x, y, i, k) { var pc = PEARL[i % PEARL.length]; capSoft(g, l.s, x, y, pc, 4.5, k); capSoft(g, l.s, x, y, pc, 4.5, k); });
-    T.S = capAtlas(T, Math.min(capD, 2), 12, function (g, l, x, y, i, k) { var pc = PEARL[i % PEARL.length]; g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });
-    O.B = capAtlas(O, bd, 12, function (g, l, x, y, i, k) { capSoft(g, l.s, x, y, 'rgba(0,0,0,.62)', 4.5, k); });
-    T.q.forEach(function (l) { dur = Math.max(dur, 120 + l.line * 90 + l.k * 18 + 1000); });
+    T.B = capAtlas(T, bd, 12, function (g, l, x, y, i, k) { var pc = capPearl(l); capSoft(g, l.s, x, y, pc, 4.5, k); capSoft(g, l.s, x, y, pc, 4.5, k); });
+    T.S = capAtlas(T, capD, 12, function (g, l, x, y, i, k) { var pc = capPearl(l); g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });   // gleiche Auflösung wie die schwarze Fassung: sie liegen deckungsgleich übereinander
+    O.B = capAtlas(O, bd, 14, function (g, l, x, y, i, k) { capSoft(g, l.s, x, y, 'rgba(0,0,0,.6)', 5.5, k); });
+    T.q.forEach(function (l) { dur = Math.max(dur, 100 + l.line * 70 + l.k * 18 + 1300); });
     capA = { t0: performance.now(), O: O, dur: dur };
     capM = { t: capA.t0, d: dur, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
   }
