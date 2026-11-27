@@ -25,8 +25,8 @@
      section.ak [data-ak]
        .ak-inner > .ak-head (.ak-kicker, h1.ak-title, .ak-lead)
                  > .ak-wheel [data-ak-wheel] > .ak-item [data-ak-item] (.ak-item-name, .ak-item-price, .ak-item-info)
-                 > .ak-caption [data-ak-caption]
-                 > .ak-contact (a.grey …) > a.ak-long
+                 > .ak-caption [data-ak-caption]   (Kasten im Aussehen der Glas-Knöpfe; der Text darin wechselt mit der gewählten Zeile)
+                 > .ak-contact (a.grey …, ausgeblendet) > a.ak-long (wandert als Knopf ins Menü, siehe linkToMenu)
    Werte zum Feinschliff in AK. Frühere Fassungen (Aquarell-Wald, erster Flug) stehen im Verlauf des Repos. */
 (function () {
   'use strict';
@@ -181,13 +181,14 @@
     '[data-ak-item] { scroll-snap-align: center; scroll-snap-stop: normal; cursor: pointer; user-select: none; -webkit-user-select: none; white-space: nowrap; }',
     '[data-ak-item] .ak-turn { will-change: transform, opacity; backface-visibility: hidden; }',
     '[data-ak-item] .ak-item-price, [data-ak-item] .ak-item-info { display: none !important; }',
-    /* Die gewählte Zeile steht in einer Kapsel: dunkler Rand, leicht heller Grund, so breit wie der Text. Beim Scrollen wächst und schrumpft
-       sie von einer Textlänge zur nächsten (drawWheel). Über dunklem Urwald kehrt sie sich um: heller Rand, dunkler Grund (ak-d1) */
-    '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); box-sizing: border-box; border: 1.5px solid #171a4c; border-radius: 999px;',
-    '  background: rgba(255,255,255,.3); transition: border-color .5s ease, background-color .5s ease; }',
-    '[data-ak].ak-d1 .ak-band { border-color: rgba(255,243,220,.8); background: rgba(23,26,76,.34); }',
-    '[data-ak-caption] { transition: opacity 260ms ease, transform 420ms ' + EASE_OUT + '; }',
-    '[data-ak-caption].is-out { opacity: 0 !important; transform: translate3d(0, .8vh, 0) !important; transition-duration: 150ms; }',
+    /* Die gewählte Zeile steht in einer Kapsel, so breit wie der Text. Beim Scrollen wächst und schrumpft sie von einer Textlänge zur
+       nächsten (drawWheel). Sie sieht aus wie der Menü-Knopf der Site (Klasse GREY): Glas-Grau, innen weisser Rand mit weichem Schein,
+       aussen schwarze Linie. Die Farben kommen aus denselben Webflow-Variablen. So ist sie über Wiese und Urwald gleich gut lesbar. */
+    '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); box-sizing: border-box; border: 1px solid var(--farbe--weiss, #fff); border-radius: 999px;',
+    '  background: var(--farbe--glas, rgba(168,168,168,.5)); outline: 1px solid var(--farbe--schwarz, #000); outline-offset: 0; box-shadow: inset 0 0 5px 0 #fff; }',
+    /* Beschreibung: Der Kasten selbst (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, nur der Text darin wechselt weich */
+    '[data-ak-caption] .ak-cap-in { display: block; transition: opacity 260ms ease, transform 420ms ' + EASE_OUT + '; }',
+    '[data-ak-caption] .ak-cap-in.is-out { opacity: 0; transform: translate3d(0, .8vh, 0); transition-duration: 150ms; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
     /* Titel mit feinem Perlmutt-Schimmer */
     /* Titel: Verlauf mit wanderndem Glanz. Die drei Farben sind Variablen, damit sie weich wechseln können (ak-d0) */
@@ -196,18 +197,27 @@
     '  transition: --ak-t1 .5s ease, --ak-t2 .5s ease, --ak-t3 .5s ease;',
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
     'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
-    /* Liegt hinter einem Textblock dunkler Urwald (beim Hochziehen), wird seine Schrift hell: ak-d0 Titel, ak-d1 Rad, ak-d2 Beschreibung, ak-d3 Link */
-    '[data-ak] .ak-kicker, [data-ak] .ak-lead, [data-ak] [data-ak-item], [data-ak] [data-ak-caption], [data-ak] .ak-long { transition: color .5s ease; }',
+    /* Liegt hinter einem Textblock dunkler Urwald (beim Hochziehen), wird seine Schrift hell: ak-d0 Titel, ak-d1 Rad.
+       Die gewählte Zeile und die Beschreibung brauchen das nicht: sie stehen auf Glas, mit schwarzer Schrift und weissem Schein wie der Menü-Knopf */
+    '[data-ak] .ak-kicker, [data-ak] .ak-lead { transition: color .5s ease; }',
+    '[data-ak] [data-ak-item] { transition: color .25s ease, text-shadow .25s ease; }',
     '[data-ak].ak-d0 .ak-title { --ak-t1: #fff3dc; --ak-t2: #ffdca8; --ak-t3: #ffffff; }',
-    '[data-ak].ak-d0 .ak-kicker, [data-ak].ak-d0 .ak-lead, [data-ak].ak-d1 [data-ak-item], [data-ak].ak-d2 [data-ak-caption], [data-ak].ak-d3 .ak-long { color: #fff3dc; }',
+    '[data-ak].ak-d0 .ak-kicker, [data-ak].ak-d0 .ak-lead, [data-ak].ak-d1 [data-ak-item] { color: #fff3dc; }',
+    '[data-ak] [data-ak-item].is-sel { color: var(--farbe--schwarz, #000); text-shadow: 0 0 1px #fff, 0 0 4px #fff, 0 0 1rem #fff; }',
+    /* Noch einmal fliegen (replay): Antippen des Titels. Text und Menü-Knopf blenden weich aus, das Perlweiss vom Laden blendet ein, dann beginnt der Flug */
+    'html.ak-on [data-ak] .ak-head { cursor: pointer; }',
+    'html.ak-re [data-ak] .ak-inner { pointer-events: none; }',
+    'html.ak-re [data-ak] .ak-inner > * { opacity: 0; transition: opacity 450ms ease; }',
+    'html.ak-re .menu-toggle-wrap { opacity: 0 !important; transition: opacity 450ms ease !important; }',
+    '.ak-cover.is-re { opacity: 0; transition: opacity 600ms ease; }',
+    '.ak-cover.is-re.is-in { opacity: 1; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
     /* Handy: Die Grössen der Texte stehen in den Webflow-Klassen als min(…vw, …svh): sie richten sich nach der Breite und werden auf niedrigen
        Bildschirmen kleiner, damit oben nichts abgeschnitten wird und unten nichts unter dem Menü-Knopf liegt.
        Sehr alte Browser kennen svh nicht und würden die Werte verwerfen. Für sie stehen hier die Werte nur nach der Breite. */
     '@supports not (height: 1svh) { @media (max-width: 479px) { [data-ak] .ak-inner { padding-top: 14vw; padding-bottom: 30vw; } [data-ak] .ak-kicker { font-size: 3.6vw; }',
     '  [data-ak] .ak-title { margin-top: 1vw; font-size: 15vw; } [data-ak] .ak-lead { margin-top: 3vw; font-size: 4.2vw; } [data-ak] .ak-wheel { height: 60vw; margin-top: 6vw; }',
-    '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { min-height: 18vw; margin-top: 4vw; font-size: 4.2vw; } [data-ak] .ak-contact { margin-top: 6vw; }',
-    '  [data-ak] .ak-long { margin-top: 5vw; font-size: 3.5vw; } } }',
+    '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { width: 88vw; min-height: 25.5vw; margin-top: 4vw; padding: 3vw; border-radius: 6vw; font-size: 4.2vw; } } }',
     '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-fly, .ak-flap, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -873,10 +883,11 @@
     var lg = root.querySelector('.ak-long'), cw = 0, a = 1e9, b = -1e9, k;
     if (con) { for (k = 0; k < con.children.length; k++) { a = Math.min(a, con.children[k].offsetLeft); b = Math.max(b, con.children[k].offsetLeft + con.children[k].offsetWidth); } cw = Math.max(0, b - a); }
     LT.longB = lg ? topOf(lg) + lg.offsetHeight : 0;
-    LT.dk = [[LT.headY, LT.headHW], [LT.band + rh / 2, Math.min(W * .34, 230)], [cap ? topOf(cap) + cap.offsetHeight / 2 : H * .6, LT.capHW * .8], [lg ? topOf(lg) + lg.offsetHeight / 2 : H * .9, W * .2]];
+    LT.dk = [[LT.headY, LT.headHW], [LT.band + rh / 2, Math.min(W * .34, 230)]];
     LT.btnHW = clamp(Math.max(cw, lg ? Math.min(lg.offsetWidth, W * .56) : 0) / 2, W * .16, W * .3);   // halbe Breite von Knöpfen und Link: so viel bleibt unten frei
     if (!(LT.band - LT.lead > 50 && LT.band < H * .7)) { LT.lead = H * .27; LT.band = H * .43; }
     if (!(LT.capB > LT.band)) LT.capB = LT.band + H * .2;
+    LT.capT = cap && topOf(cap) > LT.band ? topOf(cap) : LT.capB - H * .1;   // Oberkante des Kastens mit der Beschreibung
     if (!(LT.contact > LT.capB - 4 && LT.contact < H)) LT.contact = Math.min(H * .9, LT.capB + H * .04);
     if (!(LT.longB > LT.contact && LT.longB < H * 1.05)) LT.longB = Math.min(H * .96, LT.contact + H * .14);
   }
@@ -1514,7 +1525,7 @@
     // Tiere: ein Chamäleon auf einem Ast neben dem Rad (es schaut zur Mitte), Schmetterlinge am Rand der Lichtung. Eigene Zufallszahlen.
     R = rng(AK.seed + 67);
     (function () {
-      var cs = Math.min(U * .105, W * .11), px = S.X(mob ? .115 : .322), py = vy + LT.dk[1][0] + (LT.dk[1][0] - LT.band) * 4.2,
+      var cs = Math.min(U * .105, W * .11), px = S.X(mob ? .115 : .322), py = vy + Math.min(LT.dk[1][0] + (LT.dk[1][0] - LT.band) * 4.2, LT.capT - cs - .03 * H * AK.scrollPan),   // Ast und Schwanz bleiben über dem Kasten der Beschreibung, auch wenn das Rad das Bild am weitesten nach unten schiebt
           cc = [pick(['#3fae6a', '#2f9a4a', '#2bb6a0', '#6fbf3a']), pick(['#ffd75e', '#f59a3a', '#ff7ab8']), pick(['#e0409a', '#3560c0', '#9b6ff0'])],
           fn = function (x) { chameleon(x, px, py, cs, cc, lw * .9, 1); };
       if (SWAY) S.sway(px, py + cs * .34, cs * 1.6, 0, fn, cs * 1.6); else S.add(py - cs * 1.6, py + cs * 1.6, fn);
@@ -1805,23 +1816,24 @@
     if (n !== cur) select(n, cur !== -1);
     return p;
   }
-  var capT = 0;
+  var capT = 0, capIn = null;
   function select(n, spark) {
     var prev = cur; cur = n;
-    items.forEach(function (it, i) { it.setAttribute('aria-selected', i === n ? 'true' : 'false'); });
+    items.forEach(function (it, i) { it.setAttribute('aria-selected', i === n ? 'true' : 'false'); it.classList.toggle('is-sel', i === n); });   // is-sel: schwarze Schrift mit weissem Schein, wie im Menü-Knopf
     wheel.setAttribute('aria-activedescendant', items[n].id);
     if (cap) {
       var price = items[n].querySelector('.ak-item-price'), info = items[n].querySelector('.ak-item-info');
       var htmlTxt = (price && price.textContent.trim() ? '<span class="ak-cap-price">' + esc(price.textContent.trim()) + '</span>' : '') + (info ? esc(info.textContent.trim()) : '');
-      if (prev === -1 || reduce) cap.innerHTML = htmlTxt;
-      else { cap.classList.add('is-out'); clearTimeout(capT); capT = setTimeout(function () { cap.innerHTML = htmlTxt; cap.classList.remove('is-out'); }, 150); }
+      if (!capIn) { capIn = document.createElement('div'); capIn.className = 'ak-cap-in'; cap.textContent = ''; cap.appendChild(capIn); }   // der Kasten bleibt stehen, nur sein Inhalt wechselt
+      if (prev === -1 || reduce) capIn.innerHTML = htmlTxt;
+      else { capIn.classList.add('is-out'); clearTimeout(capT); capT = setTimeout(function () { capIn.innerHTML = htmlTxt; capIn.classList.remove('is-out'); }, 150); }
     }
   }
   function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ---------- Takt ----------
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
-      drag = null, dragged = 0, tgY = 0, XR = 0, sunT0 = '', tFz = -1, darkOn = 0, sways = [], farOn = null;
+      drag = null, dragged = 0, tgY = 0, XR = 0, sunT0 = '', tFz = -1, darkOn = 0, sways = [], farOn = null, reOn = 0, covT = 0, dn = [0, 0, 0];
   // Maus und Finger schieben die Ebenen leicht, je nachdem, wo sie gerade sind – genau wie in der allerersten Fassung («das war top»).
   // Am Computer folgt das Bild der Maus, am Handy dem Finger, solange er aufliegt; danach gleitet es zurück in die Mitte.
   function aim(e) { if (AK.pointer) { ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2; } }
@@ -1835,9 +1847,10 @@
   // Seitlich verschieben lässt sich die Szene nicht mehr (ganz weg, wie am Anfang): seitlich gibt es nur den leichten Parallax von Maus und Finger (oben).
   function inWheel(e) { return e.target && e.target.closest && e.target.closest('[data-ak-wheel]'); }
   root.addEventListener('pointerdown', function (e) {
+    dn = [e.clientX, e.clientY, e.timeStamp];
     if (e.pointerType !== 'mouse') aim(e);   // Finger: schon beim Auflegen, nicht erst beim Bewegen
     if (fl) { fl.rate = 9; return; }   // Antippen während des Flugs: schnell zu Ende fliegen
-    if (!AK.freePan || !shown || e.button > 0 || inWheel(e)) return;
+    if (!AK.freePan || !shown || reOn || e.button > 0 || inWheel(e)) return;
     drag = { id: e.pointerId, y: e.clientY, cy: tgY, on: 0, py: e.clientY, pt: e.timeStamp, vy: 0 };
   }, true);
   window.addEventListener('pointermove', function (e) {
@@ -1913,10 +1926,10 @@
       cam += (tgY - cam) * kk;
       if (Math.abs(tgY - cam) < .05) cam = tgY;
     }
-    var dk = 0;   // Schrift hell, wo dunkler Urwald dahinter liegt – je Textblock (Titel, Rad, Beschreibung, Link). Hinter den Schriften liegt nichts Helles mehr
+    var dk = 0;   // Schrift hell, wo dunkler Urwald dahinter liegt – je Textblock (Titel, Rad). Gewählte Zeile und Beschreibung stehen auf Glas
     if (shown && cam > 1) for (i = 0; i < LT.dk.length; i++) if (openHW(LT.dk[i][0] - cam) < LT.dk[i][1] * .5) dk |= 1 << i;   // erst wenn mehr als die Hälfte des Textes über dem Urwald liegt
-    if (dk !== darkOn) { for (i = 0; i < 4; i++) root.classList.toggle('ak-d' + i, !!(dk >> i & 1)); darkOn = dk; }
-    var lit = !fl && shown && cam < H * .45 && now - tStart > 420;   // das Licht kommt kurz nach dem Text: nicht alles im selben Bild
+    if (dk !== darkOn) { for (i = 0; i < LT.dk.length; i++) root.classList.toggle('ak-d' + i, !!(dk >> i & 1)); darkOn = dk; }
+    var lit = !fl && shown && !reOn && cam < H * .45 && now - tStart > 420;   // das Licht kommt kurz nach dem Text: nicht alles im selben Bild
     if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
     var p = drawWheel(); settle(now);
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
@@ -2038,7 +2051,35 @@
     var kids = root.querySelectorAll('.ak-inner > *'), i;
     for (i = 0; i < kids.length; i++) kids[i].style.transitionDelay = ((flown ? 0 : 450) + i * 150) + 'ms';
     pw.t = tStart + 1600; pw.n = pw.slow = 0;   // Wächter: das Einblenden selbst nicht werten
-    setTimeout(function () { if (cover && cover.parentNode) cover.parentNode.removeChild(cover); for (var j = 0; j < kids.length; j++) kids[j].style.transitionDelay = ''; }, AK.introMs + 1400);
+    clearTimeout(covT);
+    covT = setTimeout(function () { if (cover && cover.parentNode) cover.parentNode.removeChild(cover); for (var j = 0; j < kids.length; j++) kids[j].style.transitionDelay = ''; }, AK.introMs + 1400);
+  }
+  // Noch einmal fliegen: Ein Tipp auf den Titel (Velo Atelier, Alchemist, Slogan) spielt den Flug vom Laden wieder ab.
+  // Weich: Text und Menü-Knopf blenden aus, das Perlweiss vom Laden blendet ein, dahinter springt die Kamera nach oben, dann beginnt der Flug
+  // wie beim ersten Mal. Das Bild wird nicht neu gemalt; nur die grossen Wedel, die dicht an der Kamera vorbeiziehen, kommen wieder dazu.
+  function replay() {
+    if (reOn || fl || !shown || reduce || !(AK.flightMs > 0) || !world || performance.now() - tStart < 1800) return;   // nicht gleich nach der Landung: wer den Flug mit Tippen abkürzt, soll ihn nicht versehentlich neu starten
+    reOn = 1; drag = null; clearTimeout(covT);
+    if (cover && cover.parentNode) cover.parentNode.removeChild(cover);
+    cover = document.createElement('div'); cover.className = 'ak-cover is-re'; root.appendChild(cover);
+    html.classList.add('ak-re');
+    void cover.offsetWidth;   // Ausgangslage zeichnen, dann einblenden
+    cover.classList.add('is-in');
+    setTimeout(function () {
+      shown = false; flown = true; cam = tgY = camT; ptr.tx = ptr.ty = 0;
+      html.classList.remove('ak-on'); html.classList.remove('ak-re');
+      var r0 = R; R = rng(AK.seed * 31); flyLeaves(); R = r0;
+      var n = performance.now(); pw.t = n + 900; pw.n = pw.slow = 0;
+      fl = { u: 0, last: n, D: AK.flightMs, rate: 1 };
+      requestAnimationFrame(function () { requestAnimationFrame(function () { cover.className = 'ak-cover is-off'; reOn = 0; }); });
+    }, 720);
+  }
+  // «Ausführliche Website»: Der Link steht in Webflow auf der Seite (Text und Ziel sind dort änderbar) und wandert als Knopf ins Menü,
+  // links über «Studio». Auf der Seite selbst steht er nicht mehr. Gibt es das Menü nicht, bleibt er als Link stehen.
+  function linkToMenu() {
+    var a = root.querySelector('.ak-long'), list = document.querySelector('[data-menu-panel] .menu-list:not(.is-contact)');
+    if (!a || !list) return;
+    a.className = 'grey is-menu'; list.appendChild(a);
   }
   // Grösse: nur bei neuer Breite neu malen (Safari-Leisten ändern nur die Höhe); dann ohne Flug
   var lastW = 0, rsT = 0;
@@ -2058,6 +2099,9 @@
     try { fly = AK.flightMs > 0 && !reduce && (sessionStorage.getItem('ak-fly') === '1' || !sessionStorage.getItem('ak-seen')); sessionStorage.removeItem('ak-fly'); sessionStorage.setItem('ak-seen', '1'); } catch (e) {}
     var t0 = performance.now();
     W = root.clientWidth;
+    linkToMenu();
+    var head = root.querySelector('.ak-head');
+    if (head) head.addEventListener('click', function (e) { if (Math.abs(e.clientX - dn[0]) < 10 && Math.abs(e.clientY - dn[1]) < 10 && e.timeStamp - dn[2] < 450) replay(); });   // nur ein kurzer Tipp an Ort und Stelle: kein Wischen über den Titel, kein aufgelegter Finger (der schiebt das Bild)
     setupWheel(); drawWheel();            // zuerst das Rad: das Bild richtet sich nach dem Platz des Textes
     paintScene(fly); lastW = W;           // teuer: einmal beim Laden, solange die Seite noch perlweiss ist
     var pms = performance.now() - t0, mp = 0, cs = world.querySelectorAll('canvas'), ci;
