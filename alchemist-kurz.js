@@ -27,7 +27,7 @@
     drift: 1,             // ruhige Eigenbewegung der Kamera (0 = aus)
     pointer: 1,           // Maus / Finger bewegt die Ebenen (0 = aus)
     scrollPan: 1,         // Scrollen im Rad schiebt den Wald (0 = aus)
-    fireflies: 34,        // Glühwürmchen (Handy etwas weniger)
+    fireflies: 9,         // Glühwürmchen (Hugo 27.11., 08:46: nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
     introMs: 1500,        // Einblenden (Bewegungssystem: page)
     flyInMs: [2200, 4200] // Glühwürmchen fliegen so lange ein (von – bis)
@@ -754,8 +754,8 @@
       if (side === 0) { sx = -60; sy = P() * H; } else if (side === 1) { sx = W + 60; sy = P() * H; } else if (side === 2) { sx = P() * W; sy = -60; } else { sx = P() * W; sy = H + 60; }
       var hx = P() * W, hy = H * (.08 + P() * .88);
       flies.push({ sx: sx, sy: sy, hx: hx, hy: hy, x: sx, y: sy, d: P() * 1500, dur: AK.flyInMs[0] + P() * (AK.flyInMs[1] - AK.flyInMs[0]),
-        f1: .00018 + P() * .00025, f2: .00013 + P() * .0002, p1: P() * 6, p2: P() * 6, ax: 20 + P() * 50, ay: 14 + P() * 40,
-        pf: .0012 + P() * .0022, pp: P() * 6, s: 10 + P() * 16, spr: sprFly[Math.floor(P() * sprFly.length)] });
+        f1: .00006 + P() * .00008, f2: .00005 + P() * .00007, p1: P() * 6, p2: P() * 6, ax: 50 + P() * 90, ay: 40 + P() * 70,   // langsam, weite ruhige Bahnen
+        pf: .0004 + P() * .0005, pp: P() * 6, s: 4 + P() * 4, spr: sprFly[Math.floor(P() * sprFly.length)] });
     }
     sparks = [];
     for (var k = 0; k < AK.glitter; k++) sparks.push(newSpark(P, true));
@@ -895,8 +895,8 @@
       var bx = F.sx + (F.hx - F.sx) * e + Math.sin(e * Math.PI) * (F.hy - F.sy) * .25, by = F.sy + (F.hy - F.sy) * e - Math.sin(e * Math.PI) * (F.hx - F.sx) * .25;
       x = bx + wx * e; y = by + wy * e;
       var pulse = .5 + .5 * Math.sin(t * F.pf + F.pp); pulse = pulse * pulse;
-      a = (reduce ? .7 : (.25 + .75 * pulse)) * (q < 1 ? .6 + .4 * e : 1);
-      var s = F.s * (.75 + .5 * pulse);
+      a = (reduce ? .75 : (.65 + .2 * pulse)) * (q < 1 ? .6 + .4 * e : 1);   // kaum Blinken, nur ein sanftes Atmen
+      var s = F.s * (.92 + .12 * pulse);
       fxX.globalAlpha = a; fxX.drawImage(F.spr, x - s, y - s, s * 2, s * 2);
     }
     if (!reduce) {
