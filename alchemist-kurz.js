@@ -10,8 +10,9 @@
    oben nach unten (langsam los, schnell durch die Mitte, weich landen). Nichts wird überblendet: unten steht dasselbe
    Bild still, und nur der Text der kurzen Website blendet darüber ein (dunkle Schrift auf Himmel und Wiese).
 
-   VON HAND (Hugo 27.11., 11:02): Ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in den
-   Urwald (mit kräftigem Parallax) und wieder nach oben bis in den Himmel. Das Rad scrollt die Services, mit Parallax
+   VON HAND (Hugo 27.11., 11:02 und 11:50): Ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in
+   den Urwald (Parallax geschmeidig) und wieder nach oben bis in den Himmel. Liegt Urwald hinter dem Text, legt sich ein
+   weicher Perlmutt-Schein dahinter. Der Urwald hat Tiefe: Bänder und Lianen hinten (immer leicht unterwegs), Pflanzen davor. Das Rad scrollt die Services, mit Parallax
    dort, wo die Kamera gerade steht. Der Wald lebt: Randpflanzen und Ranken wiegen sich, die Wolken ziehen, der Blick
    treibt leicht.
 
@@ -45,7 +46,8 @@
     pointer: 1,           // Maus / Finger bewegt die Ebenen (0 = aus)
     scrollPan: 1,         // Scrollen im Rad schiebt den Wald (0 = aus)
     freePan: 1,           // die ganze Szene lässt sich von Hand verschieben: zurück nach oben und seitlich (0 = aus)
-    panX: [.3, .14],      // so weit geht es seitlich, als Anteil der Breite: Handy, Computer
+    panX: [.16, .08],     // so weit geht es seitlich, als Anteil der Breite: Handy, Computer (Hugo 11:50: Parallax halbiert, geschmeidig)
+    veil: .82,            // Lese-Schleier: heller Schein hinter dem Text, sobald Urwald dahinter liegt (0 = aus)
     sway: 1,              // Wedel am Rand und Ranken wiegen sich im Wind (0 = aus)
     fireflies: 9,         // Glühwürmchen (Hugo 27.11., 08:46: nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
@@ -95,6 +97,11 @@
     '.ak-layer, .ak-sprite, .ak-shade, .ak-glow { left: 0; top: 0; will-change: transform; transform-origin: 0 0; }',
     '.ak-shade { opacity: .2; }',
     '.ak-sway { position: absolute; will-change: transform; }',
+    /* Lesbarkeit: die kleinen Texte tragen einen feinen hellen Schein (der Titel nicht: er hat den Perlmutt-Verlauf) */
+    '[data-ak] .ak-kicker, [data-ak] .ak-lead, [data-ak] [data-ak-item], [data-ak] [data-ak-caption], [data-ak] .ak-long { text-shadow: 0 0 9px rgba(255,255,255,.8), 0 0 2px rgba(255,255,255,.55); }',
+    /* Lese-Schleier: weiches Perlmutt-Licht hinter dem Text; nur so stark, wie Urwald dahinter liegt */
+    '.ak-veil { position: absolute; z-index: 5; pointer-events: none; opacity: 0; border-radius: 44px; will-change: opacity;',
+    '  background: linear-gradient(168deg, rgb(240,249,252), rgb(246,243,252) 50%, rgb(253,247,243)); box-shadow: 0 0 30px 18px rgb(246,244,251); }',
     /* Licht: fertig gemalte Bilder mit normaler Deckkraft. Kein Mischmodus, keine Masken – die bremsten das Handy bei der Landung */
     '.ak-rays { left: 0; top: 0; will-change: transform; }',
     '.ak-rays canvas { position: absolute; left: 0; top: 0; will-change: opacity; }',
@@ -166,6 +173,10 @@
     var pts = [], n = Math.round(turns * 28);
     for (var i = 0; i <= n; i++) { var t = i / n, a = a0 + dir * t * turns * Math.PI * 2, rr2 = r * (1 - t * .85); pts.push([cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2]); }
     return pts;
+  }
+  function rrect4(x, a, b, w, h, r) {   // jede Ecke mit eigener Rundung (wirkt von Hand gezeichnet)
+    var m = Math.min(w, h) / 2, q = r.map(function (v) { return Math.min(v, m); });
+    x.beginPath(); x.moveTo(a + q[0], b); x.arcTo(a + w, b, a + w, b + h, q[1]); x.arcTo(a + w, b + h, a, b + h, q[2]); x.arcTo(a, b + h, a, b, q[3]); x.arcTo(a, b, a + w, b, q[0]); x.closePath();
   }
   function rrect(x, a, b, w, h, r) { r = Math.min(r, w / 2, h / 2); x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 
@@ -287,6 +298,65 @@
     x.beginPath(); x.arc(cx, cy, r * .34, 0, 7); x.fillStyle = '#ffd75e'; x.fill(); ol(x, lw * .8);
     x.beginPath(); x.arc(cx, cy, r * .14, 0, 7); x.fillStyle = '#e0602a'; x.fill();
   }
+  // weitere Blüten, frei erfunden (Hugo 27.11., 11:55: «die Blumen gefallen mir besonders, da kannst du kreativ weiter erfinden»)
+  function dahlia(x, cx, cy, r, cols, lw) {   // gefüllte Blüte: drei Kränze, nach innen heller
+    var a0 = R() * 6, k, i, n;
+    for (k = 0; k < 3; k++) for (n = [12, 9, 6][k], i = 0; i < n; i++) stripe(x, cx, cy, a0 + (i + k * .5) / n * Math.PI * 2, r * [1, .7, .42][k], r * [.15, .14, .12][k], 0, mix(cols[0], '#ffffff', k * .2), lw * .8, 0, .8);
+    x.beginPath(); x.arc(cx, cy, r * .13, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .7);
+  }
+  function starFlower(x, cx, cy, r, cols, lw) {   // Sternblüte: lange schmale und kurze helle Blütenblätter, Kranz aus Punkten
+    var a0 = R() * 6, n = 7 + Math.floor(R() * 3), i;
+    for (i = 0; i < n; i++) stripe(x, cx, cy, a0 + (i + .5) / n * Math.PI * 2, r * .58, r * .13, 0, mix(cols[0], '#ffffff', .4), lw * .8, 0, .3);
+    for (i = 0; i < n; i++) stripe(x, cx, cy, a0 + i / n * Math.PI * 2, r, r * .1, rr(-.06, .06), cols[0], lw * .8, 1, .15);
+    x.beginPath(); x.arc(cx, cy, r * .17, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .7);
+    for (i = 0; i < n; i++) { x.beginPath(); x.arc(cx + Math.cos(a0 + i / n * 6.283) * r * .28, cy + Math.sin(a0 + i / n * 6.283) * r * .28, r * .035, 0, 7); x.fillStyle = '#fff6c8'; x.fill(); ol(x, lw * .4); }
+  }
+  function passion(x, cx, cy, r, cols, lw) {   // Strahlenblüte: runde Blütenblätter, darüber ein Kranz feiner Fäden
+    var a0 = R() * 6, n = 9 + Math.floor(R() * 3), i, a;
+    for (i = 0; i < n; i++) stripe(x, cx, cy, a0 + i / n * Math.PI * 2, r, r * .2, 0, i % 2 ? cols[0] : mix(cols[0], '#ffffff', .22), lw * .8, 0, 1);
+    for (i = 0; i < 26; i++) { a = a0 + i / 26 * Math.PI * 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r * .2, cy + Math.sin(a) * r * .2); x.lineTo(cx + Math.cos(a) * r * .6, cy + Math.sin(a) * r * .6); ol(x, lw * 1.1, i % 2 ? cols[1] : '#f6f2ff'); }
+    x.beginPath(); x.arc(cx, cy, r * .2, 0, 7); x.fillStyle = cols[2]; x.fill(); ol(x, lw * .7);
+    for (i = 0; i < 5; i++) { a = a0 + i / 5 * 6.283; x.beginPath(); x.arc(cx + Math.cos(a) * r * .1, cy + Math.sin(a) * r * .1, r * .035, 0, 7); x.fillStyle = INK; x.fill(); }
+  }
+  function hibiscus(x, cx, cy, r, cols, lw) {   // fünf breite Blütenblätter, dunkles Auge, langer Stempel mit Perlen
+    var a0 = R() * 6, i, a, sa = a0 + rr(.2, 1);
+    for (i = 0; i < 5; i++) stripe(x, cx, cy, a0 + i / 5 * Math.PI * 2, r, r * .46, rr(-.05, .05), i % 2 ? mix(cols[0], '#ffffff', .12) : cols[0], lw * .85, mix(cols[0], INK, .25), 1);
+    x.beginPath(); x.arc(cx, cy, r * .24, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .7);
+    x.beginPath(); x.moveTo(cx, cy); x.quadraticCurveTo(cx + Math.cos(sa + .4) * r * .5, cy + Math.sin(sa + .4) * r * .5, cx + Math.cos(sa) * r * .86, cy + Math.sin(sa) * r * .86); ol(x, lw * 2.6); ol(x, lw * 1.2, '#ffd75e');
+    for (i = 0; i < 4; i++) { a = sa + (i - 1.5) * .22; x.beginPath(); x.arc(cx + Math.cos(a) * r * (.8 + (i % 2) * .1), cy + Math.sin(a) * r * (.8 + (i % 2) * .1), r * .05, 0, 7); x.fillStyle = '#ffd75e'; x.fill(); ol(x, lw * .5); }
+  }
+  function lotus(x, px, py, r, cols, lw) {   // Kelch von der Seite: Blütenblätter fächern nach oben, zwei Kelchblätter, Stiel
+    var i, c = cols[0];
+    x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + r * rr(-.3, .3), py + r * .7, px + r * rr(-.2, .2), py + r * 1.3); ol(x, lw * 3); ol(x, lw * 1.4, '#3fae6a');
+    for (i = 0; i < 2; i++) stripe(x, px, py, -Math.PI / 2 + (i ? 1.25 : -1.25), r * .55, r * .14, i ? .3 : -.3, '#2f9a4a', lw * .8, 0, .3);
+    [0, 4, 1, 3, 2].forEach(function (i) { var t = i / 4 - .5; stripe(x, px, py, -Math.PI / 2 + t * 1.7, r * (1 - Math.abs(t) * .25), r * .25, t * .5, i === 2 ? mix(c, '#ffffff', .25) : i % 2 ? c : mix(c, INK, .12), lw * .85, i === 2 ? 1 : 0, .45); });
+  }
+  function bell(x, px, py, r, cols, lw) {   // hängende Glockenblüten an einem Bogen
+    var n = 2 + Math.floor(R() * 3), d = R() < .5 ? 1 : -1, i, pts = [], t;
+    for (i = 0; i <= 12; i++) { t = i / 12; pts.push([px + d * r * 1.6 * t, py - Math.sin(t * Math.PI * .8) * r * .9]); }
+    polyline(x, pts); ol(x, lw * 3); ol(x, lw * 1.4, '#3fae6a');
+    for (i = 0; i < n; i++) {
+      var q = pts[4 + Math.round(i * 8 / n)], s = r * rr(.42, .6), c = i % 2 ? mix(cols[0], '#ffffff', .2) : cols[0], bx = q[0], by = q[1];
+      x.beginPath(); x.moveTo(bx, by); x.lineTo(bx, by + s * .3); ol(x, lw * 1.2, '#3fae6a');
+      x.beginPath(); x.moveTo(bx - s * .16, by + s * .28);
+      x.bezierCurveTo(bx - s * .5, by + s * .4, bx - s * .34, by + s, bx - s * .6, by + s * 1.25);
+      x.quadraticCurveTo(bx - s * .3, by + s * 1.42, bx, by + s * 1.26); x.quadraticCurveTo(bx + s * .3, by + s * 1.42, bx + s * .6, by + s * 1.25);
+      x.bezierCurveTo(bx + s * .34, by + s, bx + s * .5, by + s * .4, bx + s * .16, by + s * .28);
+      x.closePath(); x.fillStyle = c; x.fill(); ol(x, lw * .85);
+      x.beginPath(); x.moveTo(bx, by + s * 1.26); x.lineTo(bx, by + s * 1.55); ol(x, lw);
+      x.beginPath(); x.arc(bx, by + s * 1.6, s * .09, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .5);
+    }
+  }
+  function cluster(x, px, py, len, cols, lw) {   // Traube: kleine Blüten an einem hängenden Stiel, nach unten kleiner
+    var n = 7 + Math.floor(R() * 4), i, d = rr(-.25, .25);
+    for (i = 0; i < n; i++) {
+      var t = i / (n - 1), bx = px + Math.sin(t * 2.2) * len * d, by = py + t * len, s = len * .12 * (1 - t * .6), k;
+      for (k = 0; k < 2; k++) {
+        x.beginPath(); x.arc(bx + (k ? 1 : -1) * s * .9, by + k * s * .35, s, 0, 7); x.fillStyle = (i + k) % 3 ? cols[0] : mix(cols[0], '#ffffff', .3); x.fill(); ol(x, lw * .7);
+        x.beginPath(); x.arc(bx + (k ? 1 : -1) * s * .9, by + k * s * .35, s * .32, 0, 7); x.fillStyle = cols[1]; x.fill();
+      }
+    }
+  }
   function disc(x, cx, cy, r, cols, lw) {   // Auge: Ringe ineinander
     for (var i = 0; i < cols.length; i++) { x.beginPath(); x.arc(cx, cy, r * (1 - i / cols.length * .86), 0, 7); x.fillStyle = cols[i]; x.fill(); ol(x, lw * (i ? .7 : 1)); }
   }
@@ -308,16 +378,6 @@
     }
     polyline(x, pts); ol(x, o.lw * 2 + L * .035); ol(x, L * .035, o.col);
   }
-  function scaleBush(x, cx, cy, w, h, pal, lw) {   // Schuppenbusch: Reihen überlappender Bögen in einer Kuppel
-    var p = rpts(cx, cy - h / 2, w, h, .46, 0), r = Math.max(5, w * .085), rows = Math.ceil(h / (r * .95)) + 2, cols = Math.ceil(w / (r * 1.7)) + 2, i, j;
-    x.save(); blob(x, p); x.fillStyle = mix(pal[0], INK, .45); x.fill(); x.clip();
-    for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) {
-      var sx = cx - w / 2 + (i + (j % 2) * .5) * r * 1.7 - r * .5, sy = cy - h + j * r * .95 + r * .6;
-      x.beginPath(); x.arc(sx, sy, r, 0, 7); x.fillStyle = pal[(i + j * 2) % pal.length]; x.fill(); ol(x, lw * .7);
-      x.beginPath(); x.arc(sx, sy, r * .45, Math.PI, 0); ol(x, lw * .5, 'rgba(255,255,255,.4)');
-    }
-    x.restore(); blob(x, p); ol(x, lw * 1.2);
-  }
   function vine(x, px, y0, len, col, lw, acc) {   // hängende Ranke mit Blättchen und Perle
     var pts = [], i, ph = R() * 6, amp = rr(6, 18);
     for (i = 0; i <= 16; i++) { var t = i / 16; pts.push([px + Math.sin(t * 5 + ph) * amp * t, y0 + len * t]); }
@@ -337,29 +397,36 @@
     if (o.bead) { var e = p[p.length - 1]; disc(x, e[0], e[1] + th * .6, th * 1.25, [o.bead, col, INK], lw); }
   }
 
-  // Wolke (eigene Form): Bauch aus Bögen, an den Enden rollt sie sich zur Schnecke ein (Hugo 27.11., 11:02: ohne die langen spitzen Fahnen)
-  function swirlCloud(x, cx, cy, s, o) {
-    var n = o.n || 5, lw = o.lw, L = o.line, lobes = [], rs = [], tot = 0, i, bx;
-    for (i = 0; i < n; i++) { var k = 1 - Math.abs(i - (n - 1) / 2) / n * 1.25; rs.push(s * rr(.38, .58) * (.4 + .6 * k)); tot += rs[i] * 1.25; }
-    bx = cx - tot / 2;
-    for (i = 0; i < n; i++) { lobes.push([bx + rs[i], cy - rs[i] * rr(.5, .85), rs[i]]); bx += rs[i] * 1.25; }
-    var x0 = cx - tot / 2, x1 = cx + tot / 2, g = x.createLinearGradient(0, cy - s * 1.2, 0, cy + s * .1);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(.5, o.c1); g.addColorStop(1, o.c2);
-    [-1, 1].forEach(function (d) {   // Schnecken an den Enden
-      var rv = s * rr(.22, .32), vx = d < 0 ? x0 - rv * .15 : x1 + rv * .15, vy2 = cy - rv, sp = spiralPts(vx, vy2, rv, 1.35, Math.PI / 2, -d);
-      polyline(x, [[d < 0 ? x0 + s * .5 : x1 - s * .5, cy]].concat(sp)); ol(x, rv * .6 + lw * 2, L); ol(x, rv * .6, o.c1);
-      polyline(x, sp.slice(5)); ol(x, lw, o.inl);
-    });
-    lobes.forEach(function (c) { x.beginPath(); x.arc(c[0], c[1], c[2], 0, 7); ol(x, lw * 2, L); });
-    rrect(x, x0, cy - s * .34, tot, s * .36, s * .18); ol(x, lw * 2, L);
-    lobes.forEach(function (c) { x.beginPath(); x.arc(c[0], c[1], c[2], 0, 7); x.fillStyle = g; x.fill(); });
-    rrect(x, x0, cy - s * .34, tot, s * .36, s * .18); x.fillStyle = g; x.fill();
-    lobes.forEach(function (c, i) {
-      x.beginPath(); x.arc(c[0], c[1], c[2] * .7, Math.PI * 1.08, Math.PI * 1.92); ol(x, lw, o.inl);
-      if (c[2] > s * .33) { polyline(x, spiralPts(c[0], c[1] + c[2] * .12, c[2] * .4, 1.3, Math.PI * (i % 2 ? 0 : 1), i % 2 ? -1 : 1)); ol(x, lw, o.inl); }
+  // Wolke im Stil der El-Dorado-Zeichnungen (Hugo 27.11., 11:50; eigene Formen): runde Blöcke neben- und übereinander, jede Form
+  // mit heller dicker Kontur, innen wiederholt sich die Form, dazu kleine Zeichen. Farben wie bisher (Weiss → Rosa, Flieder, Pfirsich)
+  function glyphCloud(x, cx, cy, s, o) {
+    var n = o.n || 4, B = [], ws = [], tot = 0, ct = Math.max(1.5, s * .062), i, k, bx;
+    for (i = 0; i < n; i++) { k = 1 - Math.abs(i - (n - 1) / 2) / n * 1.1; ws.push([s * rr(.8, 1.35), s * rr(.5, 1.1) * (.5 + .5 * k)]); tot += ws[i][0] * .76; }
+    tot += ws[n - 1][0] * .24; bx = cx - tot / 2;
+    for (i = 0; i < n; i++) { B.push([bx, cy - ws[i][1], ws[i][0], ws[i][1]]); bx += ws[i][0] * .76; }
+    for (i = n - 2; i >= 0; i--) if (R() < .5 && B.length < 8) {   // kleine Blöcke obenauf (liegen dahinter)
+      var a = B[i], b = B[i + 1], w2 = s * rr(.5, .8), h2 = s * rr(.4, .6);
+      B.unshift([(a[0] + a[2] / 2 + b[0] + b[2] / 2) / 2 - w2 / 2 + rr(-.1, .1) * s, Math.min(a[1], b[1]) - h2 * .72, w2, h2 * 1.3]); i++;
+    }
+    if (R() < .5) { var c = B[B.length - 1 - Math.floor(R() * Math.min(n, 2))], w3 = s * rr(.55, .8), h3 = s * rr(.3, .42); B.push([c[0] + rr(-.25, .45) * c[2], cy - h3, w3, h3]); }   // kleiner Block davor
+    B.forEach(function (q) {
+      var m = Math.min(q[2], q[3]), r0 = m * rr(.3, .42), rs = [r0 * rr(.7, 1.35), r0 * rr(.7, 1.35), r0 * rr(.6, 1.1), r0 * rr(.6, 1.1)], g = x.createLinearGradient(0, q[1], 0, q[1] + q[3]), kind, j, iw = q[2] - ct * 5, ih = q[3] - ct * 5, mx = q[0] + q[2] / 2, my = q[1] + q[3] / 2;
+      g.addColorStop(0, o.c0); g.addColorStop(1, o.c2);
+      x.save(); x.translate(mx, my); x.rotate(rr(-.035, .035)); x.translate(-mx, -my);
+      rrect4(x, q[0], q[1], q[2], q[3], rs); ol(x, o.lw * 2, o.line);
+      rrect4(x, q[0], q[1], q[2], q[3], rs); x.fillStyle = g; x.fill();
+      x.save(); x.clip(); rrect4(x, q[0], q[1], q[2], q[3], rs); x.lineJoin = 'round'; x.lineWidth = ct * 2; x.strokeStyle = o.rim; x.stroke(); x.restore();   // helle dicke Kontur
+      if (iw < ct * 3 || ih < ct * 3) { x.restore(); return; }
+      rrect4(x, mx - iw / 2, my - ih / 2, iw, ih, rs.map(function (v) { return Math.max(2, v - ct * 2.5); })); x.fillStyle = o.inF; x.fill(); ol(x, ct * .85, o.rim);   // innen wiederholt sich die Form
+      kind = Math.floor(R() * 4);
+      if (kind === 0 && m > ct * 11) { polyline(x, spiralPts(mx, my, Math.min(iw, ih) * .3, 1.25, R() * 6, R() < .5 ? 1 : -1)); ol(x, ct * .8, o.rim); }
+      else if (kind === 1 && iw > ct * 9 && ih > ct * 4) for (j = 0; j < 3; j++) { rrect(x, mx + (j - 1) * iw * .27 - iw * .09, my - ih * .2, iw * .18, ih * .4, ct); ol(x, ct * .65, o.rim); }
+      else if (kind === 2 && iw > ct * 8 && ih > ct * 8) { rrect(x, mx - iw / 2 + ct * 2.4, my - ih / 2 + ct * 2.4, iw - ct * 4.8, ih - ct * 4.8, Math.max(2, r0 - ct * 5)); ol(x, ct * .7, o.rim); }
+      x.restore();
     });
   }
-  function cloudLook(s) { return { n: 3 + Math.floor(R() * 4), lw: Math.max(1.1, s * .034), line: '#5b6bd0', inl: 'rgba(98,112,214,.5)', c1: '#fff5ea', c2: pick(['#f8cbdc', '#d3d9fb', '#ffdcb6', '#e6d2fa']) }; }
+  function cloudLook(s) { var v = pick([['#fff3f6', '#f7c4d8'], ['#f2f0ff', '#cfd0fb'], ['#fff7ec', '#ffd6ac'], ['#f6efff', '#e0c8f8'], ['#eefaff', '#bfe6fb'], ['#eefaff', '#bfe6fb']]);
+    return { n: 3 + Math.floor(R() * 3), lw: Math.max(1, s * .03), line: 'rgba(86,104,206,.75)', rim: '#ffffff', inF: 'rgba(255,255,255,.38)', c0: v[0], c2: v[1] }; }
   // Sonne (eigene Gestaltung): Flammenstrahlen, Kranz aus Steinen, Perlenring, Schnecke
   function sun(x, cx, cy, r, lw) {
     var L = '#a8431a', i;
@@ -383,6 +450,24 @@
     for (i = 0; i < 10; i++) { x.beginPath(); x.arc(cx + Math.cos(i * .628) * r * .57, cy + Math.sin(i * .628) * r * .57, r * .055, 0, 7); x.fillStyle = '#2bb6a0'; x.fill(); ol(x, lw * .5, L); }
     x.beginPath(); x.arc(cx, cy, r * .4, 0, 7); x.fillStyle = '#fff0a8'; x.fill(); ol(x, lw * .8, L);
     polyline(x, spiralPts(cx, cy, r * .28, 1.6, 0, 1)); ol(x, lw, '#f07a2a');
+  }
+  // Kranz um die Sonne (Hugo 27.11., 11:51: grösser, viel mehr Ornamente, die ins Umfeld übergehen; eigene Gestaltung):
+  // Reihen aus Steinen laufen in leichtem Bogen weit hinaus und werden kleiner und blasser, dazwischen Perlenbögen
+  function sunField(x, cx, cy, r, lw) {
+    var n = 16, i, k, a, d, s, t;
+    for (k = 0; k < 4; k++) {
+      d = r * (2.75 + k * 1.3);
+      for (i = 0; i < 44 + k * 16; i++) { a = i / (44 + k * 16) * 6.283 + k * .2; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.036 - k * .005), 0, 7); x.fillStyle = 'rgba(255,206,100,' + (.7 - k * .16) + ')'; x.fill(); }
+    }
+    for (i = 0; i < n; i++) {
+      var lg = i % 2 === 0, m = lg ? 10 : 6, a0 = i / n * 6.283 - Math.PI / 2;
+      for (k = 0; k < m; k++) {
+        t = k / (m - 1); d = r * (2.3 + k * (lg ? .58 : .52) + t * t * .7); a = a0 + t * .24; s = r * (.34 - t * .22) * (lg ? 1 : .8);
+        x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(a); x.globalAlpha = 1 - t * .74;
+        stone(x, 0, 0, s * 1.15, s, k % 3 === 1 ? '#f59a3a' : '#f7c948', { lw: lw * (.85 - t * .4), line: 'rgba(168,74,26,.75)', kind: s > lw * 7 ? 1 : 9, c2: k % 2 ? '#e85a2a' : '#2bb6a0', r: .4, j: 0 });
+        x.restore();
+      }
+    }
   }
   // Grat einer Bergkette: x → Höhe über der Grundlinie (mod drückt die Berge zur Sonne hin flach)
   function peaksFn(x0, x1, n, hgt, mod) {
@@ -444,7 +529,7 @@
       Z_WARM = ['#e07a28', '#f09a30', '#d85a28', '#f2b830', '#c8442a', '#f7c948'],
       ZONES = [Z_WARM, Z_GREEN, Z_TEAL, Z_PURP, Z_MAG, Z_PURP, Z_BLUE, Z_TEAL, Z_GREEN],
       P_GOLD = ['#f2b830', '#f7c948', '#e9a420', '#ffd75e', '#d98f1a'],
-      P_FLOWER = ['#e0409a', '#ff5a8a', '#f07a2a', '#ffd75e', '#c58cf0', '#ff7ab8', '#f6f2ff', '#d0379a'],
+      P_FLOWER = ['#e0409a', '#ff5a8a', '#f07a2a', '#ffd75e', '#c58cf0', '#ff7ab8', '#f6f2ff', '#d0379a', '#ff6a4a', '#6aa8ff', '#9b6ff0', '#ffb347'],
       P_ACC = ['#ffd75e', '#f59a3a', '#ff7ab8', '#7fe0d0', '#f6f2ff'],
       P_LIANA = ['#c8332e', '#e0602a', '#f2b830', '#d0379a', '#8a35b0', '#1fa39a', '#3560c0', '#e0509f'],
       ZP = [0, 0, 0];
@@ -456,14 +541,14 @@
 
   // ---------- Szene ----------
   var world, strips = [], sprites = [], fliers = [], rays, dapple, glow, flare, sheen, fxC, fxX, W = 0, H = 0, U = 0, LW0 = 2, mob = false,
-      camRef = 0, camT = 0, cam = 0, QF = 1, PANS = [0.006, 0.016, 0.03, 0.05], DEPTH = [0.18, 0.38, 0.62, 1],
+      camRef = 0, camT = 0, cam = 0, QF = 1, veil = null, veilW = 0, openHW = function () { return 1e6; },
       SUN = [.5, .325];   // Sonne im Schlussbild (Anteil von Breite und Höhe): tief über dem See, zwischen Slogan und Rad
   // Ein Streifen = eine Tiefen-Ebene. y = 0 ist die Oberkante des Schlussbilds, der Weg der Kamera liegt bei y < 0.
   // Gemalt wird in Kacheln; jedes Teil (add) kennt seine Höhe und wird nur in den Kacheln gemalt, die es berührt.
-  function strip(i, f, dprFin, dprFly) {
-    var mg = .08, mx = W * mg + XR * f, pan = PANS[i] * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
+  function strip(i, f, d, pk, dprFin, dprFly) {
+    var mg = .08, mx = W * mg + XR * f, pan = pk * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
     var el = document.createElement('div'); el.className = 'ak-layer'; el.style.width = w + 'px'; el.style.height = (fh + tf) + 'px';
-    var S = { el: el, f: f, d: DEPTH[i], w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
+    var S = { el: el, f: f, d: d, w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
     S.X = function (fr) { return mx + fr * W; };
     S.Y = function (c, fr) { return S.vy - c * camRef * f + fr * H; };   // Höhe im Streifen, die beim Fortschritt c (1 = oben, 0 = gelandet) am Bildschirm bei fr liegt
     S.add = function (y0, y1, fn) { S.items.push([y0, y1, fn, AK.seed * 7919 + i * 100003 + S.items.length * 31 + 5]); };
@@ -483,7 +568,7 @@
         el.appendChild(c.c); S.tiles.push([c.c, a]);
       }
       S.sw.forEach(function (q) {
-        var r = q[2], o = q[3] ? 4 : r, c = canvas(r * 2, r * 2, dprFin), P = rng(q[5] + 1);
+        var r = q[2], o = q[3] ? 4 : r, c = canvas(r * 2, r * 2, Math.min(dprFin, 1.5)), P = rng(q[5] + 1);
         R = rng(q[5]); c.x.translate(r - q[0], o - q[1]); q[4](c.x); paper(c.x, q[0] - r, q[1] - o, r * 2, r * 2, 1);
         c.c.className = 'ak-sway'; c.c.style.cssText = 'left:' + (q[0] - r) + 'px;top:' + (q[1] - o + tf) + 'px;width:' + r * 2 + 'px;height:' + r * 2 + 'px;transform-origin:50% ' + (q[3] ? '4px' : '50%');
         el.appendChild(c.c);
@@ -495,7 +580,7 @@
 
   // 0 · Himmel, Sonne und Berge im Hintergrund (sie sind von Anfang an zu sehen und bewegen sich kaum), darunter ferne Hügel
   function sceneFar(S) {
-    var top = -S.tf, bot = S.fh, w = S.w, vy = S.vy, lw = LW0 * .7, base = vy + H * .385, sx = S.X(SUN[0]), sy = vy + H * SUN[1], sr = Math.min(U * .064, H * .03);
+    var top = -S.tf, bot = S.fh, w = S.w, vy = S.vy, lw = LW0 * .7, base = vy + H * .385, sx = S.X(SUN[0]), sy = vy + H * SUN[1], sr = Math.min(U * .1, H * .047);
     S.add(top, bot, function (x) {
       var g = x.createLinearGradient(0, top, 0, bot), span = bot - top;
       function st(y, c) { g.addColorStop(clamp((y - top) / span, 0, 1), c); }
@@ -504,15 +589,16 @@
       x.fillStyle = g; x.fillRect(0, top, w, span);
       flow(x, -20, w + 20, top + H * .08, base - U * .1, { n: 26, th: U * .02, amp: U * .018, pal: ['rgba(255,255,255,.2)', 'rgba(200,244,255,.2)', 'rgba(255,240,214,.18)'], plain: 1 });
     });
-    S.add(sy - sr * 7, sy + sr * 7, function (x) {
-      var g = x.createRadialGradient(sx, sy, 0, sx, sy, sr * 7); g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(.22, 'rgba(255,240,180,.55)'); g.addColorStop(1, 'rgba(255,236,180,0)');
-      x.fillStyle = g; x.fillRect(sx - sr * 7, sy - sr * 7, sr * 14, sr * 14);
-      sun(x, sx, sy, sr, lw * 1.2);
+    S.add(sy - sr * 9.5, sy + sr * 9.5, function (x) {
+      var g = x.createRadialGradient(sx, sy, 0, sx, sy, sr * 6); g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(.25, 'rgba(255,240,180,.5)'); g.addColorStop(1, 'rgba(255,236,180,0)');
+      x.fillStyle = g; x.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
+      sunField(x, sx, sy, sr, lw * 1.2);
+      sun(x, sx, sy, sr, lw * 1.3);
     });
     // kleine Wolken, die im Bild stehen bleiben (die grossen ziehen als einzelne Teile vorbei)
     [[.8, -.18, .07], [.24, -.32, .06], [.62, -.08, .05]].forEach(function (c) {
       var s = U * c[2], py = vy + H * c[1];
-      S.add(py - s * 1.6, py + s * .4, function (x) { swirlCloud(x, S.X(c[0]), py, s, cloudLook(s)); });
+      S.add(py - s * 1.6, py + s * .4, function (x) { glyphCloud(x, S.X(c[0]), py, s, cloudLook(s)); });
     });
     var m1 = function (px) { var d = clamp(Math.abs(px - sx) / (w * .44), 0, 1); return .1 + .9 * d * d * (3 - 2 * d); },
         m2 = function (px) { var d = clamp(Math.abs(px - sx) / (w * .38), 0, 1); return .07 + .93 * d * d * (3 - 2 * d); },
@@ -562,7 +648,8 @@
           eL1 = function (y) { return -14 + (cx - HW1 + 14) * sh(y) + (Math.sin(y * .005 + q1) * .03 + Math.sin(y * .016 + q2) * .012) * U * sh(y); },
           eR1 = function (y) { return w + 14 - (cx - HW1 + 14) * sh(y) - (Math.sin(y * .0046 + q2) * .03 + Math.sin(y * .018 + q1) * .012) * U * sh(y); },
           end = function () { return bot; };
-      jungle(S, yT1, bot, eL1, eR1, { ground: '#1c2158', size: .5, dens: 1.15, lwk: .8, cell: .05, lianas: [{ x0: 2, x1: cx - HW1 - U * .06, yEnd: end }, { x0: cx + HW1 + U * .06, x1: w - 2, yEnd: end }] });
+      var o1 = { ground: '#1c2158', size: .5, dens: 1.15, lwk: .8, cell: .05, lianas: [{ x0: 2, x1: cx - HW1 - U * .06, yEnd: end }, { x0: cx + HW1 + U * .06, x1: w - 2, yEnd: end }] };
+      ground(S, yT1, bot, eL1, eR1, o1); plants(S, yT1, bot, eL1, eR1, o1);
       S.add(yT1, bot + 4, function (x) {
         var q; x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(140,195,238,.2)';
         x.beginPath(); x.moveTo(-14, yT1); for (q = yT1; q <= bot + 4; q += 12) x.lineTo(eL1(q), q); x.lineTo(-14, bot + 4); x.closePath();
@@ -571,14 +658,20 @@
     }
   }
 
-  // dichter Urwald links von eL(y) und rechts von eR(y): dunkler Grund mit Mäanderbändern, lange Lianen, darüber Pflanzen
-  // dicht an dicht. Am Rand wachsen Wedel in die Öffnung, oben (o.topFn) schliessen Kronen ab: nirgends eine gerade Kante.
-  var KINDS = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 7, 8, 8, 9], SIZES = [.55, .7, .7, .85, .85, 1, 1, 1.2, 1.5];
-  function jungle(S, y0, y1, eL, eR, o) {
-    var w = S.w, s = U * (o.cell || .06), ph = s * 14, lw = LW0 * (o.lwk || 1), u = U * (o.size || 1), top = o.topFn, ys = y0 - (top ? s * 2 : 0), y, i, px, py, list = [], n;
-    function inJ(qx, qy) { return (!top || qy > top(qx)) && (qx < eL(qy) || qx > eR(qy)); }
+  // Urwald in zwei Teilen, damit er Tiefe bekommt (Hugo 27.11., 11:50):
+  //   ground: dunkler Grund mit Mäanderbändern und langen Lianen – liegt weiter hinten und wandert immer leicht auf einer kleinen Bahn
+  //   plants: Pflanzen und Blüten dicht an dicht davor; am Rand wachsen sie in die Öffnung, oben schliessen Kronen ab
+  var KINDS = [0, 0, 0, 1, 1, 2, 9, 7, 7, 5, 8, 3, 3, 4, 10, 10, 11, 12, 12, 13, 13, 14, 14, 15, 16, 16], FLOWERS = [3, 4, 10, 11, 12, 13, 14, 15, 16], SIZES = [.55, .7, .7, .85, .85, 1, 1, 1.2, 1.5];
+  // zeichnet in die Ebene T mit den Koordinaten der Ebene S (beide decken sich, wenn die Kamera unten steht)
+  function onto(T, S) {
+    var ax = (T.w - S.w) / 2, ay = T.vy - S.vy;
+    return { w: S.w, add: function (y0, y1, fn) { T.add(y0 + ay, y1 + ay, function (x) { x.translate(ax, ay); fn(x); }); },
+      sway: function (px, py, r, top, fn) { T.sway(px + ax, py + ay, r, top, function (x) { x.translate(ax, ay); fn(x); }); } };
+  }
+  function ground(T, y0, y1, eL, eR, o) {
+    var w = T.w, s = U * (o.cell || .06), ph = s * 14, lw = LW0 * (o.lwk || 1), u = U * (o.size || 1), top = o.topFn, ys = y0 - (top ? s * 2 : 0), y, px;
     for (y = ys; y < y1; y += ph) (function (ya, yb, first) {
-      S.add(ya - s, yb + s, function (x) {
+      T.add(ya - s, yb + s, function (x) {
         var q;
         x.beginPath();
         if (first && top) { x.moveTo(-14, yb + 1); for (q = -14; q <= w + 14; q += 8) x.lineTo(q, top(q)); x.lineTo(w + 14, yb + 1); x.closePath(); }
@@ -595,12 +688,16 @@
       for (px = rg.x0 + u * rr(.03, .1); px < rg.x1; px += u * rr(.1, .22)) (function (px, yb, th, col) {
         var ya = top ? top(px) + 2 : y0;
         if (yb - ya < u * .3) return;
-        S.add(ya, yb + th * 4, function (x) { liana(x, px, ya, yb, th, col, lw, { step: u * .22, x0: Math.max(rg.x0, px - u * .12), x1: Math.min(rg.x1, px + u * .12), inner: R() < .5 ? mix(col, '#ffffff', .4) : 0, bead: rg.bead ? pick(P_ACC) : 0 }); });
+        T.add(ya, yb + th * 4, function (x) { liana(x, px, ya, yb, th, col, lw, { step: u * .22, x0: Math.max(rg.x0, px - u * .12), x1: Math.min(rg.x1, px + u * .12), inner: R() < .5 ? mix(col, '#ffffff', .4) : 0, bead: rg.bead ? pick(P_ACC) : 0 }); });
       })(px, rg.yEnd(px), U * rr(.012, .026), pick(P_LIANA));
     });
-    n = Math.round((w + 20) * (y1 - y0) / (u * u * .085) * (o.dens || 1));
-    var cz = o.calm, qz = [R() * 6, R() * 6], sz, dq;
+    if (top && o.crowns) for (px = -u * .1; px < w + u * .1; px += u * rr(.2, .34)) plant(T, px, top(px) + u * rr(-.02, .12), pick([0, 0, 9, 7]), lw, u * rr(1, 1.5), -Math.PI / 2);
+  }
+  function plants(S, y0, y1, eL, eR, o) {
+    var w = S.w, lw = LW0 * (o.lwk || 1), u = U * (o.size || 1), top = o.topFn, y, i, px, py, list = [], n, cz = o.calm, qz = [R() * 6, R() * 6], sz, dq, ne = 0;
+    function inJ(qx, qy) { return (!top || qy > top(qx)) && (qx < eL(qy) || qx > eR(qy)); }
     function calm(qy) { return cz && qy > cz[0] && qy < cz[1]; }   // neben dem Text bleiben die Pflanzen klein, damit er frei steht
+    n = Math.round((w + 20) * (y1 - y0) / (u * u * .085) * (o.dens || 1));
     for (i = 0; i < n; i++) {
       px = rr(-10, w + 10); py = rr(y0, y1); if (!inJ(px, py)) continue;
       if (R() > .62 + .38 * Math.sin(px / u * 1.7 + qz[0]) * Math.sin(py / u * 1.3 + qz[1]) + .3) continue;   // Dichte in Flecken: dazwischen bleiben die Mäanderbänder sichtbar
@@ -610,12 +707,11 @@
     }
     list.sort(function (a, b) { return a[1] - b[1]; });
     list.forEach(function (p) { plant(S, p[0], p[1], p[2], lw, u * p[3]); });
-    var ne = 0;
     for (y = y0; y < y1; y += u * rr(.14, .26) * (calm(y) ? cz[2] * 1.5 : 1)) [0, 1].forEach(function (sd) {
       var e = sd ? eR : eL, ex = e(y), d = (e(y + 6) - e(y - 6)) / 12, a, c = calm(y);
       if (ex < -10 || ex > w + 10 || eR(y) - eL(y) < 6) return;
       a = (sd ? Math.atan2(d, -1) : Math.atan2(-d, 1)) + (sd ? 1 : -1) * (c ? .95 : .45) / (1 + d * d * 4);
-      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < .7 ? 9 : R() < .5 ? 3 : 4, lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a,
+      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < .55 ? 9 : pick(FLOWERS), lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a,
         !!(o.sway && AK.sway && y > o.sway[0] && ne++ % o.sway[1] === 0));   // im Schlussbild wiegt sich ein Teil der Randpflanzen
     });
     if (top) for (px = -u * .1; px < w + u * .1; px += u * rr(.18, .3)) plant(S, px, top(px) + u * rr(-.05, .12), pick([0, 0, 2, 9, 7]), lw, u * rr(1.1, 1.7), -Math.PI / 2);
@@ -629,29 +725,42 @@
       else if (k === 3) bloom(x, px, py, u * rr(.13, .24), pick(R() < .6 ? Z_MAG : P_FLOWER), lw);
       else if (k === 4) flowerB(x, px, py, u * rr(.07, .13), pick(P_FLOWER), lw);
       else if (k === 5) fern(x, { x: px, y: py + u * .3, len: u * rr(.3, .5), col: pick(z), dir: R() < .5 ? 1 : -1, lw: lw * .8 });
-      else if (k === 6) scaleBush(x, px, py + u * .2, u * rr(.3, .5), u * rr(.22, .36), [pick(z), pick(z), pick(z2)], lw);
+      else if (k === 10) dahlia(x, px, py, u * rr(.11, .2), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 11) bell(x, px, py, u * rr(.12, .2), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 12) lotus(x, px, py, u * rr(.16, .28), [pick(R() < .5 ? Z_MAG : P_FLOWER)], lw);
+      else if (k === 13) passion(x, px, py, u * rr(.11, .19), [pick(P_FLOWER), pick(Z_PURP), pick(P_ACC)], lw);
+      else if (k === 14) hibiscus(x, px, py, u * rr(.13, .22), [pick(P_FLOWER), pick(Z_MAG)], lw);
+      else if (k === 15) cluster(x, px, py - u * .15, u * rr(.25, .42), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 16) starFlower(x, px, py, u * rr(.12, .22), [pick(P_FLOWER), pick(P_ACC)], lw);
       else if (k === 7) for (i = 0, c = 2 + Math.floor(R() * 3); i < c; i++) bigLeaf(x, px, py + u * .25, -Math.PI / 2 + (i - (c - 1) / 2) * rr(.45, .8), u * rr(.34, .56), u * rr(.07, .1), (i - (c - 1) / 2) * .22, pick(z), lw);
-      else if (k === 8) { if (R() < .5) disc(x, px, py, u * rr(.05, .09), [pick(z), pick(P_ACC), pick(z2), INK], lw); else pearls(x, px, py - u * .2, u * rr(.25, .45), u * .016, pick(P_ACC), lw, rr(-.25, .25)); }
+      else if (k === 8) pearls(x, px, py - u * .2, u * rr(.25, .45), u * .016, pick(P_ACC), lw, rr(-.25, .25));
       else frond(x, { x: px, y: py, a: dirA == null ? R() * 6 : dirA + rr(-.3, .3), spread: rr(1.1, 1.9), n: 6 + Math.floor(R() * 5), len: u * rr(.3, .56), wid: u * rr(.036, .06), droop: rr(.25, .6), cols: z, lw: lw, rib: R() < .35 ? 1 : 0 });
     };
     if (sway) S.sway(px, py, u * .7, 0, fn); else S.add(py - u * .9, py + u * .9, fn);
   }
 
-  // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese
-  function sceneMain(S) {
+  // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese.
+  // SB = Grund mit Bändern und Lianen (weiter hinten), S = Pflanzen und Wiese, SF = einzelne Pflanzen dicht vor der Kamera
+  function sceneMain(S, SB, SF) {
     var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .478 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
-        p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; };
+        yCb = vy - H * .78, yAb = vy - H * .2, p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; },
+        size = mob ? .7 : .82, TB = onto(SB, S), TF = onto(SF, S);
     // Öffnung der Lichtung: oben ein spitzer Bogen, in der Texthöhe breit (Handy: fast die ganze Breite), unten wächst das Unterholz wieder herein
-    function hw(y) {
-      if (y <= yA) return 0;
-      var t = clamp((y - yA) / (yB - yA), 0, 1), f = clamp((y - (vy + H * .845)) / (H * .24), 0, 1);
+    function hwOf(y, a) {
+      if (y <= a) return 0;
+      var t = clamp((y - a) / (yB - a), 0, 1), f = clamp((y - (vy + H * .845)) / (H * .24), 0, 1);
       return Math.max(0, HW * Math.pow(t, 1.5) - Math.pow(f, 1.2) * W * (mob ? .34 : .17));
     }
-    function eL(y) { var h = hw(y), k = Math.min(1, h / (U * .25)); return cx - h - (Math.sin(y * .006 + p1) * .03 + Math.sin(y * .017 + p2) * .012) * U * k; }
-    function eR(y) { var h = hw(y), k = Math.min(1, h / (U * .25)); return cx + h + (Math.sin(y * .0052 + p2) * .03 + Math.sin(y * .019 + p1) * .012) * U * k; }
+    function hw(y) { return hwOf(y, yA); }
+    function hwB(y) { return hwOf(y, yAb); }   // der Grund dahinter schliesst etwas tiefer: man sieht ihn als zweiten Bogen
+    function edge(h, sd, pa, pb) { return function (y) { var v = h(y), k = Math.min(1, v / (U * .25)); return cx + sd * (v + (Math.sin(y * (sd < 0 ? .006 : .0052) + pa) * .03 + Math.sin(y * (sd < 0 ? .017 : .019) + pb) * .012) * U * k); }; }
+    var eL = edge(hw, -1, p1, p2), eR = edge(hw, 1, p2, p1), eLb = edge(hwB, -1, p1, p2), eRb = edge(hwB, 1, p2, p1);
+    function archYb(px) { var d = Math.abs(px - cx) / HW; return d >= 1 ? bot : yAb + Math.pow(d, 1 / 1.5) * (yB - yAb); }
     function archY(px) { var d = Math.abs(px - cx) / HW; return d >= 1 ? bot : yA + Math.pow(d, 1 / 1.5) * (yB - yA); }
     function topFn(px) { return yC + (Math.sin(px * .011 + p3) * .05 + Math.sin(px * .027 + p4) * .025) * U; }
+    function topB(px) { return yCb + (Math.sin(px * .009 + p4) * .05 + Math.sin(px * .023 + p3) * .025) * U; }
     function yN(px) { return vy + H * .565 + Math.cos((px - cx) / w * Math.PI * 2) * U * .018 + Math.sin(px * .011 + p3) * U * .01; }
+    openHW = function (yr) { var y = vy + yr; return y < yC - U * .3 ? 1e6 : Math.min(hw(y), hwB(y)); };   // freie halbe Breite der Öffnung (für den Lese-Schleier)
     // nahe Wiese: helle fliessende Bänder, in der Mitte ruhig (dort steht der Text)
     S.add(vy + H * .5, bot + 4, function (x) {
       var px, py, k, t, s, g = x.createLinearGradient(0, vy + H * .565, 0, bot);
@@ -663,13 +772,17 @@
       for (k = 0; k < (mob ? 26 : 60); k++) {
         px = rr(0, w); py = rr(vy + H * .62, bot); t = (py - vy - H * .56) / (bot - vy - H * .56); s = U * (.012 + .03 * t);
         if (py < vy + H * .84 && Math.abs(px - cx) < HW * (mob ? .94 : .62) && (mob || R() < .82)) continue;   // in der Texthöhe bleibt die Mitte frei
-        if (R() < .45) flowerB(x, px, py, s, pick(P_FLOWER), lw * .6);
+        if (R() < .3) flowerB(x, px, py, s, pick(P_FLOWER), lw * .6);
+        else if (R() < .35) starFlower(x, px, py, s * 1.3, [pick(P_FLOWER), '#ffd75e'], lw * .6);
         else frond(x, { x: px, y: py, a: -Math.PI / 2, spread: 1.5, n: 5, len: s * 2.4, wid: s * .34, droop: .3, cols: ['#4fae3f', '#2f9a4a', '#6fbf3a'], lw: lw * .6, rib: 0 });
       }
     });
-    jungle(S, yC, bot, eL, eR, { ground: '#161a48', size: mob ? .7 : .82, dens: 1.1, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75], sway: [vy - H * .06, mob ? 3 : 1],
+    // hinten: Grund, Bänder, Lianen
+    ground(TB, yCb, bot, eLb, eRb, { ground: '#161a48', size: size, topFn: topB, crowns: 1,
       lianas: [{ x0: 2, x1: cx - HW - U * .05, yEnd: end }, { x0: cx + HW + U * .05, x1: w - 2, yEnd: end },
-        { x0: cx - HW * .92, x1: cx + HW * .92, yEnd: function (px) { return Math.min(archY(px) + U * rr(.02, .16), vy + H * .04); }, bead: 1 }] });
+        { x0: cx - HW * .92, x1: cx + HW * .92, yEnd: function (px) { return Math.min(archYb(px) + U * rr(.02, .16), vy + H * .04); }, bead: 1 }] });
+    // davor: Pflanzen und Blüten
+    plants(S, yC, bot, eL, eR, { size: size, dens: 1.15, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75], sway: [vy - H * .06, mob ? 3 : 1] });
     // Ranken hängen vom Bogen in die Lichtung
     for (i = 0; i < (mob ? 5 : 9); i++) (function (px) {
       var y0 = archY(px) - U * .03, len = Math.min(U * rr(.25, .7), vy + H * .06 - y0), fn;
@@ -677,6 +790,11 @@
       fn = function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); };
       if (AK.sway && y0 + len > vy - H * .1) S.sway(px, y0, len / 2 + 22, 1, fn); else S.add(y0 - 4, y0 + len + 20, fn);
     })(cx + rr(-.9, .9) * HW);
+    // vorn: einzelne grosse Pflanzen dicht vor der Kamera. Sie liegen nur über dem dichten Urwald, nie frei vor Himmel oder Lichtung
+    var nf = Math.round(w * H * .6 / Math.pow(U * size * 1.3, 2) / .42), fl2 = [];
+    for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.3, -.7), pick([0, 1, 9, 7, 3, 10, 13, 14, 16, 12]), rr(1.1, 1.6)]);
+    fl2.sort(function (a, b) { return a[1] - b[1]; });
+    fl2.forEach(function (q) { plant(TF, q[0], q[1], q[2], lw * 1.15, U * size * q[3]); });
   }
 
   // einzelnes Teil mit eigener Tiefe (Wolke, vorbeiziehendes Blatt): liegt beim Fortschritt ci am Bildschirm bei fr
@@ -689,7 +807,7 @@
   function skyClouds(defs) {   // [Fortschritt, x, Höhe am Bildschirm, Grösse, Tiefe]
     defs.forEach(function (d) {
       var s = U * d[3], cw = s * 6, chh = s * 2, vx = (R() < .5 ? -1 : 1) * rr(3, 7) * (.5 + d[4] * .5) / 1000;   // die Wolken ziehen langsam
-      flyer(cw, chh, d[4], d[0], d[1] * W, d[2], function (x) { swirlCloud(x, cw / 2, chh * .86, s, cloudLook(s)); }, vx);
+      flyer(cw, chh, d[4], d[0], d[1] * W, d[2], function (x) { glyphCloud(x, cw / 2, chh * .86, s, cloudLook(s)); }, vx);
     });
   }
   function flyLeaves() {   // grosse Wedel ziehen kurz vor der Landung dicht an der Kamera vorbei
@@ -698,6 +816,7 @@
       flyer(s, s, d[3], d[0], d[1] ? W - s * .1 : s * .1, d[2], function (x, w, h) {
         frond(x, { x: d[1] ? w * .97 : w * .03, y: h * .5, a: d[1] ? Math.PI : 0, spread: 2.2, n: 9, len: w * .8, wid: w * .05, droop: .3, cols: z, lw: LW0 * 1.6, rib: 1 });
       });
+      fliers[fliers.length - 1].leaf = 1;
     });
   }
 
@@ -708,14 +827,22 @@
     ZP = [R() * 6, R() * 6, R() * 6];
     XR = AK.freePan ? W * (mob ? AK.panX[0] : AK.panX[1]) : 0;
     camRef = Math.round(H * AK.flightH); camT = camRef; cam = tgY = fly ? camT : 0; camX = tgX = 0;   // immer das ganze Bild: man kann von Hand wieder nach oben
+    // Lese-Schleier in drei Feldern (Titel und Slogan · Rad · Preis und Kontakte): jedes leuchtet nur, wenn hinter ihm Urwald liegt
+    if (!veil) veil = [[.1, .29], [.385, .585], [.61, .835]].map(function (z) {
+      var e = document.createElement('div'); e.className = 'ak-veil'; e.setAttribute('aria-hidden', 'true'); root.insertBefore(e, root.querySelector('.ak-inner'));
+      return { el: e, y0: z[0], y1: z[1], v: 0, q: -1 };
+    });
+    veilW = Math.min(W * .44, 330);
+    veil.forEach(function (z) { z.el.style.cssText = 'left:' + (W / 2 - veilW - 4) + 'px;width:' + (veilW * 2 + 8) + 'px;top:' + H * z.y0 + 'px;height:' + H * (z.y1 - z.y0) + 'px;'; z.q = -1; });
     if (world) world.remove();
     world = document.createElement('div'); world.className = 'ak-world'; world.setAttribute('aria-hidden', 'true');
     root.insertBefore(world, root.firstChild);
     sprites = []; fliers = []; sways = [];
-    var q = W > 1100 ? Math.min(DPR, 1.5) : DPR; QF = Math.min(DPR, W > 1100 ? 1.25 : 1.5);   // grosse Bildschirme etwas weniger scharf (Speicher)
-    var S0 = strip(0, .14, q, q), S1 = strip(1, .5, q, QF), S2 = strip(2, 1, q, QF);
-    strips = [S0, S1, S2];
-    sceneFar(S0); sceneMid(S1); sceneMain(S2);
+    var big = W > 1100, q = big ? Math.min(DPR, 1.5) : DPR, qs = Math.min(DPR, big ? 1.25 : 1.5), qf = Math.min(DPR, big ? 1 : 1.25); QF = qs;   // Schärfe nach Bedarf: vorn scharf, Himmel und Hintergrund weicher (Speicher)
+    var S0 = strip(0, .14, .18, .006, qs, qs), S1 = strip(1, .5, .38, .016, q, QF), SB = strip(2, .86, .54, .025, qs, qf), S2 = strip(3, 1, .62, .03, q, QF), SF = strip(4, 1.2, .76, .038, qf, qf);
+    SB.path = U * .024;   // die Bänder und Lianen wandern immer leicht auf einer kleinen Bahn (Hugo 11:50)
+    strips = [S0, S1, SB, S2, SF];
+    sceneFar(S0); sceneMid(S1); sceneMain(S2, SB, SF);
     S0.build(); world.appendChild(S0.el);
     R = rng(AK.seed + 3);
     skyClouds([[1, .2, .3, .07, .25], [.97, .84, .5, .09, .3], [.9, .5, .2, .08, .36], [.84, .14, .62, .1, .4], [.78, .8, .35, .09, .45], [.7, .4, .55, .1, .42],
@@ -723,7 +850,9 @@
     S1.build(); world.appendChild(S1.el);
     R = rng(AK.seed + 4);
     skyClouds([[.99, .72, .2, .14, .6], [.93, .25, .75, .16, .7], [.86, .85, .5, .15, .8], [.8, .3, .3, .18, .9], [.73, .7, .7, .16, .75], [.67, .2, .5, .2, .95]]);   // mittlere Wolken
+    SB.build(); world.appendChild(SB.el);
     S2.build(); world.appendChild(S2.el);
+    SF.build(); world.appendChild(SF.el);
     R = rng(AK.seed + 5);
     skyClouds([[.97, .1, .9, .22, 1.3], [.9, .9, .6, .26, 1.6], [.85, .3, .5, .3, 1.9], [.79, .75, .4, .24, 1.25], [.74, .1, .6, .3, 1.7], [.69, .6, .5, .26, 1.45], [.65, .9, .4, .22, 1.2]]);   // nahe Wolken rauschen vorbei
 
@@ -795,10 +924,10 @@
     dc.c.style.cssText = 'width:' + W + 'px;height:' + H + 'px;' + (reduce ? '' : 'animation:akSpot 13s ease-in-out infinite;');
     dapple.appendChild(dc.c); world.appendChild(dapple);
     sprites.forEach(function (s) { world.appendChild(s.el); });
-    flyLeaves();
+    if (fly) flyLeaves();   // nur im Flug; danach verschwinden sie (sonst hingen sie beim Verschieben in der Luft)
 
     // Glühwürmchen, Glitzer, Fahrtwind
-    var fxc = canvas(W, H, Math.min(DPR, 1.5)); fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; world.appendChild(fxC);
+    var fxc = canvas(W, H, Math.min(DPR, 1.25)); fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; world.appendChild(fxC);
     // Linsen-Glanz und Perlmutt-Schimmer (erst unten in der Lichtung)
     flare = document.createElement('div'); flare.className = 'ak-flare';
     [[.22, .1, '#fae4b4', .35], [.45, .05, '#c3b2fa', .3], [.62, .16, '#96dcf5', .18], [.8, .07, '#f8bed7', .28]].forEach(function (f) {
@@ -949,12 +1078,12 @@
       try { window.getSelection().removeAllRanges(); } catch (er) {}
     }
     drag.vx = drag.vx * .6 + (e.clientX - drag.px) / d * .4; drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.px = e.clientX; drag.py = e.clientY; drag.pt = e.timeStamp;
-    tgX = clamp(drag.cx - mx * 1.2, -XR, XR); tgY = clamp(drag.cy + my * 1.7, 0, camT);   // das Bild folgt dem Finger: nach unten ziehen = zurück nach oben
+    tgX = clamp(drag.cx - mx, -XR, XR); tgY = clamp(drag.cy + my * 1.7, 0, camT);   // das Bild folgt dem Finger: nach unten ziehen = zurück nach oben
   }, { passive: true });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
     if (drag.on) {   // beim Loslassen gleitet die Kamera noch ein Stück weiter
-      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 260, -XR, XR); tgY = clamp(tgY + drag.vy * 420, 0, camT); }
+      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 180, -XR, XR); tgY = clamp(tgY + drag.vy * 420, 0, camT); }
       dragged = 1; setTimeout(function () { dragged = 0; }, 80); root.classList.remove('ak-drag');
     }
     drag = null;
@@ -967,6 +1096,26 @@
     var k = e.deltaMode === 1 ? 32 : 1;
     tgY = clamp(tgY - e.deltaY * k * 1.1, 0, camT); tgX = clamp(tgX + e.deltaX * k, -XR, XR);
   }, { passive: false });
+
+  // Handy: kein «Zurück» durch Wischen vom Bildschirmrand (Hugo 27.11., 11:50). Beim seitlichen Verschieben löste der Browser es sonst aus.
+  // 1. Eine Berührung, die am Rand beginnt, bekommt der Browser nicht für seine Wischgeste.
+  // 2. Rutscht die Geste trotzdem durch, bleibt die Seite stehen. Der Zurück-Knopf des Browsers geht weiter wie gewohnt.
+  var edgeT = -1e9, guard = 0;
+  if (touch) {
+    root.addEventListener('touchstart', function (e) {
+      var q = e.touches && e.touches[0]; if (!q) return;
+      if (!guard) { guard = 1; try { history.pushState({ ak: 1 }, ''); } catch (er) {} }
+      if (q.clientX < 28 || q.clientX > window.innerWidth - 28) {
+        edgeT = performance.now();
+        if (e.cancelable && !(e.target.closest && e.target.closest('a, button'))) e.preventDefault();
+      }
+    }, { passive: false });
+    window.addEventListener('popstate', function () {
+      if (!guard) return;
+      if (performance.now() - edgeT < 3500) { try { history.pushState({ ak: 1 }, ''); } catch (er) {} }
+      else { guard = 0; history.back(); }
+    });
+  }
 
   // Der grosse Schwung: langsam los, schnell durch die Mitte, weich landen; ganz am Ende federt die Kamera einen Hauch nach
   function swing(u) {
@@ -983,12 +1132,22 @@
       var c0 = cam; fl.u = Math.min(1, fl.u + Math.min(64, now - fl.last) / fl.D * fl.rate); fl.last = now;
       cam = camT * (1 - swing(fl.u)); vel = cam - c0;
       if (!shown && fl.u >= .92) reveal();   // erst wenn die Kamera fast steht: Glas-Knöpfe über einem fahrenden Bild kosten das Handy viel
-      if (fl.u >= 1) { fl = null; cam = tgY = 0; camX = tgX = 0; }
+      if (fl.u >= 1) {
+        fl = null; cam = tgY = 0; camX = tgX = 0;
+        setTimeout(function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); }, 3200);   // die grossen Wedel gehörten nur zum Flug (weg, sobald alles ruhig steht)
+      }
     } else if (AK.freePan) {   // von Hand: die Kamera zieht gemütlich nach
       var kk = 1 - Math.exp(-dt / 170);
       cam += (tgY - cam) * kk; camX += (tgX - camX) * kk;
       if (Math.abs(tgY - cam) < .05) cam = tgY;
       if (Math.abs(tgX - camX) < .05) camX = tgX;
+    }
+    if (veil) for (i = 0; i < veil.length; i++) {   // Lese-Schleier: so viel Licht hinter jedem Textfeld, wie Urwald dahinter liegt
+      var Z = veil[i], need = 0, yy, vq;
+      if (shown && AK.veil) for (yy = 0; yy <= 2; yy++) need = Math.max(need, clamp((veilW - (openHW((Z.y0 + (Z.y1 - Z.y0) * yy / 2) * H - cam) - Math.abs(camX))) / (U * .2), 0, 1));
+      Z.v += (need - Z.v) * (1 - Math.exp(-dt / 220));
+      vq = Math.round(Z.v * AK.veil * 50) / 50;
+      if (vq !== Z.q) { Z.q = vq; Z.el.style.opacity = vq; }
     }
     var lit = !fl && shown && cam < H * .45;
     if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
@@ -996,21 +1155,22 @@
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
     ptr.x += (ptr.tx - ptr.x) * .06; ptr.y += (ptr.ty - ptr.y) * .06;
-    var dr = reduce ? 0 : AK.drift * (mob ? 2.2 : 1.6);   // der Blick steht nie ganz still (Hugo 11:02), am Handy etwas mehr
+    var dr = reduce ? 0 : AK.drift * (mob ? 1.8 : 1.5);   // der Blick steht nie ganz still (Hugo 11:02), am Handy etwas mehr
     var dx = (Math.sin(t * .00011) * 10 + Math.sin(t * .00023 + 1) * 5) * dr - ptr.x * 18 * AK.pointer;
     var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr * .7 - ptr.y * 12 * AK.pointer;
     // ohne Flug: beim Einblenden sinkt die Kamera ein Stück ins Bild (leichter Zoom)
     var ip = flown || reduce || !shown ? (shown || flown ? 1 : 0) : clamp((now - tStart) / (AK.introMs * 1.6), 0, 1), ie = 1 - Math.pow(1 - ip, 3);
     for (i = 0; i < strips.length; i++) {
-      var L = strips[i], z = 1 + (1 - ie) * .06 * L.d;
-      L.el.style.transform = 'translate3d(' + (L.ox + dx * L.d - camX * L.f).toFixed(1) + 'px,' + (L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d).toFixed(1) + 'px,0) scale(' + z.toFixed(4) + ')';
+      var L = strips[i], z = 1 + (1 - ie) * .06 * L.d, lx = L.ox + dx * L.d - camX * L.f, ly = L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d;
+      if (L.path && !reduce) { lx += Math.sin(t * .00052) * L.path; ly += Math.sin(t * .00037 + 1.3) * L.path * .75; }   // Bänder und Lianen: immer leicht unterwegs auf einer kleinen Bahn
+      L.el.style.transform = 'translate3d(' + lx.toFixed(1) + 'px,' + ly.toFixed(1) + 'px,0) scale(' + z.toFixed(4) + ')';
     }
     for (i = 0; i < fliers.length; i++) {
       var F = fliers[i], fy = F.y + cam * F.f, on = fy > -F.h && fy < H ? 1 : 0;
       if (on) {
         var fxp = F.x;
         if (F.vx) { var spn = W + F.w + XR * F.f * 2 + 40, off = F.w + XR * F.f + 20; fxp = ((F.x + off + t * F.vx) % spn + spn) % spn - off; }   // zieht langsam und kommt auf der anderen Seite wieder
-        F.el.style.transform = 'translate3d(' + (fxp + dx * F.f * .6 - camX * F.f).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
+        F.el.style.transform = 'translate3d(' + (fxp + dx * F.f * .6 - camX * Math.min(F.f, 1.2)).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
       }
       if (on !== F.on) { F.on = on; F.el.style.visibility = on ? 'visible' : 'hidden'; }
     }
@@ -1020,7 +1180,7 @@
     }
     for (i = 0; i < sprites.length; i++) {
       var S = sprites[i], rot = reduce ? 0 : Math.sin(t * S.f + S.ph) * S.amp + Math.sin(t * S.f * 2.3 + S.ph * 2) * S.amp * .35;
-      var sx = S.x + dx * 1.35 - camX * 1.5, sy = S.y + cam * 1.5 + dy * 1.35 - pan * 2 * PANS[3] * H * AK.scrollPan * 1.3 + (1 - ie) * 90;
+      var sx = S.x + dx * 1.35 - camX * 1.2, sy = S.y + cam * 1.25 + dy * 1.35 - pan * H * AK.scrollPan * .13 + (1 - ie) * 90;
       var piv = 'translate(' + (S.w * S.ax) + 'px,' + (S.h * S.ay) + 'px) rotate(', back = ' translate(' + (-S.w * S.ax) + 'px,' + (-S.h * S.ay) + 'px)';
       S.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0) ' + piv + rot.toFixed(2) + 'deg)' + back;
       // Schatten: die Sonne steht hinten in der Mitte, also fällt er nach vorn und etwas nach aussen
