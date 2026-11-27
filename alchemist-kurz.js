@@ -46,8 +46,7 @@
     drift: 1,             // ruhige Eigenbewegung der Kamera (0 = aus)
     pointer: 1,           // Maus / Finger bewegt die Ebenen (0 = aus)
     scrollPan: 1,         // Scrollen im Rad schiebt den Wald (0 = aus)
-    freePan: 1,           // die ganze Szene lässt sich von Hand verschieben: zurück nach oben und seitlich (0 = aus)
-    panX: [.09, .05],     // so weit geht es seitlich, als Anteil der Breite: Handy, Computer (Hugo 13:19: dezent und weich wie am Anfang)
+    freePan: 1,           // die Szene lässt sich von Hand wieder nach oben in den Himmel schieben (0 = aus). Seitlich nicht: das ist seit 27.11., 15:33 ganz weg
     panSoft: 420,         // so weich zieht die Kamera dem Finger nach (Millisekunden; grösser = weicher)
     veil: [.34, .88],     // weiches Feld hinter Rad-Mitte und Beschreibung: Deckkraft in der Lichtung, Deckkraft über dem Urwald (0 = aus)
     sway: 1,              // Wedel am Rand und Ranken wiegen sich im Wind (0 = aus)
@@ -108,9 +107,13 @@
     '.ak-veil { position: absolute; z-index: 5; pointer-events: none; opacity: 0; will-change: opacity; }',
     /* Licht: fertig gemalte Bilder mit normaler Deckkraft. Kein Mischmodus, keine Masken – die bremsten das Handy bei der Landung */
     '.ak-rays { left: 0; top: 0; will-change: transform; }',
-    '.ak-rays canvas { position: absolute; left: 0; top: 0; will-change: opacity; }',
-    '@keyframes akRayA { 0%, 100% { opacity: 1; } 35% { opacity: .5; } 70% { opacity: .85; } }',
-    '@keyframes akRayB { 0%, 100% { opacity: .55; } 40% { opacity: 1; } 75% { opacity: .65; } }',
+    '.ak-rays canvas { position: absolute; left: 0; top: 0; will-change: opacity, transform; }',
+    /* die Lichtstrahlen atmen und schwenken ruhig um die Sonne, die beiden Bilder gegeneinander (Hugo 15:25) */
+    '@keyframes akRayA { 0%, 100% { opacity: 1; transform: rotate(-3deg); } 35% { opacity: .5; } 50% { transform: rotate(3deg); } 70% { opacity: .85; } }',
+    '@keyframes akRayB { 0%, 100% { opacity: .55; transform: rotate(2.6deg); } 40% { opacity: 1; } 50% { transform: rotate(-2.6deg); } 75% { opacity: .65; } }',
+    /* blasse Ornamente wachsen von der Sonne nach vorn und verblassen: Sonnenstrahlung */
+    '.ak-sunwave { position: absolute; opacity: 0; will-change: transform, opacity; animation: akWave 13s linear infinite; }',
+    '@keyframes akWave { 0% { transform: scale(.52) rotate(0deg); opacity: 0; } 14% { opacity: .5; } 62% { opacity: .2; } 100% { transform: scale(2.5) rotate(16deg); opacity: 0; } }',
     '.ak-dapple { left: 0; top: 0; will-change: transform; }',
     '.ak-dapple canvas { position: absolute; left: 0; top: 0; will-change: transform, opacity; }',
     '@keyframes akSpot { 0%, 100% { transform: translate3d(0,0,0); opacity: 1; } 50% { transform: translate3d(18px,-12px,0); opacity: .65; } }',
@@ -153,7 +156,7 @@
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
     'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
-    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
+    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -512,32 +515,41 @@
     x.beginPath(); x.arc(cx, cy, r * .2, 0, 7); x.fillStyle = '#fff6c8'; x.fill(); ol(x, lw * .6);
     x.beginPath(); x.arc(cx, cy, r * .08, 0, 7); x.fillStyle = cols[1]; x.fill();
   }
-  // Baobab im Stil der Zeichnungen (eigene Form; Hugo 14:44): dicker Flaschenstamm mit Bändern, kurze Äste mit Kronen, daran Lianen
-  // mit Blüten. hz = Dunst der Ferne (0…1): je weiter weg, desto heller.
+  // Grandidier-Baobab (Hugo 27.11., 15:25), im Stil der Zeichnungen und in eigener Form: hoher, fast gerader, glatter rötlicher Stamm,
+  // oben wenige waagrechte Äste und eine flache Krone. Die Blätter sind Zeichen in der Art der Wolken: runde Blöcke mit heller Kontur,
+  // innen wiederholt sich die Form. Daran hängen Lianen mit Blüten. hz = Dunst der Ferne (0 … 1): je weiter weg, desto heller.
   function baobab(x, px, py, h, lw, hz) {
     function C(c) { return hz ? mix(c, '#bfe4f4', hz) : c; }
-    var w = h * .3, th = h * .58, tc = C(pick(['#a8489a', '#8a4fb8', '#b85a8a', '#7a5ac0', '#c0603a'])), L = C(INK), ends = [], n = 5 + Math.floor(R() * 3), i, t, a, bl, bx, ex, ey, z;
-    function trunk() { x.beginPath(); x.moveTo(px - w * .62, py); x.bezierCurveTo(px - w * .8, py - th * .45, px - w * .3, py - th * .7, px - w * .3, py - th); x.lineTo(px + w * .3, py - th); x.bezierCurveTo(px + w * .3, py - th * .7, px + w * .8, py - th * .45, px + w * .62, py); x.closePath(); }
-    for (i = 0; i < n; i++) {
-      t = n > 1 ? i / (n - 1) - .5 : 0; a = -Math.PI / 2 + t * 2.3 + rr(-.12, .12); bl = h * rr(.2, .34) * (1 - Math.abs(t) * .25); bx = px + t * w * .5; ex = bx + Math.cos(a) * bl; ey = py - th + Math.sin(a) * bl;
-      x.beginPath(); x.moveTo(bx, py - th + w * .12); x.quadraticCurveTo(bx + Math.cos(a) * bl * .5, py - th + Math.sin(a) * bl * .5 - bl * .14, ex, ey); ol(x, w * .2 + lw * 2, L); ol(x, w * .2, tc);
+    var w = h * .19, th = h * .76, tc = C(pick(['#c8684a', '#d07a52', '#bf5f5a', '#c9705f'])), L = C(INK), ends = [], n = 5, s = h * .115,
+        lv = pick([['#8fe3b4', '#1f9a72'], ['#86dfd0', '#168f8c'], ['#b4e58a', '#3f9e3a'], ['#7fdcc0', '#1a8f7c']]), i, t, a, bl, bx, ex, ey, yy,   // bläuliches Grün wie beim echten Baum
+        look = function (sz) { return { n: 0, lw: Math.max(1, sz * .035), line: L, rim: C(mix(lv[0], '#ffffff', .4)), inF: 'rgba(255,255,255,.14)', c0: C(lv[0]), c2: C(lv[1]) }; }, o;
+    function trunk() {   // unten leicht ausgestellt, dann fast zylindrisch, oben eine sanfte Schulter
+      x.beginPath(); x.moveTo(px - w * .64, py);
+      x.bezierCurveTo(px - w * .5, py - th * .1, px - w * .5, py - th * .3, px - w * .48, py - th * .72);
+      x.bezierCurveTo(px - w * .47, py - th * .92, px - w * .34, py - th * .97, px - w * .28, py - th);
+      x.lineTo(px + w * .28, py - th);
+      x.bezierCurveTo(px + w * .34, py - th * .97, px + w * .47, py - th * .92, px + w * .48, py - th * .72);
+      x.bezierCurveTo(px + w * .5, py - th * .3, px + w * .5, py - th * .1, px + w * .64, py);
+      x.closePath();
+    }
+    for (i = 0; i < n; i++) {   // kurze Äste, flach ausgebreitet
+      t = i / (n - 1) - .5; a = -Math.PI / 2 + t * 2.5 + rr(-.08, .08); bl = h * (.12 + Math.abs(t) * .2); bx = px + t * w * .5; ex = bx + Math.cos(a) * bl; ey = py - th + Math.sin(a) * bl * .62 - h * .03;
+      x.beginPath(); x.moveTo(bx, py - th + w * .1); x.quadraticCurveTo(bx + Math.cos(a) * bl * .35, py - th - bl * .3, ex, ey); ol(x, w * .2 + lw * 2, L); ol(x, w * .2, tc);
       ends.push([ex, ey]);
     }
     trunk(); x.fillStyle = tc; x.fill();
     x.save(); trunk(); x.clip();
-    for (i = 1; i <= 4; i++) { t = py - th * i / 5; x.beginPath(); x.moveTo(px - w, t + w * .1); x.quadraticCurveTo(px, t - w * .18, px + w, t + w * .1); ol(x, lw * 2.2, i % 2 ? mix(tc, '#ffffff', .32) : mix(tc, INK, .22)); }
-    for (i = -1; i <= 1; i++) { x.beginPath(); x.arc(px + i * w * .22, py - th * .5 - Math.abs(i) * w * .03, w * .06, 0, 7); x.fillStyle = C('#ffd75e'); x.fill(); }
+    for (i = 1; i <= 7; i++) { yy = py - th * i / 8; x.beginPath(); x.moveTo(px - w, yy + w * .08); x.quadraticCurveTo(px, yy - w * .14, px + w, yy + w * .08); ol(x, lw * 1.6, i % 2 ? mix(tc, '#ffffff', .26) : mix(tc, INK, .16)); }
+    for (i = 0; i < 3; i++) { rrect(x, px - w * .14, py - th * (.3 + i * .16) - w * .1, w * .28, w * .2, w * .07); x.fillStyle = C('#ffd9a8'); x.fill(); ol(x, lw * .6, L); }
     x.restore(); trunk(); ol(x, lw, L);
-    ends.forEach(function (e, i) {
-      z = [Z_GREEN, Z_TEAL, Z_GREEN, Z_PURP, Z_MAG][Math.floor(R() * 5)].map(C);
-      if (i % 2 === 0) {   // Liane mit Blättchen und Blüten
-        var len = h * rr(.28, .55), ph = R() * 6, pts = [], q, c = C(pick(P_FLOWER));
-        for (q = 0; q <= 8; q++) pts.push([e[0] + Math.sin(q * .8 + ph) * h * .02 * q / 8, e[1] + len * q / 8]);
-        polyline(x, pts); ol(x, lw * 2.4, L); ol(x, lw * 1.1, C('#3fae6a'));
-        for (q = 2; q <= 8; q += 2) { x.beginPath(); x.arc(pts[q][0] + (q % 4 ? 1 : -1) * h * .018, pts[q][1], h * .016, 0, 7); x.fillStyle = q === 8 ? c : C('#4fae3f'); x.fill(); ol(x, lw * .5, L); }
-      }
-      crown(x, e[0], e[1] - h * .03, h * rr(.09, .13), z, lw * .9);
+    [0, n - 1].forEach(function (i) {   // Lianen hängen aussen von der Krone, mit Blättchen und einer Blüte
+      var e = ends[i], len = h * rr(.26, .46), ph = R() * 6, pts = [], q, c = C(pick(P_FLOWER));
+      for (q = 0; q <= 8; q++) pts.push([e[0] + Math.sin(q * .8 + ph) * h * .02 * q / 8, e[1] + len * q / 8]);
+      polyline(x, pts); ol(x, lw * 2.4, L); ol(x, lw * 1.1, C('#3fae6a'));
+      for (q = 2; q <= 8; q += 2) { x.beginPath(); x.arc(pts[q][0] + (q % 4 ? 1 : -1) * h * .018, pts[q][1], h * (q === 8 ? .022 : .015), 0, 7); x.fillStyle = q === 8 ? c : C('#4fae3f'); x.fill(); ol(x, lw * .5, L); }
     });
+    [0, n - 1].forEach(function (i) { o = look(s * .8); o.n = 2; glyphCloud(x, ends[i][0], ends[i][1] + s * .25, s * .8, o); });   // kleine Blattzeichen an den äusseren Ästen
+    o = look(s); o.n = 4 + Math.floor(R() * 2); glyphCloud(x, px, py - th - h * .05, s, o);   // flache Krone
   }
   // hängende Liane mit Blattpaaren und kleinen Blüten, am Ende eine grosse Blüte (Hugo 13:21: «Lianen, die runter hängen und sich bewegen, mit Blumen»)
   function flowerVine(x, px, y0, len, amp, lw) {
@@ -629,22 +641,12 @@
   // Sonne (eigene Gestaltung; Hugo 27.11., 13:19: noch mehr Ornamente, gern nach heiliger Geometrie und Goldenem Schnitt):
   // Die Ringe verkleinern sich nach innen im Goldenen Schnitt (jeder Radius = der vorige durch √φ), die Zahlen der Teile stammen
   // aus der Fibonacci-Reihe (8, 13, 21, 34), und in der Mitte liegt die «Saat des Lebens» aus sieben Kreisen.
-  function sun(x, cx, cy, r, lw) {
+  function sunBody(x, cx, cy, r, lw) {   // Kern der Sonne: steht still und liegt über den Strahlen
     var L = '#a8431a', A = 1.22, q = Math.sqrt(PHI), R1 = A / q, R2 = A / PHI, R3 = R2 / q, R4 = R2 / PHI, R5 = R4 / q, rho = r * R5 / 2 * .97, i, a;
     function at(ang, fn) { x.save(); x.translate(cx, cy); x.rotate(ang); fn(); x.restore(); }
     function ring(rad, col) { x.beginPath(); x.arc(cx, cy, r * rad, 0, 7); x.fillStyle = col; x.fill(); ol(x, lw, L); }
-    for (i = 0; i < 26; i++) at(i / 26 * 6.2832 - Math.PI / 2, function () {   // 13 Flammen, dazwischen 13 Blätter mit Perle
-      if (i % 2 === 0) {
-        x.beginPath(); x.moveTo(r * 1.18, -r * .13); x.quadraticCurveTo(r * 1.6, -r * .15, r * 1.95, 0); x.quadraticCurveTo(r * 1.6, r * .15, r * 1.18, r * .13); x.closePath();
-        x.fillStyle = i % 4 ? '#ffd75e' : '#f7c948'; x.fill(); ol(x, lw * .8, L);
-        x.beginPath(); x.moveTo(r * 1.28, 0); x.lineTo(r * 1.7, 0); ol(x, lw * .6, '#f59a3a');
-      } else {
-        stone(x, r * 1.42, 0, r * .34, r * .17, '#f59a3a', { lw: lw * .8, line: L, kind: 9, r: .48, j: 0 });
-        x.beginPath(); x.arc(r * 1.7, 0, r * .05, 0, 7); x.fillStyle = '#2bb6a0'; x.fill(); ol(x, lw * .5, L);
-      }
-    });
     ring(A, '#e85a2a');
-    for (i = 0; i < 21; i++) at(i / 21 * 6.2832, function () { stone(x, r * (A + R1) / 2, 0, r * .2, r * .27, i % 2 ? '#f7c948' : '#f59a3a', { lw: lw * .7, line: L, kind: i % 3 ? 9 : 1, c2: '#2bb6a0', r: .42, j: 0 }); });   // Kranz aus 21 Steinen
+    for (i = 0; i < 21; i++) at(i / 21 * 6.2832, function () { stone(x, r * (A + R1) / 2, 0, r * .2, r * .27, i % 3 === 0 ? '#1fa36a' : i % 3 === 1 ? '#f7c948' : '#f59a3a', { lw: lw * .7, line: L, kind: i % 3 ? 9 : 1, c2: i % 3 ? '#2bb6a0' : '#ffd75e', r: .42, j: 0 }); });   // Kranz aus 21 Steinen
     ring(R1, '#f7c948');
     for (i = 0; i < 34; i++) { a = i / 34 * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * r * (R1 + R2) / 2, cy + Math.sin(a) * r * (R1 + R2) / 2, r * .042, 0, 7); x.fillStyle = i % 2 ? '#2bb6a0' : '#fff6c8'; x.fill(); ol(x, lw * .45, L); }   // 34 Perlen
     ring(R2, '#ffd75e');
@@ -661,6 +663,37 @@
     x.restore();
     x.beginPath(); x.arc(cx, cy, r * R5, 0, 7); ol(x, lw * .8, L);
   }
+  // Pfauenauge (Hugo 27.11., 15:25: Farben und Stil des Pfaus, eigene Form): smaragdgrünes Oval, darin Gold, Türkis und ein tiefblauer Kern
+  function peye(x, px, py, s, lw, line) {
+    x.beginPath(); x.ellipse(px, py, s * .62, s * .44, 0, 0, 7); x.fillStyle = '#1fa36a'; x.fill(); if (lw) ol(x, lw, line);
+    x.beginPath(); x.ellipse(px + s * .08, py, s * .42, s * .3, 0, 0, 7); x.fillStyle = '#f2c040'; x.fill();
+    x.beginPath(); x.arc(px + s * .14, py, s * .21, 0, 7); x.fillStyle = '#1fc0b0'; x.fill();
+    x.beginPath(); x.arc(px + s * .18, py, s * .1, 0, 7); x.fillStyle = '#2a2f9a'; x.fill();
+  }
+  // Strahlen der Sonne: 13 Flammen, dazwischen 13 Pfauenfedern mit Auge. b = Biegung (−1 … 1): die Strahlen sind gebogen und schwenken
+  // ruhig von einer Richtung in die andere (Hugo 15:25). Wird im Takt in ein kleines eigenes Bild gemalt.
+  function sunRays(x, cx, cy, r, lw, b, b2) {
+    var L = '#a8431a', i, a, Ln, w, by;
+    function blade(Ln, w, by, tip, col, line) {
+      x.beginPath(); x.moveTo(0, -w * .2);
+      x.bezierCurveTo(Ln * .28, -w * 1.05 + by * .08, Ln * (.74 + .22 * tip), -w * (.8 + .3 * tip) + by * (.58 + .32 * tip), Ln, by);
+      x.bezierCurveTo(Ln * (.72 + .23 * tip), w * (.62 + .36 * tip) + by * (.62 + .3 * tip), Ln * .28, w * .95 + by * .1, 0, w * .2);
+      x.closePath(); x.fillStyle = col; x.fill(); ol(x, lw * .8, line);
+    }
+    for (i = 0; i < 26; i++) {
+      a = i / 26 * 6.2832 - Math.PI / 2;
+      x.save(); x.translate(cx + Math.cos(a) * r * 1.13, cy + Math.sin(a) * r * 1.13); x.rotate(a);
+      if (i % 2 === 0) {
+        Ln = r * .84; by = b * Ln * .42; blade(Ln, r * .15, by, 0, i % 4 ? '#ffd75e' : '#f7c948', L);
+        x.beginPath(); x.moveTo(Ln * .14, by * .02); x.bezierCurveTo(Ln * .3, by * .09, Ln * .55, by * .36, Ln * .68, by * .55); ol(x, lw * .6, '#f59a3a');
+      } else {
+        Ln = r * .62; by = b2 * Ln * .5; blade(Ln, r * .17, by, 1, '#1fa36a', '#0e5c48');
+        x.beginPath(); x.moveTo(Ln * .1, by * .01); x.bezierCurveTo(Ln * .25, by * .07, Ln * .45, by * .25, Ln * .56, by * .42); ol(x, lw * .5, '#8fe0b0');
+        peye(x, Ln * .7, by * .6, r * .2, 0);
+      }
+      x.restore();
+    }
+  }
   // Feld um die Sonne: 144 Steine und Ringe, jeder 137.5° (Goldener Winkel) weiter und etwas weiter aussen – wie die Kerne einer
   // Sonnenblume. So entstehen von selbst die Spiralarme, die weit in den Himmel laufen, kleiner und blasser werden. Dazu Perlenkreise
   // in Abständen des Goldenen Schnitts (55, 89 und 144 Perlen).
@@ -673,7 +706,8 @@
     for (n = N; n >= 1; n--) {
       t = n / N; a = n * GA; d = r * (2.2 + 6.4 * Math.pow(t, .7)); sz = r * (.3 - .19 * t);
       x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(a); x.globalAlpha = 1 - t * .8;
-      if (n % 3 === 0) {
+      if (n % 6 === 0) peye(x, 0, 0, sz * .95, lw * (.7 - t * .3), 'rgba(14,92,72,.7)');   // jedes sechste Zeichen ist ein Pfauenauge
+      else if (n % 3 === 0) {
         x.beginPath(); x.arc(0, 0, sz * .42, 0, 7); x.fillStyle = '#fff3c4'; x.fill(); ol(x, lw * (.7 - t * .3), 'rgba(168,74,26,.7)');
         x.beginPath(); x.arc(0, 0, sz * .16, 0, 7); x.fillStyle = '#2bb6a0'; x.fill();
       } else stone(x, 0, 0, sz * 1.15, sz * .86, n % 3 === 1 ? '#f7c948' : '#f59a3a', { lw: lw * (.85 - t * .45), line: 'rgba(168,74,26,.75)', kind: sz > lw * 7 ? 1 : 9, c2: n % 2 ? '#e85a2a' : '#2bb6a0', r: .42, j: 0 });
@@ -790,11 +824,11 @@
   }
   // Ein Streifen = eine Tiefen-Ebene. y = 0 ist die Oberkante des Schlussbilds, der Weg der Kamera liegt bei y < 0.
   // Gemalt wird in Kacheln; jedes Teil (add) kennt seine Höhe und wird nur in den Kacheln gemalt, die es berührt.
-  function strip(i, f, d, pk, dprFin, dprFly, fx) {   // f = Tempo nach oben/unten, fx = Tempo seitlich (ohne Angabe gleich f)
+  function strip(i, f, d, pk, dprFin, dprFly, fx) {   // f = Tempo nach oben/unten; fx bestimmt nur noch den Malrand (siehe XR)
     fx = fx || f;
-    var mg = .08, mx = W * mg + XR * fx, pan = pk * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2 + HX, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
+    var mg = .08, cut = Math.floor(XR * fx / 4) * 4, mx = W * mg + XR * fx, pan = pk * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2 + HX, tf = Math.round(camT * f);   // mx und w bleiben, wie sie waren: so liegt jedes Teil am alten Platz. cut = Rand, der nie ins Bild kommt und nicht gemalt wird (Vielfaches von 4: scharf bei jeder Auflösung)
     var el = document.createElement('div'); el.className = 'ak-layer'; el.style.width = w + 'px'; el.style.height = (fh + tf) + 'px';
-    var S = { el: el, f: f, fx: fx, d: d, w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
+    var S = { el: el, f: f, d: d, w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
     S.X = function (fr) { return mx + fr * W; };
     S.Y = function (c, fr) { return S.vy - c * camRef * f + fr * H; };   // Höhe im Streifen, die beim Fortschritt c (1 = oben, 0 = gelandet) am Bildschirm bei fr liegt
     S.add = function (y0, y1, fn, seed) { S.items.push([y0, y1, fn, seed == null ? AK.seed * 7919 + i * 100003 + S.items.length * 31 + 5 : seed]); };
@@ -809,9 +843,9 @@
         for (n = 0; n < S.items.length; n++) if (S.items[n][1] >= a && S.items[n][0] <= a + hh) { todo.push(S.items[n]); lo = Math.min(lo, S.items[n][0]); hi = Math.max(hi, S.items[n][1]); }
         if (!todo.length) continue;
         lo = Math.max(a, Math.floor(lo - pd)); hi = Math.min(a + hh, Math.ceil(hi + pd));   // nur so hoch, wie die Teile reichen (spart Speicher)
-        var c = canvas(w, hi - lo, a < 0 ? dprFly : dprFin), x = c.x;
-        c.c.style.cssText = 'position:absolute;left:0;top:' + (lo + tf) + 'px;width:' + w + 'px;height:' + (hi - lo) + 'px';
-        x.translate(0, -lo);
+        var dq = a < 0 ? dprFly : dprFin, kx = w / Math.round(w * dq), c = canvas(w - cut * 2, hi - lo, dq), x = c.x;   // kx: Breite eines Bildpunkts wie beim ganzen Streifen, so liegt alles haargenau am alten Platz
+        c.c.style.cssText = 'position:absolute;left:' + (cut * dq * kx) + 'px;top:' + (lo + tf) + 'px;width:' + (c.c.width * kx) + 'px;height:' + (hi - lo) + 'px';
+        x.translate(-cut, -lo);
         for (n = 0; n < todo.length; n++) { R = rng(todo[n][3]); x.save(); todo[n][2](x); x.restore(); }
         paper(x, 0, lo, w, hi - lo, i > 0 && i < 5 ? 1 : .45);   // Himmel und Berge bleiben glatter
         el.appendChild(c.c); S.tiles.push([c.c, lo]);
@@ -842,8 +876,7 @@
     S.add(sy - sr * 9.6, sy + sr * 9.6, function (x) {
       var g = x.createRadialGradient(sx, sy, 0, sx, sy, sr * 6); g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(.25, 'rgba(255,240,180,.5)'); g.addColorStop(1, 'rgba(255,236,180,0)');
       x.fillStyle = g; x.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
-      sunField(x, sx, sy, sr, lw * 1.2);
-      sun(x, sx, sy, sr, lw * 1.3);
+      sunField(x, sx, sy, sr, lw * 1.2);   // Kern und Strahlen der Sonne sind eigene Bilder darüber (sunParts)
     });
     // kleine Wolken, die im Bild stehen bleiben (die grossen ziehen als einzelne Teile vorbei)
     [[.8, -.2, .07], [.24, -.34, .06]].forEach(function (c) {
@@ -862,6 +895,35 @@
     SN.fill(base + TN.ay + 4, 'linear-gradient(to bottom,#5955c8 0,#7f8be6 ' + Math.round(H * .05) + 'px,#98a2f2 ' + Math.round(H * .12) + 'px)');   // läuft in die Farbe der Hügel aus (Dunst zwischen den Ketten)
     TH.add(base - U * .03, bot + 6, function (x) { hills(x, 0, w, base + U * .012, bot, 11, ['#98a2f2', '#84a2ea', '#6ba6d8', '#52aac0', '#3fa8a6', '#33a28e', '#2f9a78', '#2f9464', '#3a9a52', '#4aa348', '#5aac44'], { lw: lw, line: 'rgba(24,48,120,.55)', amp: U * .012, fq: .02 }); }, sd + 6 * 31);
     SH.fill(bot + TH.ay, '#5aac44');
+  }
+
+  // Sonne in Teilen (Hugo 27.11., 15:25), alle auf der Himmelsebene und hinter den Bergen:
+  //   Wellen: drei Kränze blasser Ornamente wachsen langsam nach vorn und verblassen (so strahlt die Sonne)
+  //   Strahlen: werden im Takt gemalt, gebogen, und schwenken ruhig von einer Seite zur anderen
+  //   Kern: steht still
+  var sunRC = null;
+  function sunParts(S) {
+    var sx = S.X(SUN[0]), sy = S.vy + H * SUN[1] + S.tf, r = SR, lw = LW0 * .7 * 1.3, dp = Math.min(DPR, 2), hw = r * 2.5, k, c, i, a, n;
+    for (k = 0; k < 3; k++) {
+      c = canvas(hw * 2, hw * 2, dp); n = 13;
+      for (i = 0; i < n; i++) {
+        a = (i + k / 3) / n * 6.2832;
+        c.x.save(); c.x.translate(hw + Math.cos(a) * r * 2, hw + Math.sin(a) * r * 2); c.x.rotate(a);
+        if (i % 3 === 0) peye(c.x, 0, 0, r * .3, lw * .5, 'rgba(14,92,72,.5)');
+        else stone(c.x, 0, 0, r * .3, r * .22, i % 3 === 1 ? '#ffe9a0' : '#ffcf8a', { lw: lw * .5, line: 'rgba(190,110,40,.55)', kind: 1, c2: '#ffffff', r: .42, j: 0 });
+        c.x.restore();
+      }
+      c.c.className = 'ak-sunwave';
+      c.c.style.cssText = 'left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px;animation-delay:' + (-k * 4.33) + 's';
+      S.el.appendChild(c.c);
+    }
+    hw = r * 2.25; c = canvas(hw * 2, hw * 2, dp);
+    c.c.style.cssText = 'position:absolute;left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px';
+    S.el.appendChild(c.c); sunRC = { x: c.x, hw: hw, r: r, lw: lw, n: 0, ph: 0 };
+    sunRays(c.x, hw, hw, r, lw, 0, 0);
+    hw = r * 1.3; c = canvas(hw * 2, hw * 2, dp); sunBody(c.x, hw, hw, r, lw); paper(c.x, 0, 0, hw * 2, hw * 2, .45);
+    c.c.style.cssText = 'position:absolute;left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px';
+    S.el.appendChild(c.c);
   }
 
   // 1 · Horizont der Lichtung: ferner Urwald, der See als goldener Spiegel der Sonne, davor beginnt die Wiese
@@ -917,7 +979,7 @@
     (mob ? [[.265, -1, .055, .34], [.725, -1, .05, .34], [.17, .045, .17, .1], [.84, .05, .15, .1]]
          : [[.42, -1, .042, .36], [.365, -1, .065, .3], [.64, -1, .06, .3], [.3, .05, .2, .1], [.705, .055, .17, .1]]).forEach(function (b, n) {
       var px = S.X(b[0]), py = b[1] < 0 ? yH + 2 : ySh + H * b[1], h = H * b[2];
-      S.insert(mk + n, py - h * 1.1, py + 6, function (x) { baobab(x, px, py, h, lw, b[3]); }, AK.seed * 7919 + 100003 + 700001 + n * 31);
+      S.insert(mk + n, py - h * 1.25, py + 6, function (x) { baobab(x, px, py, h, lw, b[3]); }, AK.seed * 7919 + 100003 + 700001 + n * 31);
     });
   }
 
@@ -1159,12 +1221,12 @@
     HOR = (LT.band - H * .03) / H; SHO = HOR + .03;            // Horizont und Ufer liegen an der Oberkante der gewählten Zeile
     SR = clamp(gap * .3, 22, U * .115); SUN[1] = HOR - SR * 1.4 / H;   // die Sonne füllt die Lücke zwischen Slogan und Rad
     ZP = [R() * 6, R() * 6, R() * 6];
-    XR = AK.freePan ? W * (mob ? AK.panX[0] : AK.panX[1]) : 0;
-    camRef = Math.round(H * AK.flightH); camT = camRef; cam = tgY = fly ? camT : 0; camX = tgX = 0;   // immer das ganze Bild: man kann von Hand wieder nach oben
+    XR = W * (mob ? .09 : .05);   // Mass aus der Zeit, als sich die Szene seitlich verschieben liess: die Ebenen sind in diesen Koordinaten gemalt. Es bleibt, damit jedes Teil an seinem Platz bleibt
+    camRef = Math.round(H * AK.flightH); camT = camRef; cam = tgY = fly ? camT : 0;   // immer das ganze Bild: man kann von Hand wieder nach oben
     if (world) world.remove();
     world = document.createElement('div'); world.className = 'ak-world'; world.setAttribute('aria-hidden', 'true');
     root.insertBefore(world, root.firstChild);
-    sprites = []; fliers = []; sways = []; farOn = null;
+    sprites = []; fliers = []; sways = []; farOn = null; sunRC = null;
     var big = W > 1100, q = big ? Math.min(DPR, 1.5) : DPR, qs = Math.min(DPR, big ? 1.25 : 1.5), qf = Math.min(DPR, big ? 1 : 1.25); QF = qs;   // Schärfe nach Bedarf: vorn scharf, Himmel und Hintergrund weicher (Speicher)
     var S0 = strip(0, .14, .18, .006, qs, qs), S1 = strip(1, .5, .38, .016, q, QF), SB = strip(2, .86, .54, .025, qs, qf), S2 = strip(3, 1, .62, .03, q, QF), SF = strip(4, 1.2, .76, .038, qf, qf),
         SA = strip(5, .16, .215, .008, qs, qs, .2), SN = strip(6, .19, .255, .01, qs, qs, .27), SH = strip(7, .215, .3, .013, qs, qs, .36);   // ferne Berge, nahe Berge, Hügel: je eigenes Tempo.
@@ -1172,7 +1234,7 @@
     SB.path = U * .024;   // die Bänder und Lianen wandern immer leicht auf einer kleinen Bahn (Hugo 11:50)
     strips = [S0, SA, SN, SH, S1, SB, S2, SF];
     sceneFar(S0, SA, SN, SH); sceneMid(S1); sceneMain(S2, SB, SF);
-    S0.build(); world.appendChild(S0.el);
+    S0.build(); sunParts(S0); world.appendChild(S0.el);
     SA.build(); world.appendChild(SA.el); SN.build(); world.appendChild(SN.el); SH.build(); world.appendChild(SH.el);
     R = rng(AK.seed + 3);
     // weniger Wolken (Hugo 13:19)
@@ -1245,7 +1307,7 @@
     var PR = rng(AK.seed + 91);
     [-112, -95, -78, 78, 95, 112].forEach(function (dg, n) { beam(rc[n % 2].x, (.05 + PR() * .08) * Math.max(W, 500), H * .72, (dg + PR() * 8 - 4) * Math.PI / 180, .13 + PR() * .14); });
     rc.forEach(function (c, i) {
-      c.c.style.cssText = 'width:' + rw + 'px;height:' + rh + 'px;left:' + (-W * .15) + 'px;' + (reduce ? '' : 'animation:' + (i ? 'akRayB 9s' : 'akRayA 7s') + ' ease-in-out infinite;');
+      c.c.style.cssText = 'width:' + rw + 'px;height:' + rh + 'px;left:' + (-W * .15) + 'px;transform-origin:' + (gsx + W * .15) + 'px ' + gsy + 'px;' + (reduce ? '' : 'animation:' + (i ? 'akRayB 19s' : 'akRayA 15s') + ' ease-in-out infinite;');
       rays.appendChild(c.c);
     });
     world.appendChild(rays);
@@ -1392,36 +1454,37 @@
 
   // ---------- Takt ----------
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
-      drag = null, dragged = 0, tgY = 0, tgX = 0, camX = 0, XR = 0, sways = [], farOn = null;
-  root.addEventListener('pointermove', function (e) {   // Maus bewegt die Ebenen leicht (am Handy macht das der Finger beim Verschieben)
+      drag = null, dragged = 0, tgY = 0, XR = 0, sways = [], farOn = null;
+  root.addEventListener('pointermove', function (e) {   // Maus bewegt die Ebenen leicht
     if (!AK.pointer || e.pointerType !== 'mouse' || drag) return;
     ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2;
   }, { passive: true });
   root.addEventListener('pointerleave', function () { ptr.tx = ptr.ty = 0; });
 
-  // Kamera von Hand (Hugo 27.11., 11:02): ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in den
-  // Urwald und wieder nach oben bis in den Himmel. Das Rad scrollt weiter die Services, mit Parallax dort, wo die Kamera gerade steht.
+  // Kamera von Hand (Hugo 27.11., 11:02): ausserhalb des Rads lässt sich die Szene gemütlich wieder nach oben bis in den Himmel schieben.
+  // Das Rad scrollt weiter die Services, mit Parallax dort, wo die Kamera gerade steht.
+  // Seitlich bewegt die Hand nichts mehr (Hugo 15:33: ganz weg, wie am Anfang): das Bild schwebt nur leicht von selbst.
   function inWheel(e) { return e.target && e.target.closest && e.target.closest('[data-ak-wheel]'); }
   root.addEventListener('pointerdown', function (e) {
     if (fl) { fl.rate = 9; return; }   // Antippen während des Flugs: schnell zu Ende fliegen
     if (!AK.freePan || !shown || e.button > 0 || inWheel(e)) return;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: tgX, cy: tgY, on: 0, px: e.clientX, py: e.clientY, pt: e.timeStamp, vx: 0, vy: 0 };
+    drag = { id: e.pointerId, y: e.clientY, cy: tgY, on: 0, py: e.clientY, pt: e.timeStamp, vy: 0 };
   }, true);
   window.addEventListener('pointermove', function (e) {
     if (!drag || e.pointerId !== drag.id) return;
-    var mx = e.clientX - drag.x, my = e.clientY - drag.y, d = Math.max(1, e.timeStamp - drag.pt);
+    var my = e.clientY - drag.y, d = Math.max(1, e.timeStamp - drag.pt);
     if (!drag.on) {
-      if (Math.abs(mx) + Math.abs(my) < 8) return;
+      if (Math.abs(my) < 8) return;
       drag.on = 1; root.classList.add('ak-drag'); ptr.tx = ptr.ty = 0;
       try { window.getSelection().removeAllRanges(); } catch (er) {}
     }
-    drag.vx = drag.vx * .6 + (e.clientX - drag.px) / d * .4; drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.px = e.clientX; drag.py = e.clientY; drag.pt = e.timeStamp;
-    tgX = clamp(drag.cx - mx * .7, -XR, XR); tgY = clamp(drag.cy + my * 1.4, 0, camT);   // das Bild folgt dem Finger, dezent: nach unten ziehen = zurück nach oben
+    drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.py = e.clientY; drag.pt = e.timeStamp;
+    tgY = clamp(drag.cy + my * 1.4, 0, camT);   // das Bild folgt dem Finger, dezent: nach unten ziehen = zurück nach oben
   }, { passive: true });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
     if (drag.on) {   // beim Loslassen gleitet die Kamera noch ein Stück weiter
-      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 110, -XR, XR); tgY = clamp(tgY + drag.vy * 380, 0, camT); }
+      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) tgY = clamp(tgY + drag.vy * 380, 0, camT);
       dragged = 1; setTimeout(function () { dragged = 0; }, 80); root.classList.remove('ak-drag');
     }
     drag = null;
@@ -1432,10 +1495,10 @@
     if (!AK.freePan || fl || !shown || inWheel(e)) return;
     e.preventDefault();
     var k = e.deltaMode === 1 ? 32 : 1;
-    tgY = clamp(tgY - e.deltaY * k * 1.1, 0, camT); tgX = clamp(tgX + e.deltaX * k, -XR, XR);
+    tgY = clamp(tgY - e.deltaY * k * 1.1, 0, camT);
   }, { passive: false });
 
-  // Handy: kein «Zurück» durch Wischen vom Bildschirmrand (Hugo 27.11., 11:50). Beim seitlichen Verschieben löste der Browser es sonst aus.
+  // Handy: kein «Zurück» durch Wischen vom Bildschirmrand (Hugo 27.11., 11:50).
   // 1. Eine Berührung, die am Rand beginnt, bekommt der Browser nicht für seine Wischgeste.
   // 2. Rutscht die Geste trotzdem durch, bleibt die Seite stehen. Der Zurück-Knopf des Browsers geht weiter wie gewohnt.
   var edgeT = -1e9, guard = 0;
@@ -1471,18 +1534,17 @@
       cam = camT * (1 - swing(fl.u)); vel = cam - c0;
       if (!shown && fl.u >= .92) reveal();   // erst wenn die Kamera fast steht: Glas-Knöpfe über einem fahrenden Bild kosten das Handy viel
       if (fl.u >= 1) {
-        fl = null; cam = tgY = 0; camX = tgX = 0;
+        fl = null; cam = tgY = 0;
         setTimeout(function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); }, 3200);   // die grossen Wedel gehörten nur zum Flug (weg, sobald alles ruhig steht)
       }
     } else if (AK.freePan) {   // von Hand: die Kamera zieht gemütlich nach
       var kk = 1 - Math.exp(-dt / AK.panSoft);
-      cam += (tgY - cam) * kk; camX += (tgX - camX) * kk;
+      cam += (tgY - cam) * kk;
       if (Math.abs(tgY - cam) < .05) cam = tgY;
-      if (Math.abs(tgX - camX) < .05) camX = tgX;
     }
     if (veil) {   // weiches Feld: in der Lichtung zart, über dem Urwald kräftiger
       var need = 0, vq;
-      if (shown) { for (i = 0; i < 3; i++) need = Math.max(need, clamp((veilW - (openHW(veil._y[i] - cam) - Math.abs(camX))) / (U * .2), 0, 1)); need = AK.veil[0] + (AK.veil[1] - AK.veil[0]) * need; }
+      if (shown) { for (i = 0; i < 3; i++) need = Math.max(need, clamp((veilW - openHW(veil._y[i] - cam)) / (U * .2), 0, 1)); need = AK.veil[0] + (AK.veil[1] - AK.veil[0]) * need; }
       veilV += (need - veilV) * (1 - Math.exp(-dt / 260));
       vq = Math.round(veilV * 50) / 50;
       if (vq !== veilQ) { veilQ = vq; veil.style.opacity = vq; }
@@ -1493,13 +1555,13 @@
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
     ptr.x += (ptr.tx - ptr.x) * .06; ptr.y += (ptr.ty - ptr.y) * .06;
-    var dr = reduce ? 0 : AK.drift * (mob ? 1.8 : 1.5);   // der Blick steht nie ganz still (Hugo 11:02), am Handy etwas mehr
+    var dr = reduce ? 0 : AK.drift;   // der Blick schwebt leicht von selbst, genau wie am Anfang (Hugo 27.11., 15:33)
     var dx = (Math.sin(t * .00011) * 10 + Math.sin(t * .00023 + 1) * 5) * dr - ptr.x * 18 * AK.pointer;
-    var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr * .7 - ptr.y * 12 * AK.pointer;
+    var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr - ptr.y * 12 * AK.pointer;
     // ohne Flug: beim Einblenden sinkt die Kamera ein Stück ins Bild (leichter Zoom)
     var ip = flown || reduce || !shown ? (shown || flown ? 1 : 0) : clamp((now - tStart) / (AK.introMs * 1.6), 0, 1), ie = 1 - Math.pow(1 - ip, 3);
     for (i = 0; i < strips.length; i++) {
-      var L = strips[i], z = 1 + (1 - ie) * .06 * L.d, lx = L.ox + dx * L.d - camX * L.fx, ly = L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d;
+      var L = strips[i], z = 1 + (1 - ie) * .06 * L.d, lx = L.ox + dx * L.d, ly = L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d;
       if (L.path && !reduce) { lx += Math.sin(t * .00052) * L.path; ly += Math.sin(t * .00037 + 1.3) * L.path * .75; }   // Bänder und Lianen: immer leicht unterwegs auf einer kleinen Bahn
       L.el.style.transform = 'translate3d(' + lx.toFixed(1) + 'px,' + ly.toFixed(1) + 'px,0) scale(' + z.toFixed(4) + ')';
     }
@@ -1508,7 +1570,7 @@
       if (on) {
         var fxp = F.x;
         if (F.vx) { var spn = W + F.w + XR * F.f * 2 + 40, off = F.w + XR * F.f + 20; fxp = ((F.x + off + t * F.vx) % spn + spn) % spn - off; }   // zieht langsam und kommt auf der anderen Seite wieder
-        F.el.style.transform = 'translate3d(' + (fxp + dx * F.f * .6 - camX * Math.min(F.f, 1.2)).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
+        F.el.style.transform = 'translate3d(' + (fxp + dx * F.f * .6).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
       }
       if (on !== F.on) { F.on = on; F.el.style.visibility = on ? 'visible' : 'hidden'; }
     }
@@ -1516,17 +1578,17 @@
     if (far !== farOn && world) { farOn = far; world.classList.toggle('ak-far', far); }
     for (i = 0; i < sprites.length; i++) {
       var S = sprites[i], rot = reduce ? 0 : Math.sin(t * S.f + S.ph) * S.amp + Math.sin(t * S.f * 2.3 + S.ph * 2) * S.amp * .35;
-      var sx = S.x + dx * 1.35 - camX * 1.2, sy = S.y + cam * 1.25 + dy * 1.35 - pan * H * AK.scrollPan * .13 + (1 - ie) * 90;
+      var sx = S.x + dx * 1.35, sy = S.y + cam * 1.25 + dy * 1.35 - pan * H * AK.scrollPan * .13 + (1 - ie) * 90;
       var piv = 'translate(' + (S.w * S.ax) + 'px,' + (S.h * S.ay) + 'px) rotate(', back = ' translate(' + (-S.w * S.ax) + 'px,' + (-S.h * S.ay) + 'px)';
       S.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0) ' + piv + rot.toFixed(2) + 'deg)' + back;
       // Schatten: die Sonne steht hinten in der Mitte, also fällt er nach vorn und etwas nach aussen
       S.sh.style.transform = 'translate3d(' + (sx + (S.ax ? 1 : -1) * W * .02 - dx * .4).toFixed(1) + 'px,' + (sy + H * .028 - dy * .4).toFixed(1) + 'px,0) ' + piv + (rot * 1.3).toFixed(2) + 'deg) scale(1.04)' + back;
     }
     // Glanz und Strahlen bleiben bei der Sonne, die Lichtflecken auf der Wiese
-    var L0 = strips[0], sdx = L0 ? dx * L0.d - camX * L0.fx : 0, sdy = L0 ? cam * L0.f + dy * L0.d - pan * 2 * L0.pan : 0, sunT = 'translate3d(' + sdx.toFixed(1) + 'px,' + sdy.toFixed(1) + 'px,0)';
+    var L0 = strips[0], sdx = L0 ? dx * L0.d : 0, sdy = L0 ? cam * L0.f + dy * L0.d - pan * 2 * L0.pan : 0, sunT = 'translate3d(' + sdx.toFixed(1) + 'px,' + sdy.toFixed(1) + 'px,0)';
     if (glow) glow.style.transform = sunT;
     if (rays) rays.style.transform = sunT;
-    if (dapple) dapple.style.transform = 'translate3d(' + (-camX).toFixed(1) + 'px,' + cam.toFixed(1) + 'px,0)';
+    if (dapple) dapple.style.transform = 'translate3d(0,' + cam.toFixed(1) + 'px,0)';
     if (lit && flare) {
       var fx0 = W * SUN[0] + sdx, fy0 = H * SUN[1] + sdy, fcx = W * .28 - dx * 1.2, fcy = H * .88 - dy * 1.2;
       for (i = 0; i < flare.children.length; i++) {
@@ -1535,6 +1597,13 @@
       }
     }
     if (lit && sheen) sheen.style.transform = 'translate3d(' + (Math.sin(t * .00007) * W * .12 + dx * 2).toFixed(1) + 'px,' + (pan * -H * .1 + dy).toFixed(1) + 'px,0)';
+    if (sunRC && !reduce && !fl) {   // Strahlen der Sonne: gebogen, schwenken ruhig hin und her (eine Runde in 11 s). Jedes dritte Bild genügt, im Flug ruhen sie
+      sunRC.ph += dt;
+      if (sunRC.n++ % 3 === 0) {
+        sunRC.x.clearRect(0, 0, sunRC.hw * 2, sunRC.hw * 2);
+        sunRays(sunRC.x, sunRC.hw, sunRC.hw, sunRC.r, sunRC.lw, Math.sin(sunRC.ph * .00057), Math.sin(sunRC.ph * .00057 - .7));   // die Federn folgen den Flammen etwas später
+      }
+    }
     drawFx(now, vel);
   }
 
@@ -1554,7 +1623,7 @@
       }
     }
     if (near) {   // Glühwürmchen und Glitzer wohnen in der Lichtung und bleiben dort, wenn die Kamera wandert
-      fxX.save(); fxX.translate(-camX * 1.1, cam * 1.1);
+      fxX.save(); fxX.translate(0, cam * 1.1);
       for (i = 0; i < flies.length; i++) {
         var F = flies[i], x, y2, a;
         var wx = Math.sin(t * F.f1 + F.p1) * F.ax + Math.sin(t * F.f2 * 2.1 + F.p2) * F.ax * .4;
@@ -1626,8 +1695,9 @@
       });
     });
     if (location.hash === '#ak-test') {   // nur für Tests: Standbild bei Fortschritt u; Kamera von Hand an eine Stelle setzen
-      window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = tgY = camT * (1 - swing(u)); camX = tgX = 0; if (u >= .92) reveal(); raf = 0; frameOnce(); };
-      window.__akPan = function (fy, fx) { stop(); run = true; flown = true; fl = null; reveal(); cam = tgY = clamp(fy, 0, 1) * camT; camX = tgX = clamp(fx, -1, 1) * XR; raf = 0; frameOnce(); return [sways.length, fliers.length]; };
+      window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = tgY = camT * (1 - swing(u)); if (u >= .92) reveal(); raf = 0; frameOnce(); };
+      window.__akSunStill = function () { sunRC = null; };   // Messung: Strahlen der Sonne nicht mehr neu malen
+      window.__akPan = function (fy) { stop(); run = true; flown = true; fl = null; reveal(); cam = tgY = clamp(fy, 0, 1) * camT; raf = 0; frameOnce(); return [sways.length, fliers.length]; };
     }
   }
   function frameOnce() { var r = requestAnimationFrame; window.requestAnimationFrame = function () { return 0; }; frame(performance.now()); window.requestAnimationFrame = r; }
