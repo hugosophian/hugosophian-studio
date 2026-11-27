@@ -156,6 +156,13 @@
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
     'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
+    /* Handy: Die Grössen der Texte stehen in den Webflow-Klassen als min(…vw, …svh): sie richten sich nach der Breite und werden auf niedrigen
+       Bildschirmen kleiner, damit oben nichts abgeschnitten wird und unten nichts unter dem Menü-Knopf liegt (Hugos Video 27.11., 16:00).
+       Sehr alte Browser kennen svh nicht und würden die Werte verwerfen. Für sie stehen hier die Werte nur nach der Breite. */
+    '@supports not (height: 1svh) { @media (max-width: 479px) { [data-ak] .ak-inner { padding-top: 14vw; padding-bottom: 30vw; } [data-ak] .ak-kicker { font-size: 3.6vw; }',
+    '  [data-ak] .ak-title { margin-top: 1vw; font-size: 15vw; } [data-ak] .ak-lead { margin-top: 3vw; font-size: 4.2vw; } [data-ak] .ak-wheel { height: 60vw; margin-top: 6vw; }',
+    '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { min-height: 18vw; margin-top: 4vw; font-size: 4.2vw; } [data-ak] .ak-contact { margin-top: 6vw; }',
+    '  [data-ak] .ak-long { margin-top: 5vw; font-size: 3.5vw; } } }',
     '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -697,14 +704,16 @@
   // Feld um die Sonne: 144 Steine und Ringe, jeder 137.5° (Goldener Winkel) weiter und etwas weiter aussen – wie die Kerne einer
   // Sonnenblume. So entstehen von selbst die Spiralarme, die weit in den Himmel laufen, kleiner und blasser werden. Dazu Perlenkreise
   // in Abständen des Goldenen Schnitts (55, 89 und 144 Perlen).
-  function sunField(x, cx, cy, r, lw) {
+  function sunField(x, cx, cy, r, lw, d0, d1) {   // d0 … d1: nur die Zeichen in diesem Ring (in Sonnenradien), ohne Angabe alle
     var N = 144, n, t, a, d, sz, k, i, m;
+    d0 = (d0 || 0) * r; d1 = (d1 || 99) * r;
     for (k = 2; k <= 4; k++) {
       d = r * 1.22 * Math.pow(PHI, k); m = [55, 89, 144][k - 2];
-      for (i = 0; i < m; i++) { a = i / m * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.04 - (k - 2) * .008), 0, 7); x.fillStyle = 'rgba(255,206,100,' + (.75 - (k - 2) * .22) + ')'; x.fill(); }
+      if (d >= d0 && d < d1) for (i = 0; i < m; i++) { a = i / m * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.04 - (k - 2) * .008), 0, 7); x.fillStyle = 'rgba(255,206,100,' + (.75 - (k - 2) * .22) + ')'; x.fill(); }
     }
     for (n = N; n >= 1; n--) {
       t = n / N; a = n * GA; d = r * (2.2 + 6.4 * Math.pow(t, .7)); sz = r * (.3 - .19 * t);
+      if (d < d0 || d >= d1) continue;
       x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(a); x.globalAlpha = 1 - t * .8;
       if (n % 6 === 0) peye(x, 0, 0, sz * .95, lw * (.7 - t * .3), 'rgba(14,92,72,.7)');   // jedes sechste Zeichen ist ein Pfauenauge
       else if (n % 3 === 0) {
@@ -876,8 +885,7 @@
     S.add(sy - sr * 9.6, sy + sr * 9.6, function (x) {
       var g = x.createRadialGradient(sx, sy, 0, sx, sy, sr * 6); g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(.25, 'rgba(255,240,180,.5)'); g.addColorStop(1, 'rgba(255,236,180,0)');
       x.fillStyle = g; x.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
-      sunField(x, sx, sy, sr, lw * 1.2);   // Kern und Strahlen der Sonne sind eigene Bilder darüber (sunParts)
-    });
+    });   // Feld, Strahlen und Kern der Sonne sind eigene Bilder darüber (sunParts)
     // kleine Wolken, die im Bild stehen bleiben (die grossen ziehen als einzelne Teile vorbei)
     [[.8, -.2, .07], [.24, -.34, .06]].forEach(function (c) {
       var s = U * c[2], py = vy + H * c[1];
@@ -898,12 +906,20 @@
   }
 
   // Sonne in Teilen (Hugo 27.11., 15:25), alle auf der Himmelsebene und hinter den Bergen:
+  //   Feld: die Ornamente, die von der Sonne nach aussen laufen, in drei Ringen. Sie machen das Schwenken der Strahlen mit, genau gleich
+  //         langsam, jeder Ring etwas später als der innere (Hugo 16:02). Unter dem Horizont sind sie verdeckt und werden nicht gemalt.
   //   Wellen: drei Kränze blasser Ornamente wachsen langsam nach vorn und verblassen (so strahlt die Sonne)
   //   Strahlen: werden im Takt gemalt, gebogen, und schwenken ruhig von einer Seite zur anderen
   //   Kern: steht still
   var sunRC = null;
   function sunParts(S) {
-    var sx = S.X(SUN[0]), sy = S.vy + H * SUN[1] + S.tf, r = SR, lw = LW0 * .7 * 1.3, dp = Math.min(DPR, 2), hw = r * 2.5, k, c, i, a, n;
+    var sx = S.X(SUN[0]), sy = S.vy + H * SUN[1] + S.tf, r = SR, lw = LW0 * .7 * 1.3, dp = Math.min(DPR, 2), hw = r * 2.5, k, c, i, a, n, fld = [];
+    [[0, 3.9, 4.25, Math.min(DPR, 1.5)], [3.9, 6, 6.35, Math.min(DPR, 1.25)], [6, 99, 8.95, 1]].forEach(function (q) {
+      var x0 = Math.max(0, sx - r * q[2]), x1 = Math.min(S.w, sx + r * q[2]), y0 = sy - r * q[2], y1 = sy + r * Math.min(q[2], 3.9), c = canvas(x1 - x0, y1 - y0, q[3]);
+      c.x.translate(sx - x0, sy - y0); sunField(c.x, 0, 0, r, LW0 * .7 * 1.2, q[0], q[1]); paper(c.x, x0 - sx, y0 - sy, x1 - x0, y1 - y0, .45);
+      c.c.style.cssText = 'position:absolute;left:' + x0 + 'px;top:' + y0 + 'px;width:' + (x1 - x0) + 'px;height:' + (y1 - y0) + 'px;transform-origin:' + (sx - x0) + 'px ' + (sy - y0) + 'px;will-change:transform';
+      S.el.appendChild(c.c); fld.push(c.c);
+    });
     for (k = 0; k < 3; k++) {
       c = canvas(hw * 2, hw * 2, dp); n = 13;
       for (i = 0; i < n; i++) {
@@ -919,7 +935,7 @@
     }
     hw = r * 2.25; c = canvas(hw * 2, hw * 2, dp);
     c.c.style.cssText = 'position:absolute;left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px';
-    S.el.appendChild(c.c); sunRC = { x: c.x, hw: hw, r: r, lw: lw, n: 0, ph: 0 };
+    S.el.appendChild(c.c); sunRC = { x: c.x, hw: hw, r: r, lw: lw, n: 0, ph: 0, f: fld };
     sunRays(c.x, hw, hw, r, lw, 0, 0);
     hw = r * 1.3; c = canvas(hw * 2, hw * 2, dp); sunBody(c.x, hw, hw, r, lw); paper(c.x, 0, 0, hw * 2, hw * 2, .45);
     c.c.style.cssText = 'position:absolute;left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px';
@@ -1455,17 +1471,20 @@
   // ---------- Takt ----------
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
       drag = null, dragged = 0, tgY = 0, XR = 0, sways = [], farOn = null;
-  root.addEventListener('pointermove', function (e) {   // Maus bewegt die Ebenen leicht
-    if (!AK.pointer || e.pointerType !== 'mouse' || drag) return;
-    ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2;
-  }, { passive: true });
+  // Maus und Finger schieben die Ebenen leicht, je nachdem, wo sie gerade sind – genau wie in der allerersten Fassung (Hugo 27.11., 16:00: «das war top»).
+  // Am Computer folgt das Bild der Maus, am Handy dem Finger, solange er aufliegt; danach gleitet es zurück in die Mitte.
+  function aim(e) { if (AK.pointer) { ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2; } }
+  function rest(e) { if (e.pointerType !== 'mouse') ptr.tx = ptr.ty = 0; }
+  root.addEventListener('pointermove', aim, { passive: true });
   root.addEventListener('pointerleave', function () { ptr.tx = ptr.ty = 0; });
+  root.addEventListener('pointerup', rest); root.addEventListener('pointercancel', rest);
 
   // Kamera von Hand (Hugo 27.11., 11:02): ausserhalb des Rads lässt sich die Szene gemütlich wieder nach oben bis in den Himmel schieben.
   // Das Rad scrollt weiter die Services, mit Parallax dort, wo die Kamera gerade steht.
-  // Seitlich bewegt die Hand nichts mehr (Hugo 15:33: ganz weg, wie am Anfang): das Bild schwebt nur leicht von selbst.
+  // Seitlich verschieben lässt sich die Szene nicht mehr (Hugo 15:33: ganz weg, wie am Anfang): seitlich gibt es nur den leichten Parallax von Maus und Finger (oben).
   function inWheel(e) { return e.target && e.target.closest && e.target.closest('[data-ak-wheel]'); }
   root.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'mouse') aim(e);   // Finger: schon beim Auflegen, nicht erst beim Bewegen
     if (fl) { fl.rate = 9; return; }   // Antippen während des Flugs: schnell zu Ende fliegen
     if (!AK.freePan || !shown || e.button > 0 || inWheel(e)) return;
     drag = { id: e.pointerId, y: e.clientY, cy: tgY, on: 0, py: e.clientY, pt: e.timeStamp, vy: 0 };
@@ -1475,7 +1494,7 @@
     var my = e.clientY - drag.y, d = Math.max(1, e.timeStamp - drag.pt);
     if (!drag.on) {
       if (Math.abs(my) < 8) return;
-      drag.on = 1; root.classList.add('ak-drag'); ptr.tx = ptr.ty = 0;
+      drag.on = 1; root.classList.add('ak-drag');
       try { window.getSelection().removeAllRanges(); } catch (er) {}
     }
     drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.py = e.clientY; drag.pt = e.timeStamp;
@@ -1554,7 +1573,8 @@
     var p = drawWheel();
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
-    ptr.x += (ptr.tx - ptr.x) * .06; ptr.y += (ptr.ty - ptr.y) * .06;
+    var pk = touch ? .035 : .06;   // am Handy folgt das Bild dem Finger noch etwas weicher (wie am Anfang)
+    ptr.x += (ptr.tx - ptr.x) * pk; ptr.y += (ptr.ty - ptr.y) * pk;
     var dr = reduce ? 0 : AK.drift;   // der Blick schwebt leicht von selbst, genau wie am Anfang (Hugo 27.11., 15:33)
     var dx = (Math.sin(t * .00011) * 10 + Math.sin(t * .00023 + 1) * 5) * dr - ptr.x * 18 * AK.pointer;
     var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr - ptr.y * 12 * AK.pointer;
@@ -1597,11 +1617,13 @@
       }
     }
     if (lit && sheen) sheen.style.transform = 'translate3d(' + (Math.sin(t * .00007) * W * .12 + dx * 2).toFixed(1) + 'px,' + (pan * -H * .1 + dy).toFixed(1) + 'px,0)';
-    if (sunRC && !reduce && !fl) {   // Strahlen der Sonne: gebogen, schwenken ruhig hin und her (eine Runde in 11 s). Jedes dritte Bild genügt, im Flug ruhen sie
+    if (sunRC && !reduce && !fl) {   // Sonne: Strahlen gebogen, schwenken ruhig hin und her (eine Runde in 11 s), das Feld darum macht mit. Im Flug ruht alles
       sunRC.ph += dt;
-      if (sunRC.n++ % 3 === 0) {
+      var sp = sunRC.ph * .00057, se = Math.min(1, sunRC.ph / 2600); se = se * se * (3 - 2 * se);   // setzt nach der Landung weich ein
+      for (i = 0; i < 3; i++) sunRC.f[i].style.transform = 'rotate(' + ([4.5, 4, 3.5][i] * se * Math.sin(sp - [.9, 1.5, 2.1][i])).toFixed(3) + 'deg)';   // jeder Ring etwas später: die Bewegung läuft nach aussen
+      if (sunRC.n++ % 3 === 0) {   // die Strahlen werden neu gemalt, jedes dritte Bild genügt
         sunRC.x.clearRect(0, 0, sunRC.hw * 2, sunRC.hw * 2);
-        sunRays(sunRC.x, sunRC.hw, sunRC.hw, sunRC.r, sunRC.lw, Math.sin(sunRC.ph * .00057), Math.sin(sunRC.ph * .00057 - .7));   // die Federn folgen den Flammen etwas später
+        sunRays(sunRC.x, sunRC.hw, sunRC.hw, sunRC.r, sunRC.lw, se * Math.sin(sp), se * Math.sin(sp - .7));   // die Federn folgen den Flammen etwas später
       }
     }
     drawFx(now, vel);
