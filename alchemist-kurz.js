@@ -176,7 +176,10 @@
     '  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%); outline: none; }',
     '[data-ak-wheel]::-webkit-scrollbar { display: none; }',
     '.ak-pad { flex: none; pointer-events: none; }',
-    '[data-ak-item] { scroll-snap-align: center; scroll-snap-stop: normal; will-change: transform, opacity; cursor: pointer; backface-visibility: hidden; user-select: none; -webkit-user-select: none; white-space: nowrap; }',
+    /* Einrasten: An der Zeile selbst rastet der Browser ein, darum bleibt sie unbewegt. Gedreht und verschoben (Zylinder) wird nur der Text
+       darin (ak-turn). Vorher bewegte sich die Zeile mit, die Rastpunkte wanderten, und das Rad blieb am iPhone manchmal versetzt stehen. */
+    '[data-ak-item] { scroll-snap-align: center; scroll-snap-stop: normal; cursor: pointer; user-select: none; -webkit-user-select: none; white-space: nowrap; }',
+    '[data-ak-item] .ak-turn { will-change: transform, opacity; backface-visibility: hidden; }',
     '[data-ak-item] .ak-item-price, [data-ak-item] .ak-item-info { display: none !important; }',
     /* Die gewählte Zeile steht in einer Kapsel: dunkler Rand, leicht heller Grund, so breit wie der Text. Beim Scrollen wächst und schrumpft
        sie von einer Textlänge zur nächsten (drawWheel). Über dunklem Urwald kehrt sie sich um: heller Rand, dunkler Grund (ak-d1) */
@@ -1746,6 +1749,7 @@
     wrap.appendChild(band);
     wheel.setAttribute('tabindex', '0'); wheel.setAttribute('role', 'listbox'); wheel.setAttribute('aria-label', 'Übersicht');
     items.forEach(function (it, i) {
+      it._n = it.querySelector('.ak-item-name') || it.firstElementChild || it; if (it._n !== it) it._n.classList.add('ak-turn');   // der Text, der sich dreht
       it.setAttribute('role', 'option'); it.id = it.id || 'ak-opt-' + i;
       it.addEventListener('click', function () { go(i); });
     });
@@ -1754,11 +1758,13 @@
       if (e.key === 'ArrowUp') { go(Math.max(0, cur - 1)); e.preventDefault(); }
     });
     wheel.addEventListener('scroll', function () { lastScroll = performance.now(); }, { passive: true });
+    wheel.addEventListener('touchstart', function () { holding = 1; }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) { wheel.addEventListener(ev, function (e) { if (!e.touches || !e.touches.length) { holding = 0; lastScroll = performance.now(); } }, { passive: true }); });
     measureWheel();
   }
   function measureWheel() {
     if (!items.length) return;
-    rowH = items[0].offsetHeight || 40;
+    rowH = items[0].getBoundingClientRect().height || items[0].offsetHeight || 40;   // genaue Höhe (auch Bruchteile), damit Zeile und Raster übereinstimmen
     var h = wheel.clientHeight, pad = Math.max(0, (h - rowH) / 2);
     wheel.firstChild.style.height = wheel.lastChild.style.height = pad + 'px';
     band.style.top = (wheel.offsetTop + pad + rowH * .06) + 'px'; band.style.height = rowH * .88 + 'px';
@@ -1769,7 +1775,13 @@
     wP = NaN;   // neu zeichnen
   }
   function go(i) { wheel.scrollTo({ top: i * rowH, behavior: reduce ? 'auto' : 'smooth' }); }
-  var lastScroll = 0, wheelPos = 0;
+  var lastScroll = 0, wheelPos = 0, holding = 0;
+  // Sicherheitsnetz fürs Einrasten: Steht das Rad still (kein Finger, 160 ms keine Bewegung) und liegt nicht genau auf einer Zeile, gleitet es zur nächsten.
+  function settle(now) {
+    if (!items.length || holding || now - lastScroll < 160) return;
+    var t = clamp(Math.round(wheel.scrollTop / rowH), 0, items.length - 1) * rowH;
+    if (Math.abs(wheel.scrollTop - t) > 1.5) { lastScroll = now + 400; wheel.scrollTo({ top: t, behavior: reduce ? 'auto' : 'smooth' }); }
+  }
   var wP = NaN, wR = 0, TW = [];
   function drawWheel() {
     if (!items.length) return 0;
@@ -1783,10 +1795,10 @@
     for (var i = 0; i < items.length; i++) {
       var d = i - p, th = d * rad, a = Math.abs(th);
       var it = items[i];
-      if (a > 1.6) { if (it._v !== 0) { it.style.opacity = 0; it._v = 0; } continue; }
+      if (a > 1.6) { if (it._v !== 0) { it._n.style.opacity = 0; it._v = 0; } continue; }
       var y = Rcyl * Math.sin(th) - d * rowH;   // Ausgleich: im Fluss liegen die Zeilen gerade untereinander
-      it.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0) scale(' + (1 - a * .06).toFixed(4) + ',' + Math.max(.05, Math.cos(th)).toFixed(4) + ')';   // Zylinder: Zeilen werden zum Rand flacher
-      it.style.opacity = Math.max(0, Math.cos(th) * (1 - a * .18)).toFixed(3);
+      it._n.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0) scale(' + (1 - a * .06).toFixed(4) + ',' + Math.max(.05, Math.cos(th)).toFixed(4) + ')';   // Zylinder: Zeilen werden zum Rand flacher
+      it._n.style.opacity = Math.max(0, Math.cos(th) * (1 - a * .18)).toFixed(3);
       it._v = 1;
     }
     var n = clamp(Math.round(p), 0, items.length - 1);
@@ -1906,7 +1918,7 @@
     if (dk !== darkOn) { for (i = 0; i < 4; i++) root.classList.toggle('ak-d' + i, !!(dk >> i & 1)); darkOn = dk; }
     var lit = !fl && shown && cam < H * .45 && now - tStart > 420;   // das Licht kommt kurz nach dem Text: nicht alles im selben Bild
     if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
-    var p = drawWheel();
+    var p = drawWheel(); settle(now);
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
     var pk = touch ? .035 : .06;   // am Handy folgt das Bild dem Finger noch etwas weicher (wie am Anfang)
