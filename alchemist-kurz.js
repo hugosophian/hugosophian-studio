@@ -21,7 +21,7 @@
   var AK = {
     seed: 7,              // fester Zufall: andere Zahl = anderer Wald
     style: 'eldorado',    // Hugo 26.11. (23:58): 'eldorado' = nach den Referenzen; 'aquarell' = erster Wald (für den Übergang aufheben)
-    wash: .34,            // Perlmutt-Schleier über den El-Dorado-Farben (0 = volle Farben, .6 = sehr pastellig)
+    wash: .1,             // Perlmutt-Schleier über den El-Dorado-Farben (Hugo 27.11.: Farben kräftig; 0 = voll, .6 = sehr pastellig)
     rowsVisible: 5,       // sichtbare Zeilen im Rad
     rowDeg: 21,           // Grad pro Zeile auf dem Zylinder (Apple ~ 20)
     drift: 1,             // ruhige Eigenbewegung der Kamera (0 = aus)
@@ -30,6 +30,7 @@
     fireflies: 9,         // Glühwürmchen (Hugo 27.11., 08:46: nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
     introMs: 1500,        // Einblenden (Bewegungssystem: page)
+    flightMs: 8500,       // Flug Himmel → Wolken → Berge → Urwald (Hugo 27.11.: 5–10 s; 0 = kein Flug)
     flyInMs: [2200, 4200] // Glühwürmchen fliegen so lange ein (von – bis)
   };
   var EASE_OUT = 'cubic-bezier(.22,1,.36,1)';
@@ -124,6 +125,22 @@
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
     'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 1.2s infinite; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
+    /* Flug */
+    '.ak-flight { position: absolute; inset: 0; z-index: 25; overflow: hidden; transition: opacity 1s ' + EASE_OUT + '; touch-action: none; }',
+    '.ak-flight.is-out { opacity: 0; pointer-events: none; }',
+    '.ak-fl-sky { position: absolute; inset: 0; background: linear-gradient(to bottom, #173a9e 0%, #2470d4 38%, #39b4dc 72%, #6fe0d8 100%); }',
+    '.ak-fl-sky.is-low { opacity: 0; background: linear-gradient(to bottom, #2a7ad8 0%, #45c3d8 45%, #9ae6c8 75%, #ffe08a 100%); }',
+    '.ak-fl-el { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; will-change: transform, opacity; opacity: 0; }',
+    '.ak-fl-glow { position: absolute; left: 0; top: 0; width: 0; height: 0; }',
+    '.ak-fl-glow::before { content: ""; position: absolute; left: -60vmax; top: -60vmax; width: 120vmax; height: 120vmax; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,246,200,.85), rgba(255,226,140,.35) 30%, rgba(255,226,140,0) 70%); }',
+    '.ak-fl-rays { position: absolute; left: 0; top: 0; width: 0; height: 0; mix-blend-mode: screen; }',
+    '.ak-fl-rays i { position: absolute; top: 0; height: 170vmax; transform-origin: 50% 0; animation: akFlRay ease-in-out infinite alternate;',
+    '  background: linear-gradient(to bottom, rgba(255,248,210,.75), rgba(255,240,200,.25) 45%, rgba(255,240,200,0) 85%);',
+    '  -webkit-mask-image: linear-gradient(to right, transparent, #000 40%, #000 60%, transparent); mask-image: linear-gradient(to right, transparent, #000 40%, #000 60%, transparent); }',
+    '@keyframes akFlRay { from { opacity: .35; } to { opacity: .9; } }',
+    '.ak-fl-motes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }',
+    '.ak-fl-veil { position: absolute; inset: 0; background: #f3f1f9; transition: opacity 700ms ease; }',
+    '.ak-fl-veil.is-gone { opacity: 0; }',
     '@media (prefers-reduced-motion: reduce) { .ak-ray, .ak-spot, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -479,7 +496,7 @@
     x.fillStyle = g; x.fillRect(0, 0, w, h); x.restore();
   }
 
-  var ED_SKY = 'linear-gradient(to bottom, #cdeeea 0%, #c4dcf3 34%, #d3c9f0 62%, #c9e6dc 100%)';
+  var ED_SKY = 'linear-gradient(to bottom, #2a7ad8 0%, #45c3d8 38%, #9ae6c8 70%, #3fbf6a 100%)';   // Hugo 27.11.: kräftig, wie am Ende des Flugs
   function edLayers(layer, mob) {
     var wa = AK.wash;
     // 0 · Himmel mit Stufenwolken, ornamentaler Sonne (Quelle der Strahlen) und Stufentempeln im Dunst
@@ -493,7 +510,7 @@
       for (var t = 0; t < (mob ? 4 : 7); t++) edTemple(x, { x: rr(0, w), y: h * rr(.5, .6), w: rr(w * .12, w * .28), h: h * rr(.12, .22), n: 4 + Math.floor(R() * 3), col: pick(['#4a67c9', '#5a52c2', '#3f7fbf']) });
       for (var b = 0; b < (mob ? 10 : 18); b++)   // ferne Baumkronen als bunte Reihe am Horizont
         edBush(x, rr(-w * .05, w * 1.05), h * rr(.6, .68), rr(w * .06, w * .12), pick(['#7a2fbf', '#c2187a', '#1f9a5a', '#2f5fd0', '#8fd14f', '#0f8a7a']), lw * .8);
-      paper(x, w, h, .18); pearlWash(x, w, h, wa + .2);
+      paper(x, w, h, .18); pearlWash(x, w, h, wa + .06);
     });
     // 1 · Urwald-Wand: Ornament-Säulen, Fächer, Büsche (Violett, Türkis, Grün, Magenta)
     layer(1, mob ? 1 : .85, function (x, w, h) {
@@ -511,7 +528,7 @@
       }
       for (var b = 0; b < (mob ? 8 : 14); b++)
         edBush(x, rr(-w * .05, w * 1.05), h * rr(.72, .8), rr(w * .06, w * .11) * (mob ? 1.3 : 1), pick(['#7a2fbf', '#c2187a', '#1f9a5a', '#2bb673', '#0f8a7a', '#5b3fd1']), lw);
-      paper(x, w, h, .16); pearlWash(x, w, h, wa + .08);
+      paper(x, w, h, .16); pearlWash(x, w, h, wa + .03);
     });
     // 2 · vorne am Fluss: Goldfluss, Steine, Bananenblätter, Farnschnecken, Blüten; die Mitte bleibt frei
     layer(2, Math.min(DPR, 1.5), function (x, w, h) {
@@ -928,21 +945,201 @@
     }, 180);
   });
 
+  // ---------- Flug: Himmel → Wolken → Berge → Urwald (Hugo 27.11.2026, 09:08) ----------
+  // Zeichenstil El Dorado mit kräftigen Farben, Stimmung und Bewegung wie in Sky: eine Kamera gleitet durch gemalte
+  // Ebenen (2.5D). Jede Ebene ist eine einmal gemalte Fläche; im Takt werden nur Lage, Grösse und Deckkraft gesetzt
+  // (läuft auf der Grafikkarte). Kamera: cz = vorwärts, cy = abwärts. Bildschirm = Mitte + (Welt − Kamera) / Abstand.
+  var FL = null;
+  function edCloudSprite(w, h) {   // grosse Stufenwolke: Blöcke als eine Form, weisse Kontur, Spiralen, weicher Schein
+    var c = canvas(w, h, 1), x = c.x, s = h * .42, bl = [], bx = w * .06, base = h * .86;
+    x.save(); x.translate(w / 2, h * .55); x.scale(1, .42);   // Schein wie in Sky (bleibt ganz in der Fläche)
+    var g0 = x.createRadialGradient(0, 0, 0, 0, 0, w * .5); g0.addColorStop(0, 'rgba(255,255,255,.5)'); g0.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g0; x.beginPath(); x.arc(0, 0, w * .5, 0, 7); x.fill(); x.restore();
+    while (bx < w * .86) { var bw = s * rr(.55, 1), bh = s * rr(.5, 1.25); bl.push([bx, base - bh, bw, bh]); bx += bw * rr(.5, .78); }
+    for (var k = 0; k < 2; k++) { var b = bl[1 + Math.floor(R() * Math.max(1, bl.length - 2))]; if (b) bl.push([b[0] + b[2] * .2, b[1] - s * rr(.35, .6), b[2] * .7, s * .7]); }
+    bl.forEach(function (q) { rrect(x, q[0], q[1], q[2], q[3], s * .26); ol(x, 9, '#ffffff'); });
+    var g = x.createLinearGradient(0, base - s * 1.6, 0, base); g.addColorStop(0, '#f2fdff'); g.addColorStop(1, '#8fd8f2');
+    bl.forEach(function (q) { rrect(x, q[0], q[1], q[2], q[3], s * .26); x.fillStyle = g; x.fill(); });
+    bl.forEach(function (q, i) {
+      rrect(x, q[0] + q[2] * .16, q[1] + q[3] * .2, q[2] * .52, q[3] * .32, s * .12); ol(x, 3, 'rgba(255,255,255,.9)');
+      if (i % 3 === 1) { polyline(x, spiralPts(q[0] + q[2] * .7, q[1] + q[3] * .62, s * .14, 1.5, 0, 1)); ol(x, 3, 'rgba(255,255,255,.9)'); }
+    });
+    return c.c;
+  }
+  function edMountains(w, h, o) {   // Bergkette wie aus El Dorado, Stimmung Heidi: Gipfel mit Schnee, Wiese mit Tannen und Blumen
+    var hh = h * (1 + (o.skirt || 0)), c = canvas(w, hh, o.dpr), x = c.x, lw = o.lw, base = h * .8, peaks = [];   // skirt: Wiese reicht weiter nach unten (keine Lücke zum Urwald)
+    for (var i = 0; i < o.n; i++) peaks.push({ px: (i + .5) / o.n * w + rr(-.3, .3) * w / o.n, pw: w / o.n * rr(1.3, 1.9), ph: h * rr(.42, .78) * o.hk });
+    peaks.sort(function (a, b) { return b.ph - a.ph; });
+    peaks.forEach(function (p) {
+      var T = [p.px, base - p.ph], L = [p.px - p.pw / 2, base + 2], Rr = [p.px + p.pw / 2, base + 2], M = [p.px + p.pw * .06, base + 2];
+      x.beginPath(); x.moveTo(T[0], T[1]); x.quadraticCurveTo(p.px - p.pw * .2, base - p.ph * .55, L[0], L[1]); x.lineTo(M[0], M[1]); x.closePath(); x.fillStyle = o.rock[0]; x.fill();
+      x.beginPath(); x.moveTo(T[0], T[1]); x.quadraticCurveTo(p.px + p.pw * .22, base - p.ph * .5, Rr[0], Rr[1]); x.lineTo(M[0], M[1]); x.closePath(); x.fillStyle = o.rock[1]; x.fill();
+      for (var z = 0; z < 3; z++) {   // Zickzack-Bänder (Ornament)
+        var yy = base - p.ph * (.55 - z * .14), pts = [];
+        for (var q = 0; q <= 8; q++) { var xx = p.px - p.pw * (.18 + z * .1) + q * p.pw * (.36 + z * .2) / 8; pts.push([xx, yy + (q % 2 ? -1 : 1) * p.ph * .025]); }
+        polyline(x, pts); ol(x, lw * .7, rgba(ED.out, .45));
+      }
+      x.beginPath(); x.moveTo(T[0], T[1]); x.quadraticCurveTo(p.px - p.pw * .2, base - p.ph * .55, L[0], L[1]); x.lineTo(Rr[0], Rr[1]); x.quadraticCurveTo(p.px + p.pw * .22, base - p.ph * .5, T[0], T[1]); ol(x, lw);
+      x.beginPath(); x.moveTo(T[0], T[1]); x.lineTo(M[0], base - p.ph * .25); ol(x, lw * .6, rgba(ED.out, .5));
+      var sl = p.ph * rr(.26, .36), sx0 = p.px - p.pw * .5 * sl / p.ph * 1.05, sx1 = p.px + p.pw * .5 * sl / p.ph * 1.05, sy = base - p.ph + sl;   // Schnee
+      x.beginPath(); x.moveTo(T[0], T[1]); x.lineTo(sx0, sy);
+      for (var k = 1; k <= 6; k++) x.lineTo(sx0 + (sx1 - sx0) * k / 6, sy + (k % 2 ? -sl * .28 : sl * .08));
+      x.closePath(); x.fillStyle = '#f4fbff'; x.fill(); ol(x, lw * .8);
+      x.beginPath(); x.moveTo(T[0], T[1]); x.lineTo(sx0 + (sx1 - sx0) * .45, sy - sl * .3); x.lineTo(sx1, sy - sl * .1); x.closePath(); x.fillStyle = '#bfe6ff'; x.fill();
+    });
+    // Wiese
+    x.beginPath(); x.moveTo(-10, h + 10);
+    for (var j = 0; j <= 30; j++) { var mx = -10 + (w + 20) * j / 30; x.lineTo(mx, base - h * .06 + Math.sin(mx * .006 + 1) * h * .035 + Math.sin(mx * .017) * h * .015); }
+    x.lineTo(w + 10, hh + 10); x.lineTo(-10, hh + 10); x.closePath(); x.fillStyle = o.meadow; x.fill(); ol(x, lw);
+    for (var t = 0; t < o.pines; t++) {   // Tannen
+      var tx = rr(0, w), ty = base - h * rr(-.01, .05), th = h * rr(.07, .13);
+      for (var lv = 0; lv < 3; lv++) {
+        var ww = th * (.5 - lv * .1), yb = ty - lv * th * .28;
+        x.beginPath(); x.moveTo(tx, yb - th * .45); x.lineTo(tx - ww / 2, yb); x.lineTo(tx + ww / 2, yb); x.closePath(); x.fillStyle = lv % 2 ? '#1f7a4a' : '#16663e'; x.fill(); ol(x, lw * .7);
+      }
+    }
+    for (var f = 0; f < o.flowers; f++) { x.beginPath(); x.arc(rr(0, w), base + rr(0, h * .18), rr(2, 5), 0, 7); x.fillStyle = pick(['#ff5a8a', '#ffd23f', '#ffffff', '#c58cf0', '#f07a2a']); x.fill(); }
+    return c.c;
+  }
+  function edCanopy(w, h) {   // Urwalddach von oben: bunte Kronen, Fächer, darunter dunkler Grund
+    var c = canvas(w, h, 1), x = c.x, lw = 2.4;
+    var gd = x.createLinearGradient(0, h * .12, 0, h); gd.addColorStop(0, '#1f7a4a'); gd.addColorStop(1, '#0b3a30');
+    x.fillStyle = gd; x.fillRect(0, h * .14, w, h);   // dichter Grund, damit zwischen den Kronen kein Himmel durchscheint
+    for (var row = 0; row < 7; row++) {
+      var y = h * (.16 + row * .125), n = Math.round(w / (h * .16));
+      for (var i = 0; i < n; i++) {
+        if (R() < .3) edFan(x, { x: rr(0, w), y: y + h * .04, a: -Math.PI / 2 + rr(-.4, .4), spread: rr(1.6, 2.6), n: 6, len: h * rr(.1, .16), cols: ED_LEAF, lw: lw, wf: .08 });
+        edBush(x, (i + rr(-.3, .3)) / n * w, y + rr(-h * .02, h * .02), h * rr(.06, .095), pick(['#c2187a', '#7a2fbf', '#1f9a5a', '#2bb673', '#8fd14f', '#2f5fd0', '#e0409a', '#0f8a7a', '#f07a2a']), lw);
+      }
+    }
+    return c.c;
+  }
+
+  function buildFlight() {
+    var Wd = W, Hd = H, mob = Wd < 768, lay = document.createElement('div');
+    lay.className = 'ak-flight'; lay.setAttribute('aria-hidden', 'true');
+    var sky1 = document.createElement('div'), sky2 = document.createElement('div');
+    sky1.className = 'ak-fl-sky'; sky2.className = 'ak-fl-sky is-low'; lay.appendChild(sky1); lay.appendChild(sky2);
+    var sunC = canvas(Math.min(Wd, Hd) * .5, Math.min(Wd, Hd) * .5, 1), sr = Math.min(Wd, Hd) * .12;
+    edSun(sunC.x, { x: sunC.c._w / 2, y: sunC.c._h / 2, r: sr, lw: 3 });
+    var sun = sunC.c; sun.className = 'ak-fl-el'; sun.style.opacity = 1; sun.style.zIndex = 2; sun.style.width = sunC.c._w + 'px'; sun.style.height = sunC.c._h + 'px';
+    var glow = document.createElement('div'); glow.className = 'ak-fl-glow'; glow.style.zIndex = 1; lay.appendChild(glow); lay.appendChild(sun);
+    var rayBox = document.createElement('div'); rayBox.className = 'ak-fl-rays'; rayBox.style.zIndex = 3; lay.appendChild(rayBox);
+    for (var r = 0; r < 6; r++) {
+      var ray = document.createElement('i'), wv = rr(.08, .18) * Math.max(Wd, 500);
+      ray.style.cssText = 'left:' + (-wv / 2) + 'px;width:' + wv + 'px;transform:rotate(' + (-50 + r * 20 + rr(-6, 6)).toFixed(1) + 'deg);animation-duration:' + rr(3, 6).toFixed(1) + 's;animation-delay:' + (-rr(0, 4)).toFixed(1) + 's';
+      rayBox.appendChild(ray);
+    }
+    var els = [];
+    function add(el, o) { el.classList.add('ak-fl-el'); el.style.zIndex = 2000 - Math.round(o.z * 100); lay.appendChild(el); o.el = el; o.w = el._w; o.h = el._h; els.push(o); return o; }
+    // Kamera-Bahn (u = 0..1): vorwärts gleichmässig, ab dem Drittel abwärts in den Urwald
+    var Z_END = 7.4, Y_END = Hd * 3.3, Y_CAN = Hd * 3.6;   // Kamera endet knapp über dem Urwalddach
+    function cam(u) { var d = clamp((u - .3) / .62, 0, 1); d = d * d * (3 - 2 * d); return { z: Z_END * u, y: Y_END * d }; }
+    // Wolken, an denen die Kamera entlangrast
+    var nC = mob ? 12 : 16;
+    for (var i = 0; i < nC; i++) {
+      var z = .9 + i * (4.1 / nC) + rr(-.1, .1), side = i % 2 ? 1 : -1, cw = Wd * rr(.55, .95) * (mob ? 1.4 : 1), uPass = clamp((z - .4) / Z_END, 0, 1), cp = cam(uPass);
+      var cl = edCloudSprite(cw, cw * .5);
+      add(cl, { x: side * rr(.18, .62) * Wd * Math.max(.6, z * .55), y: cp.y + rr(-.35, .3) * Hd * Math.max(.6, z * .5), z: z, k: 1, fadeFar: 3.2 });
+    }
+    // Berge: hinten Violett/Blau, davor Blau/Türkis (Heidi im El-Dorado-Stil)
+    var mw = Wd * (mob ? 3.4 : 2.4), mh = Hd * .8;
+    add(edMountains(mw, mh, { dpr: 1, lw: 3, n: 7, hk: 1, rock: ['#4b3fc8', '#6a5cf0'], meadow: '#2bb673', pines: 26, flowers: 160 }), { x: 0, y: Hd * .62, z: 11, k: 5.2, fadeFar: 99 });
+    add(edMountains(mw, mh, { dpr: 1, lw: 3, n: 6, hk: .8, rock: ['#1f6fb8', '#2f9fe0'], meadow: '#3fbf6a', pines: 40, flowers: 220, skirt: .6 }), { x: Wd * .1, y: Hd * .95 + mh * .3 * 4, z: 9.4, k: 4, fadeFar: 99 });
+    // Urwalddach und Blätter, durch die wir hineinfallen
+    var cwd = Wd * (mob ? 5 : 3.2), chh = Hd * 1.25;
+    add(edCanopy(cwd, chh), { x: 0, y: Y_CAN, z: 8.4, k: mob ? 2.2 : 3.4, fadeFar: 99, nearOut: .5 });
+    // Wolkenmeer unter uns (wie in Sky über den Wolken gleiten), dann tauchen wir hindurch
+    for (var sb = 0; sb < 2; sb++) {
+      var bw2 = Wd * 1.6, band = canvas(bw2, bw2 * .32, 1);
+      for (var q2 = 0; q2 < 4; q2++) { var cs = edCloudSprite(bw2 * .45, bw2 * .225); band.x.drawImage(cs, q2 * bw2 * .19 + rr(-20, 20), rr(0, bw2 * .08), bw2 * .45, bw2 * .225); }
+      add(band.c, { x: (sb ? -1 : 1) * Wd * .15, y: Hd * (sb ? .55 : .42), z: sb ? 3.1 : 1.7, k: 2.2, fadeFar: 4, nearOut: .6 });
+    }
+    for (var l = 0; l < (mob ? 7 : 9); l++) {
+      var lc = canvas(Wd * 1.1, Wd * .9, 1), lz = 7.55 + l * .1 + rr(-.04, .04), ls = l % 2 ? 1 : -1;
+      if (R() < .5) edFan(lc.x, { x: lc.c._w * .5, y: lc.c._h * .97, a: -Math.PI / 2, spread: 1.9, n: 7, len: lc.c._h * .6, cols: ED_LEAF, lw: 4, wf: .08, stripes: 6 });
+      else for (var m = 0; m < 3; m++) edLeaf(lc.x, { x: lc.c._w * .5, y: lc.c._h * .97, a: -Math.PI / 2 + (m - 1) * .45, len: lc.c._h * .75, wid: lc.c._w * .12, bend: (m - 1) * .15, col: pick(ED_LEAF), lw: 4, stripes: 9 });
+      add(lc.c, { x: ls * rr(.15, .5) * Wd, y: Y_END + rr(-.1, .4) * Hd, z: lz, k: 1.1, fadeFar: 1.6 });
+    }
+    // Lichtteilchen wie in Sky (fliegen an der Kamera vorbei)
+    var mc = canvas(Wd, Hd, Math.min(DPR, 1.5)); mc.c.className = 'ak-fl-motes'; mc.c.style.zIndex = 3000; lay.appendChild(mc.c);
+    var motes = [], PM = rng(5);
+    for (var p = 0; p < (mob ? 40 : 60); p++) motes.push({ x: (PM() - .5) * Wd * 3, y: (PM() - .5) * Hd * 2.4, z: PM() * Z_END + .3, spr: sprFly[Math.floor(PM() * sprFly.length)] });
+    var veil = document.createElement('div'); veil.className = 'ak-fl-veil'; veil.style.zIndex = 4000; lay.appendChild(veil);
+    root.appendChild(lay);
+    FL = { lay: lay, els: els, cam: cam, sun: sun, glow: glow, rays: rayBox, sky2: sky2, motes: motes, mx: mc.x, mW: Wd, mH: Hd, veil: veil };
+  }
+
+  function drawFlight(u) {
+    var c = FL.cam(u), Wd = FL.mW, Hd = FL.mH;
+    for (var i = 0; i < FL.els.length; i++) {
+      var e = FL.els[i], dz = e.z - c.z;
+      if (dz <= .06) { if (e.v !== 0) { e.el.style.opacity = 0; e.v = 0; } continue; }
+      var s = 1 / dz, sc = s * e.k, sx = Wd / 2 + (e.x - 0) * s, sy = Hd / 2 + (e.y - c.y) * s;
+      var op = clamp((e.fadeFar - dz) / .8, 0, 1) * clamp((dz - .08) / ((e.nearOut || .35) - .08), 0, 1);
+      if (op <= 0.001) { if (e.v !== 0) { e.el.style.opacity = 0; e.v = 0; } continue; }
+      e.v = 1;
+      e.el.style.opacity = op.toFixed(3);
+      e.el.style.transform = 'translate3d(' + (sx - e.w / 2).toFixed(1) + 'px,' + (sy - e.h / 2).toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')';
+    }
+    // Sonne bleibt fern; beim Abtauchen sinkt sie hinter die Berge
+    var sy0 = Hd * .2 - c.y * .32, sxs = Wd * .64;
+    FL.sun.style.transform = 'translate3d(' + (sxs - FL.sun._w / 2).toFixed(1) + 'px,' + (sy0 - FL.sun._h / 2).toFixed(1) + 'px,0) scale(' + (1 + u * .25).toFixed(3) + ') rotate(' + (u * 40).toFixed(1) + 'deg)';
+    FL.glow.style.transform = 'translate3d(' + sxs.toFixed(1) + 'px,' + sy0.toFixed(1) + 'px,0)';
+    FL.rays.style.transform = 'translate3d(' + sxs.toFixed(1) + 'px,' + sy0.toFixed(1) + 'px,0)';
+    FL.rays.style.opacity = (1 - clamp((u - .45) / .3, 0, 1) * .6).toFixed(3);
+    FL.sky2.style.opacity = clamp((u - .2) / .5, 0, 1).toFixed(3);
+    // Lichtteilchen
+    var x = FL.mx; x.clearRect(0, 0, Wd, Hd); x.globalCompositeOperation = 'lighter';
+    for (var k = 0; k < FL.motes.length; k++) {
+      var m = FL.motes[k], mz = m.z - c.z; while (mz <= .05) { m.z += Z_LOOP; mz = m.z - c.z; }
+      var ms = 1 / mz, px = Wd / 2 + m.x * ms, py = Hd / 2 + (m.y + c.y * .2) * ms, sz = clamp(5 * ms, 1, 26);
+      if (px < -40 || px > Wd + 40 || py < -40 || py > Hd + 40) continue;
+      x.globalAlpha = clamp(1.6 - mz * .5, 0, .9) * clamp(mz * 3, 0, 1); x.drawImage(m.spr, px - sz, py - sz, sz * 2, sz * 2);
+    }
+    x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  }
+  var Z_LOOP = 3;
+
+  function playFlight(done) {
+    var t0 = performance.now(), D = AK.flightMs, ended = false, rafF = 0;
+    function end() {
+      if (ended) return; ended = true; cancelAnimationFrame(rafF);
+      FL.lay.classList.add('is-out'); done();
+      setTimeout(function () { FL.lay.remove(); FL = null; }, 1100);
+    }
+    function step(now) {
+      var u = clamp((now - t0) / D, 0, 1);
+      drawFlight(u);
+      if (u >= 1) end(); else rafF = requestAnimationFrame(step);
+    }
+    FL.lay.addEventListener('pointerdown', function () { t0 = Math.min(t0, performance.now() - D * .985); }, { once: true });   // Antippen: gleich weiter
+    requestAnimationFrame(function () { FL.veil.classList.add('is-gone'); rafF = requestAnimationFrame(step); });
+    window.__akSeek = function (u) { ended = true; cancelAnimationFrame(rafF); if (FL) drawFlight(u); };   // nur für Tests
+  }
+
   // ---------- Start ----------
   function boot() {
     var cover = document.createElement('div'); cover.className = 'ak-cover'; root.appendChild(cover);
     paintScene(); lastW = W;           // teuer: einmal beim Laden, solange die Seite noch perlweiss ist
     setupWheel();
     drawWheel();
+    // Flug beim Klick auf der Weiche (/alchemist) und beim ersten Besuch in dieser Sitzung; Antippen überspringt ihn
+    var fly = false;
+    try { fly = AK.flightMs > 0 && !reduce && (sessionStorage.getItem('ak-fly') === '1' || !sessionStorage.getItem('ak-seen')); sessionStorage.removeItem('ak-fly'); sessionStorage.setItem('ak-seen', '1'); } catch (e) {}
+    if (fly) { buildFlight(); cover.style.transition = 'opacity 500ms ease'; }
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        tStart = performance.now();
-        html.classList.add('ak-on');
-        // Inhalt gestaffelt (Bewegungssystem: ui 420 ms Abstand)
-        var kids = root.querySelectorAll('.ak-inner > *');
-        for (var i = 0; i < kids.length; i++) kids[i].style.transitionDelay = (450 + i * 140) + 'ms';
-        start();
-        setTimeout(function () { cover.remove(); for (var j = 0; j < kids.length; j++) kids[j].style.transitionDelay = ''; }, AK.introMs + 1400);
+        if (fly) { cover.style.opacity = 0; playFlight(reveal); } else reveal();
+        function reveal() {
+          tStart = performance.now();
+          html.classList.add('ak-on');
+          // Inhalt gestaffelt (Bewegungssystem: ui 420 ms Abstand)
+          var kids = root.querySelectorAll('.ak-inner > *');
+          for (var i = 0; i < kids.length; i++) kids[i].style.transitionDelay = (450 + i * 140) + 'ms';
+          start();
+          setTimeout(function () { cover.remove(); for (var j = 0; j < kids.length; j++) kids[j].style.transitionDelay = ''; }, AK.introMs + 1400);
+        }
       });
     });
   }
