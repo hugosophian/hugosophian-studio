@@ -164,10 +164,10 @@
     '.ak-flare i { position: absolute; border-radius: 50%; will-change: transform; }',
     '.ak-sheen { inset: -30%; z-index: 11; will-change: transform;',
     '  background: linear-gradient(115deg, rgba(218,242,248,0) 30%, rgba(218,242,248,.9) 38%, rgba(229,225,244,.9) 44%, rgba(242,221,227,.9) 50%, rgba(251,243,222,.9) 56%, rgba(251,243,222,0) 64%); }',
-    /* Glanz, Lichtflecken und Schimmer sind nur da, wenn die Kamera unten in der Lichtung steht (ak-lit); sie blenden weich ein und aus.
-       Die Sonnenstrahlen sind immer da (Hugo 27.11., 20:49): im Flug scheinen sie durch Wolken, Blätterdach und Gebüsch; bewegt (atmen, schwenken) werden sie erst unten. */
-    '.ak-glow, .ak-dapple, .ak-flare, .ak-sheen { opacity: 0; visibility: hidden; transition: opacity 1.2s ease, visibility 0s linear 1.2s; }',
-    '.ak-lit .ak-glow, .ak-lit .ak-flare { opacity: 1; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
+    /* Das Licht (Strahlen, Glanz, Lichtflecken, Schimmer) ist nur da, wenn die Kamera unten in der Lichtung steht (ak-lit); es blendet weich ein
+       und aus. Die Strahlen waren vom 27.11., 21:05 bis 22:25 immer sichtbar; Hugo (22:16): «wieder wie damals, dass die einblenden, und wenn man bewegt, weniger». */
+    '.ak-rays, .ak-glow, .ak-dapple, .ak-flare, .ak-sheen { opacity: 0; visibility: hidden; transition: opacity 1.2s ease, visibility 0s linear 1.2s; }',
+    '.ak-lit .ak-rays, .ak-lit .ak-glow, .ak-lit .ak-flare { opacity: 1; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
     '.ak-lit .ak-dapple { opacity: 1; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
     '.ak-lit .ak-sheen { opacity: .14; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
     '.ak-world:not(.ak-lit) .ak-rays canvas, .ak-world:not(.ak-lit) .ak-dapple canvas { animation-play-state: paused; }',
@@ -972,69 +972,84 @@
   //   Kern: steht still
   var sunRC = null;
   // Mandala hinter der Sonne (Hugo 27.11., 21:22–21:55): drei blasse Ringe, die sich langsam gegeneinander drehen (180, 270 und 360 s je Umlauf)
-  // und zart pulsieren. Anzahlen nach 3, 6 und 9, Radien im Goldenen Schnitt. Davor, ab den Spitzen der Flammen, stehen Zeichen bis doppelt so
-  // weit hinaus: Spiralen, Vesica, Saat des Lebens, Sterne, Dreiecke im Goldenen Schnitt, Unendlich – eigene Zeichnung nach den Formen heiliger Geometrie.
+  // und zart pulsieren. Anzahlen nach 3, 6 und 9, Radien im Goldenen Schnitt.
+  // Seit 22:16 («mehr Farben und Übergänge, diese Symbole weg, nur die Formen, noch mehr Ornamente nach aussen, alles nochmal blasser hinter der
+  // originalen Sonnen-Zeichnung»): Die Farben laufen von innen nach aussen durch Gold, Apricot, Rosa, Flieder, Blau und Mint – als Verlauf in
+  // jeder Fläche und Linie. Die Scheiben mit Zeichen (Spirale, Sterne, Dreieck …) sind weg; ab den Spitzen stehen nur noch Formen: Tropfen,
+  // Kreise, Rauten, Punkte. Aussen kommt ein vierter Kranz dazu (36 Bögen, 72 Punkte). Alles ist blasser als zuvor (Deckkraft .5 statt .72).
   function sunMandala(S, sx, sy, r) {
-    var R2 = r * Math.pow(PHI, 3), R3 = R2 * Math.sqrt(PHI), R4 = R2 * PHI, hw = R4 * 1.2, dq = Math.min(DPR, 1.5), lw = LW0 * .8, i, k, a, q, g, P = [];
-    function line(al) { return 'rgba(190,110,40,' + al + ')'; }
+    var R2 = r * Math.pow(PHI, 3), R3 = R2 * Math.sqrt(PHI), R4 = R2 * PHI, R5 = R4 * Math.sqrt(PHI), hw = R5 * 1.07, dq = Math.min(DPR, 1.25), lw = LW0 * .8, i, k, a, q, g, P = [],
+        HU = [[255, 214, 120], [255, 178, 130], [246, 150, 184], [200, 164, 242], [158, 176, 250], [176, 236, 214]];
+    function hue(t, al, dk) {   // Farbe am Ort t (0 = an der Sonne, 1 = ganz aussen); dk < 1 = dunkler (für Linien)
+      t = clamp(t, 0, 1) * 5; var n = Math.min(4, Math.floor(t)), f = t - n, c0 = HU[n], c1 = HU[n + 1]; dk = dk || 1;
+      return 'rgba(' + Math.round((c0[0] + (c1[0] - c0[0]) * f) * dk) + ',' + Math.round((c0[1] + (c1[1] - c0[1]) * f) * dk) + ',' + Math.round((c0[2] + (c1[2] - c0[2]) * f) * dk) + ',' + al + ')';
+    }
+    function tOf(rad) { return (rad - r * 2) / (R5 - r * 2); }
+    function grad(ra, rb, a0, a1, dk) { var gr = g.createRadialGradient(0, 0, ra, 0, 0, rb); gr.addColorStop(0, hue(tOf(ra), a0, dk)); gr.addColorStop(1, hue(tOf(rb), a1, dk)); return gr; }
     function ring(dur, rev, pulse, delay, paint) {
-      var d = document.createElement('div'), c = canvas(hw * 2, hw * 2, dq); g = c.x; g.translate(hw, hw); g.globalAlpha = .72; g.lineJoin = 'round'; paint();
+      var d = document.createElement('div'), c = canvas(hw * 2, hw * 2, dq); g = c.x; g.translate(hw, hw); g.globalAlpha = .5; g.lineJoin = 'round'; g.lineCap = 'round'; paint();
       d.className = 'ak-man'; d.style.cssText = 'left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px;animation-duration:' + dur + 's;' + (rev ? 'animation-direction:reverse;' : '');
       c.c.style.cssText = 'animation-duration:' + pulse + 's;animation-delay:' + delay + 's';
       d.appendChild(c.c); S.el.appendChild(d);
     }
-    function lotus(n, ra, rb, off, fill, al) {
+    function lotus(n, ra, rb, off, af, al) {   // Kranz aus n Blättern; Fläche und Linie tragen den Farbverlauf von innen nach aussen
+      var d = Math.PI / n, m = (ra + rb) / 2 * 1.04, fill = grad(ra, rb, af, af * .5), ln = grad(ra, rb, al, al, .72);
       for (i = 0; i < n; i++) {
-        a = (i + off) / n * Math.PI * 2; var d = Math.PI / n, m = (ra + rb) / 2 * 1.04;
+        a = (i + off) / n * Math.PI * 2;
         g.beginPath(); g.moveTo(Math.cos(a - d) * ra, Math.sin(a - d) * ra); g.quadraticCurveTo(Math.cos(a - d * .9) * m, Math.sin(a - d * .9) * m, Math.cos(a) * rb, Math.sin(a) * rb);
-        g.quadraticCurveTo(Math.cos(a + d * .9) * m, Math.sin(a + d * .9) * m, Math.cos(a + d) * ra, Math.sin(a + d) * ra); g.closePath(); g.fillStyle = fill; g.fill(); g.strokeStyle = line(al); g.lineWidth = lw; g.stroke();
-        g.beginPath(); g.moveTo(Math.cos(a) * (ra + (rb - ra) * .2), Math.sin(a) * (ra + (rb - ra) * .2)); g.lineTo(Math.cos(a) * (ra + (rb - ra) * .72), Math.sin(a) * (ra + (rb - ra) * .72)); g.strokeStyle = line(al * .7); g.stroke();
+        g.quadraticCurveTo(Math.cos(a + d * .9) * m, Math.sin(a + d * .9) * m, Math.cos(a + d) * ra, Math.sin(a + d) * ra); g.closePath(); g.fillStyle = fill; g.fill(); g.strokeStyle = ln; g.lineWidth = lw; g.stroke();
+        g.beginPath(); g.moveTo(Math.cos(a) * (ra + (rb - ra) * .2), Math.sin(a) * (ra + (rb - ra) * .2)); g.lineTo(Math.cos(a) * (ra + (rb - ra) * .72), Math.sin(a) * (ra + (rb - ra) * .72)); g.stroke();
       }
     }
+    function dots(n, rad, sz, al, off) { g.fillStyle = hue(tOf(rad), al, .86); for (i = 0; i < n; i++) { a = (i + (off || 0)) / n * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * rad, Math.sin(a) * rad, sz, 0, 7); g.fill(); } }
     ring(180, 0, 9, 0, function () {   // Blume des Lebens (Sechser-Symmetrie), darum der Kreis der neun Punkte: Neunstern, die Linie 1-2-4-8-7-5 und das Dreieck 3-6-9
       var pts = [[0, 0]];
       g.save(); g.beginPath(); g.arc(0, 0, R2, 0, 7); g.arc(0, 0, r * 2.2, 0, 7, true); g.clip('evenodd'); q = R2 / 3;
+      g.fillStyle = grad(r * 2.2, R2, .1, .3); g.fillRect(-R2, -R2, R2 * 2, R2 * 2);   // Farbe als weicher Übergang: Gold an der Sonne, Rosa am Kreis
       for (i = 0; i < 6; i++) { a = i * Math.PI / 3; pts.push([Math.cos(a) * q, Math.sin(a) * q], [Math.cos(a) * 2 * q, Math.sin(a) * 2 * q], [Math.cos(a + Math.PI / 6) * q * 1.7320508, Math.sin(a + Math.PI / 6) * q * 1.7320508]); }
-      pts.forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], q, 0, 7); g.strokeStyle = line(.36); g.lineWidth = lw; g.stroke(); });
+      g.strokeStyle = grad(r * 2.2, R2, .46, .46, .74); g.lineWidth = lw;
+      pts.forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], q, 0, 7); g.stroke(); });
       g.restore();
-      g.beginPath(); g.arc(0, 0, R2, 0, 7); g.strokeStyle = line(.5); g.lineWidth = lw * 1.6; g.stroke();
-      g.beginPath(); g.arc(0, 0, R2 * .965, 0, 7); g.strokeStyle = 'rgba(255,214,120,.55)'; g.lineWidth = lw * 2.4; g.stroke();
+      g.beginPath(); g.arc(0, 0, R2, 0, 7); g.strokeStyle = hue(tOf(R2), .6, .72); g.lineWidth = lw * 1.6; g.stroke();
+      g.beginPath(); g.arc(0, 0, R2 * .965, 0, 7); g.strokeStyle = 'rgba(255,224,150,.6)'; g.lineWidth = lw * 2.4; g.stroke();
       for (k = 1; k <= 9; k++) { a = -Math.PI / 2 + k * Math.PI * 2 / 9; P[k] = [Math.cos(a) * R2, Math.sin(a) * R2]; }
-      g.beginPath(); for (k = 0; k <= 9; k++) { q = P[(k * 2) % 9 || 9]; if (k) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); } g.strokeStyle = line(.3); g.lineWidth = lw; g.stroke();
-      g.beginPath(); [1, 2, 4, 8, 7, 5, 1].forEach(function (n, j) { if (j) g.lineTo(P[n][0], P[n][1]); else g.moveTo(P[n][0], P[n][1]); }); g.strokeStyle = 'rgba(232,110,150,.5)'; g.lineWidth = lw * 1.5; g.stroke();
-      g.beginPath(); g.moveTo(P[3][0], P[3][1]); g.lineTo(P[6][0], P[6][1]); g.lineTo(P[9][0], P[9][1]); g.closePath(); g.strokeStyle = 'rgba(14,110,90,.42)'; g.lineWidth = lw * 1.9; g.stroke();
-      for (k = 1; k <= 9; k++) { g.beginPath(); g.arc(P[k][0], P[k][1], r * (k % 3 ? .15 : .24), 0, 7); g.fillStyle = k % 3 ? 'rgba(255,233,160,.9)' : 'rgba(127,224,208,.9)'; g.fill(); g.strokeStyle = k % 3 ? line(.6) : 'rgba(14,92,72,.7)'; g.lineWidth = lw * 1.2; g.stroke(); }
+      g.beginPath(); for (k = 0; k <= 9; k++) { q = P[(k * 2) % 9 || 9]; if (k) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); } g.strokeStyle = hue(.2, .3, .74); g.lineWidth = lw; g.stroke();
+      g.beginPath(); [1, 2, 4, 8, 7, 5, 1].forEach(function (n, j) { if (j) g.lineTo(P[n][0], P[n][1]); else g.moveTo(P[n][0], P[n][1]); }); g.strokeStyle = 'rgba(236,120,160,.46)'; g.lineWidth = lw * 1.5; g.stroke();
+      g.beginPath(); g.moveTo(P[3][0], P[3][1]); g.lineTo(P[6][0], P[6][1]); g.lineTo(P[9][0], P[9][1]); g.closePath(); g.strokeStyle = 'rgba(40,150,130,.42)'; g.lineWidth = lw * 1.9; g.stroke();
+      for (k = 1; k <= 9; k++) { g.beginPath(); g.arc(P[k][0], P[k][1], r * (k % 3 ? .15 : .24), 0, 7); g.fillStyle = k % 3 ? 'rgba(255,236,190,.9)' : 'rgba(176,236,214,.9)'; g.fill(); g.strokeStyle = k % 3 ? hue(tOf(R2), .7, .72) : 'rgba(40,150,130,.7)'; g.lineWidth = lw * 1.2; g.stroke(); }
     });
-    ring(270, 1, 6, -2, function () { lotus(27, R3, R4, .5, 'rgba(255,196,160,.2)', .3); lotus(18, R2 * 1.02, R3 * 1.02, 0, 'rgba(255,224,140,.26)', .38); });   // Lotus-Kränze: 18 und 27 Blätter
-    ring(360, 0, 9, -4.5, function () {   // Strahlenkranz: 54 Striche, 108 Punkte
-      for (i = 0; i < 54; i++) { a = i / 54 * Math.PI * 2; g.beginPath(); g.moveTo(Math.cos(a) * R4 * 1.03, Math.sin(a) * R4 * 1.03); g.lineTo(Math.cos(a) * R4 * (i % 3 ? 1.08 : 1.12), Math.sin(a) * R4 * (i % 3 ? 1.08 : 1.12)); g.strokeStyle = line(.4); g.lineWidth = lw * 1.3; g.lineCap = 'round'; g.stroke(); }
-      for (i = 0; i < 108; i++) { a = (i + .5) / 108 * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * R4 * 1.16, Math.sin(a) * R4 * 1.16, r * .04, 0, 7); g.fillStyle = 'rgba(232,150,70,.5)'; g.fill(); }
+    ring(270, 1, 6, -2, function () {   // Lotus-Kränze: 18 und 27 Blätter, in jedem der 27 ein Kreis
+      lotus(27, R3, R4, .5, .4, .5); lotus(18, R2 * 1.02, R3 * 1.02, 0, .42, .5);
+      q = R3 + (R4 - R3) * .46; g.strokeStyle = hue(tOf(q), .55, .74); g.lineWidth = lw;
+      for (i = 0; i < 27; i++) { a = (i + .5) / 27 * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * q, Math.sin(a) * q, r * .13, 0, 7); g.fillStyle = 'rgba(255,250,240,.4)'; g.fill(); g.stroke(); }
+      dots(18, R2 * 1.02 + (R3 - R2) * .5, r * .07, .7, 0);
     });
-    // Zeichen ab den Spitzen: 13 Speichen (wie die 13 Flammen), je drei Scheiben, die nach aussen im Goldenen Schnitt wachsen
-    var hs = r * 4.75, c = canvas(hs * 2, hs * 2, Math.min(DPR, 2)), G;
-    g = c.x; g.translate(hs, hs); g.lineJoin = 'round'; g.lineCap = 'round';
-    G = [
-      function (s) { var t, th; g.beginPath(); g.moveTo(0, 0); for (t = .025; t <= 1.001; t += .025) { th = t * Math.PI * 5; g.lineTo(Math.cos(th) * s * Math.pow(t, 1.25), Math.sin(th) * s * Math.pow(t, 1.25)); } g.stroke(); },   // Spirale
-      function (s) { [-1, 1].forEach(function (d) { g.beginPath(); g.arc(0, d * s * .3, s * .6, 0, 7); g.stroke(); }); },   // Vesica piscis
-      function (s) { for (k = 0; k < 7; k++) { g.beginPath(); g.arc(k ? Math.cos(k * Math.PI / 3) * s * .34 : 0, k ? Math.sin(k * Math.PI / 3) * s * .34 : 0, s * .34, 0, 7); g.stroke(); } },   // Saat des Lebens
-      function (s) { g.beginPath(); g.moveTo(s * .9, 0); g.lineTo(-s * .55, s * .47); g.lineTo(-s * .55, -s * .47); g.closePath(); g.fill(); g.stroke(); },   // Dreieck im Goldenen Schnitt (36°), Spitze nach aussen
-      function (s) { g.beginPath(); for (k = 0; k < 5; k++) { a = k * 4 * Math.PI / 5; if (k) g.lineTo(Math.cos(a) * s * .82, Math.sin(a) * s * .82); else g.moveTo(s * .82, 0); } g.closePath(); g.stroke(); },   // Fünfstern
-      function (s) { [0, Math.PI].forEach(function (o) { g.beginPath(); for (k = 0; k < 3; k++) { a = o + k * 2 * Math.PI / 3; if (k) g.lineTo(Math.cos(a) * s * .82, Math.sin(a) * s * .82); else g.moveTo(Math.cos(a) * s * .82, Math.sin(a) * s * .82); } g.closePath(); g.stroke(); }); },   // Sechsstern
-      function (s) { g.beginPath(); g.moveTo(s * .9, 0); for (k = 1; k <= 4; k++) { a = k * Math.PI / 2; g.quadraticCurveTo(0, 0, Math.cos(a) * s * .9, Math.sin(a) * s * .9); } g.fill(); g.stroke(); },   // vierzackiger Stern mit eingezogenen Seiten
-      function (s) { var t; g.beginPath(); for (t = 0; t <= 6.3; t += .1) { q = s * .9 / (1 + Math.sin(t) * Math.sin(t)); if (t) g.lineTo(q * Math.cos(t), q * Math.sin(t) * Math.cos(t)); else g.moveTo(q, 0); } g.closePath(); g.stroke(); }   // Unendlich
-    ];
-    for (i = 0; i < 13; i++) {
-      g.save(); g.rotate(-Math.PI / 2 + i * Math.PI * 2 / 13);
-      g.strokeStyle = line(.55); g.lineWidth = lw * 1.1; g.beginPath(); g.moveTo(r * 2.34, 0); g.lineTo(r * 4.5, 0); g.stroke();
-      [[2.64, .19], [3.32, .25], [4.14, .32]].forEach(function (p, j) {
-        var tl = (i + j) % 3 === 0;
-        g.save(); g.translate(r * p[0], 0);
-        g.beginPath(); g.arc(0, 0, r * p[1] * 1.14, 0, 7); g.fillStyle = 'rgba(255,248,222,.82)'; g.fill(); g.strokeStyle = tl ? 'rgba(14,92,72,.7)' : line(.75); g.lineWidth = lw * 1.2; g.stroke();
-        g.fillStyle = tl ? 'rgba(127,224,208,.8)' : 'rgba(255,214,120,.85)'; g.strokeStyle = tl ? 'rgba(14,92,72,.85)' : line(.9); g.lineWidth = lw * 1.05;
-        G[(i * 3 + j * 5) % 8](r * p[1]);
-        g.restore();
-      });
-      g.beginPath(); g.arc(r * 4.6, 0, r * .055, 0, 7); g.fillStyle = line(.7); g.fill();
+    ring(360, 0, 9, -4.5, function () {   // aussen: 54 Striche, 108 Punkte, dann 36 Bögen und 72 Punkte
+      g.strokeStyle = hue(tOf(R4 * 1.07), .5, .74); g.lineWidth = lw * 1.3;
+      for (i = 0; i < 54; i++) { a = i / 54 * Math.PI * 2; g.beginPath(); g.moveTo(Math.cos(a) * R4 * 1.03, Math.sin(a) * R4 * 1.03); g.lineTo(Math.cos(a) * R4 * (i % 3 ? 1.08 : 1.12), Math.sin(a) * R4 * (i % 3 ? 1.08 : 1.12)); g.stroke(); }
+      dots(108, R4 * 1.16, r * .04, .6, .5);
+      lotus(36, R4 * 1.2, R5, 0, .36, .46);
+      dots(72, R5 * 1.035, r * .045, .55, .5);
+    });
+    // Formen ab den Spitzen: über jeder der 13 Flammen ein Tropfen, ein Kreis, eine Raute und ein Punkt; über jeder Pfauenfeder ein kleiner Tropfen,
+    // ein Ring und zwei Punkte. Steht still (die Formen gehören zu den Spitzen), liegt hinter dem Feld der Sonne.
+    var hs = r * 4.5, c = canvas(hs * 2, hs * 2, Math.min(DPR, 2));
+    g = c.x; g.translate(hs, hs); g.lineJoin = 'round'; g.lineCap = 'round'; g.globalAlpha = .6; g.lineWidth = lw;
+    function drop(d0, d1, wd) { var dl = d1 - d0; g.beginPath(); g.moveTo(d0, 0); g.bezierCurveTo(d0 + dl * .22, -wd, d0 + dl * .6, -wd * .72, d1, 0); g.bezierCurveTo(d0 + dl * .6, wd * .72, d0 + dl * .22, wd, d0, 0); g.closePath(); }
+    for (i = 0; i < 26; i++) {
+      g.save(); g.rotate(-Math.PI / 2 + i * Math.PI / 13);
+      if (i % 2 === 0) {
+        drop(r * 2.2, r * 3.3, r * .15); g.fillStyle = grad(r * 2.2, r * 3.3, .7, .3); g.fill(); g.strokeStyle = grad(r * 2.2, r * 3.3, .6, .6, .74); g.stroke();
+        g.beginPath(); g.arc(r * 3.56, 0, r * .14, 0, 7); g.fillStyle = 'rgba(255,250,236,.75)'; g.fill(); g.strokeStyle = hue(tOf(r * 3.56), .7, .74); g.stroke();
+        g.beginPath(); g.arc(r * 3.56, 0, r * .055, 0, 7); g.fillStyle = hue(tOf(r * 3.9), .9, .9); g.fill();
+        g.beginPath(); g.moveTo(r * 3.82, 0); g.lineTo(r * 4, -r * .085); g.lineTo(r * 4.18, 0); g.lineTo(r * 4, r * .085); g.closePath(); g.fillStyle = hue(tOf(r * 4.4), .7); g.fill(); g.strokeStyle = hue(tOf(r * 4.4), .7, .74); g.stroke();
+        g.beginPath(); g.arc(r * 4.34, 0, r * .05, 0, 7); g.fillStyle = hue(tOf(r * 4.8), .8, .86); g.fill();
+      } else {
+        drop(r * 2.02, r * 2.64, r * .1); g.fillStyle = 'rgba(160,232,212,.6)'; g.fill(); g.strokeStyle = 'rgba(40,150,130,.5)'; g.stroke();
+        g.beginPath(); g.arc(r * 2.88, 0, r * .08, 0, 7); g.strokeStyle = hue(tOf(r * 2.9), .7, .74); g.stroke();
+        g.beginPath(); g.arc(r * 3.12, 0, r * .042, 0, 7); g.fillStyle = hue(tOf(r * 3.4), .8, .86); g.fill();
+        g.beginPath(); g.arc(r * 3.3, 0, r * .03, 0, 7); g.fill();
+      }
       g.restore();
     }
     c.c.style.cssText = 'position:absolute;left:' + (sx - hs) + 'px;top:' + (sy - hs) + 'px;width:' + hs * 2 + 'px;height:' + hs * 2 + 'px';
@@ -1358,6 +1373,7 @@
     var w = S.w, lw = LW0 * (o.lwk || 1), u = U * (o.size || 1), top = o.topFn, y, i, px, py, list = [], n, cz = o.calm, sz, dq, ne = 0, gd = [], gx,
         hang = o.hang || function (qx) { return top ? top(qx) - u * .04 : y0; };
     function inJ(qx, qy) { return (!top || qy > top(qx)) && (qx < eL(qy) || qx > eR(qy)); }
+    function inO(qx, qy) { return qx >= eL(qy) && qx <= eR(qy); }
     function calm(qy) { return cz && qy > cz[0] && qy < cz[1]; }   // neben dem Text bleiben die Pflanzen klein, damit er frei steht
     n = Math.round((w + 20) * (y1 - y0) / (u * u * .085) * (o.dens || 1));
     for (i = 0; i < n; i++) {
@@ -1367,13 +1383,15 @@
       list.push([px, py, pick(KINDS), sz, 0]);
     }
     for (gx = -u * .04; gx < w + u * .04; gx += u * rr(.13, .2)) (function (x0) {   // Lianen: leicht geschwungen, jede in ihrer Farbe
-      var p1 = R() * 6, p2 = R() * 6, a1 = u * rr(.04, .08), a2 = u * rr(.01, .025), ya = hang(x0);
-      gd.push({ fx: function (q) { return x0 + Math.sin(q / u * 2.3 + p1) * a1 + Math.sin(q / u * 5.9 + p2) * a2; }, y0: ya, y1: ya, col: R() < .25 ? pick(P_LIANA) : pick(['#2f9a4a', '#238a52', '#1f7a4a', '#4fae3f', '#178a88', '#8a5a2a']), th: U * rr(.006, .011) });   // meist grün oder braun, jede vierte bunt
+      var p1 = R() * 6, p2 = R() * 6, a1 = u * rr(.04, .08), a2 = u * rr(.01, .025), ya = hang(x0), ym = ya, q,
+          fq = function (q) { return x0 + Math.sin(q / u * 2.3 + p1) * a1 + Math.sin(q / u * 5.9 + p2) * a2; };
+      for (q = ya + 12; q < y1 + 12; q += 12) { if (inO(fq(q), q)) break; ym = q; }   // eine Liane endet, wo die Lichtung beginnt: Sie hängt nie quer durch die Öffnung zu Pflanzen weiter unten (Hugo 27.11., 22:16, rote Schlaufen)
+      gd.push({ fx: fq, y0: ya, y1: ya, ym: ym, col: R() < .25 ? pick(P_LIANA) : pick(['#2f9a4a', '#238a52', '#1f7a4a', '#4fae3f', '#178a88', '#8a5a2a']), th: U * rr(.006, .011) });   // meist grün oder braun, jede vierte bunt
     })(gx);
     list.forEach(function (p) {
       var b = null, bd = u * .5, d, k, gq;
       if (o.ground && p[1] > y1 - u * 1.25) { p[4] = 1; return; }   // nah am Boden: eigener Stiel
-      for (k = 0; k < gd.length; k++) { gq = gd[k]; if (p[1] < gq.y0 + u * .06) continue; d = Math.abs(gq.fx(p[1]) - p[0]); if (d < bd && inJ(gq.fx(p[1]), p[1])) { bd = d; b = gq; } }
+      for (k = 0; k < gd.length; k++) { gq = gd[k]; if (p[1] < gq.y0 + u * .06 || p[1] > gq.ym) continue; d = Math.abs(gq.fx(p[1]) - p[0]); if (d < bd && inJ(gq.fx(p[1]), p[1])) { bd = d; b = gq; } }
       if (b) { p[0] = b.fx(p[1]); if (p[1] > b.y1) b.y1 = p[1]; }
       else if (p[1] > (top ? top(p[0]) : y0) + u * .45) p[4] = 3;   // weder Liane noch Krone in der Nähe: diese Pflanze fällt weg (sie hinge sonst in der Luft)
     });
@@ -1505,41 +1523,58 @@
         }
       });
     });
-    // hinten: kein dunkler Grund mehr (das war der «Vorhang», Hugo 27.11., 21:22). Links steht ein breiter, gewölbter Baobab – nur oben, im Flug;
-    // im Schlussbild liegt er über dem Bildrand. Zwei Äste reichen in verschiedenen Höhen nach rechts, daran und am Blätterdach hängen die
-    // Lianen mit Blättern und Blüten (21:55). Die ganze Ebene liegt im Schatten: Die Pflanzen davor heben sich ab, in den Lücken leuchtet der Himmel.
-    var tX = S.X(mob ? .13 : .12), tW = U * (mob ? .36 : .3), tY1 = vy - H * .06, tY0 = yCb + U * .1, tH = tY1 - tY0, tC = '#c8684a', nb = 0,
+    // hinten: kein dunkler Grund mehr (das war der «Vorhang», Hugo 27.11., 21:22). Links steht ein breiter, gewölbter Baobab. Seit 22:16 reicht er
+    // bis auf die Wiese hinunter («er soll ruhig bis runter gehen, aber mehr hinter das Gebüsch, man kann ihn unten aber sehen»): Oben, im Flug,
+    // steht er breit im Bild; nach unten rückt er am Handy zum Bildrand, damit Titel und Rad frei bleiben – im Schlussbild sieht man ihn als
+    // Streifen hinter den Randpflanzen und seinen Fuss an der Wiese. Zwei Äste reichen in verschiedenen Höhen nach rechts, daran und am
+    // Blätterdach hängen die Lianen mit Blättern und Blüten (21:55). Die ganze Ebene liegt im Schatten: Die Pflanzen davor heben sich ab.
+    var tX = S.X(mob ? .13 : .12), tW = U * (mob ? .36 : .3), tYm = vy - H * .06, tY0 = yCb + U * .1, tH = tYm - tY0, tYf = vy + H * yMd, tY1 = tYf + H * .14, tC = '#c8684a', nb = 0,
+        tDx = mob ? S.X(.13) - S.X(-.02) : 0,
         bough = [[tY0 + tH * .14, S.X(1.03), yCb + U * .2, U * .16], [tY0 + tH * .46, S.X(.9), tY0 + tH * .4, U * .1]];   // je Ast: Ansatz am Stamm, Ende x, Ende y, Bogen nach oben
+    function tCx(y) { return tX - tDx * sm(vy - H * .55, vy + H * .02, y); }   // Mitte des Stamms
+    function tHw(y) {   // halbe Breite: runde Schulter, Bauch im oberen Teil, am Fuss ausgestellt
+      var sq = (y - tY0) / tH, fq = Math.max(0, tYf - y) / (U * .2);
+      return tW * (.4 + .2 * Math.exp(-Math.pow((sq - .5) / .4, 2)) + .14 * Math.exp(-fq * fq)) * Math.sqrt(clamp((y - tY0) / (U * .1), 0, 1));
+    }
     function boughY(b, qx) { var t = clamp((qx - tX) / (b[1] - tX), 0, 1); return (1 - t) * (1 - t) * b[0] + 2 * (1 - t) * t * (Math.min(b[0], b[2]) - b[3]) + t * t * b[2]; }
     function hangB(qx) { if (qx < tX + tW * .34) return topB(qx) - U * size * .04; var b = bough[nb++ % 2]; if (qx > b[1]) b = bough[0]; return boughY(b, qx); }
     TB.add(tY0 - U * .3, tY1 + 8, function (x) {
-      var i, yy, wd;
+      var i, q, wd, f, yy, len;
+      function side(f0, f1) {   // Fläche zwischen zwei Linien, die der Wölbung folgen (in Teilen der halben Breite)
+        x.beginPath(); x.moveTo(tCx(tY0) + tHw(tY0) * f0, tY0);
+        for (q = tY0 + 3; q <= tY1 + 6; q += q < tY0 + U * .1 ? 3 : 12) x.lineTo(tCx(q) + tHw(q) * f0, q);
+        for (q = tY1 + 6; q >= tY0; q -= q < tY0 + U * .1 ? 3 : 12) x.lineTo(tCx(q) + tHw(q) * f1, q);
+        x.closePath();
+      }
       bough.forEach(function (b, k) {
         wd = tW * (k ? .12 : .15);
         for (i = 0; i < 2; i++) { x.beginPath(); x.moveTo(tX, b[0]); x.quadraticCurveTo((tX + b[1]) / 2, Math.min(b[0], b[2]) - b[3], b[1], b[2]); ol(x, i ? wd : wd + lw * 2.4, i ? tC : INK); }
       });
-      function path() {   // bauchig: unten ausgestellt, in der Mitte am breitesten, oben eine runde Schulter
-        x.beginPath(); x.moveTo(tX - tW * .46, tY1);
-        x.bezierCurveTo(tX - tW * .62, tY1 - tH * .3, tX - tW * .56, tY1 - tH * .72, tX - tW * .3, tY0 + tH * .06);
-        x.quadraticCurveTo(tX - tW * .2, tY0, tX, tY0); x.quadraticCurveTo(tX + tW * .2, tY0, tX + tW * .3, tY0 + tH * .06);
-        x.bezierCurveTo(tX + tW * .56, tY1 - tH * .72, tX + tW * .62, tY1 - tH * .3, tX + tW * .46, tY1); x.closePath();
+      side(-1, 1); x.fillStyle = tC; x.fill();
+      x.save(); side(-1, 1); x.clip();
+      side(.2, 1.3); x.fillStyle = mix(tC, '#fff0c0', .3); x.fill();    // Gegenlicht: zur Sonne hin wird der Stamm in zwei Stufen heller,
+      side(.56, 1.3); x.fillStyle = mix(tC, '#fff0c0', .56); x.fill();
+      side(-1.3, -.5); x.fillStyle = mix(tC, INK, .2); x.fill();        // aussen dunkler
+      for (i = 0; i < 8; i++) {   // Rinde: lange Furchen, die dem Stamm folgen (vorher Ringe – sie sahen aus wie Mauerwerk)
+        f = -.84 + i * .24; q = tY0 + U * rr(.1, .3);
+        while (q < tY1) {
+          len = U * rr(.16, .46); x.beginPath();
+          for (yy = q; yy <= Math.min(q + len, tY1); yy += 10) { wd = tCx(yy) + tHw(yy) * f + Math.sin(yy / U * 3.1 + i * 1.7) * tW * .014; if (yy === q) x.moveTo(wd, yy); else x.lineTo(wd, yy); }
+          ol(x, lw * 1.2, f > .2 ? mix(tC, '#ffffff', .34) : mix(tC, INK, .22));
+          q += len + U * rr(.05, .16);
+        }
       }
-      path(); x.fillStyle = tC; x.fill();
-      x.save(); path(); x.clip();
-      x.fillStyle = mix(tC, '#fff0c0', .5); x.fillRect(tX + tW * .2, tY0, tW * .5, tH);   // Gegenlicht: die Seite zur Sonne ist hell
-      x.fillStyle = mix(tC, INK, .22); x.fillRect(tX - tW * .7, tY0, tW * .38, tH);
-      for (i = 1; i <= 9; i++) { yy = tY1 - tH * i / 10; x.beginPath(); x.moveTo(tX - tW, yy + tW * .06); x.quadraticCurveTo(tX, yy - tW * .1, tX + tW, yy + tW * .06); ol(x, lw * 1.6, i % 2 ? mix(tC, '#ffffff', .26) : mix(tC, INK, .16)); }
-      x.restore(); path(); ol(x, lw * 1.2);
-      [[.2, 1, 3], [.44, -1, 6], [.7, 1, 9]].forEach(function (q) { orchidSpray(x, tX + q[1] * tW * .2, tY0 + tH * q[0], q[1], U * size * .9, q[2], [q[2] === 6 ? pick(P_FLOWER) : '#f6f2ff', '#ffd75e'], lw); });   // Orchideen am Stamm: Rispen zu 3, 6 und 9 Blüten
+      x.restore(); side(-1, 1); ol(x, lw * 1.2);
+      [[.2, 1, 3], [.44, -1, 6], [.7, 1, 9]].forEach(function (q) { var oy = tY0 + tH * q[0]; orchidSpray(x, tCx(oy) + q[1] * tHw(oy) * .34, oy, q[1], U * size * .9, q[2], [q[2] === 6 ? pick(P_FLOWER) : '#f6f2ff', '#ffd75e'], lw); });   // Orchideen am Stamm: Rispen zu 3, 6 und 9 Blüten
     });
     function pushB(y) { return U * .07 * clamp((y - yAb) / (U * .3), 0, 1); }   // an den Seiten bleibt die hintere Ebene hinter dem Rahmen davor (oben am Bogen sieht man sie als zweiten Bogen)
-    plants(TB, yCb, bot, function (y) { return eLb(y) - pushB(y); }, function (y) { return eRb(y) + pushB(y); }, { size: size * 1.05, dens: 1.15, topFn: topB, hang: hangB,
+    plants(TB, yCb, bot, function (y) { return eLb(y) - pushB(y); }, function (y) { return eRb(y) + pushB(y); }, { size: size * 1.05, dens: mob ? 1.45 : 1.3, topFn: topB, hang: hangB,
       calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75],   // neben dem Text bleiben auch hier die Pflanzen klein
-      skip: function (qx, qy) { return qy > tY0 && qy < tY1 - tH * .12 && Math.abs(qx - tX) < tW * .34 && R() < .9; } });   // vor dem Stamm stehen kaum Pflanzen: man soll ihn sehen
+      skip: function (qx, qy) { return qy > tY0 && qy < tYm - tH * .12 && Math.abs(qx - tCx(qy)) < tHw(qy) * .6 && R() < .5; } });   // vor dem Stamm steht nur die Hälfte der Pflanzen: er liegt hinter dem Gebüsch, bleibt aber zu erkennen
     TB.add(yCb - U, bot + 4, function (x) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(30,28,96,.36)'; x.fillRect(-20, yCb - U * 2, w + 40, bot - yCb + U * 3); });   // Schatten über allem, was auf dieser Ebene gemalt ist
     // davor: Pflanzen und Blüten
-    plants(S, yC, bot, eL, eR, { size: size, dens: 1.15, topFn: topFn, calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75], sway: [vy - H * .06, mob ? 4 : 1], ground: 1,
-      skip: function (qx, qy) { return qy > tY0 + U * .05 && qy < tY1 - tH * .1 && Math.abs(qx - tX) < tW * .3 && R() < .7; } });   // am Handy steht der Titel ganz oben: auch dort bleiben die Randpflanzen klein
+    plants(S, yC, bot, eL, eR, { size: size, dens: mob ? 1.5 : 1.3, topFn: topFn, calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75], sway: [vy - H * .06, mob ? 4 : 1], ground: 1,
+      skip: function (qx, qy) { return qy > tY0 + U * .05 && qy < tYm - tH * .1 && Math.abs(qx - tCx(qy)) < tHw(qy) * .5 && R() < .35; } });   // am Handy steht der Titel ganz oben: auch dort bleiben die Randpflanzen klein
     // Lianen und Ranken hängen vom Bogen in die Lichtung und wiegen sich; viele tragen Blüten.
     // Über dem Titel bleiben sie kurz, aussen neben dem Text dürfen sie lang herunterhängen.
     for (i = 0; i < (mob ? 8 : 18); i++) (function (i) {
@@ -1553,13 +1588,17 @@
       if (SWAY && y0 + len > vy - H * .1) S.sway(px, y0, (len + r0 * 4 + 16) / 2, 1, fn, amp + r0 * 3.6 + 16); else S.add(y0 - 4, y0 + len + r0 * 4 + 12, fn);
     })(i);
     // vorn: einzelne grosse Pflanzen dicht vor der Kamera. Sie liegen nur über dem dichten Urwald, nie frei vor Himmel oder Lichtung
-    var nf = Math.round(w * H * .6 / Math.pow(U * size * 1.3, 2) / .42), fl2 = [];
-    for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.3, -.7), pick([0, 1, 9, 7, 3, 10, 13, 14, 16, 12]), rr(1.1, 1.6)]);
+    var nf = Math.round(w * H * .72 / Math.pow(U * size * 1.3, 2) / .42 * 1.6), fl2 = [];   // seit 27.11., 22:16 rund doppelt so viele und grösser, vor allem Blätter (Hugo: «die Blätter ganz nah am Display fand ich super»)
+    for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.32, -.6), pick([0, 0, 1, 9, 9, 7, 7, 3, 10, 13, 14, 16, 12]), rr(1.2, 1.9)]);
     fl2.sort(function (a, b) { return a[1] - b[1]; });
     exotic(fl2, 11, .6, .5);
     fl2.forEach(function (q) {   // jede steht auf einem langen Stiel, der unten aus dem Urwald kommt (von oben gehängt, ragten die Lianen in den Himmel)
-      var th = U * rr(.011, .017), col = pick(Z_GREEN), yb = q[1] + U * rr(1.1, 1.5), fx = function (y) { return q[0] + Math.sin((y - q[1]) / U * 2.4) * U * .05; };
-      TF.add(q[1] - 4, yb + 4, function (x) { var y; x.beginPath(); x.moveTo(q[0], q[1]); for (y = q[1] + 10; y < yb; y += 10) x.lineTo(fx(y), y); ol(x, th + lw * 1.8); ol(x, th, col); ol(x, th * .3, mix(col, '#ffffff', .45)); });
+      var th = U * rr(.008, .013), col = pick(Z_GREEN), yb = q[1] + U * rr(1.1, 1.5), ph = R() * 6, fx = function (y) { return q[0] + Math.sin((y - q[1]) / U * 2.4) * U * .05 + Math.sin((y - q[1]) / U * 6.1 + ph) * U * .012; };
+      TF.add(q[1] - 4, yb + 4, function (x) {   // Stiel mit Blättchen (27.11., 22:16: als kahle Stange wirkte er wie ein Stab)
+        var y, k = 0, sd;
+        x.beginPath(); x.moveTo(q[0], q[1]); for (y = q[1] + 10; y < yb; y += 10) x.lineTo(fx(y), y); ol(x, th + lw * 1.8); ol(x, th, col); ol(x, th * .3, mix(col, '#ffffff', .45));
+        for (y = q[1] + U * rr(.16, .22); y < yb - U * .04; y += U * rr(.09, .15)) { sd = k++ % 2 ? 1 : -1; leaf(x, { x: fx(y), y: y, a: -Math.PI / 2 + sd * rr(.85, 1.2), len: U * rr(.05, .075), wid: U * rr(.017, .024), bend: sd * .15, col: R() < .2 ? pick(Z_TEAL) : col, lw: lw * .8 }); }
+      });
       plant(TF, q[0], q[1], q[2], lw * 1.15, U * size * q[3]);
     });
 
@@ -1655,7 +1694,7 @@
     });
   }
   function flyLeaves() {   // grosse Wedel ziehen kurz vor der Landung dicht an der Kamera vorbei
-    [[.3, 0, .5, 2.1], [.25, 1, .4, 2.4], [.18, 0, .6, 2], [.13, 1, .5, 2.6], [.08, 0, .35, 2.2]].forEach(function (d) {
+    [[.3, 0, .5, 2.1], [.25, 1, .4, 2.4], [.18, 0, .6, 2], [.13, 1, .5, 2.6], [.08, 0, .35, 2.2], [.36, 1, .62, 2.3], [.22, 0, .22, 2.5], [.16, 1, .78, 2.2], [.11, 0, .68, 2.7]].forEach(function (d) {   // neun statt fünf (27.11., 22:16)
       var s = U * rr(.9, 1.3), z = pick([Z_PURP, Z_TEAL, Z_GREEN, Z_MAG, Z_BLUE]);
       flyer(s, s, d[3], d[0], d[1] ? W - s * .1 : s * .1, d[2], function (x, w, h) {
         frond(x, { x: d[1] ? w * .97 : w * .03, y: h * .5, a: d[1] ? Math.PI : 0, spread: 2.2, n: 9, len: w * .8, wid: w * .05, droop: .3, cols: z, lw: LW0 * 1.6, rib: 1 });
@@ -1768,7 +1807,7 @@
       c.c.style.cssText = 'width:' + rw + 'px;height:' + rh + 'px;left:' + (-W * .15) + 'px;top:' + (-rpad) + 'px;transform-origin:' + (gsx + W * .15) + 'px ' + (gsy + rpad) + 'px;' + (reduce ? '' : 'animation:' + (i ? 'akRayB 19s' : 'akRayA 15s') + ' ease-in-out infinite;');
       rays.appendChild(c.c);
     });
-    world.insertBefore(rays, S2.el);   // hinter den vorderen Pflanzen (seit 27.11., 21:55): Die Strahlen leuchten durch die Lücken, statt als Schleier über allem zu liegen
+    world.appendChild(rays);   // wieder über allem, wie bis 27.11., 21:55
     // Lichtflecken auf der Wiese: ein Bild, das langsam wandert
     dapple = document.createElement('div'); dapple.className = 'ak-dapple';
     var dc = canvas(W, H, .5);
@@ -2467,7 +2506,8 @@
     // <test> Haken für die Prüfskripte (nur mit #ak-test; tools/build.sh lässt alles zwischen den Markierungen in der ausgelieferten Datei weg)
     if (location.hash === '#ak-test') {   // nur für Tests: Standbild bei Fortschritt u; Kamera von Hand an eine Stelle setzen
       window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = tgY = camT * (1 - swing(u)); if (u >= .92) { reveal(); tStart = Math.min(tStart, performance.now() - 1000); } raf = 0; frameOnce(); };
-      window.__akSunStill = function () { sunRC = null; };   // Messung: Strahlen der Sonne nicht mehr neu malen
+      window.__akSunStill = function () { sunRC = null; };
+      window.__akNoLeaves = function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); };   // wie 3,2 s nach der Landung: die grossen Wedel des Flugs sind weg   // Messung: Strahlen der Sonne nicht mehr neu malen
       window.__akDraw = function (x, k, px, py, u, seed) { R = rng(seed || k * 7 + 1); plant({ add: function (a, b, fn) { fn(x); } }, px, py, k, LW0, u); };   // eine Pflanze einzeln malen (Musterblatt)
       window.__akPan = function (fy) { stop(); run = true; flown = true; fl = null; reveal(); tStart = Math.min(tStart, performance.now() - 1000); cam = tgY = clamp(fy, 0, 1) * camT; raf = 0; frameOnce(); return [sways.length, fliers.length]; };
     }
