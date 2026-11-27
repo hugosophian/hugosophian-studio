@@ -665,12 +665,13 @@
   // ---------- Szene ----------
   var world, strips = [], sprites = [], fliers = [], rays, dapple, glow, flare, sheen, fxC, fxX, W = 0, H = 0, U = 0, LW0 = 2, mob = false,
       camRef = 0, camT = 0, cam = 0, QF = 1, veil = null, veilW = 0, veilV = 0, veilQ = -1, openHW = function () { return 1e6; },
-      HX = 0, SR = 30, HOR = .385, SHO = .427, LT = { lead: 0, band: 0, capB: 0, contact: 0 },
+      HX = 0, SR = 30, HOR = .385, SHO = .427, LT = { title: 0, lead: 0, band: 0, capB: 0, contact: 0 },
       SUN = [.5, .325];   // Sonne im Schlussbild (Anteil von Breite und Höhe): tief über dem See, zwischen Slogan und Rad (wird aus dem Layout berechnet)
   // Das Bild richtet sich nach dem Text: wo Slogan, Rad und Kontakte wirklich stehen (auf jedem Gerät anders), dort liegen Sonne, See und Unterholz
   function topOf(el) { var y = 0; while (el && el !== root) { y += el.offsetTop; el = el.offsetParent; } return y; }
   function measureLayout() {
-    var lead = root.querySelector('.ak-lead'), con = root.querySelector('.ak-contact'), rh = items.length ? (items[0].offsetHeight || 40) : 40;
+    var lead = root.querySelector('.ak-lead'), con = root.querySelector('.ak-contact'), ttl = root.querySelector('.ak-title'), rh = items.length ? (items[0].offsetHeight || 40) : 40;
+    LT.title = ttl ? topOf(ttl) : H * .1;
     LT.lead = lead ? topOf(lead) + lead.offsetHeight : H * .27;
     LT.band = wheel ? topOf(wheel) + (wheel.clientHeight - rh) / 2 : H * .43;
     LT.capB = cap ? topOf(cap) + cap.offsetHeight : H * .62;
@@ -903,7 +904,7 @@
   // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese.
   // SB = Grund mit Bändern und Lianen (weiter hinten), S = Pflanzen und Wiese, SF = einzelne Pflanzen dicht vor der Kamera
   function sceneMain(S, SB, SF) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .43 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .36, yB = vy + H * (mob ? .085 : .02), yU = vy + LT.contact - H * .01, yMd = SHO + .14,
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .43 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .36, yB = vy + (mob ? clamp(LT.title - H * .02, -H * .02, H * .085) : H * .02), yU = vy + LT.contact - H * .01, yMd = SHO + .14,   // am Handy ist die Öffnung ab dem Titel ganz breit
         yCb = vy - H * .78, yAb = vy - H * .2, p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; },
         size = mob ? .7 : .82, TB = onto(SB, S), TF = onto(SF, S);
     // Öffnung der Lichtung, wie ein Fenster durch den Urwald (Hugo 13:21): oben ein spitzer Bogen, neben dem Text ein schmaler Rahmen,
