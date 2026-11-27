@@ -11,8 +11,9 @@
    Bild still, und nur der Text der kurzen Website blendet darüber ein (dunkle Schrift auf Himmel und Wiese).
 
    VON HAND (Hugo 27.11., 11:02 und 11:50): Ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in
-   den Urwald (Parallax geschmeidig) und wieder nach oben bis in den Himmel. Liegt Urwald hinter dem Text, legt sich ein
-   weicher Perlmutt-Schein dahinter. Der Urwald hat Tiefe: Bänder und Lianen hinten (immer leicht unterwegs), Pflanzen davor. Das Rad scrollt die Services, mit Parallax
+   den Urwald (dezent und weich) und wieder nach oben bis in den Himmel. Hinter der Mitte des Rads und der Beschreibung liegt
+   ein weiches helles Feld, über dem Urwald kräftiger. Das Bild richtet sich nach dem Text: Sonne, See und Unterholz liegen
+   dort, wo Slogan, Rad und Kontakte auf dem jeweiligen Gerät wirklich stehen (gemessen an der sichtbaren Höhe). Der Urwald hat Tiefe: Bänder und Lianen hinten (immer leicht unterwegs), Pflanzen davor. Das Rad scrollt die Services, mit Parallax
    dort, wo die Kamera gerade steht. Der Wald lebt: Randpflanzen und Ranken wiegen sich, die Wolken ziehen, der Blick
    treibt leicht.
 
@@ -46,8 +47,9 @@
     pointer: 1,           // Maus / Finger bewegt die Ebenen (0 = aus)
     scrollPan: 1,         // Scrollen im Rad schiebt den Wald (0 = aus)
     freePan: 1,           // die ganze Szene lässt sich von Hand verschieben: zurück nach oben und seitlich (0 = aus)
-    panX: [.16, .08],     // so weit geht es seitlich, als Anteil der Breite: Handy, Computer (Hugo 11:50: Parallax halbiert, geschmeidig)
-    veil: .82,            // Lese-Schleier: heller Schein hinter dem Text, sobald Urwald dahinter liegt (0 = aus)
+    panX: [.09, .05],     // so weit geht es seitlich, als Anteil der Breite: Handy, Computer (Hugo 13:19: dezent und weich wie am Anfang)
+    panSoft: 420,         // so weich zieht die Kamera dem Finger nach (Millisekunden; grösser = weicher)
+    veil: [.34, .88],     // weiches Feld hinter Rad-Mitte und Beschreibung: Deckkraft in der Lichtung, Deckkraft über dem Urwald (0 = aus)
     sway: 1,              // Wedel am Rand und Ranken wiegen sich im Wind (0 = aus)
     fireflies: 9,         // Glühwürmchen (Hugo 27.11., 08:46: nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
@@ -96,12 +98,14 @@
     '.ak-world > * { position: absolute; pointer-events: none; }',
     '.ak-layer, .ak-sprite, .ak-shade, .ak-glow { left: 0; top: 0; will-change: transform; transform-origin: 0 0; }',
     '.ak-shade { opacity: .2; }',
-    '.ak-sway { position: absolute; will-change: transform; }',
+    /* Wiegen im Wind: läuft als CSS-Animation direkt auf der Grafikkarte (kein Rechnen im Takt); steht still, wenn die Kamera weit oben ist */
+    '.ak-sway { position: absolute; will-change: transform; animation: akSway 8s ease-in-out infinite alternate; }',
+    '@keyframes akSway { from { transform: rotate(calc(var(--a) * -1)); } to { transform: rotate(var(--a)); } }',
+    '.ak-far .ak-sway { animation-play-state: paused; }',
     /* Lesbarkeit: die kleinen Texte tragen einen feinen hellen Schein (der Titel nicht: er hat den Perlmutt-Verlauf) */
     '[data-ak] .ak-kicker, [data-ak] .ak-lead, [data-ak] [data-ak-item], [data-ak] [data-ak-caption], [data-ak] .ak-long { text-shadow: 0 0 9px rgba(255,255,255,.8), 0 0 2px rgba(255,255,255,.55); }',
-    /* Lese-Schleier: weiches Perlmutt-Licht hinter dem Text; nur so stark, wie Urwald dahinter liegt */
-    '.ak-veil { position: absolute; z-index: 5; pointer-events: none; opacity: 0; border-radius: 44px; will-change: opacity;',
-    '  background: linear-gradient(168deg, rgb(240,249,252), rgb(246,243,252) 50%, rgb(253,247,243)); box-shadow: 0 0 30px 18px rgb(246,244,251); }',
+    /* ein einziges weiches Feld hinter der Mitte des Rads und der Beschreibung (Hugo 13:19); fertig gemaltes Bild ohne Kanten */
+    '.ak-veil { position: absolute; z-index: 5; pointer-events: none; opacity: 0; will-change: opacity; }',
     /* Licht: fertig gemalte Bilder mit normaler Deckkraft. Kein Mischmodus, keine Masken – die bremsten das Handy bei der Landung */
     '.ak-rays { left: 0; top: 0; will-change: transform; }',
     '.ak-rays canvas { position: absolute; left: 0; top: 0; will-change: opacity; }',
@@ -110,7 +114,7 @@
     '.ak-dapple { left: 0; top: 0; will-change: transform; }',
     '.ak-dapple canvas { position: absolute; left: 0; top: 0; will-change: transform, opacity; }',
     '@keyframes akSpot { 0%, 100% { transform: translate3d(0,0,0); opacity: 1; } 50% { transform: translate3d(18px,-12px,0); opacity: .65; } }',
-    '.ak-fx { inset: 0; width: 100%; height: 100%; z-index: 9; }',
+    '.ak-fx { left: 0; top: 0; z-index: 9; }',
     '.ak-flare { inset: 0; z-index: 10; }',
     '.ak-flare i { position: absolute; border-radius: 50%; will-change: transform; }',
     '.ak-sheen { inset: -30%; z-index: 11; will-change: transform;',
@@ -149,7 +153,7 @@
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
     'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
-    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
+    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -357,6 +361,113 @@
       }
     }
   }
+  // noch mehr Arten (Hugo 27.11., 13:19: «noch diversere Blumen», angeregt von Urwaldpflanzen – Hummerschere, Fackelingwer, Protea,
+  // Nadelkissen, Orchidee, Flamingoblume, Paradiesvogelblume, Bromelie – und von abstrakter, geometrischer Ornamentik; frei gezeichnet)
+  var PHI = 1.618034, GA = 2.399963;   // Goldener Schnitt und Goldener Winkel (137.5°): so setzt die Natur Kerne und Blätter
+  function lens(x, cx, cy, a, r0, r1, h, col, lw, line) {   // Mandelform (Vesica) entlang eines Strahls
+    var m = (r0 + r1) / 2;
+    x.save(); x.translate(cx, cy); x.rotate(a);
+    x.beginPath(); x.moveTo(r0, 0); x.quadraticCurveTo(m, -h * 2, r1, 0); x.quadraticCurveTo(m, h * 2, r0, 0); x.closePath(); x.fillStyle = col; x.fill(); ol(x, lw, line);
+    x.restore();
+  }
+  function stalk(x, px, py, len, lw) { x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + len * rr(-.25, .25), py + len * .6, px + len * rr(-.18, .18), py + len); ol(x, lw * 3.2); ol(x, lw * 1.6, '#3fae6a'); }
+  function heliconia(x, px, py, len, cols, lw) {   // hängende Kette aus Kahn-Blättern im Zickzack
+    var n = 5 + Math.floor(R() * 4), st = len / n, d = R() < .5 ? 1 : -1, pts = [[px, py - len * .12]], i;
+    for (i = 0; i <= n; i++) pts.push([px + (i % 2 ? 1 : -1) * st * .16, py + i * st]);
+    polyline(x, pts); ol(x, lw * 3); ol(x, lw * 1.4, '#3fae6a');
+    for (i = 0; i < n; i++) {
+      var sd = (i % 2 ? 1 : -1) * d, k = 1 - i / n * .45, q = pts[i + 1];
+      stripe(x, q[0], q[1], Math.PI / 2 - sd * 1.05, st * 1.3 * k, st * .36 * k, sd * .28, i % 2 ? cols[0] : mix(cols[0], '#ffffff', .14), lw * .85, 0, .2);
+      stripe(x, q[0], q[1], Math.PI / 2 - sd * 1.05, st * .85 * k, st * .12 * k, sd * .28, cols[1], lw * .5, 0, .2);
+    }
+  }
+  function torch(x, px, py, r, cols, lw) {   // Fackel: Kegel aus Schuppen über einem Kranz langer Blätter
+    var i, t;
+    stalk(x, px, py + r * .15, r * 1.3, lw);
+    for (i = 0; i < 7; i++) { t = i / 6 - .5; stripe(x, px, py + r * .15, -Math.PI / 2 + t * 2.9, r * .95, r * .2, t * .7, i % 2 ? cols[0] : mix(cols[0], INK, .12), lw * .85, 0, .5); }
+    [4, 4, 3, 2, 1].forEach(function (m, j) {
+      for (var q = 0; q < m; q++) { var u = m > 1 ? q / (m - 1) - .5 : 0; stripe(x, px + u * r * (.62 - j * .1), py - j * r * .2, -Math.PI / 2 + u * .5, r * .36, r * .13, 0, (q + j) % 2 ? cols[1] : mix(cols[1], '#ffffff', .28), lw * .7, 0, .9); }
+    });
+  }
+  function protea(x, px, py, r, cols, lw) {   // Kelch aus spitzen Hüllblättern, in der Mitte eine Kuppel aus feinen Strahlen
+    var a, i;
+    stalk(x, px, py, r * 1.2, lw);
+    [0, 10, 1, 9, 2, 8, 3, 7, 4, 6, 5].forEach(function (i) { var t = i / 10 - .5; stripe(x, px, py, -Math.PI / 2 + t * 2.3, r * (1 - Math.abs(t) * .3), r * .16, t * .25, i % 2 ? cols[0] : mix(cols[0], '#ffffff', .22), lw * .8, 1, .12); });
+    x.beginPath(); x.ellipse(px, py - r * .32, r * .36, r * .3, 0, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .8);
+    for (i = 0; i < 9; i++) { a = -Math.PI / 2 + (i / 8 - .5) * 2.2; x.beginPath(); x.moveTo(px + Math.cos(a) * r * .1, py - r * .32 + Math.sin(a) * r * .08); x.lineTo(px + Math.cos(a) * r * .32, py - r * .32 + Math.sin(a) * r * .27); ol(x, lw * .6, '#fff6c8'); }
+  }
+  function pincushion(x, cx, cy, r, cols, lw) {   // Nadelkissen: Kugel, rundherum feine Griffel mit Perlen (im Goldenen Winkel verteilt)
+    var a0 = R() * 6, i, a, L, d;
+    for (i = 0; i < 21; i++) {
+      a = a0 + i * GA; L = r * (.72 + (i % 3) * .14);
+      x.beginPath(); x.moveTo(cx + Math.cos(a) * r * .3, cy + Math.sin(a) * r * .3); x.quadraticCurveTo(cx + Math.cos(a + .25) * L * .7, cy + Math.sin(a + .25) * L * .7, cx + Math.cos(a) * L, cy + Math.sin(a) * L); ol(x, lw * 2.2); ol(x, lw, cols[0]);
+      x.beginPath(); x.arc(cx + Math.cos(a) * L, cy + Math.sin(a) * L, r * .06, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .5);
+    }
+    x.beginPath(); x.arc(cx, cy, r * .36, 0, 7); x.fillStyle = cols[0]; x.fill(); ol(x, lw * .8);
+    for (i = 1; i <= 13; i++) { a = i * GA; d = r * .3 * Math.sqrt(i / 13); x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * .035, 0, 7); x.fillStyle = cols[1]; x.fill(); }
+  }
+  function phiFlower(x, cx, cy, r, cols, lw) {   // Blüte nach dem Goldenen Winkel: jedes Blütenblatt und jeder Kern sitzt 137.5° weiter (wie bei der Sonnenblume)
+    var i, a, d;
+    for (i = 21; i >= 1; i--) stripe(x, cx, cy, i * GA, r * (.62 + .38 * i / 21), r * .15, 0, i % 3 ? cols[0] : mix(cols[0], '#ffffff', .3), lw * .75, 0, .5);
+    x.beginPath(); x.arc(cx, cy, r * .4, 0, 7); x.fillStyle = cols[2]; x.fill(); ol(x, lw * .8);
+    for (i = 1; i <= 34; i++) { a = i * GA; d = r * .36 * Math.sqrt(i / 34); x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.022 + .02 * i / 34), 0, 7); x.fillStyle = cols[1]; x.fill(); }
+  }
+  function mandala(x, cx, cy, r, cols, lw) {   // geometrische Blüte: Mandelblätter in zwei Kränzen auf dunklem Grund, dazwischen Perlen
+    var n = R() < .5 ? 6 : 8, a0 = R() * 6, i, a;
+    x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fillStyle = mix(cols[0], INK, .5); x.fill(); ol(x, lw * .9);
+    for (i = 0; i < n; i++) lens(x, cx, cy, a0 + i / n * 6.2832, 0, r * .95, r * .2, cols[0], lw * .75);
+    for (i = 0; i < n; i++) { a = a0 + (i + .5) / n * 6.2832; lens(x, cx, cy, a, 0, r * .6, r * .13, mix(cols[0], '#ffffff', .35), lw * .65); x.beginPath(); x.arc(cx + Math.cos(a) * r * .78, cy + Math.sin(a) * r * .78, r * .06, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .5); }
+    x.beginPath(); x.arc(cx, cy, r * .16, 0, 7); x.fillStyle = cols[1]; x.fill(); ol(x, lw * .7);
+  }
+  function orchid(x, cx, cy, r, cols, lw) {   // drei schmale und zwei breite Blütenblätter, unten eine getupfte Lippe
+    var a0 = rr(-.4, .4), i;
+    for (i = 0; i < 3; i++) stripe(x, cx, cy, a0 - Math.PI / 2 + i * 2.0944, r, r * .13, 0, mix(cols[0], '#ffffff', .28), lw * .8, 1, .15);
+    for (i = -1; i <= 1; i += 2) stripe(x, cx, cy, a0 - Math.PI / 2 + i * 1.15, r * .86, r * .34, i * .1, cols[0], lw * .85, 0, 1);
+    x.save(); x.translate(cx, cy); x.rotate(a0);
+    x.beginPath(); x.moveTo(-r * .12, r * .05); x.bezierCurveTo(-r * .5, r * .2, -r * .42, r * .62, -r * .12, r * .6); x.quadraticCurveTo(0, r * .78, r * .12, r * .6); x.bezierCurveTo(r * .42, r * .62, r * .5, r * .2, r * .12, r * .05); x.closePath();
+    x.fillStyle = cols[1]; x.fill(); ol(x, lw * .85);
+    for (i = 0; i < 5; i++) { x.beginPath(); x.arc((i - 2) * r * .08, r * (.3 + (i % 2) * .12), r * .03, 0, 7); x.fillStyle = INK; x.fill(); }
+    x.beginPath(); x.arc(0, 0, r * .12, 0, 7); x.fillStyle = '#ffd75e'; x.fill(); ol(x, lw * .7);
+    x.restore();
+  }
+  function heartLeaf(x, px, py, r, cols, lw) {   // Herzblatt mit Kolben
+    stalk(x, px, py, r * 1.1, lw);
+    x.save(); x.translate(px, py); x.rotate(rr(-.6, .6));
+    x.beginPath(); x.moveTo(0, r * .12); x.bezierCurveTo(-r * .5, r * .5, -r, -r * .1, 0, -r); x.bezierCurveTo(r, -r * .1, r * .5, r * .5, 0, r * .12); x.closePath(); x.fillStyle = cols[0]; x.fill(); ol(x, lw * .9);
+    x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(-r * .06, -r * .5, 0, -r * .86); ol(x, lw * .6, mix(cols[0], '#ffffff', .4));
+    x.restore();
+    stripe(x, px, py + r * .04, -Math.PI / 2 + rr(.15, .4), r * .62, r * .075, .1, cols[1], lw * .7, 0, 1);
+  }
+  function crane(x, px, py, r, cols, lw) {   // Schnabel-Hüllblatt, daraus steigen spitze Blütenblätter und ein blauer Pfeil
+    var d = R() < .5 ? 1 : -1, i;
+    stalk(x, px - d * r * .2, py + r * .05, r * 1.1, lw);
+    for (i = 0; i < 4; i++) stripe(x, px + d * r * .1 * i, py, -Math.PI / 2 + d * (.55 - i * .32), r * (1 - i * .08), r * .13, -d * .1, i % 2 ? mix(cols[0], '#ffffff', .22) : cols[0], lw * .8, 1, .1);
+    stripe(x, px + d * r * .05, py, -Math.PI / 2 + d * .9, r * .7, r * .08, 0, cols[1], lw * .8, 0, .05);
+    stripe(x, px - d * r * .25, py + r * .05, d > 0 ? -.12 : Math.PI + .12, r * .95, r * .2, d * .12, cols[2], lw * .85, 0, .15);
+  }
+  function bromeliad(x, px, py, r, cols, lw, z) {   // Trichter aus Bogenblättern, in der Mitte eine Ähre
+    var j;
+    [0, 8, 1, 7, 2, 6, 3, 5, 4].forEach(function (i) { var t = i / 8 - .5; stripe(x, px, py, -Math.PI / 2 + t * 2.7, r * (1 - Math.abs(t) * .25), r * .13, t * 1.2, z[i % z.length], lw * .85, 1, .15); });
+    for (j = 5; j >= 0; j--) [-1, 1].forEach(function (sd) { stripe(x, px, py - r * (.12 + j * .13), -Math.PI / 2 + sd * (.85 - j * .1), r * (.3 - j * .03), r * .09, 0, j % 2 ? cols[0] : mix(cols[0], '#ffffff', .25), lw * .7, 0, .3); });
+    stripe(x, px, py - r * .8, -Math.PI / 2, r * .24, r * .07, 0, cols[1], lw * .7, 0, .3);
+  }
+  // hängende Liane mit Blattpaaren und kleinen Blüten, am Ende eine grosse Blüte (Hugo 13:21: «Lianen, die runter hängen und sich bewegen, mit Blumen»)
+  function flowerVine(x, px, y0, len, amp, lw) {
+    var pts = [], n = 18, ph = R() * 6, r0 = Math.max(7, Math.min(len * .05, U * .034)), col = pick(Z_GREEN), fc = pick(P_FLOWER), ac = pick(P_ACC), i, t, p, sd, e;
+    for (i = 0; i <= n; i++) { t = i / n; pts.push([px + Math.sin(t * 4.4 + ph) * amp * t, y0 + len * t]); }
+    smooth(x, pts); ol(x, lw * 3.6); ol(x, lw * 1.9, col);
+    for (i = 2; i < n; i += 2) {
+      p = pts[i]; sd = i % 4 ? 1 : -1;
+      leaf(x, { x: p[0], y: p[1], a: Math.PI / 2 + sd * 1.05, len: r0 * 1.8, wid: r0 * .5, bend: sd * .15, col: col, lw: lw * .8 });
+      if (i % 6 === 0) starFlower(x, p[0] - sd * r0 * 1.3, p[1], r0 * 1.15, [fc, ac], lw * .7);
+      else if (i % 6 === 4) flowerB(x, p[0] - sd * r0 * 1.2, p[1], r0 * .75, pick(P_FLOWER), lw * .7);
+    }
+    e = pts[n]; t = Math.floor(R() * 4);
+    if (t === 0) bloom(x, e[0], e[1] + r0 * 1.3, r0 * 2.3, fc, lw);
+    else if (t === 1) hibiscus(x, e[0], e[1] + r0 * 1.3, r0 * 2.2, [fc, pick(Z_MAG)], lw);
+    else if (t === 2) orchid(x, e[0], e[1] + r0 * 1.2, r0 * 2.2, [fc, ac], lw);
+    else dahlia(x, e[0], e[1] + r0 * 1.3, r0 * 2.1, [fc, ac], lw);
+  }
   function disc(x, cx, cy, r, cols, lw) {   // Auge: Ringe ineinander
     for (var i = 0; i < cols.length; i++) { x.beginPath(); x.arc(cx, cy, r * (1 - i / cols.length * .86), 0, 7); x.fillStyle = cols[i]; x.fill(); ol(x, lw * (i ? .7 : 1)); }
   }
@@ -427,46 +538,58 @@
   }
   function cloudLook(s) { var v = pick([['#fff3f6', '#f7c4d8'], ['#f2f0ff', '#cfd0fb'], ['#fff7ec', '#ffd6ac'], ['#f6efff', '#e0c8f8'], ['#eefaff', '#bfe6fb'], ['#eefaff', '#bfe6fb']]);
     return { n: 3 + Math.floor(R() * 3), lw: Math.max(1, s * .03), line: 'rgba(86,104,206,.75)', rim: '#ffffff', inF: 'rgba(255,255,255,.38)', c0: v[0], c2: v[1] }; }
-  // Sonne (eigene Gestaltung): Flammenstrahlen, Kranz aus Steinen, Perlenring, Schnecke
+  // Sonne (eigene Gestaltung; Hugo 27.11., 13:19: noch mehr Ornamente, gern nach heiliger Geometrie und Goldenem Schnitt):
+  // Die Ringe verkleinern sich nach innen im Goldenen Schnitt (jeder Radius = der vorige durch √φ), die Zahlen der Teile stammen
+  // aus der Fibonacci-Reihe (8, 13, 21, 34), und in der Mitte liegt die «Saat des Lebens» aus sieben Kreisen.
   function sun(x, cx, cy, r, lw) {
-    var L = '#a8431a', i;
-    for (i = 0; i < 24; i++) {
-      x.save(); x.translate(cx, cy); x.rotate(i / 24 * Math.PI * 2);
-      if (i % 2) stone(x, r * 1.44, 0, r * .3, r * .15, '#f59a3a', { lw: lw * .8, line: L, kind: 9, r: .45, j: 0 });
-      else {
-        x.beginPath(); x.moveTo(r * 1.16, -r * .12); x.quadraticCurveTo(r * 1.65, -r * .13, r * 2.05, 0); x.quadraticCurveTo(r * 1.65, r * .13, r * 1.16, r * .12); x.closePath();
+    var L = '#a8431a', A = 1.22, q = Math.sqrt(PHI), R1 = A / q, R2 = A / PHI, R3 = R2 / q, R4 = R2 / PHI, R5 = R4 / q, rho = r * R5 / 2 * .97, i, a;
+    function at(ang, fn) { x.save(); x.translate(cx, cy); x.rotate(ang); fn(); x.restore(); }
+    function ring(rad, col) { x.beginPath(); x.arc(cx, cy, r * rad, 0, 7); x.fillStyle = col; x.fill(); ol(x, lw, L); }
+    for (i = 0; i < 26; i++) at(i / 26 * 6.2832 - Math.PI / 2, function () {   // 13 Flammen, dazwischen 13 Blätter mit Perle
+      if (i % 2 === 0) {
+        x.beginPath(); x.moveTo(r * 1.18, -r * .13); x.quadraticCurveTo(r * 1.6, -r * .15, r * 1.95, 0); x.quadraticCurveTo(r * 1.6, r * .15, r * 1.18, r * .13); x.closePath();
         x.fillStyle = i % 4 ? '#ffd75e' : '#f7c948'; x.fill(); ol(x, lw * .8, L);
-        x.beginPath(); x.moveTo(r * 1.26, 0); x.lineTo(r * 1.78, 0); ol(x, lw * .6, '#f59a3a');
+        x.beginPath(); x.moveTo(r * 1.28, 0); x.lineTo(r * 1.7, 0); ol(x, lw * .6, '#f59a3a');
+      } else {
+        stone(x, r * 1.42, 0, r * .34, r * .17, '#f59a3a', { lw: lw * .8, line: L, kind: 9, r: .48, j: 0 });
+        x.beginPath(); x.arc(r * 1.7, 0, r * .05, 0, 7); x.fillStyle = '#2bb6a0'; x.fill(); ol(x, lw * .5, L);
       }
-      x.restore();
+    });
+    ring(A, '#e85a2a');
+    for (i = 0; i < 21; i++) at(i / 21 * 6.2832, function () { stone(x, r * (A + R1) / 2, 0, r * .2, r * .27, i % 2 ? '#f7c948' : '#f59a3a', { lw: lw * .7, line: L, kind: i % 3 ? 9 : 1, c2: '#2bb6a0', r: .42, j: 0 }); });   // Kranz aus 21 Steinen
+    ring(R1, '#f7c948');
+    for (i = 0; i < 34; i++) { a = i / 34 * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * r * (R1 + R2) / 2, cy + Math.sin(a) * r * (R1 + R2) / 2, r * .042, 0, 7); x.fillStyle = i % 2 ? '#2bb6a0' : '#fff6c8'; x.fill(); ol(x, lw * .45, L); }   // 34 Perlen
+    ring(R2, '#ffd75e');
+    for (i = 0; i < 13; i++) {   // 13 Mandelblätter
+      a = i / 13 * 6.2832 - Math.PI / 2;
+      lens(x, cx, cy, a, r * R4 * 1.02, r * R2 * .97, r * .052, i % 2 ? '#f59a3a' : '#f07a2a', lw * .6, L);
+      x.beginPath(); x.moveTo(cx + Math.cos(a) * r * (R4 + (R2 - R4) * .3), cy + Math.sin(a) * r * (R4 + (R2 - R4) * .3)); x.lineTo(cx + Math.cos(a) * r * (R4 + (R2 - R4) * .72), cy + Math.sin(a) * r * (R4 + (R2 - R4) * .72)); ol(x, lw * .5, '#ffe9a0');
     }
-    x.beginPath(); x.arc(cx, cy, r * 1.13, 0, 7); x.fillStyle = '#e85a2a'; x.fill(); ol(x, lw, L);
-    for (i = 0; i < 14; i++) {
-      x.save(); x.translate(cx, cy); x.rotate(i / 14 * Math.PI * 2);
-      stone(x, r * .93, 0, r * .24, r * .34, i % 2 ? '#f7c948' : '#f59a3a', { lw: lw * .7, line: L, kind: i % 2 ? 1 : 9, c2: '#2bb6a0', r: .4, j: 0 });
-      x.restore();
-    }
-    x.beginPath(); x.arc(cx, cy, r * .72, 0, 7); x.fillStyle = '#ffd75e'; x.fill(); ol(x, lw, L);
-    for (i = 0; i < 10; i++) { x.beginPath(); x.arc(cx + Math.cos(i * .628) * r * .57, cy + Math.sin(i * .628) * r * .57, r * .055, 0, 7); x.fillStyle = '#2bb6a0'; x.fill(); ol(x, lw * .5, L); }
-    x.beginPath(); x.arc(cx, cy, r * .4, 0, 7); x.fillStyle = '#fff0a8'; x.fill(); ol(x, lw * .8, L);
-    polyline(x, spiralPts(cx, cy, r * .28, 1.6, 0, 1)); ol(x, lw, '#f07a2a');
+    ring(R4, '#f59a3a');
+    for (i = 0; i < 8; i++) { a = i / 8 * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * r * (R4 + R5) / 2, cy + Math.sin(a) * r * (R4 + R5) / 2, r * .03, 0, 7); x.fillStyle = '#2bb6a0'; x.fill(); }   // 8 Punkte
+    ring(R5, '#fff0a8');
+    x.save(); x.beginPath(); x.arc(cx, cy, r * R5, 0, 7); x.clip();   // Saat des Lebens
+    for (i = 0; i < 7; i++) { a = i * 1.0472; x.beginPath(); x.arc(cx + (i ? Math.cos(a) * rho : 0), cy + (i ? Math.sin(a) * rho : 0), rho, 0, 7); ol(x, lw * .7, '#f07a2a'); }
+    x.restore();
+    x.beginPath(); x.arc(cx, cy, r * R5, 0, 7); ol(x, lw * .8, L);
   }
-  // Kranz um die Sonne (Hugo 27.11., 11:51: grösser, viel mehr Ornamente, die ins Umfeld übergehen; eigene Gestaltung):
-  // Reihen aus Steinen laufen in leichtem Bogen weit hinaus und werden kleiner und blasser, dazwischen Perlenbögen
+  // Feld um die Sonne: 144 Steine und Ringe, jeder 137.5° (Goldener Winkel) weiter und etwas weiter aussen – wie die Kerne einer
+  // Sonnenblume. So entstehen von selbst die Spiralarme, die weit in den Himmel laufen, kleiner und blasser werden. Dazu Perlenkreise
+  // in Abständen des Goldenen Schnitts (55, 89 und 144 Perlen).
   function sunField(x, cx, cy, r, lw) {
-    var n = 16, i, k, a, d, s, t;
-    for (k = 0; k < 4; k++) {
-      d = r * (2.75 + k * 1.3);
-      for (i = 0; i < 44 + k * 16; i++) { a = i / (44 + k * 16) * 6.283 + k * .2; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.036 - k * .005), 0, 7); x.fillStyle = 'rgba(255,206,100,' + (.7 - k * .16) + ')'; x.fill(); }
+    var N = 144, n, t, a, d, sz, k, i, m;
+    for (k = 2; k <= 4; k++) {
+      d = r * 1.22 * Math.pow(PHI, k); m = [55, 89, 144][k - 2];
+      for (i = 0; i < m; i++) { a = i / m * 6.2832; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (.04 - (k - 2) * .008), 0, 7); x.fillStyle = 'rgba(255,206,100,' + (.75 - (k - 2) * .22) + ')'; x.fill(); }
     }
-    for (i = 0; i < n; i++) {
-      var lg = i % 2 === 0, m = lg ? 10 : 6, a0 = i / n * 6.283 - Math.PI / 2;
-      for (k = 0; k < m; k++) {
-        t = k / (m - 1); d = r * (2.3 + k * (lg ? .58 : .52) + t * t * .7); a = a0 + t * .24; s = r * (.34 - t * .22) * (lg ? 1 : .8);
-        x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(a); x.globalAlpha = 1 - t * .74;
-        stone(x, 0, 0, s * 1.15, s, k % 3 === 1 ? '#f59a3a' : '#f7c948', { lw: lw * (.85 - t * .4), line: 'rgba(168,74,26,.75)', kind: s > lw * 7 ? 1 : 9, c2: k % 2 ? '#e85a2a' : '#2bb6a0', r: .4, j: 0 });
-        x.restore();
-      }
+    for (n = N; n >= 1; n--) {
+      t = n / N; a = n * GA; d = r * (2.2 + 6.4 * Math.pow(t, .7)); sz = r * (.3 - .19 * t);
+      x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(a); x.globalAlpha = 1 - t * .8;
+      if (n % 3 === 0) {
+        x.beginPath(); x.arc(0, 0, sz * .42, 0, 7); x.fillStyle = '#fff3c4'; x.fill(); ol(x, lw * (.7 - t * .3), 'rgba(168,74,26,.7)');
+        x.beginPath(); x.arc(0, 0, sz * .16, 0, 7); x.fillStyle = '#2bb6a0'; x.fill();
+      } else stone(x, 0, 0, sz * 1.15, sz * .86, n % 3 === 1 ? '#f7c948' : '#f59a3a', { lw: lw * (.85 - t * .45), line: 'rgba(168,74,26,.75)', kind: sz > lw * 7 ? 1 : 9, c2: n % 2 ? '#e85a2a' : '#2bb6a0', r: .42, j: 0 });
+      x.restore();
     }
   }
   // Grat einer Bergkette: x → Höhe über der Grundlinie (mod drückt die Berge zur Sonne hin flach)
@@ -541,19 +664,46 @@
 
   // ---------- Szene ----------
   var world, strips = [], sprites = [], fliers = [], rays, dapple, glow, flare, sheen, fxC, fxX, W = 0, H = 0, U = 0, LW0 = 2, mob = false,
-      camRef = 0, camT = 0, cam = 0, QF = 1, veil = null, veilW = 0, openHW = function () { return 1e6; },
-      SUN = [.5, .325];   // Sonne im Schlussbild (Anteil von Breite und Höhe): tief über dem See, zwischen Slogan und Rad
+      camRef = 0, camT = 0, cam = 0, QF = 1, veil = null, veilW = 0, veilV = 0, veilQ = -1, openHW = function () { return 1e6; },
+      HX = 0, SR = 30, HOR = .385, SHO = .427, LT = { lead: 0, band: 0, capB: 0, contact: 0 },
+      SUN = [.5, .325];   // Sonne im Schlussbild (Anteil von Breite und Höhe): tief über dem See, zwischen Slogan und Rad (wird aus dem Layout berechnet)
+  // Das Bild richtet sich nach dem Text: wo Slogan, Rad und Kontakte wirklich stehen (auf jedem Gerät anders), dort liegen Sonne, See und Unterholz
+  function topOf(el) { var y = 0; while (el && el !== root) { y += el.offsetTop; el = el.offsetParent; } return y; }
+  function measureLayout() {
+    var lead = root.querySelector('.ak-lead'), con = root.querySelector('.ak-contact'), rh = items.length ? (items[0].offsetHeight || 40) : 40;
+    LT.lead = lead ? topOf(lead) + lead.offsetHeight : H * .27;
+    LT.band = wheel ? topOf(wheel) + (wheel.clientHeight - rh) / 2 : H * .43;
+    LT.capB = cap ? topOf(cap) + cap.offsetHeight : H * .62;
+    LT.contact = con ? topOf(con) : 0;
+    if (!(LT.band - LT.lead > 50 && LT.band < H * .7)) { LT.lead = H * .27; LT.band = H * .43; }
+    if (!(LT.capB > LT.band)) LT.capB = LT.band + H * .2;
+    if (!(LT.contact > LT.capB - 4 && LT.contact < H)) LT.contact = Math.min(H * .9, LT.capB + H * .04);
+  }
+  // weiches Feld hinter der Mitte des Rads und der Beschreibung: einmal gemalt (weiche Kanten ringsum), im Takt ändert sich nur die Deckkraft
+  function placeVeil() {
+    if (!AK.veil) return;
+    measureLayout();
+    var F = 46, y0 = LT.band - 14, y1 = LT.contact - 4, half = Math.min(W * .5 - 2, Math.max(wheel ? wheel.clientWidth : 0, cap ? cap.offsetWidth : 0, 240) / 2 + 20), vw = half * 2 + F * 2, vh = y1 - y0 + F * 2, c;
+    if (veil && veil.parentNode) veil.parentNode.removeChild(veil);
+    c = canvas(vw, vh, .5);
+    c.x.shadowColor = 'rgb(247,245,252)'; c.x.shadowBlur = 22; c.x.shadowOffsetX = 5000; c.x.fillStyle = '#fff';
+    rrect(c.x, F - 10000, F, half * 2, y1 - y0, 46); c.x.fill();
+    veil = c.c; veil.className = 'ak-veil'; veil.setAttribute('aria-hidden', 'true');
+    veil.style.cssText = 'left:' + (W / 2 - vw / 2) + 'px;top:' + (y0 - F) + 'px;width:' + vw + 'px;height:' + vh + 'px;';
+    veil._y = [y0 + 8, (y0 + y1) / 2, y1 - 8]; veilW = half * .78; veilQ = -1;
+    root.insertBefore(veil, root.querySelector('.ak-inner'));
+  }
   // Ein Streifen = eine Tiefen-Ebene. y = 0 ist die Oberkante des Schlussbilds, der Weg der Kamera liegt bei y < 0.
   // Gemalt wird in Kacheln; jedes Teil (add) kennt seine Höhe und wird nur in den Kacheln gemalt, die es berührt.
   function strip(i, f, d, pk, dprFin, dprFly) {
-    var mg = .08, mx = W * mg + XR * f, pan = pk * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
+    var mg = .08, mx = W * mg + XR * f, pan = pk * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2 + HX, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
     var el = document.createElement('div'); el.className = 'ak-layer'; el.style.width = w + 'px'; el.style.height = (fh + tf) + 'px';
     var S = { el: el, f: f, d: d, w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
     S.X = function (fr) { return mx + fr * W; };
     S.Y = function (c, fr) { return S.vy - c * camRef * f + fr * H; };   // Höhe im Streifen, die beim Fortschritt c (1 = oben, 0 = gelandet) am Bildschirm bei fr liegt
     S.add = function (y0, y1, fn) { S.items.push([y0, y1, fn, AK.seed * 7919 + i * 100003 + S.items.length * 31 + 5]); };
     // Teil, das sich wiegt: eigenes kleines Bild auf dem Streifen, dreht um seinen Fuss (top = es hängt und dreht um die Oberkante)
-    S.sway = function (px, py, r, top, fn) { S.sw.push([px, py, r, top, fn, AK.seed * 104729 + i * 7001 + S.sw.length * 13 + 3]); };
+    S.sway = function (px, py, r, top, fn, hw) { S.sw.push([px, py, r, top, fn, AK.seed * 104729 + i * 7001 + S.sw.length * 13 + 3, hw || r]); };   // hw: halbe Breite (schmal für Lianen)
     S.build = function () {
       var edges = [-tf], y = -tf, k, n; while (y < 0) { y = Math.min(0, y + 1300); edges.push(y); } edges.push(fh);
       for (k = 0; k < edges.length - 1; k++) {
@@ -568,11 +718,12 @@
         el.appendChild(c.c); S.tiles.push([c.c, a]);
       }
       S.sw.forEach(function (q) {
-        var r = q[2], o = q[3] ? 4 : r, c = canvas(r * 2, r * 2, Math.min(dprFin, 1.5)), P = rng(q[5] + 1);
-        R = rng(q[5]); c.x.translate(r - q[0], o - q[1]); q[4](c.x); paper(c.x, q[0] - r, q[1] - o, r * 2, r * 2, 1);
-        c.c.className = 'ak-sway'; c.c.style.cssText = 'left:' + (q[0] - r) + 'px;top:' + (q[1] - o + tf) + 'px;width:' + r * 2 + 'px;height:' + r * 2 + 'px;transform-origin:50% ' + (q[3] ? '4px' : '50%');
+        var r = q[2], hw = q[6], o = q[3] ? 4 : r, c = canvas(hw * 2, r * 2, Math.min(dprFin, 1.5)), P = rng(q[5] + 1);
+        R = rng(q[5]); c.x.translate(hw - q[0], o - q[1]); q[4](c.x); paper(c.x, q[0] - hw, q[1] - o, hw * 2, r * 2, 1);
+        c.c.className = 'ak-sway'; c.c.style.cssText = 'left:' + (q[0] - hw) + 'px;top:' + (q[1] - o + tf) + 'px;width:' + hw * 2 + 'px;height:' + r * 2 + 'px;transform-origin:50% ' + (q[3] ? '4px' : '50%')
+          + ';--a:' + ((q[3] ? 1.2 : 1.6) + P() * 1.7).toFixed(2) + 'deg;animation-duration:' + (3.6 + P() * 3.4).toFixed(2) + 's;animation-delay:' + (-P() * 9).toFixed(2) + 's';
         el.appendChild(c.c);
-        sways.push({ el: c.c, x: q[0], ph: P() * 6, amp: (q[3] ? 1.5 : 2.2) + P() * 2.2, f: .0007 + P() * .0006 });
+        sways.push(c.c);
       });
     };
     return S;
@@ -580,23 +731,23 @@
 
   // 0 · Himmel, Sonne und Berge im Hintergrund (sie sind von Anfang an zu sehen und bewegen sich kaum), darunter ferne Hügel
   function sceneFar(S) {
-    var top = -S.tf, bot = S.fh, w = S.w, vy = S.vy, lw = LW0 * .7, base = vy + H * .385, sx = S.X(SUN[0]), sy = vy + H * SUN[1], sr = Math.min(U * .1, H * .047);
+    var top = -S.tf, bot = S.fh, w = S.w, vy = S.vy, lw = LW0 * .7, base = vy + H * HOR, sx = S.X(SUN[0]), sy = vy + H * SUN[1], sr = SR;
     S.add(top, bot, function (x) {
       var g = x.createLinearGradient(0, top, 0, bot), span = bot - top;
       function st(y, c) { g.addColorStop(clamp((y - top) / span, 0, 1), c); }
       if (S.tf > H * .2) { st(top, '#f3f1f9'); st(top + (vy - top) * .5, '#bdeaf7'); }
-      st(vy - H * .04, '#5cc6f1'); st(vy + H * .16, '#8fd8f4'); st(vy + H * .3, '#ffe9c2'); st(base, '#ffdcae'); st(bot, '#ffdcae');
+      st(vy - H * .04, '#5cc6f1'); st(vy + H * (HOR - .225), '#8fd8f4'); st(vy + H * (HOR - .085), '#ffe9c2'); st(base, '#ffdcae'); st(bot, '#ffdcae');
       x.fillStyle = g; x.fillRect(0, top, w, span);
       flow(x, -20, w + 20, top + H * .08, base - U * .1, { n: 26, th: U * .02, amp: U * .018, pal: ['rgba(255,255,255,.2)', 'rgba(200,244,255,.2)', 'rgba(255,240,214,.18)'], plain: 1 });
     });
-    S.add(sy - sr * 9.5, sy + sr * 9.5, function (x) {
+    S.add(sy - sr * 9.6, sy + sr * 9.6, function (x) {
       var g = x.createRadialGradient(sx, sy, 0, sx, sy, sr * 6); g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(.25, 'rgba(255,240,180,.5)'); g.addColorStop(1, 'rgba(255,236,180,0)');
       x.fillStyle = g; x.fillRect(sx - sr * 6, sy - sr * 6, sr * 12, sr * 12);
       sunField(x, sx, sy, sr, lw * 1.2);
       sun(x, sx, sy, sr, lw * 1.3);
     });
     // kleine Wolken, die im Bild stehen bleiben (die grossen ziehen als einzelne Teile vorbei)
-    [[.8, -.18, .07], [.24, -.32, .06], [.62, -.08, .05]].forEach(function (c) {
+    [[.8, -.2, .07], [.24, -.34, .06]].forEach(function (c) {
       var s = U * c[2], py = vy + H * c[1];
       S.add(py - s * 1.6, py + s * .4, function (x) { glyphCloud(x, S.X(c[0]), py, s, cloudLook(s)); });
     });
@@ -610,7 +761,7 @@
 
   // 1 · Horizont der Lichtung: ferner Urwald, der See als goldener Spiegel der Sonne, davor beginnt die Wiese
   function sceneMid(S) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0 * .8, yH = vy + H * .385, ySh = vy + H * .427, p1 = R() * 6, list = [], px, k;
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0 * .8, yH = vy + H * HOR, ySh = vy + H * SHO, p1 = R() * 6, list = [], px, k;
     function shore(q) { return ySh + Math.sin(q * .008 + p1) * U * .005; }
     for (px = -U * .1; px < w + U * .1; px += U * rr(.03, .06)) {
       k = clamp((Math.abs(px - cx) / (w / 2) - (mob ? .3 : .2)) / .55, 0, 1); if (k <= 0) continue;
@@ -636,11 +787,11 @@
       x.beginPath(); x.moveTo(-14, yH); x.lineTo(w + 14, yH); ol(x, lw, '#0a3f5a');
     });
     S.add(ySh - U * .03, bot + 4, function (x) {
-      var q, g = x.createLinearGradient(0, ySh, 0, vy + H * .66);
+      var q, g = x.createLinearGradient(0, ySh, 0, vy + H * (SHO + .235));
       g.addColorStop(0, '#eef9b4'); g.addColorStop(1, '#c9ec84');
       x.beginPath(); x.moveTo(-14, bot + 14); for (q = -14; q <= w + 14; q += 10) x.lineTo(q, shore(q)); x.lineTo(w + 14, bot + 14); x.closePath();
       x.fillStyle = g; x.fill(); ol(x, lw, 'rgba(40,120,80,.6)'); x.clip();
-      flow(x, -30, w + 30, ySh + U * .012, vy + H * .68, { n: mob ? 12 : 18, th: U * .012, grow: 1.8, amp: U * .006, pow: 1.3, pal: ['#f4fbc0', '#e2f4a0', '#d6f08e', '#c9ec84'], plain: 1 });
+      flow(x, -30, w + 30, ySh + U * .012, vy + H * (SHO + .255), { n: mob ? 12 : 18, th: U * .012, grow: 1.8, amp: U * .006, pow: 1.3, pal: ['#f4fbc0', '#e2f4a0', '#d6f08e', '#c9ec84'], plain: 1 });
     });
     if (!mob) {   // Computer: eine zweite Reihe Urwald weiter hinten (Tiefe); auf dem Handy braucht der Text die Breite
       var HW1 = W * .232, yT1 = S.Y(.7, 1), q1 = R() * 6, q2 = R() * 6,
@@ -661,12 +812,12 @@
   // Urwald in zwei Teilen, damit er Tiefe bekommt (Hugo 27.11., 11:50):
   //   ground: dunkler Grund mit Mäanderbändern und langen Lianen – liegt weiter hinten und wandert immer leicht auf einer kleinen Bahn
   //   plants: Pflanzen und Blüten dicht an dicht davor; am Rand wachsen sie in die Öffnung, oben schliessen Kronen ab
-  var KINDS = [0, 0, 0, 1, 1, 2, 9, 7, 7, 5, 8, 3, 3, 4, 10, 10, 11, 12, 12, 13, 13, 14, 14, 15, 16, 16], FLOWERS = [3, 4, 10, 11, 12, 13, 14, 15, 16], SIZES = [.55, .7, .7, .85, .85, 1, 1, 1.2, 1.5];
+  var FLOWERS = [3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25], KINDS = [0, 0, 0, 0, 1, 1, 2, 9, 9, 7, 7, 5, 8, 26, 26].concat(FLOWERS, [3, 12, 14, 19, 21, 23]), SIZES = [.55, .7, .7, .85, .85, 1, 1, 1.2, 1.5];
   // zeichnet in die Ebene T mit den Koordinaten der Ebene S (beide decken sich, wenn die Kamera unten steht)
   function onto(T, S) {
     var ax = (T.w - S.w) / 2, ay = T.vy - S.vy;
     return { w: S.w, add: function (y0, y1, fn) { T.add(y0 + ay, y1 + ay, function (x) { x.translate(ax, ay); fn(x); }); },
-      sway: function (px, py, r, top, fn) { T.sway(px + ax, py + ay, r, top, function (x) { x.translate(ax, ay); fn(x); }); } };
+      sway: function (px, py, r, top, fn, hw) { T.sway(px + ax, py + ay, r, top, function (x) { x.translate(ax, ay); fn(x); }, hw); } };
   }
   function ground(T, y0, y1, eL, eR, o) {
     var w = T.w, s = U * (o.cell || .06), ph = s * 14, lw = LW0 * (o.lwk || 1), u = U * (o.size || 1), top = o.topFn, ys = y0 - (top ? s * 2 : 0), y, px;
@@ -711,7 +862,7 @@
       var e = sd ? eR : eL, ex = e(y), d = (e(y + 6) - e(y - 6)) / 12, a, c = calm(y);
       if (ex < -10 || ex > w + 10 || eR(y) - eL(y) < 6) return;
       a = (sd ? Math.atan2(d, -1) : Math.atan2(-d, 1)) + (sd ? 1 : -1) * (c ? .95 : .45) / (1 + d * d * 4);
-      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < .55 ? 9 : pick(FLOWERS), lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a,
+      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < (cz && y > cz[1] ? .25 : .55) ? 9 : pick(FLOWERS), lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a,
         !!(o.sway && AK.sway && y > o.sway[0] && ne++ % o.sway[1] === 0));   // im Schlussbild wiegt sich ein Teil der Randpflanzen
     });
     if (top) for (px = -u * .1; px < w + u * .1; px += u * rr(.18, .3)) plant(S, px, top(px) + u * rr(-.05, .12), pick([0, 0, 2, 9, 7]), lw, u * rr(1.1, 1.7), -Math.PI / 2);
@@ -732,6 +883,16 @@
       else if (k === 14) hibiscus(x, px, py, u * rr(.13, .22), [pick(P_FLOWER), pick(Z_MAG)], lw);
       else if (k === 15) cluster(x, px, py - u * .15, u * rr(.25, .42), [pick(P_FLOWER), pick(P_ACC)], lw);
       else if (k === 16) starFlower(x, px, py, u * rr(.12, .22), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 17) heliconia(x, px, py - u * .2, u * rr(.32, .5), [pick(['#e0402a', '#f07a2a', '#d0379a', '#ff5a8a']), '#ffd75e'], lw);
+      else if (k === 18) torch(x, px, py, u * rr(.16, .26), [pick(Z_MAG.concat(['#e0402a'])), pick(['#ff7ab8', '#ff5a8a', '#f59a3a'])], lw);
+      else if (k === 19) protea(x, px, py, u * rr(.17, .28), [pick(P_FLOWER), pick(['#fff0c8', '#f6f2ff', '#ffd75e'])], lw);
+      else if (k === 20) pincushion(x, px, py, u * rr(.12, .2), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 21) phiFlower(x, px, py, u * rr(.13, .22), [pick(P_FLOWER), pick(P_ACC), pick(Z_PURP)], lw);
+      else if (k === 22) mandala(x, px, py, u * rr(.1, .17), [pick(P_FLOWER), pick(P_ACC)], lw);
+      else if (k === 23) orchid(x, px, py, u * rr(.13, .22), [pick(P_FLOWER), pick(['#f6f2ff', '#ffd75e', '#ff7ab8'])], lw);
+      else if (k === 24) heartLeaf(x, px, py, u * rr(.13, .2), [pick(['#e0402a', '#d0379a', '#ff5a8a', '#f6f2ff']), '#ffd75e'], lw);
+      else if (k === 25) crane(x, px, py, u * rr(.18, .3), [pick(['#f07a2a', '#f2b830', '#ff6a4a']), '#3560c0', pick(Z_GREEN)], lw);
+      else if (k === 26) bromeliad(x, px, py + u * .1, u * rr(.26, .42), [pick(Z_MAG.concat(['#e0402a', '#f07a2a'])), '#ffd75e'], lw, z);
       else if (k === 7) for (i = 0, c = 2 + Math.floor(R() * 3); i < c; i++) bigLeaf(x, px, py + u * .25, -Math.PI / 2 + (i - (c - 1) / 2) * rr(.45, .8), u * rr(.34, .56), u * rr(.07, .1), (i - (c - 1) / 2) * .22, pick(z), lw);
       else if (k === 8) pearls(x, px, py - u * .2, u * rr(.25, .45), u * .016, pick(P_ACC), lw, rr(-.25, .25));
       else frond(x, { x: px, y: py, a: dirA == null ? R() * 6 : dirA + rr(-.3, .3), spread: rr(1.1, 1.9), n: 6 + Math.floor(R() * 5), len: u * rr(.3, .56), wid: u * rr(.036, .06), droop: rr(.25, .6), cols: z, lw: lw, rib: R() < .35 ? 1 : 0 });
@@ -742,14 +903,15 @@
   // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese.
   // SB = Grund mit Bändern und Lianen (weiter hinten), S = Pflanzen und Wiese, SF = einzelne Pflanzen dicht vor der Kamera
   function sceneMain(S, SB, SF) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .478 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .43 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .36, yB = vy + H * (mob ? .085 : .02), yU = vy + LT.contact - H * .01, yMd = SHO + .14,
         yCb = vy - H * .78, yAb = vy - H * .2, p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; },
         size = mob ? .7 : .82, TB = onto(SB, S), TF = onto(SF, S);
-    // Öffnung der Lichtung: oben ein spitzer Bogen, in der Texthöhe breit (Handy: fast die ganze Breite), unten wächst das Unterholz wieder herein
+    // Öffnung der Lichtung, wie ein Fenster durch den Urwald (Hugo 13:21): oben ein spitzer Bogen, neben dem Text ein schmaler Rahmen,
+    // ab den Kontakten wächst unten das Unterholz mit seinen Blüten wieder herein
     function hwOf(y, a) {
       if (y <= a) return 0;
-      var t = clamp((y - a) / (yB - a), 0, 1), f = clamp((y - (vy + H * .845)) / (H * .24), 0, 1);
-      return Math.max(0, HW * Math.pow(t, 1.5) - Math.pow(f, 1.2) * W * (mob ? .34 : .17));
+      var t = clamp((y - a) / (yB - a), 0, 1), f = clamp((y - yU) / (H * .24), 0, 1);
+      return Math.max(0, HW * Math.pow(t, 1.5) - Math.pow(f, 1.2) * W * (mob ? .3 : .17));
     }
     function hw(y) { return hwOf(y, yA); }
     function hwB(y) { return hwOf(y, yAb); }   // der Grund dahinter schliesst etwas tiefer: man sieht ihn als zweiten Bogen
@@ -759,19 +921,19 @@
     function archY(px) { var d = Math.abs(px - cx) / HW; return d >= 1 ? bot : yA + Math.pow(d, 1 / 1.5) * (yB - yA); }
     function topFn(px) { return yC + (Math.sin(px * .011 + p3) * .05 + Math.sin(px * .027 + p4) * .025) * U; }
     function topB(px) { return yCb + (Math.sin(px * .009 + p4) * .05 + Math.sin(px * .023 + p3) * .025) * U; }
-    function yN(px) { return vy + H * .565 + Math.cos((px - cx) / w * Math.PI * 2) * U * .018 + Math.sin(px * .011 + p3) * U * .01; }
+    function yN(px) { return vy + H * yMd + Math.cos((px - cx) / w * Math.PI * 2) * U * .018 + Math.sin(px * .011 + p3) * U * .01; }
     openHW = function (yr) { var y = vy + yr; return y < yC - U * .3 ? 1e6 : Math.min(hw(y), hwB(y)); };   // freie halbe Breite der Öffnung (für den Lese-Schleier)
     // nahe Wiese: helle fliessende Bänder, in der Mitte ruhig (dort steht der Text)
-    S.add(vy + H * .5, bot + 4, function (x) {
-      var px, py, k, t, s, g = x.createLinearGradient(0, vy + H * .565, 0, bot);
+    S.add(vy + H * (yMd - .07), bot + 4, function (x) {
+      var px, py, k, t, s, g = x.createLinearGradient(0, vy + H * yMd, 0, bot);
       g.addColorStop(0, '#c6ea80'); g.addColorStop(.5, '#b0e170'); g.addColorStop(1, '#93d463');
       x.beginPath(); x.moveTo(-14, bot + 14); for (px = -14; px <= w + 14; px += 10) x.lineTo(px, yN(px)); x.lineTo(w + 14, bot + 14); x.closePath();
       x.fillStyle = g; x.fill(); ol(x, lw * .7, 'rgba(60,150,80,.34)'); x.clip();
-      flow(x, -30, w + 30, vy + H * .6, bot + U * .05, { n: mob ? 14 : 22, th: U * .03, grow: 1.5, amp: U * .012, pow: 1.25, pal: ['#d2ee8a', '#c4e87a', '#b8e272', '#a8dc6a', '#bfe676'], plain: 1 });
-      flow(x, -30, w + 30, vy + H * .62, bot + U * .05, { n: mob ? 7 : 11, th: U * .004, grow: 1, amp: U * .012, pow: 1.2, pal: ['rgba(250,255,214,.7)', 'rgba(70,160,80,.3)'], plain: 1 });
+      flow(x, -30, w + 30, vy + H * (yMd + .035), bot + U * .05, { n: mob ? 14 : 22, th: U * .03, grow: 1.5, amp: U * .012, pow: 1.25, pal: ['#d2ee8a', '#c4e87a', '#b8e272', '#a8dc6a', '#bfe676'], plain: 1 });
+      flow(x, -30, w + 30, vy + H * (yMd + .055), bot + U * .05, { n: mob ? 7 : 11, th: U * .004, grow: 1, amp: U * .012, pow: 1.2, pal: ['rgba(250,255,214,.7)', 'rgba(70,160,80,.3)'], plain: 1 });
       for (k = 0; k < (mob ? 26 : 60); k++) {
-        px = rr(0, w); py = rr(vy + H * .62, bot); t = (py - vy - H * .56) / (bot - vy - H * .56); s = U * (.012 + .03 * t);
-        if (py < vy + H * .84 && Math.abs(px - cx) < HW * (mob ? .94 : .62) && (mob || R() < .82)) continue;   // in der Texthöhe bleibt die Mitte frei
+        px = rr(0, w); py = rr(vy + H * (yMd + .055), bot); t = clamp((py - vy - H * yMd) / (bot - vy - H * yMd), 0, 1); s = U * (.012 + .03 * t);
+        if (py < yU + H * .15 && Math.abs(px - cx) < HW * (mob ? .94 : .62) && (mob || R() < .82)) continue;   // in der Texthöhe bleibt die Mitte frei
         if (R() < .3) flowerB(x, px, py, s, pick(P_FLOWER), lw * .6);
         else if (R() < .35) starFlower(x, px, py, s * 1.3, [pick(P_FLOWER), '#ffd75e'], lw * .6);
         else frond(x, { x: px, y: py, a: -Math.PI / 2, spread: 1.5, n: 5, len: s * 2.4, wid: s * .34, droop: .3, cols: ['#4fae3f', '#2f9a4a', '#6fbf3a'], lw: lw * .6, rib: 0 });
@@ -782,14 +944,16 @@
       lianas: [{ x0: 2, x1: cx - HW - U * .05, yEnd: end }, { x0: cx + HW + U * .05, x1: w - 2, yEnd: end },
         { x0: cx - HW * .92, x1: cx + HW * .92, yEnd: function (px) { return Math.min(archYb(px) + U * rr(.02, .16), vy + H * .04); }, bead: 1 }] });
     // davor: Pflanzen und Blüten
-    plants(S, yC, bot, eL, eR, { size: size, dens: 1.15, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75], sway: [vy - H * .06, mob ? 3 : 1] });
-    // Ranken hängen vom Bogen in die Lichtung
-    for (i = 0; i < (mob ? 5 : 9); i++) (function (px) {
-      var y0 = archY(px) - U * .03, len = Math.min(U * rr(.25, .7), vy + H * .06 - y0), fn;
-      if (len < U * .1) return;
-      fn = function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); };
-      if (AK.sway && y0 + len > vy - H * .1) S.sway(px, y0, len / 2 + 22, 1, fn); else S.add(y0 - 4, y0 + len + 20, fn);
-    })(cx + rr(-.9, .9) * HW);
+    plants(S, yC, bot, eL, eR, { size: size, dens: 1.15, topFn: topFn, calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75], sway: [vy - H * .06, mob ? 4 : 1] });   // am Handy steht der Titel ganz oben: auch dort bleiben die Randpflanzen klein
+    // Lianen und Ranken hängen vom Bogen in die Lichtung und wiegen sich; viele tragen Blüten (Hugo 13:21).
+    // Über dem Titel bleiben sie kurz, aussen neben dem Text dürfen sie lang herunterhängen.
+    for (i = 0; i < (mob ? 8 : 18); i++) (function (i) {
+      var out = i % 3 !== 2, sd = i % 2 ? 1 : -1, px = cx + sd * HW * (out ? rr(mob ? .95 : .84, 1.05) : rr(.08, .8)), y0 = archY(px) - U * .04,
+          len = out ? Math.min(U * rr(.45, 1.15), vy + LT.band + H * rr(0, .1) - y0) : Math.min(U * rr(.25, .6), vy + Math.max(0, LT.lead - H * (mob ? .26 : .2)) - y0), amp = U * rr(.014, .03), fl = R() < .68, r0 = Math.max(7, Math.min(len * .05, U * .034)), fn;
+      if (len < U * .12) return;
+      fn = fl ? function (x) { flowerVine(x, px, y0, len, amp, lw * .9); } : function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); };
+      if (AK.sway && y0 + len > vy - H * .1) S.sway(px, y0, (len + r0 * 4 + 16) / 2, 1, fn, amp + r0 * 3.6 + 16); else S.add(y0 - 4, y0 + len + r0 * 4 + 12, fn);
+    })(i);
     // vorn: einzelne grosse Pflanzen dicht vor der Kamera. Sie liegen nur über dem dichten Urwald, nie frei vor Himmel oder Lichtung
     var nf = Math.round(w * H * .6 / Math.pow(U * size * 1.3, 2) / .42), fl2 = [];
     for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.3, -.7), pick([0, 1, 9, 7, 3, 10, 13, 14, 16, 12]), rr(1.1, 1.6)]);
@@ -822,22 +986,20 @@
 
   function paintScene(fly) {
     R = rng(AK.seed);
-    W = root.clientWidth; H = root.clientHeight; mob = W < 768;
+    var inner = root.querySelector('.ak-inner'), HR = root.clientHeight;
+    W = root.clientWidth; H = inner && inner.clientHeight > 200 ? Math.min(HR, inner.clientHeight) : HR; HX = HR - H; mob = W < 768;   // H = sichtbare Höhe (am Handy ohne die Leisten des Browsers); HX = was darunter noch gemalt wird
     U = clamp(Math.min(W, H * .62), 300, 620); LW0 = Math.max(1.5, U * .0056);
+    measureLayout();
+    var gap = LT.band - LT.lead;
+    HOR = (LT.band - H * .03) / H; SHO = HOR + .03;            // Horizont und Ufer liegen an der Oberkante der gewählten Zeile
+    SR = clamp(gap * .3, 22, U * .115); SUN[1] = HOR - SR * 1.4 / H;   // die Sonne füllt die Lücke zwischen Slogan und Rad
     ZP = [R() * 6, R() * 6, R() * 6];
     XR = AK.freePan ? W * (mob ? AK.panX[0] : AK.panX[1]) : 0;
     camRef = Math.round(H * AK.flightH); camT = camRef; cam = tgY = fly ? camT : 0; camX = tgX = 0;   // immer das ganze Bild: man kann von Hand wieder nach oben
-    // Lese-Schleier in drei Feldern (Titel und Slogan · Rad · Preis und Kontakte): jedes leuchtet nur, wenn hinter ihm Urwald liegt
-    if (!veil) veil = [[.1, .29], [.385, .585], [.61, .835]].map(function (z) {
-      var e = document.createElement('div'); e.className = 'ak-veil'; e.setAttribute('aria-hidden', 'true'); root.insertBefore(e, root.querySelector('.ak-inner'));
-      return { el: e, y0: z[0], y1: z[1], v: 0, q: -1 };
-    });
-    veilW = Math.min(W * .44, 330);
-    veil.forEach(function (z) { z.el.style.cssText = 'left:' + (W / 2 - veilW - 4) + 'px;width:' + (veilW * 2 + 8) + 'px;top:' + H * z.y0 + 'px;height:' + H * (z.y1 - z.y0) + 'px;'; z.q = -1; });
     if (world) world.remove();
     world = document.createElement('div'); world.className = 'ak-world'; world.setAttribute('aria-hidden', 'true');
     root.insertBefore(world, root.firstChild);
-    sprites = []; fliers = []; sways = [];
+    sprites = []; fliers = []; sways = []; farOn = null;
     var big = W > 1100, q = big ? Math.min(DPR, 1.5) : DPR, qs = Math.min(DPR, big ? 1.25 : 1.5), qf = Math.min(DPR, big ? 1 : 1.25); QF = qs;   // Schärfe nach Bedarf: vorn scharf, Himmel und Hintergrund weicher (Speicher)
     var S0 = strip(0, .14, .18, .006, qs, qs), S1 = strip(1, .5, .38, .016, q, QF), SB = strip(2, .86, .54, .025, qs, qf), S2 = strip(3, 1, .62, .03, q, QF), SF = strip(4, 1.2, .76, .038, qf, qf);
     SB.path = U * .024;   // die Bänder und Lianen wandern immer leicht auf einer kleinen Bahn (Hugo 11:50)
@@ -845,16 +1007,17 @@
     sceneFar(S0); sceneMid(S1); sceneMain(S2, SB, SF);
     S0.build(); world.appendChild(S0.el);
     R = rng(AK.seed + 3);
-    skyClouds([[1, .2, .3, .07, .25], [.97, .84, .5, .09, .3], [.9, .5, .2, .08, .36], [.84, .14, .62, .1, .4], [.78, .8, .35, .09, .45], [.7, .4, .55, .1, .42],
-      [0, .14, .1, .05, .2], [0, .86, .2, .06, .26], [0, .5, .045, .042, .22]]);   // ferne Wolken; die letzten drei stehen im Schlussbild am Himmel
+    // weniger Wolken (Hugo 13:19)
+    skyClouds([[1, .2, .3, .07, .25], [.93, .84, .5, .09, .3], [.84, .5, .2, .08, .36], [.74, .16, .6, .1, .42],
+      [0, .13, .06, .05, .2], [0, .87, .1, .055, .26]]);   // ferne Wolken; die letzten zwei stehen im Schlussbild am Himmel
     S1.build(); world.appendChild(S1.el);
     R = rng(AK.seed + 4);
-    skyClouds([[.99, .72, .2, .14, .6], [.93, .25, .75, .16, .7], [.86, .85, .5, .15, .8], [.8, .3, .3, .18, .9], [.73, .7, .7, .16, .75], [.67, .2, .5, .2, .95]]);   // mittlere Wolken
+    skyClouds([[.98, .72, .2, .14, .6], [.88, .25, .7, .16, .7], [.78, .8, .4, .17, .85], [.68, .3, .55, .19, .95]]);   // mittlere Wolken
     SB.build(); world.appendChild(SB.el);
     S2.build(); world.appendChild(S2.el);
     SF.build(); world.appendChild(SF.el);
     R = rng(AK.seed + 5);
-    skyClouds([[.97, .1, .9, .22, 1.3], [.9, .9, .6, .26, 1.6], [.85, .3, .5, .3, 1.9], [.79, .75, .4, .24, 1.25], [.74, .1, .6, .3, 1.7], [.69, .6, .5, .26, 1.45], [.65, .9, .4, .22, 1.2]]);   // nahe Wolken rauschen vorbei
+    skyClouds([[.95, .1, .85, .22, 1.3], [.86, .88, .55, .28, 1.7], [.77, .3, .45, .26, 1.4], [.68, .8, .5, .24, 1.25]]);   // nahe Wolken rauschen vorbei
 
     // Glanz der Sonne über dem See (liegt vor den vorderen Ebenen, bleibt aber bei der Sonne)
     var gc = document.createElement('canvas'), gx, gg, gsx = W * SUN[0], gsy = H * SUN[1];
@@ -873,8 +1036,8 @@
       sprites.push({ el: c.c, sh: shade.c, x: place[0] - sw * ax, y: place[1] - sh * ay, ax: ax, ay: ay, w: sw, h: sh, amp: rr(.8, 1.8), f: rr(.00028, .00048), ph: rr(0, 6) });
     }
     var Zs = mob ? W * .82 : Math.min(W * .5, H * .95), lw = LW0 * 1.25;
-    sprite(Zs * .62, Zs * .62, 0, 0, [-W * (mob ? .2 : .04), -H * (mob ? .08 : .03)], function (x, w, h) {
-      frond(x, { x: w * .04, y: h * .04, a: mob ? 1.25 : .8, spread: mob ? 1 : 1.5, n: 8, len: w * .84, wid: w * .05, droop: .25, cols: Z_PURP.concat(Z_BLUE), lw: lw, rib: 1 });
+    sprite(Zs * .62, Zs * .62, 0, 0, [-W * (mob ? .26 : .04), -H * (mob ? .1 : .03)], function (x, w, h) {
+      frond(x, { x: w * .04, y: h * .04, a: mob ? 1.36 : .8, spread: mob ? .85 : 1.5, n: 8, len: w * .84, wid: w * .05, droop: .25, cols: Z_PURP.concat(Z_BLUE), lw: lw, rib: 1 });
       bloom(x, w * .27, h * .2, w * .1, '#d0379a', lw);
     });
     sprite(Zs * .6, Zs * .55, 1, 0, [W * (mob ? 1.12 : 1.04), -H * (mob ? .06 : .02)], function (x, w, h) {
@@ -883,10 +1046,12 @@
     sprite(Zs * .55, Zs * .8, 0, 1, [-W * .05, H * 1.03], function (x, w, h) {
       for (var i = 0; i < 3; i++) bigLeaf(x, w * .05 + i * w * .08, h, -Math.PI / 2 + rr(.15, .7), h * rr(.66, .9), w * .11, rr(.12, .28), pick(Z_GREEN.concat(Z_TEAL)), lw);
       fern(x, { x: w * .42, y: h, len: h * .36, col: '#8fc93a', dir: -1, lw: lw });
+      hibiscus(x, w * .5, h * .78, w * .13, ['#ff5a8a', '#b8288a'], lw); protea(x, w * .22, h * .62, w * .16, ['#f07a2a', '#fff0c8'], lw);
     });
     sprite(Zs * .58, Zs * .6, 1, 1, [W * 1.05, H * 1.03], function (x, w, h) {
       frond(x, { x: w * .95, y: h, a: -Math.PI / 2 - .55, spread: 1.7, n: 9, len: h * .8, wid: w * .045, droop: .3, cols: Z_MAG.concat(Z_PURP), lw: lw, rib: 1 });
       flowerB(x, w * .46, h * .7, w * .08, '#f07a2a', lw);
+      orchid(x, w * .66, h * .56, w * .12, ['#c58cf0', '#ffd75e'], lw); phiFlower(x, w * .3, h * .86, w * .11, ['#ffd75e', '#f07a2a', '#6a2a9a'], lw);
     });
     sprites.forEach(function (s) { world.appendChild(s.sh); });
 
@@ -927,7 +1092,7 @@
     if (fly) flyLeaves();   // nur im Flug; danach verschwinden sie (sonst hingen sie beim Verschieben in der Luft)
 
     // Glühwürmchen, Glitzer, Fahrtwind
-    var fxc = canvas(W, H, Math.min(DPR, 1.25)); fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; world.appendChild(fxC);
+    var fxc = canvas(W, H, Math.min(DPR, 1.25)); fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; fxC.style.width = W + 'px'; fxC.style.height = H + 'px'; world.appendChild(fxC);
     // Linsen-Glanz und Perlmutt-Schimmer (erst unten in der Lichtung)
     flare = document.createElement('div'); flare.className = 'ak-flare';
     [[.22, .1, '#fae4b4', .35], [.45, .05, '#c3b2fa', .3], [.62, .16, '#96dcf5', .18], [.8, .07, '#f8bed7', .28]].forEach(function (f) {
@@ -938,6 +1103,7 @@
     world.appendChild(flare);
     sheen = document.createElement('div'); sheen.className = 'ak-sheen'; world.appendChild(sheen);
     initParticles(); initWind();
+    placeVeil();
   }
 
   // ---------- Glühwürmchen und Glitzer ----------
@@ -1054,7 +1220,7 @@
 
   // ---------- Takt ----------
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
-      drag = null, dragged = 0, tgY = 0, tgX = 0, camX = 0, XR = 0, sways = [];
+      drag = null, dragged = 0, tgY = 0, tgX = 0, camX = 0, XR = 0, sways = [], farOn = null;
   root.addEventListener('pointermove', function (e) {   // Maus bewegt die Ebenen leicht (am Handy macht das der Finger beim Verschieben)
     if (!AK.pointer || e.pointerType !== 'mouse' || drag) return;
     ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2;
@@ -1078,12 +1244,12 @@
       try { window.getSelection().removeAllRanges(); } catch (er) {}
     }
     drag.vx = drag.vx * .6 + (e.clientX - drag.px) / d * .4; drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.px = e.clientX; drag.py = e.clientY; drag.pt = e.timeStamp;
-    tgX = clamp(drag.cx - mx, -XR, XR); tgY = clamp(drag.cy + my * 1.7, 0, camT);   // das Bild folgt dem Finger: nach unten ziehen = zurück nach oben
+    tgX = clamp(drag.cx - mx * .7, -XR, XR); tgY = clamp(drag.cy + my * 1.4, 0, camT);   // das Bild folgt dem Finger, dezent: nach unten ziehen = zurück nach oben
   }, { passive: true });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
     if (drag.on) {   // beim Loslassen gleitet die Kamera noch ein Stück weiter
-      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 180, -XR, XR); tgY = clamp(tgY + drag.vy * 420, 0, camT); }
+      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 110, -XR, XR); tgY = clamp(tgY + drag.vy * 380, 0, camT); }
       dragged = 1; setTimeout(function () { dragged = 0; }, 80); root.classList.remove('ak-drag');
     }
     drag = null;
@@ -1137,17 +1303,17 @@
         setTimeout(function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); }, 3200);   // die grossen Wedel gehörten nur zum Flug (weg, sobald alles ruhig steht)
       }
     } else if (AK.freePan) {   // von Hand: die Kamera zieht gemütlich nach
-      var kk = 1 - Math.exp(-dt / 170);
+      var kk = 1 - Math.exp(-dt / AK.panSoft);
       cam += (tgY - cam) * kk; camX += (tgX - camX) * kk;
       if (Math.abs(tgY - cam) < .05) cam = tgY;
       if (Math.abs(tgX - camX) < .05) camX = tgX;
     }
-    if (veil) for (i = 0; i < veil.length; i++) {   // Lese-Schleier: so viel Licht hinter jedem Textfeld, wie Urwald dahinter liegt
-      var Z = veil[i], need = 0, yy, vq;
-      if (shown && AK.veil) for (yy = 0; yy <= 2; yy++) need = Math.max(need, clamp((veilW - (openHW((Z.y0 + (Z.y1 - Z.y0) * yy / 2) * H - cam) - Math.abs(camX))) / (U * .2), 0, 1));
-      Z.v += (need - Z.v) * (1 - Math.exp(-dt / 220));
-      vq = Math.round(Z.v * AK.veil * 50) / 50;
-      if (vq !== Z.q) { Z.q = vq; Z.el.style.opacity = vq; }
+    if (veil) {   // weiches Feld: in der Lichtung zart, über dem Urwald kräftiger
+      var need = 0, vq;
+      if (shown) { for (i = 0; i < 3; i++) need = Math.max(need, clamp((veilW - (openHW(veil._y[i] - cam) - Math.abs(camX))) / (U * .2), 0, 1)); need = AK.veil[0] + (AK.veil[1] - AK.veil[0]) * need; }
+      veilV += (need - veilV) * (1 - Math.exp(-dt / 260));
+      vq = Math.round(veilV * 50) / 50;
+      if (vq !== veilQ) { veilQ = vq; veil.style.opacity = vq; }
     }
     var lit = !fl && shown && cam < H * .45;
     if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
@@ -1174,10 +1340,8 @@
       }
       if (on !== F.on) { F.on = on; F.el.style.visibility = on ? 'visible' : 'hidden'; }
     }
-    if (sways.length && !reduce && cam < H * 1.2) for (i = 0; i < sways.length; i++) {   // Wind im Urwald: Böen wandern quer durchs Bild
-      var q = sways[i], g = .55 + .45 * Math.sin(t * .00023 + q.x * .004);
-      q.el.style.transform = 'rotate(' + ((Math.sin(t * q.f + q.ph) + Math.sin(t * q.f * 2.7 + q.ph * 1.3) * .3) * q.amp * g).toFixed(2) + 'deg)';
-    }
+    var far = cam > H * 1.2;   // weit oben sieht man die wiegenden Pflanzen nicht: Animation anhalten
+    if (far !== farOn && world) { farOn = far; world.classList.toggle('ak-far', far); }
     for (i = 0; i < sprites.length; i++) {
       var S = sprites[i], rot = reduce ? 0 : Math.sin(t * S.f + S.ph) * S.amp + Math.sin(t * S.f * 2.3 + S.ph * 2) * S.amp * .35;
       var sx = S.x + dx * 1.35 - camX * 1.2, sy = S.y + cam * 1.25 + dy * 1.35 - pan * H * AK.scrollPan * .13 + (1 - ie) * 90;
@@ -1263,8 +1427,9 @@
   window.addEventListener('resize', function () {
     clearTimeout(rsT);
     rsT = setTimeout(function () {
-      if (Math.abs(root.clientWidth - lastW) > 20) { lastW = root.clientWidth; fl = null; paintScene(false); litOn = null; reveal(); }
-      measureWheel();
+      W = root.clientWidth; measureWheel();
+      if (Math.abs(W - lastW) > 20) { lastW = W; fl = null; paintScene(false); litOn = null; reveal(); measureWheel(); }
+      else placeVeil();
     }, 180);
   });
 
@@ -1275,10 +1440,11 @@
     var fly = false;
     try { fly = AK.flightMs > 0 && !reduce && (sessionStorage.getItem('ak-fly') === '1' || !sessionStorage.getItem('ak-seen')); sessionStorage.removeItem('ak-fly'); sessionStorage.setItem('ak-seen', '1'); } catch (e) {}
     var t0 = performance.now();
+    W = root.clientWidth;
+    setupWheel(); drawWheel();            // zuerst das Rad: das Bild richtet sich nach dem Platz des Textes
     paintScene(fly); lastW = W;           // teuer: einmal beim Laden, solange die Seite noch perlweiss ist
     if (location.hash === '#ak-test') window.__akPaintMs = Math.round(performance.now() - t0);
-    setupWheel();
-    drawWheel();
+    measureWheel();
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         tBoot = performance.now();
