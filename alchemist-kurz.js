@@ -188,13 +188,12 @@
     '  background: var(--farbe--glas, rgba(168,168,168,.5)); outline: 1px solid var(--farbe--schwarz, #000); outline-offset: 0; box-shadow: inset 0 0 5px 0 #fff; }',
     /* Beschreibung: Der Kasten (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, und der Text steht fest an der oberen Kante.
        Der Text liegt unsichtbar im Layout (ak-cap-l: so bestimmt der Browser Umbruch und Platz jedes Buchstabens) und wird auf eine eigene
-       Zeichenfläche gemalt (ak-cap-cv, siehe «Beschreibung im Kasten»). Solange das Rad auf einer anderen Zeile steht, ist er blasser (is-stale). */
+       Zeichenfläche gemalt (ak-cap-cv, siehe «Beschreibung im Kasten»). */
     '[data-ak-caption] { position: relative; }',
     '[data-ak-caption] .ak-cap-in { display: block; width: 100%; }',
     '[data-ak-caption] .ak-cap-l { display: block; visibility: hidden; }',
     '[data-ak-caption] .ak-w { white-space: nowrap; }',
-    '.ak-cap-cv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .2s ease; }',
-    '[data-ak-caption].is-stale .ak-cap-cv { opacity: .45; }',
+    '.ak-cap-cv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }',
     '.ak-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
     /* Titel: dunkler Verlauf mit wanderndem Glanz. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation») */
@@ -1817,7 +1816,9 @@
     return p;
   }
   // ---------- Beschreibung im Kasten ----------
-  // Hugo 27.11. (19:21–19:37): Der Text steht fest an der oberen Kante. Gewechselt wird erst, wenn das Rad losgelassen ist und steht (capTick).
+  // Hugo 27.11. (19:21–19:57): Der Text steht fest an der oberen Kante. Gewechselt wird, sobald das Rad losgelassen ist und klar ist, auf welcher
+  // Zeile es landet (capTick). Bis dahin bleibt der alte Text unverändert stehen (er wurde zuerst blasser und wartete, bis das Rad ganz stand: am
+  // iPhone fast eine Sekunde, Video 19:56 – «wieso wird der Text vor der Animation blass und macht erst später die Animation?»).
   // Dann schreibt er sich um wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie (home.js goIn, galerie.js setHint): Die alten
   // Buchstaben werden von links nach rechts unscharf und gehen nach oben weg; die neuen kommen von unten aus der Unschärfe, leuchten in einer
   // Hirsch-Perlmutt-Farbe und setzen sich dann schwarz. Gleiche Zeiten wie dort (14 und 18 ms je Buchstabe versetzt, 0.42 s Kommen, 1 s Farbe);
@@ -1928,13 +1929,13 @@
     X.globalAlpha = 1; X.clearRect(0, 0, capW, capH);
     if (!A) { X.drawImage(T.G, 0, 0, capW, capH); for (i = 0; i < T.q.length; i++) capBlit(T.F, i, T.q[i], 1); X.globalAlpha = 1; return; }
     t = now - A.t0;
-    X.globalAlpha = A.oa * (1 - clamp(t / 400, 0, 1)); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
+    X.globalAlpha = 1 - clamp(t / 400, 0, 1); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
     X.globalAlpha = clamp((t - 500) / Math.max(1, A.dur - 500), 0, 1); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);
     for (i = 0; i < A.O.q.length; i++) {   // alter Text: wird unscharf, blasser und geht ein Stück nach oben weg
       l = A.O.q[i]; p = (t - l.line * 90 - l.k * 14) / 420; if (p >= 1) continue;
       p = p < 0 ? 0 : p * p * (3 - 2 * p);
-      capBlit(A.O.F, i, l, A.oa * (1 - p) * (1 - p), -.35 * l.em * p);
-      capBlit(A.O.B, i, l, A.oa * (1 - p) * p * 2.8, -.35 * l.em * p);
+      capBlit(A.O.F, i, l, (1 - p) * (1 - p), -.35 * l.em * p);
+      capBlit(A.O.B, i, l, (1 - p) * p * 2.8, -.35 * l.em * p);
     }
     for (i = 0; i < T.q.length; i++) {   // neuer Text: von unten aus der Unschärfe, Perlmutt, dann schwarz
       l = T.q[i]; x = t - 120 - l.line * 90 - l.k * 18; if (x <= 0) continue;
@@ -1956,10 +1957,9 @@
     }
     if (capA) { capFree(capA.O); capA = null; if (capT.B) { capT.B.c.width = capT.S.c.width = 0; capT.B = capT.S = null; } }   // ein laufendes Umschreiben wird abgelöst
     var resized = cap.clientWidth !== capW || cap.clientHeight !== capH; capCanvas();
-    var O = capT, stale = cap.classList.contains('is-stale'), fx = anim && O && !resized && !reduce && lv < 2 && !capOff;
+    var O = capT, fx = anim && O && !resized && !reduce && lv < 2 && !capOff;
     capShown = n; capT = capBuild(n);
     if (cap.clientWidth !== capW || cap.clientHeight !== capH) { capFree(capT); capCanvas(); capT = capBuild(n); fx = false; }   // der neue Text hat den Kasten vergrössert: Zeichenfläche anpassen, ohne Animation
-    capCv.style.transition = 'none'; cap.classList.remove('is-stale'); void capCv.offsetWidth; capCv.style.transition = '';   // die Blässe des alten Textes übernimmt ab jetzt die Zeichnung (oa), ohne Sprung
     if (!fx) { capFree(O); capDraw(0); return; }
     var T = capT, dur = 0;
     var bd = CAPSH ? Math.min(capD, 1.5) : .3;
@@ -1967,7 +1967,7 @@
     T.S = capAtlas(T, Math.min(capD, 2), 12, function (g, l, x, y, i, k) { var pc = PEARL[i % PEARL.length]; g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });
     O.B = capAtlas(O, bd, 12, function (g, l, x, y, i, k) { capSoft(g, l.s, x, y, 'rgba(0,0,0,.62)', 4.5, k); });
     T.q.forEach(function (l) { dur = Math.max(dur, 120 + l.line * 90 + l.k * 18 + 1000); });
-    capA = { t0: performance.now(), O: O, oa: stale ? .45 : 1, dur: dur };
+    capA = { t0: performance.now(), O: O, dur: dur };
     capM = { t: capA.t0, d: dur, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
   }
   function capRedraw() {   // neue Grösse: Text neu ausmessen und ruhig hinmalen
@@ -1981,9 +1981,17 @@
     capBad = capM.n < capM.d * .02 || capM.slow >= capM.n * .25 ? capBad + 1 : 0; if (capBad >= 2) capOff = 1;
     capM = null;
   }
-  function capTick(now) {   // im Takt: erst umschreiben, wenn kein Finger mehr am Rad ist, es steht und eingerastet ist
+  // Im Takt: umschreiben, sobald kein Finger mehr am Rad ist und klar ist, wo es landet – das Rad ist langsam (unter 1.2 Zeilen pro Sekunde), nah an
+  // der Zeile (unter 0.3 Zeilen) und die Auswahl seit 90 ms dieselbe. Auf den völligen Stillstand zu warten dauerte am iPhone zu lange: das
+  // Einrasten läuft dort lange aus, obwohl das Rad für das Auge schon steht.
+  var capST = 0, capSN = 0, capVel = 0, capCN = -1, capCT = 0;
+  function capTick(now) {
     if (capA) capDraw(now);
-    if (!cap || cur < 0 || cur === capShown || holding || now - lastScroll < 140 || Math.abs(wheel.scrollTop - cur * rowH) > 1.5) return;
+    if (!cap || cur < 0) return;
+    var st = wheel.scrollTop, dt = now - capSN;
+    capVel = dt > 0 && dt < 100 ? capVel * .5 + Math.abs(st - capST) / dt * .5 : 0; capST = st; capSN = now;   // Tempo des Rads in px je ms, geglättet
+    if (cur !== capCN) { capCN = cur; capCT = now; }
+    if (cur === capShown || holding || now - capCT < 90 || capVel * 1000 > rowH * 1.2 || Math.abs(st - cur * rowH) > rowH * .3) return;
     showCap(cur, true);
   }
   function select(n, spark) {
@@ -1991,8 +1999,7 @@
     items.forEach(function (it, i) { it.setAttribute('aria-selected', i === n ? 'true' : 'false'); it.classList.toggle('is-sel', i === n); });   // is-sel: schwarze Schrift mit weissem Schein, wie im Menü-Knopf
     wheel.setAttribute('aria-activedescendant', items[n].id);
     if (!cap) return;
-    if (prev === -1) showCap(n, false);
-    else cap.classList.toggle('is-stale', n !== capShown);   // das Rad steht auf einer anderen Zeile: der alte Text wartet blasser
+    if (prev === -1) showCap(n, false);   // danach wechselt der Text in capTick
   }
 
   // ---------- Takt ----------
