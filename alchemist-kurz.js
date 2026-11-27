@@ -1768,8 +1768,8 @@
       if (e.key === 'ArrowUp') { go(Math.max(0, cur - 1)); e.preventDefault(); }
     });
     wheel.addEventListener('scroll', function () { lastScroll = performance.now(); }, { passive: true });
-    wheel.addEventListener('touchstart', function () { holding = 1; }, { passive: true });
-    ['touchend', 'touchcancel'].forEach(function (ev) { wheel.addEventListener(ev, function (e) { if (!e.touches || !e.touches.length) { holding = 0; lastScroll = performance.now(); } }, { passive: true }); });
+    wheel.addEventListener('touchstart', function () { holding = 1; capRel = 0; capPr = capPN = -1; }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) { wheel.addEventListener(ev, function (e) { if (!e.touches || !e.touches.length) { holding = 0; lastScroll = capRel = performance.now(); capHi.length = 0; capPr = capPN = -1; } }, { passive: true }); });
     measureWheel();
   }
   function measureWheel() {
@@ -1784,13 +1784,13 @@
     });
     wP = NaN;   // neu zeichnen
   }
-  function go(i) { wheel.scrollTo({ top: i * rowH, behavior: reduce ? 'auto' : 'smooth' }); }
+  function go(i) { capGo = i; capGoT = performance.now(); wheel.scrollTo({ top: i * rowH, behavior: reduce ? 'auto' : 'smooth' }); }   // capGo: das Ziel steht fest, die Beschreibung wechselt sofort (capTick)
   var lastScroll = 0, wheelPos = 0, holding = 0;
   // Sicherheitsnetz fürs Einrasten: Steht das Rad still (kein Finger, 160 ms keine Bewegung) und liegt nicht genau auf einer Zeile, gleitet es zur nächsten.
   function settle(now) {
     if (!items.length || holding || now - lastScroll < 160) return;
     var t = clamp(Math.round(wheel.scrollTop / rowH), 0, items.length - 1) * rowH;
-    if (Math.abs(wheel.scrollTop - t) > 1.5) { lastScroll = now + 400; wheel.scrollTo({ top: t, behavior: reduce ? 'auto' : 'smooth' }); }
+    if (Math.abs(wheel.scrollTop - t) > 1.5) { lastScroll = now + 400; capGo = Math.round(t / rowH); capGoT = now; wheel.scrollTo({ top: t, behavior: reduce ? 'auto' : 'smooth' }); }
   }
   var wP = NaN, wR = 0, TW = [];
   function drawWheel() {
@@ -1816,28 +1816,32 @@
     return p;
   }
   // ---------- Beschreibung im Kasten ----------
-  // Hugo 27.11. (19:21–19:57): Der Text steht fest an der oberen Kante. Gewechselt wird, sobald das Rad losgelassen ist und klar ist, auf welcher
-  // Zeile es landet (capTick). Bis dahin bleibt der alte Text unverändert stehen (er wurde zuerst blasser und wartete, bis das Rad ganz stand: am
-  // iPhone fast eine Sekunde, Video 19:56 – «wieso wird der Text vor der Animation blass und macht erst später die Animation?»).
-  // Dann schreibt er sich um wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie (home.js goIn, galerie.js setHint): Die alten
-  // Buchstaben werden von links nach rechts unscharf und gehen nach oben weg; die neuen kommen von unten aus der Unschärfe, leuchten in einer
-  // Hirsch-Perlmutt-Farbe und setzen sich dann schwarz. Der Ablauf folgt den Vorbildern (18 ms je Buchstabe versetzt, von unten aus der Unschärfe),
-  // ist aber weicher und etwas länger (20:05): Die Farbe geht in 0.9 s sanft in Schwarz über, der alte Text wird erst unscharf und löst sich dann auf.
-  // Die Zeilen laufen nebeneinander, jede 70 ms später.
+  // Hugo 27.11. (19:21–20:13): Der Text steht fest an der oberen Kante. Gewechselt wird, sobald klar ist, auf welcher Zeile das Rad landet
+  // (capTick) – nicht erst, wenn es steht («fühlt sich an wie ein Lag», 20:13): beim Tippen auf eine Zeile sofort, nach dem Wischen kurz nach
+  // dem Loslassen. Bis dahin bleibt der alte Text unverändert stehen. Dann blendet er als Ganzes rasch aus – ohne dunkle Unschärfe («schwarzer
+  // Schatten beim Wechsel», 20:13) – und der neue schreibt sich hinein wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie
+  // (home.js goIn, galerie.js setHint): Buchstabe für Buchstabe von unten aus der Unschärfe, in fliessendem Hirsch-Perlmutt, das sich in 0.9 s
+  // sanft schwarz setzt (18 ms je Buchstabe versetzt, die Zeilen nebeneinander, jede 70 ms später).
   //
   // Warum Ebenen auf einer Zeichenfläche und nicht wie dort einzelne Buchstaben im Dokument: Die erste Fassung animierte Farbe und Schein von
   // rund 70 Buchstaben einzeln. Auf Hugos iPhone malte Safari den Text dabei nur rund 12-mal pro Sekunde neu (Video 19:37), es ruckelte.
   // Jetzt wird jeder Buchstabe beim Wechsel einmal in drei Fassungen vorgemalt (unscharf in Perlmutt, scharf in Perlmutt mit Schein, schwarz mit
-  // weissem Schein; vom alten Text dazu eine unscharfe). Im Takt werden diese fertigen Bildchen nur noch mit wechselnder Deckkraft übereinander
-  // gelegt – das kostet fast nichts. Wo jeder Buchstabe steht, sagt weiter der Browser: Der Text liegt unsichtbar im Layout (capBuild).
+  // weissem Schein). Der alte Text ist ein Abbild der Zeichenfläche, so wie sie im Moment des Wechsels aussah – auch mitten in einem laufenden
+  // Umschreiben, das dadurch weich abgelöst wird. Im Takt werden diese fertigen Bilder nur noch mit wechselnder Deckkraft übereinander gelegt –
+  // das kostet fast nichts. Wo jeder Buchstabe steht, sagt weiter der Browser: Der Text liegt unsichtbar im Layout (capBuild).
   var PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'], capIn = null, capSr = null, capCv = null, capX = null, capW = 0, capH = 0, capD = 1,
-      capShown = -1, capT = null, capA = null, capM = null, capBad = 0, capOff = 0;
+      capShown = -1, capT = null, capA = null, capM = null, capBad = 0, capOff = 0, capSn = null, capSnX = null;
   function capCanvas() {   // Zeichenfläche so gross wie der Kasten, in Gerätepixeln (bis 3-fach: die Schrift soll so scharf sein wie daneben)
     var w = cap.clientWidth, h = cap.clientHeight;
     if (capCv && w === capW && h === capH) return;
     if (!capCv) { capCv = document.createElement('canvas'); capCv.className = 'ak-cap-cv'; capCv.setAttribute('aria-hidden', 'true'); cap.appendChild(capCv); capX = capCv.getContext('2d'); }
     capD = Math.min(window.devicePixelRatio || 1, 3); capW = w; capH = h;
     capCv.width = Math.max(2, Math.round(w * capD)); capCv.height = Math.max(2, Math.round(h * capD)); capX.setTransform(capD, 0, 0, capD, 0, 0);
+  }
+  function capSnap() {   // Abbild der Zeichenfläche: der alte Text, genau wie er gerade dasteht
+    if (!capSn) { capSn = document.createElement('canvas'); capSnX = capSn.getContext('2d'); }
+    if (capSn.width !== capCv.width || capSn.height !== capCv.height) { capSn.width = capCv.width; capSn.height = capCv.height; } else capSnX.clearRect(0, 0, capSn.width, capSn.height);
+    capSnX.drawImage(capCv, 0, 0);
   }
   function capDom(n) {   // der Text als unsichtbare Zeile(n) im Layout: Wörter bleiben zusammen, jeder Buchstabe ist ein eigenes Stück zum Ausmessen
     var price = items[n].querySelector('.ak-item-price'), info = items[n].querySelector('.ak-item-info'), l = document.createElement('span'), ch = [];
@@ -1935,18 +1939,11 @@
     X.globalAlpha = 1; X.clearRect(0, 0, capW, capH);
     if (!A) { X.drawImage(T.G, 0, 0, capW, capH); for (i = 0; i < T.q.length; i++) capBlit(T.F, i, T.q[i], 1); X.globalAlpha = 1; return; }
     t = now - A.t0;
-    X.globalAlpha = 1 - sm(t / 400); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
-    X.globalAlpha = sm((t - 600) / Math.max(1, A.dur - 600)); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);
-    // Weiche Übergänge (Hugo 27.11., 20:05: «Farbwechsel und Übergang noch smoother»): Keine Ebene blendet aus, bevor die nächste ganz da ist –
-    // sonst entsteht dazwischen ein dünner, grauer Moment. Alle Kurven beginnen und enden sanft (sm).
-    for (i = 0; i < A.O.q.length; i++) {   // alter Text: wird zuerst weich unscharf (alle fast zugleich), dann löst er sich von links nach rechts nach oben auf
-      l = A.O.q[i]; p = (t - l.line * 50 - l.k * 6) / 600; if (p >= 1) continue; if (p < 0) p = 0;
-      dy = -.35 * l.em * sm(p);
-      capBlit(A.O.F, i, l, 1 - sm(p / .4), dy);
-      capBlit(A.O.B, i, l, sm(p / .3) * (1 - sm((p - .35) / .65)), dy);
-    }
+    X.globalAlpha = 1 - sm(t / 200); if (X.globalAlpha > .004) X.drawImage(capSn, 0, 0, capW, capH);   // der alte Text samt Schein blendet als Ganzes rasch aus – ohne dunkle Unschärfe
+    X.globalAlpha = sm((t - 600) / Math.max(1, A.dur - 600)); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);   // der grosse weiche Schein des neuen Textes
+    // Weiche Übergänge (Hugo 27.11., 20:05): Keine Ebene blendet aus, bevor die nächste ganz da ist. Alle Kurven beginnen und enden sanft (sm).
     for (i = 0; i < T.q.length; i++) {   // neuer Text: von unten aus der Unschärfe, Perlmutt, dann langsam schwarz
-      l = T.q[i]; x = t - 100 - l.line * 70 - l.k * 18; if (x <= 0) continue;
+      l = T.q[i]; x = t - 60 - l.line * 70 - l.k * 18; if (x <= 0) continue;
       if (x >= 1300) { capBlit(T.F, i, l, 1); continue; }
       p = Math.min(1, x / 480); e = 1 - Math.pow(1 - p, 3); sh = sm((x - 60) / 420); cf = sm((x - 380) / 900);
       dy = .35 * l.em * (1 - e);
@@ -1955,31 +1952,33 @@
       capBlit(T.F, i, l, sh * cf, dy);                                // Schwarz legt sich langsam darüber: die Farbe mischt sich, statt umzuspringen
     }
     X.globalAlpha = 1;
-    if (t >= A.dur) { capFree(A.O); capA = null; T.B.c.width = T.S.c.width = 0; T.B = T.S = null; capDraw(now); }   // fertig: Hilfsbilder freigeben, Ruhebild malen
+    if (t >= A.dur) { capA = null; T.B.c.width = T.S.c.width = 0; T.B = T.S = null; capDraw(now); }   // fertig: Hilfsbilder freigeben, Ruhebild malen
   }
   function showCap(n, anim) {
     if (!capIn) {   // für Vorlese-Programme steht der ganze Text unsichtbar daneben
       capIn = document.createElement('div'); capIn.className = 'ak-cap-in'; capSr = document.createElement('span'); capSr.className = 'ak-sr';
       cap.textContent = ''; cap.appendChild(capSr); cap.appendChild(capIn);
     }
-    if (capA) { capFree(capA.O); capA = null; if (capT.B) { capT.B.c.width = capT.S.c.width = 0; capT.B = capT.S = null; } }   // ein laufendes Umschreiben wird abgelöst
-    var resized = cap.clientWidth !== capW || cap.clientHeight !== capH; capCanvas();
-    var O = capT, fx = anim && O && !resized && !reduce && lv < 2 && !capOff;
-    capShown = n; capT = capBuild(n);
+    var resized = cap.clientWidth !== capW || cap.clientHeight !== capH, O = capT, fx = anim && O && capCv && !resized && !reduce && lv < 2 && !capOff;
+    // <test>
+    if (window.__akCapLog) window.__akCapLog.push([Math.round(performance.now()), n, capGo >= 0 ? 'ziel' : capPr === n ? 'schaetzung' : 'netz', +(wheel.scrollTop / rowH).toFixed(2), capMiss]);
+    // </test>
+    if (fx) capSnap();   // vor allem anderen: So sieht der Kasten jetzt aus (auch mitten in einem laufenden Umschreiben) – das blendet gleich aus
+    capA = null; capCanvas();
+    capShown = n; capT = capBuild(n); capFree(O);
     if (cap.clientWidth !== capW || cap.clientHeight !== capH) { capFree(capT); capCanvas(); capT = capBuild(n); fx = false; }   // der neue Text hat den Kasten vergrössert: Zeichenfläche anpassen, ohne Animation
-    if (!fx) { capFree(O); capDraw(0); return; }
+    if (!fx) { capDraw(0); return; }
     var T = capT, dur = 0;
     var bd = CAPSH ? Math.min(capD, 1.5) : .3;
     T.B = capAtlas(T, bd, 12, function (g, l, x, y, i, k) { var pc = capPearl(l); capSoft(g, l.s, x, y, pc, 4.5, k); capSoft(g, l.s, x, y, pc, 4.5, k); });
     T.S = capAtlas(T, capD, 12, function (g, l, x, y, i, k) { var pc = capPearl(l); g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });   // gleiche Auflösung wie die schwarze Fassung: sie liegen deckungsgleich übereinander
-    O.B = capAtlas(O, bd, 14, function (g, l, x, y, i, k) { capSoft(g, l.s, x, y, 'rgba(0,0,0,.6)', 5.5, k); });
-    T.q.forEach(function (l) { dur = Math.max(dur, 100 + l.line * 70 + l.k * 18 + 1300); });
-    capA = { t0: performance.now(), O: O, dur: dur };
+    T.q.forEach(function (l) { dur = Math.max(dur, 60 + l.line * 70 + l.k * 18 + 1300); });
+    capA = { t0: performance.now(), dur: dur };
     capM = { t: capA.t0, d: dur, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
   }
   function capRedraw() {   // neue Grösse: Text neu ausmessen und ruhig hinmalen
     if (!capIn || capShown < 0) return;
-    if (capA) { capFree(capA.O); capA = null; }
+    capA = null;
     capFree(capT); capT = null; capW = 0; capCanvas(); capT = capBuild(capShown); capDraw(0);
   }
   function capWatch(raw, now) {   // ruckelt das Umschreiben zweimal hintereinander (jedes vierte Bild zu langsam), wechselt der Text auf diesem Gerät künftig ohne Animation
@@ -1988,17 +1987,62 @@
     capBad = capM.n < capM.d * .02 || capM.slow >= capM.n * .25 ? capBad + 1 : 0; if (capBad >= 2) capOff = 1;
     capM = null;
   }
-  // Im Takt: umschreiben, sobald kein Finger mehr am Rad ist und klar ist, wo es landet – das Rad ist langsam (unter 1.2 Zeilen pro Sekunde), nah an
-  // der Zeile (unter 0.3 Zeilen) und die Auswahl seit 90 ms dieselbe. Auf den völligen Stillstand zu warten dauerte am iPhone zu lange: das
-  // Einrasten läuft dort lange aus, obwohl das Rad für das Auge schon steht.
-  var capST = 0, capSN = 0, capVel = 0, capCN = -1, capCT = 0;
+  // Im Takt: umschreiben, sobald klar ist, wo das Rad landet (Hugo 27.11., 20:13: «direkt beim Einrasten oder eher sobald losgelassen wird und
+  // klar steht, wo es einrastet – es fühlt sich jetzt noch an wie ein Lag»). Drei Wege, vom schnellsten zum sichersten:
+  // 1. Ziel bekannt (capGo): Tipp auf eine Zeile, Pfeiltaste oder Nachgleiten – der Text wechselt sofort, während das Rad noch hinfährt.
+  // 2. Nach dem Wischen (capGuess): Das losgelassene Rad läuft aus. Aus den letzten Bildern wird geschätzt, wo es stehen bleibt (wie schnell es
+  //    gerade ist und wie stark es bremst). Zeigt die Schätzung einige Bilder lang auf dieselbe Zeile (drei, bei längerem Restweg mehr), wechselt
+  //    der Text – meist ein bis zwei Zehntelsekunden nach dem Loslassen. Lag die Schätzung zweimal daneben (der Text musste nachkorrigiert
+  //    werden), bleibt dieser Weg bis zum nächsten Laden aus.
+  // 3. Sicherheitsnetz: Das Rad ist langsam (unter 1.2 Zeilen pro Sekunde), nah an der Zeile (unter 0.3 Zeilen) und die Auswahl seit 90 ms
+  //    dieselbe. Das gilt auch für Mausrad und Trackpad.
+  var capST = 0, capSN = 0, capVel = 0, capCN = -1, capCT = 0, capGo = -1, capGoT = 0, capRel = 0, capHi = [], capPN = -1, capPC = 0, capPr = -1, capMiss = 0, capGR = 0;
+  function capGuess(now, st) {   // Zeile, auf der das losgelassene Rad stehen bleiben wird; -1 = noch unklar
+    capHi.push([now, st]); if (capHi.length > 7) capHi.shift();
+    var n = capHi.length, a = capHi[0], b = capHi[n - 1], m = capHi[n >> 1], last = items.length - 1, p = st / rowH, vA, vB, sp, q, tau, est;
+    capGR = 0; if (n < 3 || b[0] - a[0] < 20) return -1;
+    vB = (b[1] - m[1]) / Math.max(1, b[0] - m[0]); sp = Math.abs(vB) * 1000 / rowH;   // Tempo in Zeilen pro Sekunde
+    if (sp < .5 && Math.abs(b[1] - a[1]) / (b[0] - a[0]) * 1000 < rowH * .5) return clamp(Math.round(p), 0, last);   // steht praktisch: die nächste Zeile
+    if (n < 5) return -1;
+    vA = (m[1] - a[1]) / Math.max(1, m[0] - a[0]);
+    if (vA * vB < 0) return -1;   // Richtung wechselt gerade
+    q = vA ? vB / vA : 9;
+    if (q > .05 && q < .85) {   // bremst deutlich aus (Schwung nach dem Wischen): heutige Stelle plus die Strecke, die beim Auslaufen noch kommt
+      tau = -(b[0] - a[0]) / 2 / Math.log(q);
+      est = st + vB * Math.exp(-(b[0] - m[0]) / 2 / tau) * tau;
+      capGR = Math.abs(est - st) / rowH;   // so viele Zeilen läuft das Rad noch
+      if (capGR > 4 || Math.abs(est / rowH - Math.round(est / rowH)) > .38) return -1;   // noch zu weit weg oder zu nah an der Grenze zwischen zwei Zeilen: lieber noch ein Bild warten
+      return clamp(Math.round(est / rowH), 0, last);
+    }
+    if (q >= .93 && sp < 3.5) return clamp(vB > 0 ? Math.ceil(p - .1) : Math.floor(p + .1), 0, last);   // gleitet gleichmässig oder zieht an: Das ist das Einrasten selbst, es endet auf der nächsten Zeile voraus
+    return -1;
+  }
   function capTick(now) {
     if (capA) capDraw(now);
     if (!cap || cur < 0) return;
-    var st = wheel.scrollTop, dt = now - capSN;
+    var st = wheel.scrollTop, dt = now - capSN, mv = st !== capST, n;
     capVel = dt > 0 && dt < 100 ? capVel * .5 + Math.abs(st - capST) / dt * .5 : 0; capST = st; capSN = now;   // Tempo des Rads in px je ms, geglättet
     if (cur !== capCN) { capCN = cur; capCT = now; }
-    if (cur === capShown || holding || now - capCT < 90 || capVel * 1000 > rowH * 1.2 || Math.abs(st - cur * rowH) > rowH * .3) return;
+    if (holding) { capGo = -1; return; }
+    if (capGo >= 0) {   // 1. Ziel bekannt
+      if (mv) capGoT = now;
+      if (now - capGoT < 250) { if (capGo !== capShown) showCap(capGo, true); return; }
+      capGo = -1;   // angekommen (oder unterwegs angehalten): ab hier gilt wieder, wo das Rad wirklich steht
+    }
+    if (capRel) {   // 2. nach dem Wischen
+      if (now - capRel > 1500) { capRel = 0; capPr = -1; }
+      else if (capMiss < 2) {
+        n = capGuess(now, st);
+        if (n !== capPN) { capPN = n; capPC = 0; }
+        if (n >= 0 && ++capPC >= (capPr < 0 ? 3 : 6) + Math.round(capGR * 2) && n !== capShown) {   // je weiter der Weg noch ist, desto länger muss die Schätzung dieselbe bleiben
+          if (capPr >= 0) capMiss++;   // die erste Schätzung lag daneben
+          capPr = n; showCap(n, true); return;
+        }
+      }
+    }
+    // 3. Sicherheitsnetz. Hat die Schätzung schon gewechselt, zählt hier erst der wirkliche Stillstand – sonst spränge der Text zurück, solange das Rad noch nah an der alten Zeile anfährt.
+    if (cur === capShown || now - capCT < 90 || capVel * 1000 > rowH * (capPr < 0 ? 1.2 : .15) || Math.abs(st - cur * rowH) > rowH * .3) return;
+    if (capPr >= 0) { capMiss++; capPr = -1; }   // die Schätzung lag daneben
     showCap(cur, true);
   }
   function select(n, spark) {
