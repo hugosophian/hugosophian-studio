@@ -186,14 +186,15 @@
        aussen schwarze Linie. Die Farben kommen aus denselben Webflow-Variablen. So ist sie über Wiese und Urwald gleich gut lesbar. */
     '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); box-sizing: border-box; border: 1px solid var(--farbe--weiss, #fff); border-radius: 999px;',
     '  background: var(--farbe--glas, rgba(168,168,168,.5)); outline: 1px solid var(--farbe--schwarz, #000); outline-offset: 0; box-shadow: inset 0 0 5px 0 #fff; }',
-    /* Beschreibung: Der Kasten (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, und der Text steht fest an der oberen Kante. Er bewegt
-       sich nie: Beim Wechsel schreiben sich die Buchstaben an Ort und Stelle um (showCap). Solange das Rad auf einer anderen Zeile steht als
-       der Text, ist er blasser (is-stale). Der alte Text liegt beim Umschreiben kurz über dem neuen (is-old). */
-    '[data-ak-caption] .ak-cap-in { display: block; position: relative; width: 100%; transition: opacity .2s ease; }',
-    '[data-ak-caption] .ak-cap-in.is-stale { opacity: .45; }',
-    '[data-ak-caption] .ak-cap-l { display: block; }',
-    '[data-ak-caption] .ak-cap-l.is-old { position: absolute; left: 0; right: 0; top: 0; }',
+    /* Beschreibung: Der Kasten (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, und der Text steht fest an der oberen Kante.
+       Der Text liegt unsichtbar im Layout (ak-cap-l: so bestimmt der Browser Umbruch und Platz jedes Buchstabens) und wird auf eine eigene
+       Zeichenfläche gemalt (ak-cap-cv, siehe «Beschreibung im Kasten»). Solange das Rad auf einer anderen Zeile steht, ist er blasser (is-stale). */
+    '[data-ak-caption] { position: relative; }',
+    '[data-ak-caption] .ak-cap-in { display: block; width: 100%; }',
+    '[data-ak-caption] .ak-cap-l { display: block; visibility: hidden; }',
     '[data-ak-caption] .ak-w { white-space: nowrap; }',
+    '.ak-cap-cv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .2s ease; }',
+    '[data-ak-caption].is-stale .ak-cap-cv { opacity: .45; }',
     '.ak-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
     /* Titel: dunkler Verlauf mit wanderndem Glanz. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation») */
@@ -219,7 +220,7 @@
        Sehr alte Browser kennen svh nicht und würden die Werte verwerfen. Für sie stehen hier die Werte nur nach der Breite. */
     '@supports not (height: 1svh) { @media (max-width: 479px) { [data-ak] .ak-inner { padding-top: 14vw; padding-bottom: 30vw; } [data-ak] .ak-kicker { font-size: 3.6vw; }',
     '  [data-ak] .ak-title { margin-top: 1vw; font-size: 15vw; } [data-ak] .ak-lead { margin-top: 3vw; font-size: 4.2vw; } [data-ak] .ak-wheel { height: 60vw; margin-top: 6vw; }',
-    '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { width: 88vw; min-height: 25.5vw; margin-top: 4vw; padding: 3vw; border-radius: 6vw; font-size: 4.2vw; } } }',
+    '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { width: 88vw; min-height: 26.2vw; margin-top: 4vw; padding: 3vw; border-radius: 6vw; font-size: 4.2vw; } } }',
     '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-fly, .ak-flap, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -1815,17 +1816,31 @@
     if (n !== cur) select(n, cur !== -1);
     return p;
   }
-  // Beschreibung im Kasten (Hugo 27.11., 19:21–19:24): Der Text steht fest an der oberen Kante und bewegt sich nie. Gewechselt wird erst, wenn
-  // das Rad losgelassen ist und steht (capTick) – beim Drehen wechselt die Auswahl mehrmals pro Sekunde, das würde flimmern. Dann schreiben sich
-  // die Buchstaben an Ort und Stelle um, mit dem Perlmutt-Schimmer der Site (wie «Werkstatt betreten» auf der Homepage, home.js goIn): Jeder
-  // Buchstabe kommt aus der Unschärfe, leuchtet in einer Hirsch-Perlmutt-Farbe und setzt sich dann schwarz. Die Unschärfe ist ein Schein in
-  // der Farbe des Buchstabens (durchsichtiger Buchstabe mit weichem Schatten), kein Filter: der Filter je Buchstabe ruckelte am Handy.
-  // Das Ganze dauert eine Sekunde, egal wie lang der Text ist. Ab Stufe 2 (schwaches Gerät) und bei «Bewegung reduzieren» wechselt der Text ohne Schimmer.
-  var PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'], capIn = null, capSr = null, capShown = -1, capFin = null, capM = null, capBad = 0, capOff = 0;
-  function capLayer(n) {
+  // ---------- Beschreibung im Kasten ----------
+  // Hugo 27.11. (19:21–19:37): Der Text steht fest an der oberen Kante. Gewechselt wird erst, wenn das Rad losgelassen ist und steht (capTick).
+  // Dann schreibt er sich um wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie (home.js goIn, galerie.js setHint): Die alten
+  // Buchstaben werden von links nach rechts unscharf und gehen nach oben weg; die neuen kommen von unten aus der Unschärfe, leuchten in einer
+  // Hirsch-Perlmutt-Farbe und setzen sich dann schwarz. Gleiche Zeiten wie dort (14 und 18 ms je Buchstabe versetzt, 0.42 s Kommen, 1 s Farbe);
+  // die Zeilen laufen nebeneinander, jede 90 ms später.
+  //
+  // Warum Ebenen auf einer Zeichenfläche und nicht wie dort einzelne Buchstaben im Dokument: Die erste Fassung animierte Farbe und Schein von
+  // rund 70 Buchstaben einzeln. Auf Hugos iPhone malte Safari den Text dabei nur rund 12-mal pro Sekunde neu (Video 19:37), es ruckelte.
+  // Jetzt wird jeder Buchstabe beim Wechsel einmal in drei Fassungen vorgemalt (unscharf in Perlmutt, scharf in Perlmutt mit Schein, schwarz mit
+  // weissem Schein; vom alten Text dazu eine unscharfe). Im Takt werden diese fertigen Bildchen nur noch mit wechselnder Deckkraft übereinander
+  // gelegt – das kostet fast nichts. Wo jeder Buchstabe steht, sagt weiter der Browser: Der Text liegt unsichtbar im Layout (capBuild).
+  var PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'], capIn = null, capSr = null, capCv = null, capX = null, capW = 0, capH = 0, capD = 1,
+      capShown = -1, capT = null, capA = null, capM = null, capBad = 0, capOff = 0;
+  function capCanvas() {   // Zeichenfläche so gross wie der Kasten, in Gerätepixeln (bis 3-fach: die Schrift soll so scharf sein wie daneben)
+    var w = cap.clientWidth, h = cap.clientHeight;
+    if (capCv && w === capW && h === capH) return;
+    if (!capCv) { capCv = document.createElement('canvas'); capCv.className = 'ak-cap-cv'; capCv.setAttribute('aria-hidden', 'true'); cap.appendChild(capCv); capX = capCv.getContext('2d'); }
+    capD = Math.min(window.devicePixelRatio || 1, 3); capW = w; capH = h;
+    capCv.width = Math.max(2, Math.round(w * capD)); capCv.height = Math.max(2, Math.round(h * capD)); capX.setTransform(capD, 0, 0, capD, 0, 0);
+  }
+  function capDom(n) {   // der Text als unsichtbare Zeile(n) im Layout: Wörter bleiben zusammen, jeder Buchstabe ist ein eigenes Stück zum Ausmessen
     var price = items[n].querySelector('.ak-item-price'), info = items[n].querySelector('.ak-item-info'), l = document.createElement('span'), ch = [];
     l.className = 'ak-cap-l'; l.setAttribute('aria-hidden', 'true');
-    function words(txt, into) {   // Wörter bleiben zusammen (kein Umbruch mitten im Wort), jeder Buchstabe ist ein eigenes Stück
+    function words(txt, into) {
       txt.split(/\s+/).forEach(function (w, k) {
         if (!w) return;
         if (k) into.appendChild(document.createTextNode(' '));
@@ -1839,44 +1854,135 @@
     words(it, l);
     return { el: l, ch: ch, txt: (pt ? pt + '. ' : '') + it };
   }
+  // Unschärfe: Gemalt wird nur der weiche Schatten eines Buchstabens, der Buchstabe selbst liegt weit ausserhalb des Bildes. Ob ein Browser das
+  // so malt, wird einmal ausprobiert (CAPSH). Wenn nicht, wird der Buchstabe stattdessen sehr grob gemalt und beim Auflegen vergrössert: auch unscharf.
+  var CAPSH = (function () {
+    try {
+      var c = document.createElement('canvas'); c.width = c.height = 8; var g = c.getContext('2d'), d, i, a = 0;
+      g.beginPath(); g.rect(0, 0, 8, 8); g.clip(); g.font = 'bold 24px sans-serif'; g.shadowColor = '#000'; g.shadowBlur = 2; g.shadowOffsetX = 3000; g.fillText('MMM', -3020, 12);
+      d = g.getImageData(0, 0, 8, 8).data; for (i = 3; i < d.length; i += 4) a += d[i];
+      return a > 200;
+    } catch (e) { return false; }
+  })();
+  function capSoft(g, s, x, y, col, blur, k) {
+    if (!CAPSH) { g.fillStyle = col; g.fillText(s, x, y); return; }
+    g.shadowColor = col; g.shadowBlur = blur * k; g.shadowOffsetX = 3000 * k; g.fillStyle = '#000'; g.fillText(s, x - 3000, y);
+    g.shadowOffsetX = 0; g.shadowBlur = 0; g.shadowColor = 'transparent';
+  }
+  function capAtlas(T, dpr, pad, paint) {   // alle Buchstaben eines Textes in einer Fassung, jeder in seinem eigenen Feld mit Rand für Schein und Unschärfe
+    var x = 0, y = 0, rh = 0, mw = Math.floor(2400 / dpr), cells = [], Wd = 2;
+    T.q.forEach(function (l) {
+      var cw = Math.ceil((l.w + pad * 2) / 2) * 2, ch = Math.ceil((l.h + pad * 2) / 2) * 2;
+      if (x + cw > mw) { x = 0; y += rh; rh = 0; }
+      cells.push([x, y, cw, ch]); x += cw; if (x > Wd) Wd = x; if (ch > rh) rh = ch;
+    });
+    var c = canvas(Wd, y + rh, dpr), g = c.x; g.textBaseline = 'alphabetic';
+    T.q.forEach(function (l, i) {
+      var q = cells[i]; g.save(); g.beginPath(); g.rect(q[0], q[1], q[2], q[3]); g.clip(); g.font = T.fonts[l.f].f;
+      paint(g, l, q[0] + pad + l.x - l.dx, q[1] + pad + l.y - l.dy + l.by, i, dpr); g.restore();
+    });
+    return { c: c.c, cells: cells, pad: pad, k: c.c.width / Wd };
+  }
+  function capFree(T) { if (T) ['F', 'B', 'S', 'G'].forEach(function (k) { if (T[k]) { (T[k].c || T[k]).width = 0; T[k] = null; } }); }
+  function capBuild(n) {   // Text n ins Layout legen, jeden Buchstaben ausmessen und die Ruhe-Fassung (schwarz mit weissem Schein) vormalen
+    var L = capDom(n), old = capIn.querySelector('.ak-cap-l'); if (old) old.remove();
+    capIn.appendChild(L.el); capSr.textContent = L.txt;
+    var b = cap.getBoundingClientRect(), ox = b.left + cap.clientLeft, oy = b.top + cap.clientTop, T = { q: [], fonts: [] }, lines = [], fi = {}, cnt = [],
+        cs = getComputedStyle(cap), col = cs.color, small = [], big = [];
+    (cs.textShadow && cs.textShadow !== 'none' ? cs.textShadow.split(/,(?![^(]*\))/) : []).forEach(function (sh) {   // Schein aus der Webflow-Klasse: kleine Radien je Buchstabe, grosse als eine weiche Ebene
+      var c = sh.match(/rgba?\([^)]*\)|#[0-9a-f]{3,8}/i), px = sh.match(/-?[\d.]+px/g);
+      if (c && px && px.length > 2) (parseFloat(px[2]) <= 6 ? small : big).push([c[0], parseFloat(px[2])]);
+    });
+    L.ch.forEach(function (c) {
+      var r = c.getBoundingClientRect(); if (!r.width) return;
+      var host = c.parentNode.parentNode, key = host.className === 'ak-cap-price' ? 1 : 0, li, ly = r.top - oy;
+      if (fi[key] == null) {
+        var hs = getComputedStyle(host), fs = parseFloat(hs.fontSize) || 15, f = hs.fontStyle + ' ' + hs.fontWeight + ' ' + fs + 'px ' + hs.fontFamily;
+        capX.font = f; var m = capX.measureText('H');
+        fi[key] = T.fonts.length; T.fonts.push({ f: f, fs: fs, up: hs.textTransform === 'uppercase', as: m.fontBoundingBoxAscent || 0, de: m.fontBoundingBoxDescent || 0 });
+      }
+      for (li = 0; li < lines.length; li++) if (Math.abs(lines[li] - ly) < 4) break;
+      if (li === lines.length) { lines.push(ly); cnt.push(0); }
+      var F = T.fonts[fi[key]], x = r.left - ox;
+      T.q.push({ s: F.up ? c.textContent.toUpperCase() : c.textContent, x: x, y: ly, w: r.width, h: r.height, f: fi[key], line: li, k: cnt[li]++, em: F.fs,
+        dx: Math.floor(x * capD) / capD, dy: Math.floor(ly * capD) / capD,   // auf ganze Gerätepixel gelegt: so bleibt die fertige Schrift scharf
+        by: F.as > 0 ? (r.height - F.as - F.de) / 2 + F.as : r.height * .805 });   // Grundlinie im Feld des Buchstabens
+    });
+    T.F = capAtlas(T, capD, 8, function (g, l, x, y, i, k) {   // Ruhe-Fassung: erst der feine helle Schein (heller Buchstabe mit Schatten), darüber der Buchstabe in seiner Farbe
+      small.forEach(function (sh) { g.shadowColor = sh[0]; g.shadowBlur = sh[1] * k; g.fillStyle = sh[0]; g.fillText(l.s, x, y); });
+      g.shadowBlur = 0; g.shadowColor = 'transparent'; g.fillStyle = col; g.fillText(l.s, x, y);
+    });
+    var G = canvas(capW, capH, Math.min(capD, 1.5)); G.x.textBaseline = 'alphabetic';   // der grosse weiche Schein als eine Ebene für den ganzen Text
+    if (CAPSH) T.q.forEach(function (l) { G.x.font = T.fonts[l.f].f; big.forEach(function (sh) { capSoft(G.x, l.s, l.x, l.y + l.by, sh[0], sh[1], G.c._dpr); }); });
+    T.G = G.c;
+    return T;
+  }
+  function capBlit(A, i, l, a, dy) {
+    if (a <= .004) return;
+    var q = A.cells[i], k = A.k; capX.globalAlpha = a > 1 ? 1 : a;
+    capX.drawImage(A.c, q[0] * k, q[1] * k, q[2] * k, q[3] * k, l.dx - A.pad, l.dy - A.pad + (dy || 0), q[2], q[3]);
+  }
+  function capDraw(now) {
+    var A = capA, T = capT, X = capX, i, l, t, x, e, sh, cf, p;
+    if (!X || !T) return;
+    X.globalAlpha = 1; X.clearRect(0, 0, capW, capH);
+    if (!A) { X.drawImage(T.G, 0, 0, capW, capH); for (i = 0; i < T.q.length; i++) capBlit(T.F, i, T.q[i], 1); X.globalAlpha = 1; return; }
+    t = now - A.t0;
+    X.globalAlpha = A.oa * (1 - clamp(t / 400, 0, 1)); if (X.globalAlpha > .004) X.drawImage(A.O.G, 0, 0, capW, capH);   // der grosse weiche Schein: alt geht, neu kommt
+    X.globalAlpha = clamp((t - 500) / Math.max(1, A.dur - 500), 0, 1); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);
+    for (i = 0; i < A.O.q.length; i++) {   // alter Text: wird unscharf, blasser und geht ein Stück nach oben weg
+      l = A.O.q[i]; p = (t - l.line * 90 - l.k * 14) / 420; if (p >= 1) continue;
+      p = p < 0 ? 0 : p * p * (3 - 2 * p);
+      capBlit(A.O.F, i, l, A.oa * (1 - p) * (1 - p), -.35 * l.em * p);
+      capBlit(A.O.B, i, l, A.oa * (1 - p) * p * 2.8, -.35 * l.em * p);
+    }
+    for (i = 0; i < T.q.length; i++) {   // neuer Text: von unten aus der Unschärfe, Perlmutt, dann schwarz
+      l = T.q[i]; x = t - 120 - l.line * 90 - l.k * 18; if (x <= 0) continue;
+      if (x >= 1000) { capBlit(T.F, i, l, 1); continue; }
+      p = Math.min(1, x / 420); e = 1 - Math.pow(1 - p, 4); sh = p * p * (3 - 2 * p);
+      cf = x < 400 ? 0 : (x - 400) / 600; cf = 1 - (1 - cf) * (1 - cf);
+      var dy = .35 * l.em * (1 - e);
+      capBlit(T.B, i, l, e * (1 - sh) * 1.25, dy);
+      capBlit(T.S, i, l, e * sh * (1 - cf), dy);
+      capBlit(T.F, i, l, sh * cf, dy);
+    }
+    X.globalAlpha = 1;
+    if (t >= A.dur) { capFree(A.O); capA = null; T.B.c.width = T.S.c.width = 0; T.B = T.S = null; capDraw(now); }   // fertig: Hilfsbilder freigeben, Ruhebild malen
+  }
   function showCap(n, anim) {
-    if (!capIn) {   // der Kasten bleibt stehen, nur sein Inhalt wechselt. Für Vorlese-Programme steht der ganze Text unsichtbar daneben
+    if (!capIn) {   // für Vorlese-Programme steht der ganze Text unsichtbar daneben
       capIn = document.createElement('div'); capIn.className = 'ak-cap-in'; capSr = document.createElement('span'); capSr.className = 'ak-sr';
       cap.textContent = ''; cap.appendChild(capSr); cap.appendChild(capIn);
     }
-    capShown = n; capIn.classList.remove('is-stale');
-    var olds = [].slice.call(capIn.querySelectorAll('.ak-cap-l')), L = capLayer(n), fx = anim && !reduce && lv < 2 && !capOff && !!L.el.animate;
-    capSr.textContent = L.txt;
-    olds.forEach(function (o) {
-      if (!fx || o.classList.contains('is-old')) { o.remove(); return; }
-      o.classList.add('is-old');   // der alte Text löst sich an Ort und Stelle auf (wird unscharf und blass)
-      var oc = o.querySelectorAll('.ak-w > span'), m = Math.max(1, oc.length - 1);
-      [].forEach.call(oc, function (c, k) {
-        try { c.animate([{ opacity: 1 }, { opacity: 0, color: 'rgba(0,0,0,0)', textShadow: '0 0 .4em rgba(0,0,0,.5)' }], { duration: 190, delay: 110 * k / m, easing: 'ease-in', fill: 'forwards' }); } catch (er) {}
-      });
-      setTimeout(function () { o.remove(); }, 330);
-    });
-    capIn.appendChild(L.el);
-    if (!fx) return;
-    if (!capFin) { var cs = getComputedStyle(cap); capFin = [cs.color, cs.textShadow]; }
-    capM = { t: performance.now(), n: 0, slow: 0 }; pw.t = Math.max(pw.t, capM.t + 1100);   // der Wächter der Szene wertet diese Sekunde nicht; der Schimmer prüft sich selbst (capWatch)
-    var m2 = Math.max(1, L.ch.length - 1), spread = Math.min(18 * m2, 340);   // zusammen eine Sekunde: 110 ms Vorlauf + höchstens 340 ms Versatz + 550 ms je Buchstabe
-    L.ch.forEach(function (c, k) {
-      var pc = PEARL[k % PEARL.length], d = 110 + spread * k / m2;
-      try {
-        c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 230, delay: d, easing: 'ease-out', fill: 'backwards' });
-        c.animate([{ color: 'rgba(255,255,255,0)', textShadow: '0 0 4px ' + pc }, { color: pc, textShadow: '0 0 .6em ' + pc, offset: .25 },
-          { color: pc, textShadow: '0 0 .4em ' + pc, offset: .4 }, { color: capFin[0], textShadow: capFin[1] }], { duration: 550, delay: d, easing: 'ease-out', fill: 'backwards' });
-      } catch (er) {}
-    });
+    if (capA) { capFree(capA.O); capA = null; if (capT.B) { capT.B.c.width = capT.S.c.width = 0; capT.B = capT.S = null; } }   // ein laufendes Umschreiben wird abgelöst
+    var resized = cap.clientWidth !== capW || cap.clientHeight !== capH; capCanvas();
+    var O = capT, stale = cap.classList.contains('is-stale'), fx = anim && O && !resized && !reduce && lv < 2 && !capOff;
+    capShown = n; capT = capBuild(n);
+    if (cap.clientWidth !== capW || cap.clientHeight !== capH) { capFree(capT); capCanvas(); capT = capBuild(n); fx = false; }   // der neue Text hat den Kasten vergrössert: Zeichenfläche anpassen, ohne Animation
+    capCv.style.transition = 'none'; cap.classList.remove('is-stale'); void capCv.offsetWidth; capCv.style.transition = '';   // die Blässe des alten Textes übernimmt ab jetzt die Zeichnung (oa), ohne Sprung
+    if (!fx) { capFree(O); capDraw(0); return; }
+    var T = capT, dur = 0;
+    var bd = CAPSH ? Math.min(capD, 1.5) : .3;
+    T.B = capAtlas(T, bd, 12, function (g, l, x, y, i, k) { var pc = PEARL[i % PEARL.length]; capSoft(g, l.s, x, y, pc, 4.5, k); capSoft(g, l.s, x, y, pc, 4.5, k); });
+    T.S = capAtlas(T, Math.min(capD, 2), 12, function (g, l, x, y, i, k) { var pc = PEARL[i % PEARL.length]; g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });
+    O.B = capAtlas(O, bd, 12, function (g, l, x, y, i, k) { capSoft(g, l.s, x, y, 'rgba(0,0,0,.62)', 4.5, k); });
+    T.q.forEach(function (l) { dur = Math.max(dur, 120 + l.line * 90 + l.k * 18 + 1000); });
+    capA = { t0: performance.now(), O: O, oa: stale ? .45 : 1, dur: dur };
+    capM = { t: capA.t0, d: dur, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
   }
-  function capWatch(raw, now) {   // ruckelt das Umschreiben zweimal hintereinander (ein gutes Drittel der Bilder zu langsam), wechselt der Text künftig ohne Schimmer
+  function capRedraw() {   // neue Grösse: Text neu ausmessen und ruhig hinmalen
+    if (!capIn || capShown < 0) return;
+    if (capA) { capFree(capA.O); capA = null; }
+    capFree(capT); capT = null; capW = 0; capCanvas(); capT = capBuild(capShown); capDraw(0);
+  }
+  function capWatch(raw, now) {   // ruckelt das Umschreiben zweimal hintereinander (jedes vierte Bild zu langsam), wechselt der Text auf diesem Gerät künftig ohne Animation
     if (!capM) return;
-    if (now - capM.t < 1000) { capM.n++; if (raw > 36) capM.slow++; return; }
-    capBad = capM.n < 8 || capM.slow >= capM.n * .35 ? capBad + 1 : 0; if (capBad >= 2) capOff = 1;
+    if (now - capM.t < capM.d) { capM.n++; if (raw > 34) capM.slow++; return; }
+    capBad = capM.n < capM.d * .02 || capM.slow >= capM.n * .25 ? capBad + 1 : 0; if (capBad >= 2) capOff = 1;
     capM = null;
   }
   function capTick(now) {   // im Takt: erst umschreiben, wenn kein Finger mehr am Rad ist, es steht und eingerastet ist
+    if (capA) capDraw(now);
     if (!cap || cur < 0 || cur === capShown || holding || now - lastScroll < 140 || Math.abs(wheel.scrollTop - cur * rowH) > 1.5) return;
     showCap(cur, true);
   }
@@ -1886,7 +1992,7 @@
     wheel.setAttribute('aria-activedescendant', items[n].id);
     if (!cap) return;
     if (prev === -1) showCap(n, false);
-    else if (capIn) capIn.classList.toggle('is-stale', n !== capShown);   // das Rad steht auf einer anderen Zeile: der alte Text wartet blasser
+    else cap.classList.toggle('is-stale', n !== capShown);   // das Rad steht auf einer anderen Zeile: der alte Text wartet blasser
   }
 
   // ---------- Takt ----------
@@ -2162,7 +2268,7 @@
   window.addEventListener('resize', function () {
     clearTimeout(rsT);
     rsT = setTimeout(function () {
-      W = root.clientWidth; measureWheel(); placeLead();
+      W = root.clientWidth; measureWheel(); placeLead(); capRedraw();
       if (Math.abs(W - lastW) > 20) { lastW = W; fl = null; paintScene(false); litOn = null; reveal(); measureWheel(); }
     }, 180);
   });
@@ -2176,6 +2282,7 @@
     var t0 = performance.now();
     W = root.clientWidth;
     linkToMenu(); leadToMenu();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { capRedraw(); });   // kam die Schrift erst nach dem Start, wird der Text im Kasten noch einmal mit ihr gemalt
     var head = root.querySelector('.ak-head');
     if (head) head.addEventListener('click', function (e) { if (Math.abs(e.clientX - dn[0]) < 10 && Math.abs(e.clientY - dn[1]) < 10 && e.timeStamp - dn[2] < 450) replay(); });   // nur ein kurzer Tipp an Ort und Stelle: kein Wischen über den Titel, kein aufgelegter Finger (der schiebt das Bild)
     setupWheel(); drawWheel();            // zuerst das Rad: das Bild richtet sich nach dem Platz des Textes
