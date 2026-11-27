@@ -178,11 +178,11 @@
     '.ak-pad { flex: none; pointer-events: none; }',
     '[data-ak-item] { scroll-snap-align: center; scroll-snap-stop: normal; will-change: transform, opacity; cursor: pointer; backface-visibility: hidden; user-select: none; -webkit-user-select: none; white-space: nowrap; }',
     '[data-ak-item] .ak-item-price, [data-ak-item] .ak-item-info { display: none !important; }',
-    '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); }',
-    '.ak-band::before { content: ""; position: absolute; inset: -30% -6%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,255,255,.7), rgba(255,255,255,0)); }',
-    '.ak-band i { position: absolute; left: 0; right: 0; height: 1px; opacity: .85;',
-    '  background: linear-gradient(to right, transparent, #96dcf5 18%, #c3b2fa 38%, #fff 50%, #f8bed7 62%, #fae4b4 82%, transparent); }',
-    '.ak-band i:first-child { top: 0; } .ak-band i:last-child { bottom: 0; }',
+    /* Die gewählte Zeile steht in einer Kapsel: dunkler Rand, leicht heller Grund, so breit wie der Text. Beim Scrollen wächst und schrumpft
+       sie von einer Textlänge zur nächsten (drawWheel). Über dunklem Urwald kehrt sie sich um: heller Rand, dunkler Grund (ak-d1) */
+    '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); box-sizing: border-box; border: 1.5px solid #171a4c; border-radius: 999px;',
+    '  background: rgba(255,255,255,.3); transition: border-color .5s ease, background-color .5s ease; }',
+    '[data-ak].ak-d1 .ak-band { border-color: rgba(255,243,220,.8); background: rgba(23,26,76,.34); }',
     '[data-ak-caption] { transition: opacity 260ms ease, transform 420ms ' + EASE_OUT + '; }',
     '[data-ak-caption].is-out { opacity: 0 !important; transform: translate3d(0, .8vh, 0) !important; transition-duration: 150ms; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
@@ -1742,7 +1742,7 @@
     wheel.style.display = 'flex'; wheel.style.flexDirection = 'column';
     var p1 = document.createElement('div'), p2 = document.createElement('div'); p1.className = p2.className = 'ak-pad';
     wheel.insertBefore(p1, wheel.firstChild); wheel.appendChild(p2);
-    band = document.createElement('div'); band.className = 'ak-band'; band.innerHTML = '<i></i><i></i>'; band.setAttribute('aria-hidden', 'true');
+    band = document.createElement('div'); band.className = 'ak-band'; band.setAttribute('aria-hidden', 'true');
     wrap.appendChild(band);
     wheel.setAttribute('tabindex', '0'); wheel.setAttribute('role', 'listbox'); wheel.setAttribute('aria-label', 'Übersicht');
     items.forEach(function (it, i) {
@@ -1761,16 +1761,25 @@
     rowH = items[0].offsetHeight || 40;
     var h = wheel.clientHeight, pad = Math.max(0, (h - rowH) / 2);
     wheel.firstChild.style.height = wheel.lastChild.style.height = pad + 'px';
-    band.style.top = (wheel.offsetTop + pad) + 'px'; band.style.height = rowH + 'px'; band.style.width = Math.min(wheel.clientWidth, W * .92) + 'px';
+    band.style.top = (wheel.offsetTop + pad + rowH * .06) + 'px'; band.style.height = rowH * .88 + 'px';
+    TW = items.map(function (it) {   // Breite der Kapsel je Zeile: Textlänge plus Luft links und rechts
+      var nm = it.querySelector('.ak-item-name') || it.firstElementChild, tw = nm ? nm.offsetWidth : 0;
+      return clamp((tw > 8 && tw < it.offsetWidth - 4 ? tw : it.offsetWidth * .6) + rowH * 1.05, rowH * 2.2, Math.min(wheel.clientWidth, W * .94));
+    });
+    wP = NaN;   // neu zeichnen
   }
   function go(i) { wheel.scrollTo({ top: i * rowH, behavior: reduce ? 'auto' : 'smooth' }); }
   var lastScroll = 0, wheelPos = 0;
-  var wP = NaN, wR = 0;
+  var wP = NaN, wR = 0, TW = [];
   function drawWheel() {
     if (!items.length) return 0;
     var p = wheel.scrollTop / rowH, rad = AK.rowDeg * Math.PI / 180, Rcyl = rowH / rad;
     if (p === wP && rowH === wR) return p;   // steht das Rad, gibt es nichts zu tun
     wP = p; wR = rowH;
+    if (TW.length) {   // Kapsel: gleitet von der Breite der einen Zeile zur Breite der nächsten
+      var i0 = clamp(Math.floor(p), 0, items.length - 1), i1 = Math.min(items.length - 1, i0 + 1), f = clamp(p - i0, 0, 1); f = f * f * (3 - 2 * f);
+      band.style.width = (TW[i0] + (TW[i1] - TW[i0]) * f).toFixed(1) + 'px';
+    }
     for (var i = 0; i < items.length; i++) {
       var d = i - p, th = d * rad, a = Math.abs(th);
       var it = items[i];
