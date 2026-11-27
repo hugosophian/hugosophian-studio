@@ -627,7 +627,7 @@
 
   // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese
   function sceneMain(S) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .445 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .462 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
         p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; };
     // Öffnung der Lichtung: oben ein spitzer Bogen, in der Texthöhe breit (Handy: fast die ganze Breite), unten wächst das Unterholz wieder herein
     function hw(y) {
@@ -655,7 +655,7 @@
         else frond(x, { x: px, y: py, a: -Math.PI / 2, spread: 1.5, n: 5, len: s * 2.4, wid: s * .34, droop: .3, cols: ['#4fae3f', '#2f9a4a', '#6fbf3a'], lw: lw * .6, rib: 0 });
       }
     });
-    jungle(S, yC, bot, eL, eR, { ground: '#161a48', size: mob ? .7 : .82, dens: 1.1, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .34 : .75],
+    jungle(S, yC, bot, eL, eR, { ground: '#161a48', size: mob ? .7 : .82, dens: 1.1, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75],
       lianas: [{ x0: 2, x1: cx - HW - U * .05, yEnd: end }, { x0: cx + HW + U * .05, x1: w - 2, yEnd: end },
         { x0: cx - HW * .92, x1: cx + HW * .92, yEnd: function (px) { return Math.min(archY(px) + U * rr(.02, .16), vy + H * .04); }, bead: 1 }] });
     // Ranken hängen vom Bogen in die Lichtung
