@@ -204,10 +204,14 @@
     '.ak-cap-cv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }',
     '.ak-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
-    /* Titel: dunkler Verlauf mit wanderndem Glanz. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation») */
-    '[data-ak] .ak-title { background: linear-gradient(100deg, #2a2442 0%, #2a2442 38%, #6e64a5 46%, #a68bd8 50%, #6e64a5 54%, #2a2442 62%, #2a2442 100%);',
-    '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
-    'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
+    /* Titel: dunkle Schrift mit wanderndem Schimmer. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation»).
+       Schimmer seit 22:48 in Hirsch-Perlmutt mit Eis-Cyan in der Mitte («in dem Cyan-Perlmutt und seidig weich»; vorher Lila): Eis-Cyan, an den Flanken Flieder,
+       hinten ein Hauch Rosé. Seidig: Der Schimmer ist so breit wie der ganze Titel und läuft in vielen kleinen Stufen aus, ohne Kante; er gleitet langsam und
+       setzt weich ein und aus. Das Bild des Verlaufs ist dreimal so breit wie der Titel, der Schimmer liegt im mittleren Drittel: in Ruhe ist nichts von ihm zu sehen. */
+    '[data-ak] .ak-title { background: linear-gradient(100deg, #2a2442 0%, #2a2442 34%, #322d55 37%, #4b4a84 40%, #7f86cf 43%, #a9b6f4 45.5%, #96dcf5 48%, #cfeffa 50%, #96dcf5 52%, #b3c0f8 54.5%, #c3b2fa 57%, #d9b6e6 59%, #8d7cc4 61%, #4a4078 63.5%, #2a2442 66%, #2a2442 100%);',
+    '  background-size: 300% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;',
+    '  -webkit-text-stroke: .014em #2a2442; }',   /* feine dunkle Kontur: Wo der helle Schimmer liegt, bleiben die Buchstaben vor dem hellblauen Himmel lesbar (ohne sie verschwanden sie fast) */
+    'html.ak-on [data-ak] .ak-title { animation: akTitle 8s cubic-bezier(.45, 0, .25, 1) 2.6s infinite; }',
     /* Gewählte Zeile: schwarze Schrift mit weissem Schein wie im Menü-Knopf (sie steht auf dem Glas der Kapsel) */
     '[data-ak] [data-ak-item] { transition: color .25s ease, text-shadow .25s ease; }',
     '[data-ak] [data-ak-item].is-sel { color: var(--farbe--schwarz, #000); text-shadow: 0 0 1px #fff, 0 0 4px #fff, 0 0 1rem #fff; }',
@@ -221,7 +225,7 @@
     'html.ak-re .menu-toggle-wrap { opacity: 0 !important; transition: opacity 450ms ease !important; }',
     '.ak-cover.is-re { opacity: 0; transition: opacity 600ms ease; }',
     '.ak-cover.is-re.is-in { opacity: 1; }',
-    '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
+    '@keyframes akTitle { 0% { background-position: 100% 0; } 55%, 100% { background-position: 0% 0; } }',
     /* Handy: Die Grössen der Texte stehen in den Webflow-Klassen als min(…vw, …svh): sie richten sich nach der Breite und werden auf niedrigen
        Bildschirmen kleiner, damit oben nichts abgeschnitten wird und unten nichts unter dem Menü-Knopf liegt.
        Sehr alte Browser kennen svh nicht und würden die Werte verwerfen. Für sie stehen hier die Werte nur nach der Breite. */
