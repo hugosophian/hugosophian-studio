@@ -10,9 +10,14 @@
    oben nach unten (langsam los, schnell durch die Mitte, weich landen). Nichts wird überblendet: unten steht dasselbe
    Bild still, und nur der Text der kurzen Website blendet darüber ein (dunkle Schrift auf Himmel und Wiese).
 
+   VON HAND (Hugo 27.11., 11:02): Ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in den
+   Urwald (mit kräftigem Parallax) und wieder nach oben bis in den Himmel. Das Rad scrollt die Services, mit Parallax
+   dort, wo die Kamera gerade steht. Der Wald lebt: Randpflanzen und Ranken wiegen sich, die Wolken ziehen, der Blick
+   treibt leicht.
+
    Technik: drei Tiefen-Ebenen als hohe Streifen (in Kacheln gemalt), dazu einzelne Wolken und Blätter. Im Takt werden
-   nur Verschiebungen gesetzt, darum läuft der Schwung auf der Grafikkarte. Ohne Flug (zweiter Besuch, «Bewegung
-   reduzieren») wird nur das Schlussbild gemalt.
+   nur Verschiebungen und Drehungen gesetzt, darum läuft alles auf der Grafikkarte. Das ganze Bild wird einmal beim
+   Laden gemalt und bleibt stehen (kein Aufräumen nach der Landung: man kann ja wieder nach oben).
 
    Aufbau in Webflow (Texte und Aussehen im Designer änderbar):
      section.ak [data-ak]
@@ -39,6 +44,9 @@
     drift: 1,             // ruhige Eigenbewegung der Kamera (0 = aus)
     pointer: 1,           // Maus / Finger bewegt die Ebenen (0 = aus)
     scrollPan: 1,         // Scrollen im Rad schiebt den Wald (0 = aus)
+    freePan: 1,           // die ganze Szene lässt sich von Hand verschieben: zurück nach oben und seitlich (0 = aus)
+    panX: [.3, .14],      // so weit geht es seitlich, als Anteil der Breite: Handy, Computer
+    sway: 1,              // Wedel am Rand und Ranken wiegen sich im Wind (0 = aus)
     fireflies: 9,         // Glühwürmchen (Hugo 27.11., 08:46: nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
     introMs: 1500,        // Einblenden ohne Flug (Bewegungssystem: page)
@@ -78,29 +86,34 @@
   // ---------- CSS ----------
   var css = [
     'html.ak-page, html.ak-page body { height: 100%; overflow: hidden; overscroll-behavior: none; background: #f3f1f9; }',
-    '[data-ak] { position: relative; width: 100%; height: 100vh; height: 100lvh; overflow: hidden; isolation: isolate; -webkit-tap-highlight-color: transparent; background: #15123f; }',
+    '[data-ak] { position: relative; width: 100%; height: 100vh; height: 100lvh; overflow: hidden; isolation: isolate; -webkit-tap-highlight-color: transparent; background: #15123f; touch-action: none; }',
+    '[data-ak].ak-drag { cursor: grabbing; -webkit-user-select: none; user-select: none; }',
     '[data-ak] .ak-inner { position: relative; z-index: 6; height: 100vh; height: 100svh; box-sizing: border-box; }',
     'html:not(.ak-on) [data-ak] .ak-inner { pointer-events: none; }',   /* während des Flugs kann man nichts versehentlich antippen */
     '.ak-world { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }',
     '.ak-world > * { position: absolute; pointer-events: none; }',
     '.ak-layer, .ak-sprite, .ak-shade, .ak-glow { left: 0; top: 0; will-change: transform; transform-origin: 0 0; }',
     '.ak-shade { opacity: .2; }',
-    '.ak-rays { inset: 0; mix-blend-mode: screen; will-change: transform; }',
-    '.ak-ray { position: absolute; top: -12%; height: 150%; transform-origin: 50% 0; will-change: opacity;',
-    '  background: linear-gradient(to bottom, rgba(255,251,238,0) 0%, rgba(255,251,238,.9) 10%, rgba(255,248,232,.5) 38%, rgba(255,246,236,0) 88%);',
-    '  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%, #000 62%, transparent 100%); mask-image: linear-gradient(to right, transparent 0%, #000 38%, #000 62%, transparent 100%); }',
-    /* Prisma an den Strahlrändern (wie überall auf der Website: Regenbogen nur als Saum) */
-    '.ak-ray::before, .ak-ray::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14%; background: linear-gradient(to bottom, rgba(150,220,245,0), rgba(150,220,245,.55) 10%, rgba(195,178,250,.2) 50%, transparent 85%); }',
-    '.ak-ray::before { left: 22%; } .ak-ray::after { right: 22%; background: linear-gradient(to bottom, rgba(248,190,215,0), rgba(248,190,215,.55) 10%, rgba(250,228,180,.2) 50%, transparent 85%); }',
-    '@keyframes akRay { 0%, 100% { opacity: var(--o1); } 30% { opacity: var(--o2); } 55% { opacity: var(--o3); } 80% { opacity: var(--o2); } }',
-    '.ak-dapple { inset: 0; mix-blend-mode: soft-light; opacity: .6; will-change: transform; }',
-    '.ak-spot { position: absolute; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,250,235,.95), rgba(255,250,235,0)); will-change: transform; }',
-    '@keyframes akSpot { 0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: .9; } 50% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.18); opacity: .45; } }',
+    '.ak-sway { position: absolute; will-change: transform; }',
+    /* Licht: fertig gemalte Bilder mit normaler Deckkraft. Kein Mischmodus, keine Masken – die bremsten das Handy bei der Landung */
+    '.ak-rays { left: 0; top: 0; will-change: transform; }',
+    '.ak-rays canvas { position: absolute; left: 0; top: 0; will-change: opacity; }',
+    '@keyframes akRayA { 0%, 100% { opacity: 1; } 35% { opacity: .5; } 70% { opacity: .85; } }',
+    '@keyframes akRayB { 0%, 100% { opacity: .55; } 40% { opacity: 1; } 75% { opacity: .65; } }',
+    '.ak-dapple { left: 0; top: 0; will-change: transform; }',
+    '.ak-dapple canvas { position: absolute; left: 0; top: 0; will-change: transform, opacity; }',
+    '@keyframes akSpot { 0%, 100% { transform: translate3d(0,0,0); opacity: 1; } 50% { transform: translate3d(18px,-12px,0); opacity: .65; } }',
     '.ak-fx { inset: 0; width: 100%; height: 100%; z-index: 9; }',
-    '.ak-flare { inset: 0; z-index: 10; mix-blend-mode: screen; }',
+    '.ak-flare { inset: 0; z-index: 10; }',
     '.ak-flare i { position: absolute; border-radius: 50%; will-change: transform; }',
-    '.ak-sheen { inset: -30%; z-index: 11; mix-blend-mode: soft-light; opacity: .26; will-change: transform;',
+    '.ak-sheen { inset: -30%; z-index: 11; will-change: transform;',
     '  background: linear-gradient(115deg, rgba(218,242,248,0) 30%, rgba(218,242,248,.9) 38%, rgba(229,225,244,.9) 44%, rgba(242,221,227,.9) 50%, rgba(251,243,222,.9) 56%, rgba(251,243,222,0) 64%); }',
+    /* Das Licht ist nur da, wenn die Kamera unten in der Lichtung steht (ak-lit); es blendet weich ein und aus */
+    '.ak-rays, .ak-glow, .ak-dapple, .ak-flare, .ak-sheen { opacity: 0; visibility: hidden; transition: opacity 1.2s ease, visibility 0s linear 1.2s; }',
+    '.ak-lit .ak-rays, .ak-lit .ak-glow, .ak-lit .ak-flare { opacity: 1; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
+    '.ak-lit .ak-dapple { opacity: 1; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
+    '.ak-lit .ak-sheen { opacity: .14; visibility: visible; transition: opacity 2s ease, visibility 0s; }',
+    '.ak-world:not(.ak-lit) .ak-rays canvas, .ak-world:not(.ak-lit) .ak-dapple canvas { animation-play-state: paused; }',
     '.ak-cover { position: absolute; inset: 0; z-index: 30; background: #f3f1f9; pointer-events: none; transition: opacity ' + AK.introMs + 'ms ' + EASE_OUT + '; }',
     'html.ak-on .ak-cover { opacity: 0; }',
     '.ak-cover.is-off { opacity: 0; transition: opacity 700ms ease; }',   /* Flug: aus dem Perlweiss in den Himmel */
@@ -127,9 +140,9 @@
     /* Titel mit feinem Perlmutt-Schimmer */
     '[data-ak] .ak-title { background: linear-gradient(100deg, #2a2442 0%, #2a2442 38%, #6e64a5 46%, #a68bd8 50%, #6e64a5 54%, #2a2442 62%, #2a2442 100%);',
     '  background-size: 260% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }',
-    'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 1.2s infinite; }',
+    'html.ak-on [data-ak] .ak-title { animation: akTitle 7s ' + EASE_OUT + ' 2.6s infinite; }',
     '@keyframes akTitle { 0% { background-position: 100% 0; } 40%, 100% { background-position: 0% 0; } }',
-    '@media (prefers-reduced-motion: reduce) { .ak-ray, .ak-spot, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
+    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -148,11 +161,6 @@
     x.beginPath(); x.moveTo(p[0][0], p[0][1]);
     for (var i = 1; i < p.length - 1; i++) x.quadraticCurveTo(p[i][0], p[i][1], (p[i][0] + p[i + 1][0]) / 2, (p[i][1] + p[i + 1][1]) / 2);
     x.lineTo(p[p.length - 1][0], p[p.length - 1][1]);
-  }
-  // Linie, die spitz ausläuft (Wolkenfahnen)
-  function taper(x, p, w0, w1, col) {
-    x.lineCap = 'round'; x.strokeStyle = col;
-    for (var i = 0; i < p.length - 1; i++) { x.lineWidth = w0 + (w1 - w0) * i / (p.length - 1); x.beginPath(); x.moveTo(p[i][0], p[i][1]); x.lineTo(p[i + 1][0], p[i + 1][1]); x.stroke(); }
   }
   function spiralPts(cx, cy, r, turns, a0, dir) {
     var pts = [], n = Math.round(turns * 28);
@@ -329,7 +337,7 @@
     if (o.bead) { var e = p[p.length - 1]; disc(x, e[0], e[1] + th * .6, th * 1.25, [o.bead, col, INK], lw); }
   }
 
-  // Wolke (eigene Form): Bauch aus Bögen, an den Enden rollt sie sich zur Schnecke ein, lange Fahnen laufen spitz aus
+  // Wolke (eigene Form): Bauch aus Bögen, an den Enden rollt sie sich zur Schnecke ein (Hugo 27.11., 11:02: ohne die langen spitzen Fahnen)
   function swirlCloud(x, cx, cy, s, o) {
     var n = o.n || 5, lw = o.lw, L = o.line, lobes = [], rs = [], tot = 0, i, bx;
     for (i = 0; i < n; i++) { var k = 1 - Math.abs(i - (n - 1) / 2) / n * 1.25; rs.push(s * rr(.38, .58) * (.4 + .6 * k)); tot += rs[i] * 1.25; }
@@ -337,13 +345,6 @@
     for (i = 0; i < n; i++) { lobes.push([bx + rs[i], cy - rs[i] * rr(.5, .85), rs[i]]); bx += rs[i] * 1.25; }
     var x0 = cx - tot / 2, x1 = cx + tot / 2, g = x.createLinearGradient(0, cy - s * 1.2, 0, cy + s * .1);
     g.addColorStop(0, '#ffffff'); g.addColorStop(.5, o.c1); g.addColorStop(1, o.c2);
-    [-1, 1].forEach(function (d) {   // Fahnen hinter dem Bauch
-      if (R() < .2) return;
-      var len = s * rr(.8, 1.7), px = d < 0 ? x0 + s * .3 : x1 - s * .3, py = cy - s * rr(.03, .13), p = [], q, m = 22, f = rr(2.6, 3.8);
-      for (q = 0; q <= m; q++) { var t = q / m; p.push([px + d * len * t, py + Math.sin(t * f) * s * .08 - t * t * s * .1]); }
-      var e = p[m], rc = s * rr(.09, .15); p = p.concat(spiralPts(e[0], e[1] - rc, rc, 1.1, Math.PI / 2, -d));
-      taper(x, p, s * .19 + lw * 2, lw * 2.6, L); taper(x, p, s * .19, lw * .9, o.c1);
-    });
     [-1, 1].forEach(function (d) {   // Schnecken an den Enden
       var rv = s * rr(.22, .32), vx = d < 0 ? x0 - rv * .15 : x1 + rv * .15, vy2 = cy - rv, sp = spiralPts(vx, vy2, rv, 1.35, Math.PI / 2, -d);
       polyline(x, [[d < 0 ? x0 + s * .5 : x1 - s * .5, cy]].concat(sp)); ol(x, rv * .6 + lw * 2, L); ol(x, rv * .6, o.c1);
@@ -455,17 +456,19 @@
 
   // ---------- Szene ----------
   var world, strips = [], sprites = [], fliers = [], rays, dapple, glow, flare, sheen, fxC, fxX, W = 0, H = 0, U = 0, LW0 = 2, mob = false,
-      camRef = 0, camT = 0, cam = 0, PANS = [0.006, 0.016, 0.03, 0.05], DEPTH = [0.18, 0.38, 0.62, 1],
+      camRef = 0, camT = 0, cam = 0, QF = 1, PANS = [0.006, 0.016, 0.03, 0.05], DEPTH = [0.18, 0.38, 0.62, 1],
       SUN = [.5, .325];   // Sonne im Schlussbild (Anteil von Breite und Höhe): tief über dem See, zwischen Slogan und Rad
   // Ein Streifen = eine Tiefen-Ebene. y = 0 ist die Oberkante des Schlussbilds, der Weg der Kamera liegt bei y < 0.
   // Gemalt wird in Kacheln; jedes Teil (add) kennt seine Höhe und wird nur in den Kacheln gemalt, die es berührt.
   function strip(i, f, dprFin, dprFly) {
-    var mg = .08, pan = PANS[i] * H * AK.scrollPan, w = W * (1 + mg * 2), fh = H * (1 + mg * 2) + pan * 2, tf = Math.round(camT * f);
+    var mg = .08, mx = W * mg + XR * f, pan = PANS[i] * H * AK.scrollPan, w = W + mx * 2, fh = H * (1 + mg * 2) + pan * 2, tf = Math.round(camT * f);   // seitlich so viel breiter, wie die Ebene beim Verschieben wandert
     var el = document.createElement('div'); el.className = 'ak-layer'; el.style.width = w + 'px'; el.style.height = (fh + tf) + 'px';
-    var S = { el: el, f: f, d: DEPTH[i], w: w, fh: fh, tf: tf, ox: -W * mg, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [] };
-    S.X = function (fr) { return W * mg + fr * W; };
+    var S = { el: el, f: f, d: DEPTH[i], w: w, fh: fh, tf: tf, ox: -mx, oy: -H * mg - pan - tf, pan: pan, vy: H * mg + pan, items: [], tiles: [], sw: [] };
+    S.X = function (fr) { return mx + fr * W; };
     S.Y = function (c, fr) { return S.vy - c * camRef * f + fr * H; };   // Höhe im Streifen, die beim Fortschritt c (1 = oben, 0 = gelandet) am Bildschirm bei fr liegt
     S.add = function (y0, y1, fn) { S.items.push([y0, y1, fn, AK.seed * 7919 + i * 100003 + S.items.length * 31 + 5]); };
+    // Teil, das sich wiegt: eigenes kleines Bild auf dem Streifen, dreht um seinen Fuss (top = es hängt und dreht um die Oberkante)
+    S.sway = function (px, py, r, top, fn) { S.sw.push([px, py, r, top, fn, AK.seed * 104729 + i * 7001 + S.sw.length * 13 + 3]); };
     S.build = function () {
       var edges = [-tf], y = -tf, k, n; while (y < 0) { y = Math.min(0, y + 1300); edges.push(y); } edges.push(fh);
       for (k = 0; k < edges.length - 1; k++) {
@@ -479,8 +482,14 @@
         paper(x, 0, a, w, hh, i ? 1 : .45);   // der Himmel bleibt glatter
         el.appendChild(c.c); S.tiles.push([c.c, a]);
       }
+      S.sw.forEach(function (q) {
+        var r = q[2], o = q[3] ? 4 : r, c = canvas(r * 2, r * 2, dprFin), P = rng(q[5] + 1);
+        R = rng(q[5]); c.x.translate(r - q[0], o - q[1]); q[4](c.x); paper(c.x, q[0] - r, q[1] - o, r * 2, r * 2, 1);
+        c.c.className = 'ak-sway'; c.c.style.cssText = 'left:' + (q[0] - r) + 'px;top:' + (q[1] - o + tf) + 'px;width:' + r * 2 + 'px;height:' + r * 2 + 'px;transform-origin:50% ' + (q[3] ? '4px' : '50%');
+        el.appendChild(c.c);
+        sways.push({ el: c.c, x: q[0], ph: P() * 6, amp: (q[3] ? 1.5 : 2.2) + P() * 2.2, f: .0007 + P() * .0006 });
+      });
     };
-    S.release = function () { S.tiles.forEach(function (t) { if (t[1] < 0) { t[0].width = t[0].height = 0; if (t[0].parentNode) t[0].parentNode.removeChild(t[0]); } }); };
     return S;
   }
 
@@ -501,7 +510,7 @@
       sun(x, sx, sy, sr, lw * 1.2);
     });
     // kleine Wolken, die im Bild stehen bleiben (die grossen ziehen als einzelne Teile vorbei)
-    [[.12, .1, .05], [.9, .19, .06], [.2, .27, .042], [.8, -.18, .07], [.24, -.32, .06], [.62, -.08, .05]].forEach(function (c) {
+    [[.8, -.18, .07], [.24, -.32, .06], [.62, -.08, .05]].forEach(function (c) {
       var s = U * c[2], py = vy + H * c[1];
       S.add(py - s * 1.6, py + s * .4, function (x) { swirlCloud(x, S.X(c[0]), py, s, cloudLook(s)); });
     });
@@ -601,16 +610,18 @@
     }
     list.sort(function (a, b) { return a[1] - b[1]; });
     list.forEach(function (p) { plant(S, p[0], p[1], p[2], lw, u * p[3]); });
+    var ne = 0;
     for (y = y0; y < y1; y += u * rr(.14, .26) * (calm(y) ? cz[2] * 1.5 : 1)) [0, 1].forEach(function (sd) {
       var e = sd ? eR : eL, ex = e(y), d = (e(y + 6) - e(y - 6)) / 12, a, c = calm(y);
       if (ex < -10 || ex > w + 10 || eR(y) - eL(y) < 6) return;
       a = (sd ? Math.atan2(d, -1) : Math.atan2(-d, 1)) + (sd ? 1 : -1) * (c ? .95 : .45) / (1 + d * d * 4);
-      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < .7 ? 9 : R() < .5 ? 3 : 4, lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a);
+      plant(S, ex + (sd ? 1 : -1) * u * .04, y, R() < .7 ? 9 : R() < .5 ? 3 : 4, lw, u * pick([.7, .85, 1, 1.2]) * (c ? cz[2] : 1), a,
+        !!(o.sway && AK.sway && y > o.sway[0] && ne++ % o.sway[1] === 0));   // im Schlussbild wiegt sich ein Teil der Randpflanzen
     });
     if (top) for (px = -u * .1; px < w + u * .1; px += u * rr(.18, .3)) plant(S, px, top(px) + u * rr(-.05, .12), pick([0, 0, 2, 9, 7]), lw, u * rr(1.1, 1.7), -Math.PI / 2);
   }
-  function plant(S, px, py, k, lw, u, dirA) {
-    S.add(py - u * .9, py + u * .9, function (x) {
+  function plant(S, px, py, k, lw, u, dirA, sway) {
+    var fn = function (x) {
       var z = zc(px, py), z2 = R() < .3 ? zc(px + u, py) : z, i, c;
       if (k === 0) frond(x, { x: px, y: py + u * .15, a: -Math.PI / 2 + rr(-.5, .5), spread: rr(1.7, 2.9), n: 7 + Math.floor(R() * 6), len: u * rr(.3, .56), wid: u * rr(.036, .06), droop: rr(.3, .7), cols: z, lw: lw, rib: R() < .3 ? 1 : 0 });
       else if (k === 1) frond(x, { x: px, y: py - u * .2, a: Math.PI / 2 + rr(-.4, .4), spread: rr(1.2, 2.2), n: 6 + Math.floor(R() * 5), len: u * rr(.3, .5), wid: u * rr(.036, .06), droop: -rr(.15, .45), cols: z, lw: lw, rib: 0 });
@@ -622,12 +633,13 @@
       else if (k === 7) for (i = 0, c = 2 + Math.floor(R() * 3); i < c; i++) bigLeaf(x, px, py + u * .25, -Math.PI / 2 + (i - (c - 1) / 2) * rr(.45, .8), u * rr(.34, .56), u * rr(.07, .1), (i - (c - 1) / 2) * .22, pick(z), lw);
       else if (k === 8) { if (R() < .5) disc(x, px, py, u * rr(.05, .09), [pick(z), pick(P_ACC), pick(z2), INK], lw); else pearls(x, px, py - u * .2, u * rr(.25, .45), u * .016, pick(P_ACC), lw, rr(-.25, .25)); }
       else frond(x, { x: px, y: py, a: dirA == null ? R() * 6 : dirA + rr(-.3, .3), spread: rr(1.1, 1.9), n: 6 + Math.floor(R() * 5), len: u * rr(.3, .56), wid: u * rr(.036, .06), droop: rr(.25, .6), cols: z, lw: lw, rib: R() < .35 ? 1 : 0 });
-    });
+    };
+    if (sway) S.sway(px, py, u * .7, 0, fn); else S.add(py - u * .9, py + u * .9, fn);
   }
 
   // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese
   function sceneMain(S) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .462 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .478 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .42, yB = vy + H * (mob ? .085 : .02),
         p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; };
     // Öffnung der Lichtung: oben ein spitzer Bogen, in der Texthöhe breit (Handy: fast die ganze Breite), unten wächst das Unterholz wieder herein
     function hw(y) {
@@ -655,28 +667,29 @@
         else frond(x, { x: px, y: py, a: -Math.PI / 2, spread: 1.5, n: 5, len: s * 2.4, wid: s * .34, droop: .3, cols: ['#4fae3f', '#2f9a4a', '#6fbf3a'], lw: lw * .6, rib: 0 });
       }
     });
-    jungle(S, yC, bot, eL, eR, { ground: '#161a48', size: mob ? .7 : .82, dens: 1.1, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75],
+    jungle(S, yC, bot, eL, eR, { ground: '#161a48', size: mob ? .7 : .82, dens: 1.1, topFn: topFn, calm: [vy - H * .03, vy + H * .86, mob ? .28 : .75], sway: [vy - H * .06, mob ? 3 : 1],
       lianas: [{ x0: 2, x1: cx - HW - U * .05, yEnd: end }, { x0: cx + HW + U * .05, x1: w - 2, yEnd: end },
         { x0: cx - HW * .92, x1: cx + HW * .92, yEnd: function (px) { return Math.min(archY(px) + U * rr(.02, .16), vy + H * .04); }, bead: 1 }] });
     // Ranken hängen vom Bogen in die Lichtung
     for (i = 0; i < (mob ? 5 : 9); i++) (function (px) {
-      var y0 = archY(px) - U * .03, len = Math.min(U * rr(.25, .7), vy + H * .06 - y0);
+      var y0 = archY(px) - U * .03, len = Math.min(U * rr(.25, .7), vy + H * .06 - y0), fn;
       if (len < U * .1) return;
-      S.add(y0 - 4, y0 + len + 20, function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); });
+      fn = function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); };
+      if (AK.sway && y0 + len > vy - H * .1) S.sway(px, y0, len / 2 + 22, 1, fn); else S.add(y0 - 4, y0 + len + 20, fn);
     })(cx + rr(-.9, .9) * HW);
   }
 
   // einzelnes Teil mit eigener Tiefe (Wolke, vorbeiziehendes Blatt): liegt beim Fortschritt ci am Bildschirm bei fr
-  function flyer(wd, hd, f, ci, xc, fr, fn) {
-    var c = canvas(wd, hd, f > 1.9 ? 1 : Math.min(DPR, 1.5)); fn(c.x, wd, hd);
+  function flyer(wd, hd, f, ci, xc, fr, fn, vx) {
+    var c = canvas(wd, hd, f > 1.9 ? 1 : QF); fn(c.x, wd, hd);
     c.c.className = 'ak-sprite'; c.c.style.width = wd + 'px'; c.c.style.height = hd + 'px'; c.c.style.visibility = 'hidden';
-    fliers.push({ el: c.c, x: xc - wd / 2, y: -ci * camRef * f + fr * H - hd / 2, f: f, h: hd, on: 0 });
+    fliers.push({ el: c.c, x: xc - wd / 2, y: -ci * camRef * f + fr * H - hd / 2, f: f, w: wd, h: hd, on: 0, vx: vx || 0 });
     world.appendChild(c.c);
   }
   function skyClouds(defs) {   // [Fortschritt, x, Höhe am Bildschirm, Grösse, Tiefe]
     defs.forEach(function (d) {
-      var s = U * d[3], cw = s * 8.8, chh = s * 2;
-      flyer(cw, chh, d[4], d[0], d[1] * W, d[2], function (x) { swirlCloud(x, cw / 2, chh * .86, s, cloudLook(s)); });
+      var s = U * d[3], cw = s * 6, chh = s * 2, vx = (R() < .5 ? -1 : 1) * rr(3, 7) * (.5 + d[4] * .5) / 1000;   // die Wolken ziehen langsam
+      flyer(cw, chh, d[4], d[0], d[1] * W, d[2], function (x) { swirlCloud(x, cw / 2, chh * .86, s, cloudLook(s)); }, vx);
     });
   }
   function flyLeaves() {   // grosse Wedel ziehen kurz vor der Landung dicht an der Kamera vorbei
@@ -693,23 +706,26 @@
     W = root.clientWidth; H = root.clientHeight; mob = W < 768;
     U = clamp(Math.min(W, H * .62), 300, 620); LW0 = Math.max(1.5, U * .0056);
     ZP = [R() * 6, R() * 6, R() * 6];
-    camRef = Math.round(H * AK.flightH); camT = fly ? camRef : 0; cam = camT;
+    XR = AK.freePan ? W * (mob ? AK.panX[0] : AK.panX[1]) : 0;
+    camRef = Math.round(H * AK.flightH); camT = camRef; cam = tgY = fly ? camT : 0; camX = tgX = 0;   // immer das ganze Bild: man kann von Hand wieder nach oben
     if (world) world.remove();
     world = document.createElement('div'); world.className = 'ak-world'; world.setAttribute('aria-hidden', 'true');
     root.insertBefore(world, root.firstChild);
-    sprites = []; fliers = [];
-    var S0 = strip(0, .14, DPR, DPR), S1 = strip(1, .5, DPR, Math.min(DPR, 1.5)), S2 = strip(2, 1, DPR, Math.min(DPR, 1.5));
+    sprites = []; fliers = []; sways = [];
+    var q = W > 1100 ? Math.min(DPR, 1.5) : DPR; QF = Math.min(DPR, W > 1100 ? 1.25 : 1.5);   // grosse Bildschirme etwas weniger scharf (Speicher)
+    var S0 = strip(0, .14, q, q), S1 = strip(1, .5, q, QF), S2 = strip(2, 1, q, QF);
     strips = [S0, S1, S2];
     sceneFar(S0); sceneMid(S1); sceneMain(S2);
     S0.build(); world.appendChild(S0.el);
     R = rng(AK.seed + 3);
-    if (fly) skyClouds([[1, .2, .3, .07, .25], [.97, .84, .5, .09, .3], [.9, .5, .2, .08, .36], [.84, .14, .62, .1, .4], [.78, .8, .35, .09, .45], [.7, .4, .55, .1, .42]]);   // ferne Wolken
+    skyClouds([[1, .2, .3, .07, .25], [.97, .84, .5, .09, .3], [.9, .5, .2, .08, .36], [.84, .14, .62, .1, .4], [.78, .8, .35, .09, .45], [.7, .4, .55, .1, .42],
+      [0, .14, .1, .05, .2], [0, .86, .2, .06, .26], [0, .5, .045, .042, .22]]);   // ferne Wolken; die letzten drei stehen im Schlussbild am Himmel
     S1.build(); world.appendChild(S1.el);
     R = rng(AK.seed + 4);
-    if (fly) skyClouds([[.99, .72, .2, .14, .6], [.93, .25, .75, .16, .7], [.86, .85, .5, .15, .8], [.8, .3, .3, .18, .9], [.73, .7, .7, .16, .75], [.67, .2, .5, .2, .95]]);   // mittlere Wolken
+    skyClouds([[.99, .72, .2, .14, .6], [.93, .25, .75, .16, .7], [.86, .85, .5, .15, .8], [.8, .3, .3, .18, .9], [.73, .7, .7, .16, .75], [.67, .2, .5, .2, .95]]);   // mittlere Wolken
     S2.build(); world.appendChild(S2.el);
     R = rng(AK.seed + 5);
-    if (fly) skyClouds([[.97, .1, .9, .22, 1.3], [.9, .9, .6, .26, 1.6], [.85, .3, .5, .3, 1.9], [.79, .75, .4, .24, 1.25], [.74, .1, .6, .3, 1.7], [.69, .6, .5, .26, 1.45], [.65, .9, .4, .22, 1.2]]);   // nahe Wolken rauschen vorbei
+    skyClouds([[.97, .1, .9, .22, 1.3], [.9, .9, .6, .26, 1.6], [.85, .3, .5, .3, 1.9], [.79, .75, .4, .24, 1.25], [.74, .1, .6, .3, 1.7], [.69, .6, .5, .26, 1.45], [.65, .9, .4, .22, 1.2]]);   // nahe Wolken rauschen vorbei
 
     // Glanz der Sonne über dem See (liegt vor den vorderen Ebenen, bleibt aber bei der Sonne)
     var gc = document.createElement('canvas'), gx, gg, gsx = W * SUN[0], gsy = H * SUN[1];
@@ -745,31 +761,41 @@
     });
     sprites.forEach(function (s) { world.appendChild(s.sh); });
 
-    // Sonnenstrahlen: von der Sonne über die Lichtung
+    // Sonnenstrahlen: von der Sonne über die Lichtung. Jeder Strahl wird einmal gemalt (weich zu den Seiten, Prisma als Saum),
+    // verteilt auf zwei Bilder, die gegeneinander atmen
     rays = document.createElement('div'); rays.className = 'ak-rays';
-    for (var r = 0; r < 7; r++) {
-      var ray = document.createElement('div'); ray.className = 'ak-ray';
-      var wv = rr(.05, .13) * Math.max(W, 500), ang = -60 + r * 20 + rr(-5, 5), o1 = rr(.12, .26);
-      ray.style.left = (gsx - wv / 2) + 'px'; ray.style.top = gsy + 'px'; ray.style.height = '92%'; ray.style.width = wv + 'px';
-      ray.style.transform = 'rotate(' + ang.toFixed(1) + 'deg)';
-      ray.style.setProperty('--o1', o1.toFixed(2)); ray.style.setProperty('--o2', (o1 * rr(.3, .7)).toFixed(2)); ray.style.setProperty('--o3', clamp(o1 * rr(1.1, 1.7), 0, .7).toFixed(2));
-      ray.style.opacity = o1;
-      if (!reduce) ray.style.animation = 'akRay ' + rr(5, 11).toFixed(1) + 's ease-in-out ' + (-rr(0, 10)).toFixed(1) + 's infinite';
-      rays.appendChild(ray);
+    var rw = W * 1.3, rh = H * 1.25, rc = [canvas(rw, rh, .5), canvas(rw, rh, .5)], r, g;
+    for (r = 0; r < 7; r++) {
+      var wv = rr(.05, .13) * Math.max(W, 500), len = H * .9, ang = (-60 + r * 20 + rr(-5, 5)) * Math.PI / 180, tc = canvas(wv, len, .5), tx = tc.x, X = rc[r % 2].x;
+      g = tx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, 'rgba(255,251,238,0)'); g.addColorStop(.1, 'rgba(255,251,238,.9)'); g.addColorStop(.38, 'rgba(255,248,232,.5)'); g.addColorStop(.88, 'rgba(255,246,236,0)');
+      tx.fillStyle = g; tx.fillRect(0, 0, wv, len);
+      g = tx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, 'rgba(150,220,245,0)'); g.addColorStop(.1, 'rgba(150,220,245,.55)'); g.addColorStop(.5, 'rgba(195,178,250,.2)'); g.addColorStop(.85, 'rgba(195,178,250,0)');
+      tx.fillStyle = g; tx.fillRect(wv * .22, 0, wv * .14, len);
+      g = tx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, 'rgba(248,190,215,0)'); g.addColorStop(.1, 'rgba(248,190,215,.55)'); g.addColorStop(.5, 'rgba(250,228,180,.2)'); g.addColorStop(.85, 'rgba(250,228,180,0)');
+      tx.fillStyle = g; tx.fillRect(wv * .64, 0, wv * .14, len);
+      tx.globalCompositeOperation = 'destination-in';
+      g = tx.createLinearGradient(0, 0, wv, 0); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.38, '#000'); g.addColorStop(.62, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      tx.fillStyle = g; tx.fillRect(0, 0, wv, len);
+      X.save(); X.translate(gsx + W * .15, gsy); X.rotate(ang); X.globalAlpha = rr(.14, .3); X.drawImage(tc.c, -wv / 2, 0, wv, len); X.restore();
     }
+    rc.forEach(function (c, i) {
+      c.c.style.cssText = 'width:' + rw + 'px;height:' + rh + 'px;left:' + (-W * .15) + 'px;' + (reduce ? '' : 'animation:' + (i ? 'akRayB 9s' : 'akRayA 7s') + ' ease-in-out infinite;');
+      rays.appendChild(c.c);
+    });
     world.appendChild(rays);
-    // Lichtflecken (wandern langsam)
+    // Lichtflecken auf der Wiese: ein Bild, das langsam wandert
     dapple = document.createElement('div'); dapple.className = 'ak-dapple';
+    var dc = canvas(W, H, .5);
     for (var d = 0; d < 9; d++) {
-      var sp = document.createElement('i'); sp.className = 'ak-spot';
-      var sz = rr(.12, .3) * Math.min(W, H);
-      sp.style.cssText = 'left:' + rr(.1, .9) * W + 'px;top:' + rr(.25, .95) * H + 'px;width:' + sz + 'px;height:' + sz * rr(.5, .8) + 'px;margin:' + (-sz / 2) + 'px 0 0 ' + (-sz / 2) + 'px;--dx:' + rr(-30, 30) + 'px;--dy:' + rr(-20, 20) + 'px;'
-        + (reduce ? '' : 'animation:akSpot ' + rr(7, 14).toFixed(1) + 's ease-in-out ' + (-rr(0, 14)).toFixed(1) + 's infinite;');
-      dapple.appendChild(sp);
+      var sz = rr(.12, .3) * Math.min(W, H), dx0 = rr(.1, .9) * W, dy0 = rr(.3, .95) * H;
+      dc.x.save(); dc.x.translate(dx0, dy0); dc.x.scale(1, rr(.5, .8));
+      g = dc.x.createRadialGradient(0, 0, 0, 0, 0, sz / 2); g.addColorStop(0, 'rgba(255,250,235,.3)'); g.addColorStop(1, 'rgba(255,250,235,0)');
+      dc.x.fillStyle = g; dc.x.fillRect(-sz / 2, -sz / 2, sz, sz); dc.x.restore();
     }
-    world.appendChild(dapple);
+    dc.c.style.cssText = 'width:' + W + 'px;height:' + H + 'px;' + (reduce ? '' : 'animation:akSpot 13s ease-in-out infinite;');
+    dapple.appendChild(dc.c); world.appendChild(dapple);
     sprites.forEach(function (s) { world.appendChild(s.el); });
-    if (fly) flyLeaves();
+    flyLeaves();
 
     // Glühwürmchen, Glitzer, Fahrtwind
     var fxc = canvas(W, H, Math.min(DPR, 1.5)); fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; world.appendChild(fxC);
@@ -894,21 +920,53 @@
       if (prev === -1 || reduce) cap.innerHTML = htmlTxt;
       else { cap.classList.add('is-out'); clearTimeout(capT); capT = setTimeout(function () { cap.innerHTML = htmlTxt; cap.classList.remove('is-out'); }, 150); }
     }
-    if (spark && !reduce && band) {   // kleiner Glitzer an den Enden der Auswahl
-      var r = band.getBoundingClientRect(), rw = root.getBoundingClientRect();
-      for (var k = 0; k < 3; k++) { sparks.push(newSpark(null, false, [r.left - rw.left + 10, r.top - rw.top + r.height / 2, 40])); sparks.push(newSpark(null, false, [r.right - rw.left - 10, r.top - rw.top + r.height / 2, 40])); }
-    }
   }
   function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ---------- Takt ----------
-  var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, shown = false, flown = false, fl = null, cover = null, lightK = -1, wind = [];
-  root.addEventListener('pointermove', function (e) {
-    if (!AK.pointer) return;
+  var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
+      drag = null, dragged = 0, tgY = 0, tgX = 0, camX = 0, XR = 0, sways = [];
+  root.addEventListener('pointermove', function (e) {   // Maus bewegt die Ebenen leicht (am Handy macht das der Finger beim Verschieben)
+    if (!AK.pointer || e.pointerType !== 'mouse' || drag) return;
     ptr.tx = (e.clientX / W - .5) * 2; ptr.ty = (e.clientY / H - .5) * 2;
   }, { passive: true });
   root.addEventListener('pointerleave', function () { ptr.tx = ptr.ty = 0; });
-  root.addEventListener('pointerdown', function () { if (fl) fl.rate = 9; }, true);   // Antippen während des Flugs: schnell zu Ende fliegen
+
+  // Kamera von Hand (Hugo 27.11., 11:02): ausserhalb des Rads lässt sich die ganze Szene gemütlich verschieben – seitlich in den
+  // Urwald und wieder nach oben bis in den Himmel. Das Rad scrollt weiter die Services, mit Parallax dort, wo die Kamera gerade steht.
+  function inWheel(e) { return e.target && e.target.closest && e.target.closest('[data-ak-wheel]'); }
+  root.addEventListener('pointerdown', function (e) {
+    if (fl) { fl.rate = 9; return; }   // Antippen während des Flugs: schnell zu Ende fliegen
+    if (!AK.freePan || !shown || e.button > 0 || inWheel(e)) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: tgX, cy: tgY, on: 0, px: e.clientX, py: e.clientY, pt: e.timeStamp, vx: 0, vy: 0 };
+  }, true);
+  window.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var mx = e.clientX - drag.x, my = e.clientY - drag.y, d = Math.max(1, e.timeStamp - drag.pt);
+    if (!drag.on) {
+      if (Math.abs(mx) + Math.abs(my) < 8) return;
+      drag.on = 1; root.classList.add('ak-drag'); ptr.tx = ptr.ty = 0;
+      try { window.getSelection().removeAllRanges(); } catch (er) {}
+    }
+    drag.vx = drag.vx * .6 + (e.clientX - drag.px) / d * .4; drag.vy = drag.vy * .6 + (e.clientY - drag.py) / d * .4; drag.px = e.clientX; drag.py = e.clientY; drag.pt = e.timeStamp;
+    tgX = clamp(drag.cx - mx * 1.2, -XR, XR); tgY = clamp(drag.cy + my * 1.7, 0, camT);   // das Bild folgt dem Finger: nach unten ziehen = zurück nach oben
+  }, { passive: true });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (drag.on) {   // beim Loslassen gleitet die Kamera noch ein Stück weiter
+      if (e.type === 'pointerup' && e.timeStamp - drag.pt < 90) { tgX = clamp(tgX - drag.vx * 260, -XR, XR); tgY = clamp(tgY + drag.vy * 420, 0, camT); }
+      dragged = 1; setTimeout(function () { dragged = 0; }, 80); root.classList.remove('ak-drag');
+    }
+    drag = null;
+  }
+  window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag);
+  root.addEventListener('click', function (e) { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = 0; } }, true);   // nach dem Ziehen löst kein Knopf aus
+  root.addEventListener('wheel', function (e) {   // Mausrad und Trackpad ausserhalb des Rads
+    if (!AK.freePan || fl || !shown || inWheel(e)) return;
+    e.preventDefault();
+    var k = e.deltaMode === 1 ? 32 : 1;
+    tgY = clamp(tgY - e.deltaY * k * 1.1, 0, camT); tgX = clamp(tgX + e.deltaX * k, -XR, XR);
+  }, { passive: false });
 
   // Der grosse Schwung: langsam los, schnell durch die Mitte, weich landen; ganz am Ende federt die Kamera einen Hauch nach
   function swing(u) {
@@ -920,71 +978,77 @@
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    var t = now - tBoot, vel = 0, i;
+    var t = now - tBoot, dt = Math.min(64, now - lastT), vel = 0, i; lastT = now;
     if (fl) {
       var c0 = cam; fl.u = Math.min(1, fl.u + Math.min(64, now - fl.last) / fl.D * fl.rate); fl.last = now;
       cam = camT * (1 - swing(fl.u)); vel = cam - c0;
-      if (!shown && fl.u >= .8) reveal();
-      if (fl.u >= 1) { fl = null; cam = 0; landed(); }
+      if (!shown && fl.u >= .92) reveal();   // erst wenn die Kamera fast steht: Glas-Knöpfe über einem fahrenden Bild kosten das Handy viel
+      if (fl.u >= 1) { fl = null; cam = tgY = 0; camX = tgX = 0; }
+    } else if (AK.freePan) {   // von Hand: die Kamera zieht gemütlich nach
+      var kk = 1 - Math.exp(-dt / 170);
+      cam += (tgY - cam) * kk; camX += (tgX - camX) * kk;
+      if (Math.abs(tgY - cam) < .05) cam = tgY;
+      if (Math.abs(tgX - camX) < .05) camX = tgX;
     }
+    var lit = !fl && shown && cam < H * .45;
+    if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
     var p = drawWheel();
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
-    var k = touch ? .035 : .06;
-    ptr.x += (ptr.tx - ptr.x) * k; ptr.y += (ptr.ty - ptr.y) * k;
-    var dr = reduce ? 0 : AK.drift;
+    ptr.x += (ptr.tx - ptr.x) * .06; ptr.y += (ptr.ty - ptr.y) * .06;
+    var dr = reduce ? 0 : AK.drift * (mob ? 2.2 : 1.6);   // der Blick steht nie ganz still (Hugo 11:02), am Handy etwas mehr
     var dx = (Math.sin(t * .00011) * 10 + Math.sin(t * .00023 + 1) * 5) * dr - ptr.x * 18 * AK.pointer;
-    var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr - ptr.y * 12 * AK.pointer;
+    var dy = (Math.sin(t * .00009 + 2) * 7 + Math.cos(t * .00019) * 4) * dr * .7 - ptr.y * 12 * AK.pointer;
     // ohne Flug: beim Einblenden sinkt die Kamera ein Stück ins Bild (leichter Zoom)
     var ip = flown || reduce || !shown ? (shown || flown ? 1 : 0) : clamp((now - tStart) / (AK.introMs * 1.6), 0, 1), ie = 1 - Math.pow(1 - ip, 3);
     for (i = 0; i < strips.length; i++) {
       var L = strips[i], z = 1 + (1 - ie) * .06 * L.d;
-      L.el.style.transform = 'translate3d(' + (L.ox + dx * L.d).toFixed(1) + 'px,' + (L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d).toFixed(1) + 'px,0) scale(' + z.toFixed(4) + ')';
+      L.el.style.transform = 'translate3d(' + (L.ox + dx * L.d - camX * L.f).toFixed(1) + 'px,' + (L.oy + cam * L.f + dy * L.d - pan * 2 * L.pan + (1 - ie) * 40 * L.d).toFixed(1) + 'px,0) scale(' + z.toFixed(4) + ')';
     }
     for (i = 0; i < fliers.length; i++) {
       var F = fliers[i], fy = F.y + cam * F.f, on = fy > -F.h && fy < H ? 1 : 0;
-      if (on) F.el.style.transform = 'translate3d(' + (F.x + dx * F.f * .6).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
+      if (on) {
+        var fxp = F.x;
+        if (F.vx) { var spn = W + F.w + XR * F.f * 2 + 40, off = F.w + XR * F.f + 20; fxp = ((F.x + off + t * F.vx) % spn + spn) % spn - off; }   // zieht langsam und kommt auf der anderen Seite wieder
+        F.el.style.transform = 'translate3d(' + (fxp + dx * F.f * .6 - camX * F.f).toFixed(1) + 'px,' + fy.toFixed(1) + 'px,0)';
+      }
       if (on !== F.on) { F.on = on; F.el.style.visibility = on ? 'visible' : 'hidden'; }
+    }
+    if (sways.length && !reduce && cam < H * 1.2) for (i = 0; i < sways.length; i++) {   // Wind im Urwald: Böen wandern quer durchs Bild
+      var q = sways[i], g = .55 + .45 * Math.sin(t * .00023 + q.x * .004);
+      q.el.style.transform = 'rotate(' + ((Math.sin(t * q.f + q.ph) + Math.sin(t * q.f * 2.7 + q.ph * 1.3) * .3) * q.amp * g).toFixed(2) + 'deg)';
     }
     for (i = 0; i < sprites.length; i++) {
       var S = sprites[i], rot = reduce ? 0 : Math.sin(t * S.f + S.ph) * S.amp + Math.sin(t * S.f * 2.3 + S.ph * 2) * S.amp * .35;
-      var sx = S.x + dx * 1.35, sy = S.y + cam * 1.5 + dy * 1.35 - pan * 2 * PANS[3] * H * AK.scrollPan * 1.3 + (1 - ie) * 90;
+      var sx = S.x + dx * 1.35 - camX * 1.5, sy = S.y + cam * 1.5 + dy * 1.35 - pan * 2 * PANS[3] * H * AK.scrollPan * 1.3 + (1 - ie) * 90;
       var piv = 'translate(' + (S.w * S.ax) + 'px,' + (S.h * S.ay) + 'px) rotate(', back = ' translate(' + (-S.w * S.ax) + 'px,' + (-S.h * S.ay) + 'px)';
       S.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0) ' + piv + rot.toFixed(2) + 'deg)' + back;
       // Schatten: die Sonne steht hinten in der Mitte, also fällt er nach vorn und etwas nach aussen
       S.sh.style.transform = 'translate3d(' + (sx + (S.ax ? 1 : -1) * W * .02 - dx * .4).toFixed(1) + 'px,' + (sy + H * .028 - dy * .4).toFixed(1) + 'px,0) ' + piv + (rot * 1.3).toFixed(2) + 'deg) scale(1.04)' + back;
     }
-    // Licht gehört zum Bild unten und fährt darum mit der Kamera mit
-    var cy = cam.toFixed(1);
-    var L0 = strips[0], sdx = L0 ? dx * L0.d : 0, sdy = L0 ? cam * L0.f + dy * L0.d - pan * 2 * L0.pan : 0, sunT = 'translate3d(' + sdx.toFixed(1) + 'px,' + sdy.toFixed(1) + 'px,0)';   // Glanz und Strahlen bleiben bei der Sonne
+    // Glanz und Strahlen bleiben bei der Sonne, die Lichtflecken auf der Wiese
+    var L0 = strips[0], sdx = L0 ? dx * L0.d - camX * L0.f : 0, sdy = L0 ? cam * L0.f + dy * L0.d - pan * 2 * L0.pan : 0, sunT = 'translate3d(' + sdx.toFixed(1) + 'px,' + sdy.toFixed(1) + 'px,0)';
     if (glow) glow.style.transform = sunT;
     if (rays) rays.style.transform = sunT;
-    if (dapple) dapple.style.transform = 'translate3d(0,' + cy + 'px,0)';
-    var lk = Math.round(clamp(1 - cam / (H * .7), 0, 1) * 50) / 50;
-    if (lk !== lightK) {   // Licht erst unten in der Lichtung; oben ganz ausgeblendet (spart der Grafikkarte die Mischmodi im Flug)
-      lightK = lk; var vis = lk > 0 ? 'visible' : 'hidden';
-      if (flare) { flare.style.opacity = lk; flare.style.visibility = vis; }
-      if (sheen) { sheen.style.opacity = (lk * .26).toFixed(3); sheen.style.visibility = vis; }
-      if (rays) { rays.style.opacity = lk; rays.style.visibility = vis; }
-      if (glow) { glow.style.opacity = lk; glow.style.visibility = vis; }
-    }
-    if (flare && lk > 0) {
+    if (dapple) dapple.style.transform = 'translate3d(' + (-camX).toFixed(1) + 'px,' + cam.toFixed(1) + 'px,0)';
+    if (lit && flare) {
       var fx0 = W * SUN[0] + sdx, fy0 = H * SUN[1] + sdy, fcx = W * .28 - dx * 1.2, fcy = H * .88 - dy * 1.2;
       for (i = 0; i < flare.children.length; i++) {
         var c = flare.children[i], tt = c._t;
         c.style.transform = 'translate3d(' + (fx0 + (fcx - fx0) * tt * 1.4).toFixed(1) + 'px,' + (fy0 + (fcy - fy0) * tt * 1.4).toFixed(1) + 'px,0)';
       }
     }
-    if (sheen && lk > 0) sheen.style.transform = 'translate3d(' + (Math.sin(t * .00007) * W * .12 + dx * 2).toFixed(1) + 'px,' + (pan * -H * .1 + dy).toFixed(1) + 'px,0)';
+    if (lit && sheen) sheen.style.transform = 'translate3d(' + (Math.sin(t * .00007) * W * .12 + dx * 2).toFixed(1) + 'px,' + (pan * -H * .1 + dy).toFixed(1) + 'px,0)';
     drawFx(now, vel);
   }
 
   function drawFx(now, vel) {
     if (!fxX) return;
-    var t = now - tStart, i; nowT = t;
+    var t = now - tStart, i, sp = Math.abs(vel), near = shown && cam < H * 1.25; nowT = t;
+    if (sp <= 1.5 && !near) { if (!fxClean) { fxX.clearRect(0, 0, W, H); fxClean = 1; } return; }   // weit oben und ohne Fahrtwind gibt es nichts zu malen
+    fxClean = 0;
     fxX.clearRect(0, 0, W, H);
     fxX.globalCompositeOperation = 'lighter';
-    var sp = Math.abs(vel);
     if (sp > 1.5) {   // Fahrtwind: helle Striche, je schneller desto länger
       var wa = clamp((sp - 1.5) / 20, 0, 1), span = H + 400;
       fxX.lineCap = 'round'; fxX.strokeStyle = '#ffffff';
@@ -993,7 +1057,8 @@
         fxX.globalAlpha = wa * q[3]; fxX.lineWidth = 1 + q[2] * .8; fxX.beginPath(); fxX.moveTo(q[0], y); fxX.lineTo(q[0], y + len); fxX.stroke();
       }
     }
-    if (shown) {
+    if (near) {   // Glühwürmchen und Glitzer wohnen in der Lichtung und bleiben dort, wenn die Kamera wandert
+      fxX.save(); fxX.translate(-camX * 1.1, cam * 1.1);
       for (i = 0; i < flies.length; i++) {
         var F = flies[i], x, y2, a;
         var wx = Math.sin(t * F.f1 + F.p1) * F.ax + Math.sin(t * F.f2 * 2.1 + F.p2) * F.ax * .4;
@@ -1016,6 +1081,7 @@
         fxX.save(); fxX.translate(P.x, P.y + age * P.vy * 10); fxX.rotate(P.rot + u * .6);
         fxX.drawImage(P.spr, -ss, -ss, ss * 2, ss * 2); fxX.restore();
       }
+      fxX.restore();
     }
     fxX.globalAlpha = 1; fxX.globalCompositeOperation = 'source-over';
   }
@@ -1029,23 +1095,15 @@
     if (shown) return; shown = true; tStart = performance.now(); nowT = 0;
     html.classList.add('ak-on');
     var kids = root.querySelectorAll('.ak-inner > *'), i;
-    for (i = 0; i < kids.length; i++) kids[i].style.transitionDelay = ((flown ? 150 : 450) + i * 140) + 'ms';
+    for (i = 0; i < kids.length; i++) kids[i].style.transitionDelay = ((flown ? 200 : 450) + i * 150) + 'ms';
     setTimeout(function () { if (cover && cover.parentNode) cover.parentNode.removeChild(cover); for (var j = 0; j < kids.length; j++) kids[j].style.transitionDelay = ''; }, AK.introMs + 1400);
   }
-  // gelandet: die Kacheln und Teile vom Weg nach unten werden nicht mehr gebraucht
-  function landed() {
-    setTimeout(function () {
-      strips.forEach(function (S) { S.release(); });
-      fliers.forEach(function (F) { F.el.width = F.el.height = 0; if (F.el.parentNode) F.el.parentNode.removeChild(F.el); }); fliers = [];
-    }, 600);
-  }
-
   // Grösse: nur bei neuer Breite neu malen (Safari-Leisten ändern nur die Höhe); dann ohne Flug
   var lastW = 0, rsT = 0;
   window.addEventListener('resize', function () {
     clearTimeout(rsT);
     rsT = setTimeout(function () {
-      if (Math.abs(root.clientWidth - lastW) > 20) { lastW = root.clientWidth; fl = null; paintScene(false); lightK = -1; reveal(); }
+      if (Math.abs(root.clientWidth - lastW) > 20) { lastW = root.clientWidth; fl = null; paintScene(false); litOn = null; reveal(); }
       measureWheel();
     }, 180);
   });
@@ -1069,7 +1127,10 @@
         start();
       });
     });
-    if (location.hash === '#ak-test') window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = camT * (1 - swing(u)); lightK = -1; if (u >= .8) reveal(); raf = 0; frameOnce(); };   // nur für Tests: Standbild bei Fortschritt u
+    if (location.hash === '#ak-test') {   // nur für Tests: Standbild bei Fortschritt u; Kamera von Hand an eine Stelle setzen
+      window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = tgY = camT * (1 - swing(u)); camX = tgX = 0; if (u >= .92) reveal(); raf = 0; frameOnce(); };
+      window.__akPan = function (fy, fx) { stop(); run = true; flown = true; fl = null; reveal(); cam = tgY = clamp(fy, 0, 1) * camT; camX = tgX = clamp(fx, -1, 1) * XR; raf = 0; frameOnce(); return [sways.length, fliers.length]; };
+    }
   }
   function frameOnce() { var r = requestAnimationFrame; window.requestAnimationFrame = function () { return 0; }; frame(performance.now()); window.requestAnimationFrame = r; }
   if (document.fonts && document.fonts.ready) {
