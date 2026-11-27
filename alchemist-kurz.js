@@ -1044,7 +1044,7 @@
           eL1 = function (y) { return -14 + (cx - HW1 + 14) * sh(y) + (Math.sin(y * .005 + q1) * .03 + Math.sin(y * .016 + q2) * .012) * U * sh(y); },
           eR1 = function (y) { return w + 14 - (cx - HW1 + 14) * sh(y) - (Math.sin(y * .0046 + q2) * .03 + Math.sin(y * .018 + q1) * .012) * U * sh(y); },
           end = function () { return bot; };
-      var o1 = { ground: '#1c2158', shade: 'rgba(28,33,88,.55)', thk: 1.5, size: .5, dens: 1.15, lwk: .8, cell: .05, lianas: [{ x0: 2, x1: cx - HW1 - U * .06, yEnd: end }, { x0: cx + HW1 + U * .06, x1: w - 2, yEnd: end }] };
+      var o1 = { ground: '#1c2158', shade: 'rgba(28,33,88,.55)', thk: 2, size: .5, dens: 1.15, lwk: .8, cell: .05, lianas: [{ x0: 2, x1: cx - HW1 - U * .06, yEnd: end }, { x0: cx + HW1 + U * .06, x1: w - 2, yEnd: end }] };
       ground(S, yT1, bot, eL1, eR1, o1); plants(S, yT1, bot, eL1, eR1, o1);
       S.add(yT1, bot + 4, function (x) {
         var q; x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(140,195,238,.2)';
@@ -1081,13 +1081,13 @@
   // Pflanzen über ihren Streifen hinaus und decken die Naht zum Streifen darüber. dist(x, y) = Abstand zur Kante der Wand (unter 0 = ausserhalb):
   // zur Kante hin werden die Pflanzen klein, damit nichts weit in die Öffnung ragt. Eigener Zufall des Streifens: alles andere bleibt, wie es ist.
   var THICK = [40, 40, 40, 41, 41, 42, 42, 43, 43, 44, 44, 7, 7, 7, 0, 0, 9, 26, 45, 46, 47, 29, 14, 23, 16, 3, 17, 25, 49, 48];
-  function thicket(x, x0, x1, ya, yb, u, lw, dist, shade) {
+  function thicket(x, x0, x1, ya, yb, u, lw, dist, shade, e0, dens) {   // e0: so gross dürfen Pflanzen direkt an der Kante sein (ohne Angabe bleiben sie dort winzig); dens: Dichte (1 = üblich)
     var m = x.getTransform(), k = Math.abs(m.a) || 1, ov = u * .9, X0 = (Math.round(m.a * x0 + m.e) - m.e) / m.a, Y0 = (Math.round(m.d * (ya - ov) + m.f) - m.f) / m.d,
         c = canvas(x1 - X0, yb - Y0, k), g = c.x, fk = { add: function (a, b, fn) { fn(g); } },
-        n = Math.round((x1 - x0) * (yb - ya + u * .3) / (u * u * AK.thick)), L = [], i, px, py, d, sz;
+        n = Math.round((x1 - x0) * (yb - ya + u * .3) / (u * u * AK.thick) * (dens || 1)), L = [], i, px, py, d, sz;
     for (i = 0; i < n; i++) {
       px = rr(x0, x1); py = rr(ya - u * .2, yb + u * .1); d = dist(px, py); if (d < 0) continue;
-      sz = Math.min(pick([1.1, 1.3, 1.45, 1.6, 1.8]), (d + u * .05) / (u * .3)); if (sz < .32) continue;   // gross: wenige grosse Pflanzen decken die Wand und sind rasch gemalt
+      sz = Math.min(pick([1.1, 1.3, 1.45, 1.6, 1.8]), (d + u * (e0 || .05)) / (u * .3)); if (sz < .32) continue;   // gross: wenige grosse Pflanzen decken die Wand und sind rasch gemalt
       L.push([px, py, pick(THICK), sz]);
     }
     L.sort(function (a, b) { return a[1] - b[1]; });
@@ -1476,12 +1476,12 @@
     function wR(y) { return y < tS ? eR(y) : Math.min(eR(y), cx + hwT(y) - wb(y)); }
     for (yy = yW0; yy < bot; yy += sW * 14) (function (ya, yb, n) {   // die Wand: dunkler Grund mit Bändern, gleich nach der Wiese gemalt (unter allen Pflanzen)
       S.insert(1 + n, ya - sW, yb + sW, function (x) {
-        var q;
+        var q, ins = uF * .16;   // der dunkle Grund beginnt erst ein Stück hinter der Kante: an der Kante selbst stehen nur Pflanzen (sonst sah man ihn dort als glatten Block)
         x.beginPath();
-        x.moveTo(-14, ya); for (q = ya; q <= yb + 1; q += 8) x.lineTo(wL(q), q); x.lineTo(wL(yb + 1), yb + 1); x.lineTo(-14, yb + 1); x.closePath();
-        x.moveTo(w + 14, ya); for (q = ya; q <= yb + 1; q += 8) x.lineTo(wR(q), q); x.lineTo(wR(yb + 1), yb + 1); x.lineTo(w + 14, yb + 1); x.closePath();
+        x.moveTo(-14, ya); for (q = ya; q <= yb + 1; q += 8) x.lineTo(wL(q - ins) - ins, q); x.lineTo(wL(yb + 1 - ins) - ins, yb + 1); x.lineTo(-14, yb + 1); x.closePath();
+        x.moveTo(w + 14, ya); for (q = ya; q <= yb + 1; q += 8) x.lineTo(wR(q - ins) + ins, q); x.lineTo(wR(yb + 1 - ins) + ins, yb + 1); x.lineTo(w + 14, yb + 1); x.closePath();
         x.fillStyle = '#161a48'; x.fill();
-        thicket(x, -14, w + 14, ya, yb, uF, lw, function (qx, qy) { return Math.max(wL(qy) - qx, qx - wR(qy)); }, 'rgba(22,26,72,.34)');
+        thicket(x, -14, w + 14, ya, yb, uF * (mob ? .6 : .9), lw, function (qx, qy) { return Math.max(wL(qy) - qx, qx - wR(qy)); }, 'rgba(22,26,72,.34)', .17, mob ? 2.4 : 1.1);   // bis an die Kante; am Handy sind die Ecken klein: dort kleinere Pflanzen, dafür dichter
       }, seedW + n * 31);
     })(yy, Math.min(bot, yy + sW * 14), nW++);
     nF = Math.round((w + 20) * (bot - tS) / (uF * uF * .085) * 1.3);
@@ -1514,11 +1514,12 @@
       for (y = vy - H * .14; y < bot + 4; y += 10) {
         ky = sm(vy - H * .14, vy + H * .04, y);
         [0, 1].forEach(function (sd) {
-          var e = sd ? wR(y) : wL(y), far = sd ? w + 14 : -14, span = Math.abs(far - e), g; if (span < 4) return;
-          g = x.createLinearGradient(e, 0, far, 0);
-          g.addColorStop(0, 'rgba(255,238,170,' + (.34 * ky).toFixed(3) + ')'); g.addColorStop(Math.min(.45, dW / span), 'rgba(255,238,170,0)');
-          g.addColorStop(Math.min(.5, dW * 1.2 / span), 'rgba(22,18,74,0)'); g.addColorStop(1, 'rgba(22,18,74,' + (.36 * ky).toFixed(3) + ')');
-          x.fillStyle = g; x.fillRect(Math.min(e, far), y, span, 10.5);
+          var e = sd ? wR(y) : wL(y), far = sd ? w + 14 : -14, span = Math.abs(far - e), g, e0, sp, f0; if (span < 4) return;
+          e0 = e + (sd ? -1 : 1) * dW * .35; sp = span + dW * .35; f0 = dW * .35 / sp;   // das Licht setzt schon kurz vor der Kante weich ein: Blätter, die in die Öffnung ragen, bekommen keinen harten Strich
+          g = x.createLinearGradient(e0, 0, far, 0);
+          g.addColorStop(0, 'rgba(255,238,170,0)'); g.addColorStop(f0, 'rgba(255,238,170,' + (.34 * ky).toFixed(3) + ')'); g.addColorStop(Math.min(.6, f0 + dW / sp), 'rgba(255,238,170,0)');
+          g.addColorStop(Math.min(.65, f0 + dW * 1.2 / sp), 'rgba(22,18,74,0)'); g.addColorStop(1, 'rgba(22,18,74,' + (.36 * ky).toFixed(3) + ')');
+          x.fillStyle = g; x.fillRect(Math.min(e0, far), y, sp, 10.5);
         });
       }
     });
