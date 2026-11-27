@@ -25,7 +25,7 @@
      section.ak [data-ak]
        .ak-inner > .ak-head (.ak-kicker, h1.ak-title, .ak-lead: hält nur noch seinen Platz, sichtbar ist der Slogan im offenen Menü, siehe leadToMenu)
                  > .ak-wheel [data-ak-wheel] > .ak-item [data-ak-item] (.ak-item-name, .ak-item-price, .ak-item-info)
-                 > .ak-caption [data-ak-caption]   (Kasten im Aussehen der Glas-Knöpfe; der Text darin wechselt mit der gewählten Zeile)
+                 > .ak-caption [data-ak-caption]   (Kasten im Aussehen der Glas-Knöpfe; der Text steht fest oben und schreibt sich um, wenn das Rad steht)
                  > .ak-contact (a.grey …, ausgeblendet) > a.ak-long (wandert als Knopf ins Menü, siehe linkToMenu)
    Werte zum Feinschliff in AK. Frühere Fassungen (Aquarell-Wald, erster Flug) stehen im Verlauf des Repos. */
 (function () {
@@ -186,9 +186,15 @@
        aussen schwarze Linie. Die Farben kommen aus denselben Webflow-Variablen. So ist sie über Wiese und Urwald gleich gut lesbar. */
     '.ak-band { position: absolute; z-index: 0; left: 50%; pointer-events: none; transform: translateX(-50%); box-sizing: border-box; border: 1px solid var(--farbe--weiss, #fff); border-radius: 999px;',
     '  background: var(--farbe--glas, rgba(168,168,168,.5)); outline: 1px solid var(--farbe--schwarz, #000); outline-offset: 0; box-shadow: inset 0 0 5px 0 #fff; }',
-    /* Beschreibung: Der Kasten selbst (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, nur der Text darin wechselt weich */
-    '[data-ak-caption] .ak-cap-in { display: block; transition: opacity 260ms ease, transform 420ms ' + EASE_OUT + '; }',
-    '[data-ak-caption] .ak-cap-in.is-out { opacity: 0; transform: translate3d(0, .8vh, 0); transition-duration: 150ms; }',
+    /* Beschreibung: Der Kasten (Aussehen in der Webflow-Klasse ak-caption) bleibt stehen, und der Text steht fest an der oberen Kante. Er bewegt
+       sich nie: Beim Wechsel schreiben sich die Buchstaben an Ort und Stelle um (showCap). Solange das Rad auf einer anderen Zeile steht als
+       der Text, ist er blasser (is-stale). Der alte Text liegt beim Umschreiben kurz über dem neuen (is-old). */
+    '[data-ak-caption] .ak-cap-in { display: block; position: relative; width: 100%; transition: opacity .2s ease; }',
+    '[data-ak-caption] .ak-cap-in.is-stale { opacity: .45; }',
+    '[data-ak-caption] .ak-cap-l { display: block; }',
+    '[data-ak-caption] .ak-cap-l.is-old { position: absolute; left: 0; right: 0; top: 0; }',
+    '[data-ak-caption] .ak-w { white-space: nowrap; }',
+    '.ak-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
     /* Titel: dunkler Verlauf mit wanderndem Glanz. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation») */
     '[data-ak] .ak-title { background: linear-gradient(100deg, #2a2442 0%, #2a2442 38%, #6e64a5 46%, #a68bd8 50%, #6e64a5 54%, #2a2442 62%, #2a2442 100%);',
@@ -1809,20 +1815,79 @@
     if (n !== cur) select(n, cur !== -1);
     return p;
   }
-  var capT = 0, capIn = null;
+  // Beschreibung im Kasten (Hugo 27.11., 19:21–19:24): Der Text steht fest an der oberen Kante und bewegt sich nie. Gewechselt wird erst, wenn
+  // das Rad losgelassen ist und steht (capTick) – beim Drehen wechselt die Auswahl mehrmals pro Sekunde, das würde flimmern. Dann schreiben sich
+  // die Buchstaben an Ort und Stelle um, mit dem Perlmutt-Schimmer der Site (wie «Werkstatt betreten» auf der Homepage, home.js goIn): Jeder
+  // Buchstabe kommt aus der Unschärfe, leuchtet in einer Hirsch-Perlmutt-Farbe und setzt sich dann schwarz. Die Unschärfe ist ein Schein in
+  // der Farbe des Buchstabens (durchsichtiger Buchstabe mit weichem Schatten), kein Filter: der Filter je Buchstabe ruckelte am Handy.
+  // Das Ganze dauert eine Sekunde, egal wie lang der Text ist. Ab Stufe 2 (schwaches Gerät) und bei «Bewegung reduzieren» wechselt der Text ohne Schimmer.
+  var PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'], capIn = null, capSr = null, capShown = -1, capFin = null, capM = null, capBad = 0, capOff = 0;
+  function capLayer(n) {
+    var price = items[n].querySelector('.ak-item-price'), info = items[n].querySelector('.ak-item-info'), l = document.createElement('span'), ch = [];
+    l.className = 'ak-cap-l'; l.setAttribute('aria-hidden', 'true');
+    function words(txt, into) {   // Wörter bleiben zusammen (kein Umbruch mitten im Wort), jeder Buchstabe ist ein eigenes Stück
+      txt.split(/\s+/).forEach(function (w, k) {
+        if (!w) return;
+        if (k) into.appendChild(document.createTextNode(' '));
+        var ws = document.createElement('span'); ws.className = 'ak-w';
+        for (var q = 0; q < w.length; q++) { var c = document.createElement('span'); c.textContent = w.charAt(q); ws.appendChild(c); ch.push(c); }
+        into.appendChild(ws);
+      });
+    }
+    var pt = price ? price.textContent.trim() : '', it = info ? info.textContent.trim() : '';
+    if (pt) { var ps = document.createElement('span'); ps.className = 'ak-cap-price'; words(pt, ps); l.appendChild(ps); }
+    words(it, l);
+    return { el: l, ch: ch, txt: (pt ? pt + '. ' : '') + it };
+  }
+  function showCap(n, anim) {
+    if (!capIn) {   // der Kasten bleibt stehen, nur sein Inhalt wechselt. Für Vorlese-Programme steht der ganze Text unsichtbar daneben
+      capIn = document.createElement('div'); capIn.className = 'ak-cap-in'; capSr = document.createElement('span'); capSr.className = 'ak-sr';
+      cap.textContent = ''; cap.appendChild(capSr); cap.appendChild(capIn);
+    }
+    capShown = n; capIn.classList.remove('is-stale');
+    var olds = [].slice.call(capIn.querySelectorAll('.ak-cap-l')), L = capLayer(n), fx = anim && !reduce && lv < 2 && !capOff && !!L.el.animate;
+    capSr.textContent = L.txt;
+    olds.forEach(function (o) {
+      if (!fx || o.classList.contains('is-old')) { o.remove(); return; }
+      o.classList.add('is-old');   // der alte Text löst sich an Ort und Stelle auf (wird unscharf und blass)
+      var oc = o.querySelectorAll('.ak-w > span'), m = Math.max(1, oc.length - 1);
+      [].forEach.call(oc, function (c, k) {
+        try { c.animate([{ opacity: 1 }, { opacity: 0, color: 'rgba(0,0,0,0)', textShadow: '0 0 .4em rgba(0,0,0,.5)' }], { duration: 190, delay: 110 * k / m, easing: 'ease-in', fill: 'forwards' }); } catch (er) {}
+      });
+      setTimeout(function () { o.remove(); }, 330);
+    });
+    capIn.appendChild(L.el);
+    if (!fx) return;
+    if (!capFin) { var cs = getComputedStyle(cap); capFin = [cs.color, cs.textShadow]; }
+    capM = { t: performance.now(), n: 0, slow: 0 }; pw.t = Math.max(pw.t, capM.t + 1100);   // der Wächter der Szene wertet diese Sekunde nicht; der Schimmer prüft sich selbst (capWatch)
+    var m2 = Math.max(1, L.ch.length - 1), spread = Math.min(18 * m2, 340);   // zusammen eine Sekunde: 110 ms Vorlauf + höchstens 340 ms Versatz + 550 ms je Buchstabe
+    L.ch.forEach(function (c, k) {
+      var pc = PEARL[k % PEARL.length], d = 110 + spread * k / m2;
+      try {
+        c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 230, delay: d, easing: 'ease-out', fill: 'backwards' });
+        c.animate([{ color: 'rgba(255,255,255,0)', textShadow: '0 0 4px ' + pc }, { color: pc, textShadow: '0 0 .6em ' + pc, offset: .25 },
+          { color: pc, textShadow: '0 0 .4em ' + pc, offset: .4 }, { color: capFin[0], textShadow: capFin[1] }], { duration: 550, delay: d, easing: 'ease-out', fill: 'backwards' });
+      } catch (er) {}
+    });
+  }
+  function capWatch(raw, now) {   // ruckelt das Umschreiben zweimal hintereinander (ein gutes Drittel der Bilder zu langsam), wechselt der Text künftig ohne Schimmer
+    if (!capM) return;
+    if (now - capM.t < 1000) { capM.n++; if (raw > 36) capM.slow++; return; }
+    capBad = capM.n < 8 || capM.slow >= capM.n * .35 ? capBad + 1 : 0; if (capBad >= 2) capOff = 1;
+    capM = null;
+  }
+  function capTick(now) {   // im Takt: erst umschreiben, wenn kein Finger mehr am Rad ist, es steht und eingerastet ist
+    if (!cap || cur < 0 || cur === capShown || holding || now - lastScroll < 140 || Math.abs(wheel.scrollTop - cur * rowH) > 1.5) return;
+    showCap(cur, true);
+  }
   function select(n, spark) {
     var prev = cur; cur = n;
     items.forEach(function (it, i) { it.setAttribute('aria-selected', i === n ? 'true' : 'false'); it.classList.toggle('is-sel', i === n); });   // is-sel: schwarze Schrift mit weissem Schein, wie im Menü-Knopf
     wheel.setAttribute('aria-activedescendant', items[n].id);
-    if (cap) {
-      var price = items[n].querySelector('.ak-item-price'), info = items[n].querySelector('.ak-item-info');
-      var htmlTxt = (price && price.textContent.trim() ? '<span class="ak-cap-price">' + esc(price.textContent.trim()) + '</span>' : '') + (info ? esc(info.textContent.trim()) : '');
-      if (!capIn) { capIn = document.createElement('div'); capIn.className = 'ak-cap-in'; cap.textContent = ''; cap.appendChild(capIn); }   // der Kasten bleibt stehen, nur sein Inhalt wechselt
-      if (prev === -1 || reduce) capIn.innerHTML = htmlTxt;
-      else { capIn.classList.add('is-out'); clearTimeout(capT); capT = setTimeout(function () { capIn.innerHTML = htmlTxt; capIn.classList.remove('is-out'); }, 150); }
-    }
+    if (!cap) return;
+    if (prev === -1) showCap(n, false);
+    else if (capIn) capIn.classList.toggle('is-stale', n !== capShown);   // das Rad steht auf einer anderen Zeile: der alte Text wartet blasser
   }
-  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ---------- Takt ----------
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 }, pan = 0, run = false, raf = 0, tBoot = 0, lastT = 0, shown = false, flown = false, fl = null, cover = null, litOn = null, fxClean = 0, wind = [],
@@ -1905,7 +1970,7 @@
   function frame(now) {
     raf = requestAnimationFrame(frame);
     var t = now - tBoot, raw = now - lastT, dt = Math.min(64, raw), vel = 0, i; lastT = now; fN++;
-    watch(raw, now);
+    watch(raw, now); capWatch(raw, now);
     if (fl) {
       var c0 = cam; fl.u = Math.min(1, fl.u + Math.min(64, now - fl.last) / fl.D * fl.rate); fl.last = now;
       cam = camT * (1 - swing(fl.u)); vel = cam - c0;
@@ -1921,7 +1986,7 @@
     }
     var lit = !fl && shown && !reOn && cam < H * .45 && now - tStart > 420;   // das Licht kommt kurz nach dem Text: nicht alles im selben Bild
     if (lit !== litOn && world) { litOn = lit; world.classList.toggle('ak-lit', lit); }
-    var p = drawWheel(); settle(now);
+    var p = drawWheel(); settle(now); capTick(now);
     var pn = items.length > 1 ? p / (items.length - 1) - .5 : 0;
     pan += (pn - pan) * .06;
     var pk = touch ? .035 : .06;   // am Handy folgt das Bild dem Finger noch etwas weicher (wie am Anfang)
