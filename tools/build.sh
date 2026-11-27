@@ -6,8 +6,11 @@
 set -e
 cd "$(dirname "$0")/.."
 cat src/home/*.js > home.js
+mkdir -p .build
 for f in home galerie alchemist-kurz; do   # die anderen Dateien stecken als Inline-Skripte in Webflow (dort von Hand aktualisieren)
-  [ -f "$f.js" ] && npx --yes terser "$f.js" -c -m -f ascii_only=true -o "$f.min.js"
+  [ -f "$f.js" ] || continue
+  sed '/\/\/ <test>/,/\/\/ <\/test>/d' "$f.js" > ".build/$f.js"   # Haken für die Prüfskripte (zwischen // <test> und // </test>) gehören nicht in die ausgelieferte Datei
+  npx --yes terser ".build/$f.js" -c -m -f ascii_only=true -o "$f.min.js"
 done
 echo "Prüfsummen (I im Lader):"
 for f in home.min.js galerie.min.js alchemist-kurz.min.js; do
