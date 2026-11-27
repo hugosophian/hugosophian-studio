@@ -1821,7 +1821,8 @@
   // dem Loslassen. Bis dahin bleibt der alte Text unverändert stehen. Dann blendet er als Ganzes rasch aus – ohne dunkle Unschärfe («schwarzer
   // Schatten beim Wechsel», 20:13) – und der neue schreibt sich hinein wie «Galerie öffnen» auf der Homepage und der Hinweis in der Galerie
   // (home.js goIn, galerie.js setHint): Buchstabe für Buchstabe von unten aus der Unschärfe, in fliessendem Hirsch-Perlmutt, das sich in 0.9 s
-  // sanft schwarz setzt (18 ms je Buchstabe versetzt, die Zeilen nebeneinander, jede 70 ms später).
+  // sanft schwarz setzt (18 ms je Buchstabe versetzt, die Zeilen nebeneinander, jede 70 ms später). Seit 20:42 läuft das Ganze doppelt so
+  // schnell (CAPSP): rund 1 s statt 2 s, alle genannten Zeiten also halb so lang.
   //
   // Warum Ebenen auf einer Zeichenfläche und nicht wie dort einzelne Buchstaben im Dokument: Die erste Fassung animierte Farbe und Schein von
   // rund 70 Buchstaben einzeln. Auf Hugos iPhone malte Safari den Text dabei nur rund 12-mal pro Sekunde neu (Video 19:37), es ruckelte.
@@ -1830,7 +1831,8 @@
   // Umschreiben, das dadurch weich abgelöst wird. Im Takt werden diese fertigen Bilder nur noch mit wechselnder Deckkraft übereinander gelegt –
   // das kostet fast nichts. Wo jeder Buchstabe steht, sagt weiter der Browser: Der Text liegt unsichtbar im Layout (capBuild).
   var PEARL = ['#96dcf5', '#c3b2fa', '#f8bed7', '#fae4b4', '#a5e8d7'], capIn = null, capSr = null, capCv = null, capX = null, capW = 0, capH = 0, capD = 1,
-      capShown = -1, capT = null, capA = null, capM = null, capBad = 0, capOff = 0, capSn = null, capSnX = null;
+      capShown = -1, capT = null, capA = null, capM = null, capBad = 0, capOff = 0, capSn = null, capSnX = null,
+      CAPSP = 2;   // Tempo des Umschreibens: Alle Zeiten in capDraw gelten für Tempo 1 (rund 2 s); 2 = doppelt so schnell (Hugo 27.11., 20:42: «halbiere mal die Zeit der Schreib-Animation»)
   function capCanvas() {   // Zeichenfläche so gross wie der Kasten, in Gerätepixeln (bis 3-fach: die Schrift soll so scharf sein wie daneben)
     var w = cap.clientWidth, h = cap.clientHeight;
     if (capCv && w === capW && h === capH) return;
@@ -1938,7 +1940,7 @@
     if (!X || !T) return;
     X.globalAlpha = 1; X.clearRect(0, 0, capW, capH);
     if (!A) { X.drawImage(T.G, 0, 0, capW, capH); for (i = 0; i < T.q.length; i++) capBlit(T.F, i, T.q[i], 1); X.globalAlpha = 1; return; }
-    t = now - A.t0;
+    t = (now - A.t0) * CAPSP;
     X.globalAlpha = 1 - sm(t / 200); if (X.globalAlpha > .004) X.drawImage(capSn, 0, 0, capW, capH);   // der alte Text samt Schein blendet als Ganzes rasch aus – ohne dunkle Unschärfe
     X.globalAlpha = sm((t - 600) / Math.max(1, A.dur - 600)); if (X.globalAlpha > .004) X.drawImage(T.G, 0, 0, capW, capH);   // der grosse weiche Schein des neuen Textes
     // Weiche Übergänge (Hugo 27.11., 20:05): Keine Ebene blendet aus, bevor die nächste ganz da ist. Alle Kurven beginnen und enden sanft (sm).
@@ -1974,7 +1976,7 @@
     T.S = capAtlas(T, capD, 12, function (g, l, x, y, i, k) { var pc = capPearl(l); g.shadowColor = pc; g.shadowBlur = .45 * l.em * k; g.fillStyle = pc; g.fillText(l.s, x, y); g.shadowBlur = 0; g.shadowColor = 'transparent'; });   // gleiche Auflösung wie die schwarze Fassung: sie liegen deckungsgleich übereinander
     T.q.forEach(function (l) { dur = Math.max(dur, 60 + l.line * 70 + l.k * 18 + 1300); });
     capA = { t0: performance.now(), dur: dur };
-    capM = { t: capA.t0, d: dur, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
+    capM = { t: capA.t0, d: dur / CAPSP, n: 0, slow: 0 }; pw.t = Math.max(pw.t, capA.t0 + dur / CAPSP + 100);   // der Wächter der Szene wertet diese Zeit nicht; das Umschreiben prüft sich selbst (capWatch)
   }
   function capRedraw() {   // neue Grösse: Text neu ausmessen und ruhig hinmalen
     if (!capIn || capShown < 0) return;
