@@ -137,9 +137,8 @@
     '.ak-l1 .ak-rays canvas { transform: none !important; }',
     '.ak-l2 .ak-sway { animation-play-state: paused; }',
     '.ak-l2 .ak-dapple, .ak-l2 .ak-flare { display: none; }',
-    'html.ak-on [data-ak].ak-l2 .ak-title { animation: none; }',
     '.ak-l3 .ak-rays, .ak-l3 .ak-fx { display: none; }',
-    /* Lesbarkeit: die kleinen Texte tragen einen feinen hellen Schein (der Titel nicht: er hat den Perlmutt-Verlauf) */
+    /* Lesbarkeit: die kleinen Texte tragen einen feinen hellen Schein (der Titel nicht: er steht gross und dunkel für sich) */
     /* ein einziges weiches Feld hinter der Mitte des Rads und der Beschreibung; fertig gemaltes Bild ohne Kanten */
     /* Licht: fertig gemalte Bilder mit normaler Deckkraft. Kein Mischmodus, keine Masken – die bremsten das Handy bei der Landung */
     '.ak-rays { left: 0; top: 0; will-change: transform; }',
@@ -204,14 +203,9 @@
     '.ak-cap-cv { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }',
     '.ak-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
     '[data-ak-caption] .ak-cap-price { display: block; font-weight: 500; margin-bottom: .25em; letter-spacing: .04em; }',
-    /* Titel: dunkle Schrift mit wanderndem Schimmer. Alle Schriften bleiben dunkel, auch über dem Urwald (Hugo 27.11., 19:11: «wieder ins Schwarz, ohne Animation»).
-       Schimmer seit 22:48 in Hirsch-Perlmutt mit Eis-Cyan in der Mitte («in dem Cyan-Perlmutt und seidig weich»; vorher Lila): Eis-Cyan, an den Flanken Flieder,
-       hinten ein Hauch Rosé. Seidig: Der Schimmer ist so breit wie der ganze Titel und läuft in vielen kleinen Stufen aus, ohne Kante; er gleitet langsam und
-       setzt weich ein und aus. Das Bild des Verlaufs ist dreimal so breit wie der Titel, der Schimmer liegt im mittleren Drittel: in Ruhe ist nichts von ihm zu sehen. */
-    '[data-ak] .ak-title { background: linear-gradient(100deg, #2a2442 0%, #2a2442 34%, #322d55 37%, #4b4a84 40%, #7f86cf 43%, #a9b6f4 45.5%, #96dcf5 48%, #cfeffa 50%, #96dcf5 52%, #b3c0f8 54.5%, #c3b2fa 57%, #d9b6e6 59%, #8d7cc4 61%, #4a4078 63.5%, #2a2442 66%, #2a2442 100%);',
-    '  background-size: 300% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;',
-    '  -webkit-text-stroke: .014em #2a2442; }',   /* feine dunkle Kontur: Wo der helle Schimmer liegt, bleiben die Buchstaben vor dem hellblauen Himmel lesbar (ohne sie verschwanden sie fast) */
-    'html.ak-on [data-ak] .ak-title { animation: akTitle 8s cubic-bezier(.45, 0, .25, 1) 2.6s infinite; }',
+    /* Titel: schlicht dunkel, ohne Bewegung. Der wandernde Schimmer (bis 27.11. lila, am 27.11., 22:52 in Hirsch-Perlmutt mit feiner Kontur) ist weg:
+       Hugo 28.11., 09:18: «Ich will die Animation auf Alchemist nicht mehr.» Alle Schriften bleiben dunkel, auch über dem Urwald (27.11., 19:11). */
+    '[data-ak] .ak-title { color: #2a2442; }',
     /* Gewählte Zeile: schwarze Schrift mit weissem Schein wie im Menü-Knopf (sie steht auf dem Glas der Kapsel) */
     '[data-ak] [data-ak-item] { transition: color .25s ease, text-shadow .25s ease; }',
     '[data-ak] [data-ak-item].is-sel { color: var(--farbe--schwarz, #000); text-shadow: 0 0 1px #fff, 0 0 4px #fff, 0 0 1rem #fff; }',
@@ -225,14 +219,13 @@
     'html.ak-re .menu-toggle-wrap { opacity: 0 !important; transition: opacity 450ms ease !important; }',
     '.ak-cover.is-re { opacity: 0; transition: opacity 600ms ease; }',
     '.ak-cover.is-re.is-in { opacity: 1; }',
-    '@keyframes akTitle { 0% { background-position: 100% 0; } 55%, 100% { background-position: 0% 0; } }',
     /* Handy: Die Grössen der Texte stehen in den Webflow-Klassen als min(…vw, …svh): sie richten sich nach der Breite und werden auf niedrigen
        Bildschirmen kleiner, damit oben nichts abgeschnitten wird und unten nichts unter dem Menü-Knopf liegt.
        Sehr alte Browser kennen svh nicht und würden die Werte verwerfen. Für sie stehen hier die Werte nur nach der Breite. */
     '@supports not (height: 1svh) { @media (max-width: 479px) { [data-ak] .ak-inner { padding-top: 14vw; padding-bottom: 30vw; } [data-ak] .ak-kicker { font-size: 3.6vw; }',
     '  [data-ak] .ak-title { margin-top: 1vw; font-size: 15vw; } [data-ak] .ak-lead { margin-top: 3vw; font-size: 4.2vw; } [data-ak] .ak-wheel { height: 60vw; margin-top: 6vw; }',
     '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { width: 88vw; min-height: 26.2vw; margin-top: 4vw; padding: 3vw; border-radius: 6vw; font-size: 4.2vw; } } }',
-    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-man, .ak-man canvas, .ak-fly, .ak-flap, html.ak-on [data-ak] .ak-title { animation: none !important; } }'
+    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-man, .ak-man canvas, .ak-fly, .ak-flap { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
