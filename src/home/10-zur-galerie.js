@@ -2,9 +2,11 @@
     // Hugo 24.11.: Auf dem Weg zu einer Galerie (Creator, Singer, Model) schaltet die Seite ab wie ein alter Röhrenfernseher.
     // Das Bild klappt zu einer hellen Linie zusammen (Blitz am Horizont), die Linie schlägt immer schneller zu einem
     // Lichtpunkt zusammen. Der Punkt bleibt stehen, bis die Galerie da ist; dort fällt er in sich zusammen und explodiert
-    // (galerie.js). Alle anderen Ziele (Alchemist → Werkstatt) wie bisher mit Überblenden.
+    // (galerie.js). Seit 28.11.2026 (Hugo 13:55: «sobald das Studio verlassen wird, immer die TV-Animation») auch auf dem Weg zum
+    // Alchemist (Auswahl /alchemist). Dort blendet die Seite aus dem Schwarz mit dem Punkt ein (Seiten-Head der Auswahl, hs-vt-crt).
     var CRT = {
       paths:    ['/creator', '/singer', '/model-2027'],   // Seiten mit galerie.js
+      off:      ['/alchemist', '/alchemist-kurz', '/mechanic'],   // weitere Ziele mit TV-Animation (ohne Vorladen der Galerie)
       squashMs: 220,    // Bild klappt zur Linie zusammen, wird dabei heller
       lineMs:   440     // Linie schlägt zum Punkt zusammen: holt kurz Schwung nach aussen, dann immer schneller zur Mitte
     };
@@ -140,7 +142,7 @@
       if (!to) return;
       var clean = to.replace(/\/$/, '') || '/';
       if (CRT.paths.indexOf(clean) > -1) { try { sessionStorage.setItem('hp-return', clean); } catch (er) {} }
-      if (!reduce && CRT.paths.indexOf(clean) > -1) {
+      if (!reduce && (CRT.paths.indexOf(clean) > -1 || CRT.off.indexOf(clean) > -1)) {
         // Seite schon jetzt laden, damit der Punkt nicht lange steht
         try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; document.head.appendChild(l); } catch (er) {}
         crtOff(function () {
