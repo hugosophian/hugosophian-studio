@@ -149,11 +149,6 @@
     /* blasse Ornamente wachsen von der Sonne nach vorn und verblassen: Sonnenstrahlung */
     '.ak-sunwave { position: absolute; opacity: 0; will-change: transform, opacity; animation: akWave 13s linear infinite; }',
     /* Mandala hinter der Sonne: der Rahmen dreht sich, das Bild darin pulsiert */
-    '.ak-man { position: absolute; will-change: transform; animation: akSpin 180s linear infinite; }',
-    '.ak-man canvas { display: block; position: static; width: 100%; height: 100%; will-change: transform; animation: akPulse 9s ease-in-out infinite; }',
-    '@keyframes akSpin { to { transform: rotate(360deg); } }',
-    '@keyframes akPulse { 0%, 100% { transform: scale(.975); } 50% { transform: scale(1.03); } }',
-    '.ak-l2 .ak-man, .ak-l2 .ak-man canvas { animation: none; }',
     '@keyframes akWave { 0% { transform: scale(.52) rotate(0deg); opacity: 0; } 14% { opacity: .5; } 62% { opacity: .2; } 100% { transform: scale(2.5) rotate(16deg); opacity: 0; } }',
     '.ak-dapple { left: 0; top: 0; will-change: transform; }',
     '.ak-dapple canvas { position: absolute; left: 0; top: 0; will-change: transform, opacity; }',
@@ -225,7 +220,7 @@
     '@supports not (height: 1svh) { @media (max-width: 479px) { [data-ak] .ak-inner { padding-top: 14vw; padding-bottom: 30vw; } [data-ak] .ak-kicker { font-size: 3.6vw; }',
     '  [data-ak] .ak-title { margin-top: 1vw; font-size: 15vw; } [data-ak] .ak-lead { margin-top: 3vw; font-size: 4.2vw; } [data-ak] .ak-wheel { height: 60vw; margin-top: 6vw; }',
     '  [data-ak] .ak-item { height: 12vw; font-size: 5.4vw; } [data-ak] .ak-caption { width: 88vw; min-height: 26.2vw; margin-top: 4vw; padding: 3vw; border-radius: 6vw; font-size: 4.2vw; } } }',
-    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-man, .ak-man canvas, .ak-fly, .ak-flap { animation: none !important; } }'
+    '@media (prefers-reduced-motion: reduce) { .ak-rays canvas, .ak-dapple canvas, .ak-sway, .ak-sunwave, .ak-fly, .ak-flap { animation: none !important; } }'
   ].join('\n');
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -610,8 +605,9 @@
     o = look(s); o.n = 4 + Math.floor(R() * 2); glyphCloud(x, px, py - th - h * .05, s, o);   // flache Krone
   }
   // hängende Liane mit Blattpaaren und kleinen Blüten, am Ende eine grosse Blüte («Lianen, die runter hängen und sich bewegen, mit Blumen»)
-  function flowerVine(x, px, y0, len, amp, lw) {
+  function flowerVine(x, px, y0, len, amp, lw, o) {   // o: feste Blütenfarbe (fc), festes Ende (end: 0 Sternblüte, 1 Hibiskus, 2 Orchidee, 3 Dahlie), feste Grösse der Blüten (r0)
     var pts = [], n = 18, ph = R() * 6, r0 = Math.max(7, Math.min(len * .05, U * .034)), col = pick(Z_GREEN), fc = pick(P_FLOWER), ac = pick(P_ACC), i, t, p, sd, e;
+    if (o) { fc = o.fc || fc; r0 = o.r0 || r0; }
     for (i = 0; i <= n; i++) { t = i / n; pts.push([px + Math.sin(t * 4.4 + ph) * amp * t, y0 + len * t]); }
     smooth(x, pts); ol(x, lw * 3.6); ol(x, lw * 1.9, col);
     for (i = 2; i < n; i += 2) {
@@ -620,11 +616,40 @@
       if (i % 6 === 0) starFlower(x, p[0] - sd * r0 * 1.3, p[1], r0 * 1.15, [fc, ac], lw * .7);
       else if (i % 6 === 4) flowerB(x, p[0] - sd * r0 * 1.2, p[1], r0 * .75, pick(P_FLOWER), lw * .7);
     }
-    e = pts[n]; t = Math.floor(R() * 4);
+    e = pts[n]; t = Math.floor(R() * 4); if (o && o.end != null) t = o.end;
     if (t === 0) bloom(x, e[0], e[1] + r0 * 1.3, r0 * 2.3, fc, lw);
     else if (t === 1) hibiscus(x, e[0], e[1] + r0 * 1.3, r0 * 2.2, [fc, pick(Z_MAG)], lw);
     else if (t === 2) orchid(x, e[0], e[1] + r0 * 1.2, r0 * 2.2, [fc, ac], lw);
     else dahlia(x, e[0], e[1] + r0 * 1.3, r0 * 2.1, [fc, ac], lw);
+  }
+  // Glyzinie: hängende Blütentraube. Oben ein kurzer Stiel hinter zwei Blättchen, dann dicht an dicht runde Blüten, zur Spitze hin kleiner und dunkler
+  // (Hugo 28.11., 09:13: «diversifizieren mit paar hängenden Blumen wie Glyzinien»)
+  var WIST = [['#dcc4ff', '#8a55d8'], ['#e6d2ff', '#a070e0'], ['#cdb4f8', '#6f4fc8'], ['#f1e4ff', '#b48ae8'], ['#ffd0e6', '#e0609a'], ['#c8d0ff', '#6a78e0']];   // Flieder und Violett, dazu wenig Rosa und Blau
+  function wisteria(x, px, py, len, cols, lw) {
+    var n = Math.max(7, Math.round(len / (lw * 2.6))), sw = len * rr(-.12, .12), r0 = Math.min(len * .095, U * .028), i, t, r, sd, cx, cy;
+    x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + sw * .3, py + len * .5, px + sw, py + len); ol(x, lw * 2.2); ol(x, lw, '#4fae3f');
+    for (i = n - 1; i >= 0; i--) {   // von der Spitze nach oben: die grossen Blüten liegen über den kleinen
+      t = i / (n - 1); r = r0 * (1.05 - .62 * t); sd = (i % 2 ? 1 : -1) * r * (.85 - .5 * t);
+      cx = px + sw * t * t + sd; cy = py + len * (.1 + .9 * t);
+      x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fillStyle = mix(cols[0], cols[1], t); x.fill(); ol(x, lw * .6);
+      x.beginPath(); x.arc(cx - r * .22, cy - r * .25, r * .42, 0, 7); x.fillStyle = mix(cols[0], '#ffffff', .55 - .3 * t); x.fill();
+    }
+    [-1, 1].forEach(function (s) { leaf(x, { x: px, y: py + lw, a: Math.PI / 2 + s * 1.15, len: r0 * 2.6, wid: r0 * .8, bend: s * .15, col: pick(Z_GREEN), lw: lw * .7 }); });
+  }
+  function wistVine(x, px, y0, len, lw) {   // Ranke mit Blattpaaren, an der Blütentrauben hängen
+    var pts = [], n = 12, ph = R() * 6, amp = Math.min(len * .05, U * .03), col = pick(Z_GREEN), wc = pick(WIST), r0 = Math.max(6, Math.min(len * .05, U * .03)), i, t, p, sd;
+    for (i = 0; i <= n; i++) { t = i / n; pts.push([px + Math.sin(t * 4.2 + ph) * amp * t, y0 + len * .62 * t]); }
+    smooth(x, pts); ol(x, lw * 3.4); ol(x, lw * 1.8, col);
+    for (i = 2; i <= n; i += 2) {
+      p = pts[i]; sd = i % 4 ? 1 : -1;
+      leaf(x, { x: p[0], y: p[1], a: Math.PI / 2 + sd * 1.05, len: r0 * 1.8, wid: r0 * .5, bend: sd * .15, col: col, lw: lw * .8 });
+      if (i % 4 === 0) wisteria(x, p[0] - sd * r0 * .4, p[1], len * rr(.26, .38), wc, lw * .8);
+    }
+  }
+  // Blattbüschel mit kleiner Blüte am Ansatz einer hängenden Ranke: Keine Liane beginnt frei, jede kommt hinter Blättern oder Blüten hervor (Hugo 28.11., 09:13)
+  function capTuft(x, px, py, s, lw) {
+    frond(x, { x: px, y: py - s * .1, a: Math.PI / 2 + rr(-.3, .3), spread: rr(2.4, 3), n: 6 + Math.floor(R() * 3), len: s * rr(.8, 1.1), wid: s * .15, droop: -rr(.1, .3), cols: zc(px, py), lw: lw * .8, rib: 0 });
+    if (R() < .6) flowerB(x, px + rr(-.2, .2) * s, py + s * .12, s * .28, pick(P_FLOWER), lw * .7); else starFlower(x, px, py + s * .12, s * .36, [pick(P_FLOWER), '#ffd75e'], lw * .7);
   }
   function disc(x, cx, cy, r, cols, lw) {   // Auge: Ringe ineinander
     for (var i = 0; i < cols.length; i++) { x.beginPath(); x.arc(cx, cy, r * (1 - i / cols.length * .86), 0, 7); x.fillStyle = cols[i]; x.fill(); ol(x, lw * (i ? .7 : 1)); }
@@ -854,6 +879,7 @@
   function measureLayout() {
     var lead = root.querySelector('.ak-lead'), con = root.querySelector('.ak-contact'), ttl = root.querySelector('.ak-title'), rh = items.length ? (items[0].offsetHeight || 40) : 40;
     LT.title = ttl ? topOf(ttl) : H * .1;
+    var kk = root.querySelector('.ak-kicker'); LT.kick = kk ? topOf(kk) : LT.title - H * .04;   // Oberkante von «Velo Atelier»
     LT.lead = lead ? topOf(lead) + lead.offsetHeight : H * .27;
     LT.band = wheel ? topOf(wheel) + (wheel.clientHeight - rh) / 2 : H * .43;
     LT.capB = cap ? topOf(cap) + cap.offsetHeight : H * .62;
@@ -968,93 +994,9 @@
   //   Strahlen: werden im Takt gemalt, gebogen, und schwenken ruhig von einer Seite zur anderen
   //   Kern: steht still
   var sunRC = null;
-  // Mandala hinter der Sonne (Hugo 27.11., 21:22–21:55): drei blasse Ringe, die sich langsam gegeneinander drehen (180, 270 und 360 s je Umlauf)
-  // und zart pulsieren. Anzahlen nach 3, 6 und 9, Radien im Goldenen Schnitt.
-  // Seit 22:16 («mehr Farben und Übergänge, diese Symbole weg, nur die Formen, noch mehr Ornamente nach aussen, alles nochmal blasser hinter der
-  // originalen Sonnen-Zeichnung»): Die Farben laufen von innen nach aussen durch Gold, Apricot, Rosa, Flieder, Blau und Mint – als Verlauf in
-  // jeder Fläche und Linie. Die Scheiben mit Zeichen (Spirale, Sterne, Dreieck …) sind weg; ab den Spitzen stehen nur noch Formen: Tropfen,
-  // Kreise, Rauten, Punkte. Aussen kommt ein vierter Kranz dazu (36 Bögen, 72 Punkte). Alles ist blasser als zuvor (Deckkraft .5 statt .72).
-  function sunMandala(S, sx, sy, r) {
-    var R2 = r * Math.pow(PHI, 3), R3 = R2 * Math.sqrt(PHI), R4 = R2 * PHI, R5 = R4 * Math.sqrt(PHI), hw = R5 * 1.07, dq = Math.min(DPR, 1.25), lw = LW0 * .8, i, k, a, q, g, P = [],
-        HU = [[255, 214, 120], [255, 178, 130], [246, 150, 184], [200, 164, 242], [158, 176, 250], [176, 236, 214]];
-    function hue(t, al, dk) {   // Farbe am Ort t (0 = an der Sonne, 1 = ganz aussen); dk < 1 = dunkler (für Linien)
-      t = clamp(t, 0, 1) * 5; var n = Math.min(4, Math.floor(t)), f = t - n, c0 = HU[n], c1 = HU[n + 1]; dk = dk || 1;
-      return 'rgba(' + Math.round((c0[0] + (c1[0] - c0[0]) * f) * dk) + ',' + Math.round((c0[1] + (c1[1] - c0[1]) * f) * dk) + ',' + Math.round((c0[2] + (c1[2] - c0[2]) * f) * dk) + ',' + al + ')';
-    }
-    function tOf(rad) { return (rad - r * 2) / (R5 - r * 2); }
-    function grad(ra, rb, a0, a1, dk) { var gr = g.createRadialGradient(0, 0, ra, 0, 0, rb); gr.addColorStop(0, hue(tOf(ra), a0, dk)); gr.addColorStop(1, hue(tOf(rb), a1, dk)); return gr; }
-    function ring(dur, rev, pulse, delay, paint) {
-      var d = document.createElement('div'), c = canvas(hw * 2, hw * 2, dq); g = c.x; g.translate(hw, hw); g.globalAlpha = .5; g.lineJoin = 'round'; g.lineCap = 'round'; paint();
-      d.className = 'ak-man'; d.style.cssText = 'left:' + (sx - hw) + 'px;top:' + (sy - hw) + 'px;width:' + hw * 2 + 'px;height:' + hw * 2 + 'px;animation-duration:' + dur + 's;' + (rev ? 'animation-direction:reverse;' : '');
-      c.c.style.cssText = 'animation-duration:' + pulse + 's;animation-delay:' + delay + 's';
-      d.appendChild(c.c); S.el.appendChild(d);
-    }
-    function lotus(n, ra, rb, off, af, al) {   // Kranz aus n Blättern; Fläche und Linie tragen den Farbverlauf von innen nach aussen
-      var d = Math.PI / n, m = (ra + rb) / 2 * 1.04, fill = grad(ra, rb, af, af * .5), ln = grad(ra, rb, al, al, .72);
-      for (i = 0; i < n; i++) {
-        a = (i + off) / n * Math.PI * 2;
-        g.beginPath(); g.moveTo(Math.cos(a - d) * ra, Math.sin(a - d) * ra); g.quadraticCurveTo(Math.cos(a - d * .9) * m, Math.sin(a - d * .9) * m, Math.cos(a) * rb, Math.sin(a) * rb);
-        g.quadraticCurveTo(Math.cos(a + d * .9) * m, Math.sin(a + d * .9) * m, Math.cos(a + d) * ra, Math.sin(a + d) * ra); g.closePath(); g.fillStyle = fill; g.fill(); g.strokeStyle = ln; g.lineWidth = lw; g.stroke();
-        g.beginPath(); g.moveTo(Math.cos(a) * (ra + (rb - ra) * .2), Math.sin(a) * (ra + (rb - ra) * .2)); g.lineTo(Math.cos(a) * (ra + (rb - ra) * .72), Math.sin(a) * (ra + (rb - ra) * .72)); g.stroke();
-      }
-    }
-    function dots(n, rad, sz, al, off) { g.fillStyle = hue(tOf(rad), al, .86); for (i = 0; i < n; i++) { a = (i + (off || 0)) / n * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * rad, Math.sin(a) * rad, sz, 0, 7); g.fill(); } }
-    ring(180, 0, 9, 0, function () {   // Blume des Lebens (Sechser-Symmetrie), darum der Kreis der neun Punkte: Neunstern, die Linie 1-2-4-8-7-5 und das Dreieck 3-6-9
-      var pts = [[0, 0]];
-      g.save(); g.beginPath(); g.arc(0, 0, R2, 0, 7); g.arc(0, 0, r * 2.2, 0, 7, true); g.clip('evenodd'); q = R2 / 3;
-      g.fillStyle = grad(r * 2.2, R2, .1, .3); g.fillRect(-R2, -R2, R2 * 2, R2 * 2);   // Farbe als weicher Übergang: Gold an der Sonne, Rosa am Kreis
-      for (i = 0; i < 6; i++) { a = i * Math.PI / 3; pts.push([Math.cos(a) * q, Math.sin(a) * q], [Math.cos(a) * 2 * q, Math.sin(a) * 2 * q], [Math.cos(a + Math.PI / 6) * q * 1.7320508, Math.sin(a + Math.PI / 6) * q * 1.7320508]); }
-      g.strokeStyle = grad(r * 2.2, R2, .46, .46, .74); g.lineWidth = lw;
-      pts.forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], q, 0, 7); g.stroke(); });
-      g.restore();
-      g.beginPath(); g.arc(0, 0, R2, 0, 7); g.strokeStyle = hue(tOf(R2), .6, .72); g.lineWidth = lw * 1.6; g.stroke();
-      g.beginPath(); g.arc(0, 0, R2 * .965, 0, 7); g.strokeStyle = 'rgba(255,224,150,.6)'; g.lineWidth = lw * 2.4; g.stroke();
-      for (k = 1; k <= 9; k++) { a = -Math.PI / 2 + k * Math.PI * 2 / 9; P[k] = [Math.cos(a) * R2, Math.sin(a) * R2]; }
-      g.beginPath(); for (k = 0; k <= 9; k++) { q = P[(k * 2) % 9 || 9]; if (k) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); } g.strokeStyle = hue(.2, .3, .74); g.lineWidth = lw; g.stroke();
-      g.beginPath(); [1, 2, 4, 8, 7, 5, 1].forEach(function (n, j) { if (j) g.lineTo(P[n][0], P[n][1]); else g.moveTo(P[n][0], P[n][1]); }); g.strokeStyle = 'rgba(236,120,160,.46)'; g.lineWidth = lw * 1.5; g.stroke();
-      g.beginPath(); g.moveTo(P[3][0], P[3][1]); g.lineTo(P[6][0], P[6][1]); g.lineTo(P[9][0], P[9][1]); g.closePath(); g.strokeStyle = 'rgba(40,150,130,.42)'; g.lineWidth = lw * 1.9; g.stroke();
-      for (k = 1; k <= 9; k++) { g.beginPath(); g.arc(P[k][0], P[k][1], r * (k % 3 ? .15 : .24), 0, 7); g.fillStyle = k % 3 ? 'rgba(255,236,190,.9)' : 'rgba(176,236,214,.9)'; g.fill(); g.strokeStyle = k % 3 ? hue(tOf(R2), .7, .72) : 'rgba(40,150,130,.7)'; g.lineWidth = lw * 1.2; g.stroke(); }
-    });
-    ring(270, 1, 6, -2, function () {   // Lotus-Kränze: 18 und 27 Blätter, in jedem der 27 ein Kreis
-      lotus(27, R3, R4, .5, .4, .5); lotus(18, R2 * 1.02, R3 * 1.02, 0, .42, .5);
-      q = R3 + (R4 - R3) * .46; g.strokeStyle = hue(tOf(q), .55, .74); g.lineWidth = lw;
-      for (i = 0; i < 27; i++) { a = (i + .5) / 27 * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * q, Math.sin(a) * q, r * .13, 0, 7); g.fillStyle = 'rgba(255,250,240,.4)'; g.fill(); g.stroke(); }
-      dots(18, R2 * 1.02 + (R3 - R2) * .5, r * .07, .7, 0);
-    });
-    ring(360, 0, 9, -4.5, function () {   // aussen: 54 Striche, 108 Punkte, dann 36 Bögen und 72 Punkte
-      g.strokeStyle = hue(tOf(R4 * 1.07), .5, .74); g.lineWidth = lw * 1.3;
-      for (i = 0; i < 54; i++) { a = i / 54 * Math.PI * 2; g.beginPath(); g.moveTo(Math.cos(a) * R4 * 1.03, Math.sin(a) * R4 * 1.03); g.lineTo(Math.cos(a) * R4 * (i % 3 ? 1.08 : 1.12), Math.sin(a) * R4 * (i % 3 ? 1.08 : 1.12)); g.stroke(); }
-      dots(108, R4 * 1.16, r * .04, .6, .5);
-      lotus(36, R4 * 1.2, R5, 0, .36, .46);
-      dots(72, R5 * 1.035, r * .045, .55, .5);
-    });
-    // Formen ab den Spitzen: über jeder der 13 Flammen ein Tropfen, ein Kreis, eine Raute und ein Punkt; über jeder Pfauenfeder ein kleiner Tropfen,
-    // ein Ring und zwei Punkte. Steht still (die Formen gehören zu den Spitzen), liegt hinter dem Feld der Sonne.
-    var hs = r * 4.5, c = canvas(hs * 2, hs * 2, Math.min(DPR, 2));
-    g = c.x; g.translate(hs, hs); g.lineJoin = 'round'; g.lineCap = 'round'; g.globalAlpha = .6; g.lineWidth = lw;
-    function drop(d0, d1, wd) { var dl = d1 - d0; g.beginPath(); g.moveTo(d0, 0); g.bezierCurveTo(d0 + dl * .22, -wd, d0 + dl * .6, -wd * .72, d1, 0); g.bezierCurveTo(d0 + dl * .6, wd * .72, d0 + dl * .22, wd, d0, 0); g.closePath(); }
-    for (i = 0; i < 26; i++) {
-      g.save(); g.rotate(-Math.PI / 2 + i * Math.PI / 13);
-      if (i % 2 === 0) {
-        drop(r * 2.2, r * 3.3, r * .15); g.fillStyle = grad(r * 2.2, r * 3.3, .7, .3); g.fill(); g.strokeStyle = grad(r * 2.2, r * 3.3, .6, .6, .74); g.stroke();
-        g.beginPath(); g.arc(r * 3.56, 0, r * .14, 0, 7); g.fillStyle = 'rgba(255,250,236,.75)'; g.fill(); g.strokeStyle = hue(tOf(r * 3.56), .7, .74); g.stroke();
-        g.beginPath(); g.arc(r * 3.56, 0, r * .055, 0, 7); g.fillStyle = hue(tOf(r * 3.9), .9, .9); g.fill();
-        g.beginPath(); g.moveTo(r * 3.82, 0); g.lineTo(r * 4, -r * .085); g.lineTo(r * 4.18, 0); g.lineTo(r * 4, r * .085); g.closePath(); g.fillStyle = hue(tOf(r * 4.4), .7); g.fill(); g.strokeStyle = hue(tOf(r * 4.4), .7, .74); g.stroke();
-        g.beginPath(); g.arc(r * 4.34, 0, r * .05, 0, 7); g.fillStyle = hue(tOf(r * 4.8), .8, .86); g.fill();
-      } else {
-        drop(r * 2.02, r * 2.64, r * .1); g.fillStyle = 'rgba(160,232,212,.6)'; g.fill(); g.strokeStyle = 'rgba(40,150,130,.5)'; g.stroke();
-        g.beginPath(); g.arc(r * 2.88, 0, r * .08, 0, 7); g.strokeStyle = hue(tOf(r * 2.9), .7, .74); g.stroke();
-        g.beginPath(); g.arc(r * 3.12, 0, r * .042, 0, 7); g.fillStyle = hue(tOf(r * 3.4), .8, .86); g.fill();
-        g.beginPath(); g.arc(r * 3.3, 0, r * .03, 0, 7); g.fill();
-      }
-      g.restore();
-    }
-    c.c.style.cssText = 'position:absolute;left:' + (sx - hs) + 'px;top:' + (sy - hs) + 'px;width:' + hs * 2 + 'px;height:' + hs * 2 + 'px';
-    S.el.appendChild(c.c);
-  }
   function sunParts(S) {
     var sx = S.X(SUN[0]), sy = S.vy + H * SUN[1] + S.tf, r = SR, lw = LW0 * .7 * 1.3, dp = Math.min(DPR, 2), hw = r * 2.5, k, c, i, a, n, fld = [];
-    sunMandala(S, sx, sy, r);   // zuerst: liegt hinter allem, was zur Sonne gehört
+    // Das Mandala hinter der Sonne (drei drehende Ringe, Formen ab den Spitzen; 27.11., 22:25–22:52) ist weg: Hugo 28.11., 09:13, «diese ganze sacred Geometrie soll von der Sonne weg».
     [[0, 3.9, 4.25, Math.min(DPR, 1.5)], [3.9, 6, 6.35, Math.min(DPR, 1.25)], [6, 99, 8.95, 1]].forEach(function (q) {
       var x0 = Math.max(0, sx - r * q[2]), x1 = Math.min(S.w, sx + r * q[2]), y0 = sy - r * q[2], y1 = sy + r * Math.min(q[2], 3.9), c = canvas(x1 - x0, y1 - y0, q[3]);
       c.x.translate(sx - x0, sy - y0); sunField(c.x, 0, 0, r, LW0 * .7 * 1.2, q[0], q[1]); paper(c.x, x0 - sx, y0 - sy, x1 - x0, y1 - y0, .45);
@@ -1165,7 +1107,7 @@
   }
   // ---------- Einfache Exoten ----------
   // Nach echten Urwaldpflanzen, frei und flächig gezeichnet: wenige klare Formen, kräftige Kontur, kaum Kleinteile.
-  // Breite Blätter: Monstera, Strahlenpalme (Licuala), Pfeilblatt (Alocasia), Korbmarante (Calathea), Buntwurz (Caladium).
+  // Breite Blätter: Monstera, Pfeilblatt (Alocasia), Korbmarante (Calathea), Buntwurz (Caladium).
   // Blüten: Frangipani (Plumeria), Ruhmeskrone (Gloriosa), Kannenpflanze (Nepenthes). Hängend: Jadewein, Medinilla.
   function stemTo(x, r, col, lw) { x.beginPath(); x.moveTo(rr(-.2, .2) * r, r * .86); x.quadraticCurveTo(r * .08, r * .46, 0, r * .08); ol(x, lw * 3.1); ol(x, lw * 1.5, col); }
   function monstera(x, px, py, r, col, lw, a) {   // breites Herzblatt mit tiefen Schlitzen und Löchern
@@ -1190,16 +1132,6 @@
       x.restore();
     });
     x.beginPath(); x.moveTo(0, r * .1); x.lineTo(0, -r * 1.36); ol(x, lw * .9, c2);
-    x.restore();
-  }
-  function fanPalm(x, px, py, r, col, lw, a) {   // runder gefalteter Fächer mit gezacktem Rand
-    var n = 13, i, g, rad, a0 = -Math.PI * 1.12, sw = Math.PI * 1.24, c2 = mix(col, '#ffffff', .34), c3 = mix(col, INK, .3);
-    x.save(); x.translate(px, py); x.rotate(a == null ? rr(-.7, .7) : a);
-    stemTo(x, r, c3, lw);
-    x.beginPath(); x.moveTo(0, 0);
-    for (i = 0; i <= n * 2; i++) { g = a0 + sw * i / (n * 2); rad = r * (i % 2 ? 1 : .86); x.lineTo(Math.cos(g) * rad, Math.sin(g) * rad); }
-    x.closePath(); x.fillStyle = col; x.fill(); ol(x, lw);
-    for (i = 1; i < n * 2; i++) { g = a0 + sw * i / (n * 2); rad = r * (i % 2 ? .93 : .8); x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(g) * rad, Math.sin(g) * rad); ol(x, lw * .55, i % 2 ? c2 : c3); }
     x.restore();
   }
   function alocasia(x, px, py, r, col, lw, a) {   // Pfeilblatt mit hellen, kräftigen Adern
@@ -1354,7 +1286,8 @@
   // Mehr breite Blätter, mehr einfache Exoten: Ein Teil der Wedel-Fächer wird zu breiten Blättern, ein Teil der feinteiligen Blüten zu
   // einfachen, klaren (Hugos Lieblinge aus seinen sieben Bildern und die neuen Arten). Eigener Zufall: Plätze, Grössen und alle
   // übrigen Pflanzen bleiben, wie sie sind.
-  var BROAD = [40, 40, 40, 41, 41, 42, 42, 43, 44], EXO = [45, 45, 46, 46, 47, 48, 49, 29, 29, 16, 14, 14, 23, 31, 20, 3], FINE = [10, 11, 13, 19, 21, 22, 30];
+  var BROAD = [40, 40, 40, 42, 43, 42, 42, 43, 44],   // ohne Strahlenpalme (41): Hugo 28.11., 09:46, «kein Riesen-Fan von diesen Fächerblättern». Gleich viele Einträge: alle anderen Pflanzen bleiben, was sie waren
+      EXO = [45, 45, 46, 46, 47, 48, 49, 29, 29, 16, 14, 14, 23, 31, 20, 3], FINE = [10, 11, 13, 19, 21, 22, 30];
   function exotic(list, salt, pB, pE) {
     var Q = rng(AK.seed * 131 + salt), i, k, q;
     for (i = 0; i < list.length; i++) {
@@ -1383,7 +1316,8 @@
       var p1 = R() * 6, p2 = R() * 6, a1 = u * rr(.04, .08), a2 = u * rr(.01, .025), ya = hang(x0), ym = ya, q,
           fq = function (q) { return x0 + Math.sin(q / u * 2.3 + p1) * a1 + Math.sin(q / u * 5.9 + p2) * a2; };
       for (q = ya + 12; q < y1 + 12; q += 12) { if (inO(fq(q), q)) break; ym = q; }   // eine Liane endet, wo die Lichtung beginnt: Sie hängt nie quer durch die Öffnung zu Pflanzen weiter unten (Hugo 27.11., 22:16, rote Schlaufen)
-      gd.push({ fx: fq, y0: ya, y1: ya, ym: ym, col: R() < .25 ? pick(P_LIANA) : pick(['#2f9a4a', '#238a52', '#1f7a4a', '#4fae3f', '#178a88', '#8a5a2a']), th: U * rr(.006, .011) });   // meist grün oder braun, jede vierte bunt
+      gd.push({ fx: fq, y0: ya, y1: ya, ym: ym, col: R() < .25 ? pick(P_LIANA) : pick(['#2f9a4a', '#238a52', '#1f7a4a', '#4fae3f', '#178a88', '#8a5a2a']), th: U * rr(.006, .011),   // meist grün oder braun, jede vierte bunt
+        kind: pick([0, 0, 0, 1, 1, 2, 2, 3]), nc: !!(o.noCap && o.noCap(x0, ya)) });   // Art: 0 Ranke mit Blättern, 1 mit Blüten, 2 mit Glyzinien-Trauben, 3 holzig mit wenigen Blättern
     })(gx);
     list.forEach(function (p) {
       var b = null, bd = u * .5, d, k, gq;
@@ -1393,12 +1327,27 @@
       else if (p[1] > (top ? top(p[0]) : y0) + u * .45) p[4] = 3;   // weder Liane noch Krone in der Nähe: diese Pflanze fällt weg (sie hinge sonst in der Luft)
     });
     list = list.filter(function (p) { return p[4] !== 3; });
+    // Lianen im Stil von früher (Hugo 28.11., 09:13, «die von vorher sehen viel schöner aus»): Ranken mit Blättchen und einer Perle am Ende, dazu
+    // welche mit kleinen Blüten und welche mit hängenden Glyzinien-Trauben. Jede beginnt hinter einem Blatt oder einer Blüte: An ihrem Ansatz
+    // sitzt eine Pflanze, die nach der Liane gemalt wird (an den Ästen des Baobabs decken seine Blattbüschel den Ansatz, siehe noCap).
     gd.forEach(function (gq) {
       if (gq.y1 - gq.y0 < u * .12) return;
-      var yb = gq.y1 + u * rr(.04, .16);
-      S.add(gq.y0 - 4, yb + 6, function (x) {
-        var q; x.beginPath(); x.moveTo(gq.fx(gq.y0), gq.y0); for (q = gq.y0 + 10; q < yb; q += 10) x.lineTo(gq.fx(q), q); x.lineTo(gq.fx(yb), yb);
+      var yb = gq.y1 + u * rr(.04, .16), sz = pick([.7, .85, 1, 1.2]), cy = gq.y0 + u * .05;
+      if (!gq.nc) { if (calm(cy)) sz = Math.min(sz, cz[2] + .25); list.push([gq.fx(gq.y0), cy, pick([0, 0, 9, 7, 7, 26, 2, 3, 14, 23]), sz, 2]); }
+      S.add(gq.y0 - 4, yb + u * .55, function (x) {
+        var q, k = 0, sd, st = u * rr(.1, .14), lf = u * rr(.05, .065), lc = pick(Z_GREEN), wc = pick(WIST), fc = pick(P_FLOWER), ex = gq.fx(yb);
+        x.beginPath(); x.moveTo(gq.fx(gq.y0), gq.y0); for (q = gq.y0 + 10; q < yb; q += 10) x.lineTo(gq.fx(q), q); x.lineTo(ex, yb);
         ol(x, gq.th + lw * 1.6); ol(x, gq.th, gq.col); ol(x, gq.th * .3, mix(gq.col, '#ffffff', .45));
+        for (q = gq.y0 + st * rr(.5, 1); q < yb - lf * .4; q += st * rr(.8, 1.3) * (gq.kind === 3 ? 2.4 : 1)) {
+          sd = k++ % 2 ? 1 : -1;
+          leaf(x, { x: gq.fx(q), y: q, a: Math.PI / 2 + sd * rr(.85, 1.15), len: lf * rr(.9, 1.3), wid: lf * .38, bend: sd * .15, col: R() < .2 ? pick(Z_TEAL) : lc, lw: lw * .8 });
+          if (gq.kind === 1 && k % 3 === 1) { if (R() < .5) starFlower(x, gq.fx(q) - sd * lf * .9, q, lf * .62, [fc, '#ffd75e'], lw * .7); else flowerB(x, gq.fx(q) - sd * lf * .8, q, lf * .42, pick(P_FLOWER), lw * .7); }
+          else if (gq.kind === 2 && k % 3 === 1) wisteria(x, gq.fx(q) - sd * lf * .25, q, u * rr(.2, .36), wc, lw * .8);
+          else if (gq.kind === 3 && R() < .5) { x.beginPath(); x.arc(gq.fx(q) - sd * lf * .3, q, lw * 2.4, 0, 7); x.fillStyle = pick(P_ACC); x.fill(); ol(x, lw * .7); }
+        }
+        if (gq.kind === 2) wisteria(x, ex, yb - lf * .2, u * rr(.26, .42), wc, lw * .85);
+        else if (gq.kind === 1) { if (R() < .5) bloom(x, ex, yb + lf * .5, lf * 1.1, fc, lw * .8); else orchid(x, ex, yb + lf * .5, lf * 1.1, [fc, '#ffd75e'], lw * .8); }
+        else { x.beginPath(); x.arc(ex, yb + lw * 2, lw * 3, 0, 7); x.fillStyle = pick(P_ACC); x.fill(); ol(x, lw * .8); }
       });
     });
     list.sort(function (a, b) { return a[1] - b[1]; });
@@ -1458,7 +1407,6 @@
       else if (k === 32) spike(x, px, py + u * .1, u * rr(.3, .46), [pick(P_FLOWER), pick(P_ACC)], lw);
       else if (k === 33) glory(x, px, py, u * rr(.11, .18), [pick(['#6aa8ff', '#9b6ff0', '#c58cf0', '#ff7ab8', '#3560c0']), '#ffd75e'], lw);
       else if (k === 40) monstera(x, px, py, u * rr(.17, .27), pick(z), lw);
-      else if (k === 41) fanPalm(x, px, py, u * rr(.2, .31), pick(z), lw);
       else if (k === 42) alocasia(x, px, py, u * rr(.16, .25), pick(z), lw);
       else if (k === 43) calathea(x, px, py, u * rr(.16, .25), pick(z), lw);
       else if (k === 44) caladium(x, px, py, u * rr(.15, .23), [pick(Z_GREEN), pick(['#ff9ac0', '#ffd0e0', '#fff3f0', '#ff7ab8']), pick(['#e0409a', '#d0379a', '#2f9a4a'])], lw);
@@ -1477,8 +1425,9 @@
   // 2 · Urwald und Lichtung: oben schliesst sich das Blätterdach, darunter öffnet es sich im Bogen zur hellen Wiese.
   // SB = Grund mit Bändern und Lianen (weiter hinten), S = Pflanzen und Wiese, SF = einzelne Pflanzen dicht vor der Kamera
   function sceneMain(S, SB, SF) {
-    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .43 : W * .3, yC = S.Y(.58, 1), yA = vy - H * .36, yB = vy + (mob ? clamp(LT.title - H * .02, -H * .02, H * .085) : H * .02), yU = vy + LT.contact - H * .01, yMd = SHO + .14,   // am Handy ist die Öffnung ab dem Titel ganz breit
-        yCb = vy - H * .78, yAb = vy - H * .2, p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; },
+    var w = S.w, cx = w / 2, vy = S.vy, bot = S.fh, lw = LW0, HW = mob ? W * .43 : W * .3, yC = S.Y(.705, 1), yA = vy - H * .36, yB = vy + (mob ? clamp(LT.title - H * .02, -H * .02, H * .085) : H * .02), yU = vy + LT.contact - H * .01, yMd = SHO + .14,   // am Handy ist die Öffnung ab dem Titel ganz breit
+        yCb = vy - H * 1.18, yAb = vy - H * .2,   // Blätterdach seit 28.11. rund eine halbe Bildschirmhöhe weiter oben (Hugo 09:13, Bild 2: «der Dschungel soll nochmal höher gezogen werden»); vorher S.Y(.58, 1) und vy - H * .78
+        p1 = R() * 6, p2 = R() * 6, p3 = R() * 6, p4 = R() * 6, i, end = function () { return bot; },
         size = mob ? .7 : .82, TB = onto(SB, S), TF = onto(SF, S);
     // Öffnung der Lichtung, wie ein Fenster durch den Urwald: oben ein spitzer Bogen, neben dem Text ein schmaler Rahmen,
     // ab den Kontakten wächst unten das Unterholz mit seinen Blüten wieder herein
@@ -1520,81 +1469,164 @@
         }
       });
     });
-    // hinten: kein dunkler Grund mehr (das war der «Vorhang», Hugo 27.11., 21:22). Links steht ein breiter, gewölbter Baobab. Seit 22:16 reicht er
-    // bis auf die Wiese hinunter («er soll ruhig bis runter gehen, aber mehr hinter das Gebüsch, man kann ihn unten aber sehen»): Oben, im Flug,
-    // steht er breit im Bild; nach unten rückt er am Handy zum Bildrand, damit Titel und Rad frei bleiben – im Schlussbild sieht man ihn als
-    // Streifen hinter den Randpflanzen und seinen Fuss an der Wiese. Zwei Äste reichen in verschiedenen Höhen nach rechts, daran und am
-    // Blätterdach hängen die Lianen mit Blättern und Blüten (21:55). Die ganze Ebene liegt im Schatten: Die Pflanzen davor heben sich ab.
-    var tX = S.X(mob ? .13 : .12), tW = U * (mob ? .36 : .3), tYm = vy - H * .06, tY0 = yCb + U * .1, tH = tYm - tY0, tYf = vy + H * yMd, tY1 = tYf + H * .14, tC = '#c8684a', nb = 0,
-        tDx = mob ? S.X(.13) - S.X(-.02) : 0,
-        bough = [[tY0 + tH * .14, S.X(1.03), yCb + U * .2, U * .16], [tY0 + tH * .46, S.X(.9), tY0 + tH * .4, U * .1]];   // je Ast: Ansatz am Stamm, Ende x, Ende y, Bogen nach oben
-    function tCx(y) { return tX - tDx * sm(vy - H * .55, vy + H * .02, y); }   // Mitte des Stamms
-    function tHw(y) {   // halbe Breite: runde Schulter, Bauch im oberen Teil, am Fuss ausgestellt
-      var sq = (y - tY0) / tH, fq = Math.max(0, tYf - y) / (U * .2);
-      return tW * (.4 + .2 * Math.exp(-Math.pow((sq - .5) / .4, 2)) + .14 * Math.exp(-fq * fq)) * Math.sqrt(clamp((y - tY0) / (U * .1), 0, 1));
+    // hinten: kein dunkler Grund (das war der «Vorhang», Hugo 27.11., 21:22). Links steht ein breiter Baobab, vom Fuss an der Wiese bis über das Blätterdach.
+    // Seit 28.11., 09:13:
+    //  · Er ragt über den Urwald hinaus (Bild 1 und 2: «den Baobab über den Dschungel ziehen», «der Baobab erst dann darüber raus»): oben eine Krone aus
+    //    Blattbüscheln im Stil der Baobabs an der Wiese, zwei Äste in verschiedenen Höhen nach rechts. Unter den Büscheln hängen Lianen in den Urwald.
+    //  · Der Stamm besteht aus zwei Teilen («der Stamm ganz unten soll sich nicht bewegen, erst ab dem Dschungel»): Der untere steht auf der vorderen Ebene
+    //    (S, zusammen mit Wiese, Rahmen und Chamäleon) und verschiebt sich darum nie gegen den Boden. Der obere mit Krone, Ästen und Lianen bleibt hinten (SB)
+    //    und hat dort seine Tiefe. Die Naht (tYj) liegt mitten im Urwald: Der untere Teil läuft nach oben weich aus, dahinter reicht der obere weiter
+    //    hinunter. Beide sind gleich gezeichnet und decken sich; versetzt die Tiefe sie gegeneinander, verschiebt sich nur ein gerader Stamm in sich selbst.
+    // Am Handy rückt der Stamm nach unten zum Bildrand, damit Titel und Rad frei bleiben. Über dem Blätterdach steht er im Licht, darunter im Schatten.
+    var tX = S.X(mob ? .13 : .12), tW = U * (mob ? .36 : .3), tYm = vy - H * .06, tY0 = yCb - H * .42, tYf = vy + H * yMd, tY1 = tYf + H * .14, tYj = vy - H * .75, tC = '#c8684a', tfS = U * (mob ? .085 : .075),
+        tDx = mob ? S.X(.13) - S.X(-.02) : 0, SHB = '#1e1c60', lvB = ['#8fe3b4', '#1f9a72'],
+        tYs = tY0 + H * .07, bough, limbs;   // tYs = Schulter: hier teilt sich der Stamm in die Äste der Krone
+    function tCx(y) { return tX - tDx * sm(vy - H * .42, vy + H * .02, y); }   // Mitte des Stamms
+    function tHw(y) {   // halbe Breite: runde Schulter, nach unten breiter, Bauch im Urwald, am Fuss ausgestellt
+      var bq = (y - (vy - H * .62)) / (H * .5), fq = Math.max(0, tYf - y) / (U * .2);
+      return tW * (.33 + .08 * sm(tY0, tY0 + H * .5, y) + .2 * Math.exp(-bq * bq) + .14 * Math.exp(-fq * fq));
     }
-    function boughY(b, qx) { var t = clamp((qx - tX) / (b[1] - tX), 0, 1); return (1 - t) * (1 - t) * b[0] + 2 * (1 - t) * t * (Math.min(b[0], b[2]) - b[3]) + t * t * b[2]; }
-    function hangB(qx) { if (qx < tX + tW * .34) return topB(qx) - U * size * .04; var b = bough[nb++ % 2]; if (qx > b[1]) b = bough[0]; return boughY(b, qx); }
-    TB.add(tY0 - U * .3, tY1 + 8, function (x) {
-      var i, q, wd, f, yy, len;
-      function side(f0, f1) {   // Fläche zwischen zwei Linien, die der Wölbung folgen (in Teilen der halben Breite)
-        x.beginPath(); x.moveTo(tCx(tY0) + tHw(tY0) * f0, tY0);
-        for (q = tY0 + 3; q <= tY1 + 6; q += q < tY0 + U * .1 ? 3 : 12) x.lineTo(tCx(q) + tHw(q) * f0, q);
-        for (q = tY1 + 6; q >= tY0; q -= q < tY0 + U * .1 ? 3 : 12) x.lineTo(tCx(q) + tHw(q) * f1, q);
-        x.closePath();
+    // Krone (seit 28.11., 09:46, «eher wie eine typische Baobab-Krone»): Der dicke Stamm teilt sich oben in kräftige, kurze, knorrige Äste, an ihren Enden
+    // sitzen die Blattbüschel. Zwei lange Äste reichen nach rechts; sie sind dicker als im Mockup und setzen unregelmässig an (Wulst am Stamm, ein Knie,
+    // wechselnde Dicke). Je Ast der Krone: Ansatz (Anteil der halben Stammbreite), Ende und Bogenpunkt (x in Stammbreiten, y in Bildschirmhöhen), Dicke, Blöcke im Büschel.
+    limbs = [[-.62, -1, -.045, -.82, .012, .27, 3], [-.3, -.5, -.125, -.5, -.02, .25, 2], [.02, .08, -.16, -.1, -.07, .27, 3], [.36, .6, -.13, .52, -.02, .25, 2]].map(function (l) {
+      var a = [tX + l[0] * tHw(tYs), tYs + U * .05], c = [tX + l[3] * tW, tYs + l[4] * H], e = [tX + l[1] * tW, tYs + l[2] * H];
+      return { w: l[5] * tW, n: l[6], at: function (t) { var v = 1 - t; return [v * v * a[0] + 2 * v * t * c[0] + t * t * e[0], v * v * a[1] + 2 * v * t * c[1] + t * t * e[1]]; } };
+    });
+    // je langer Ast: Ansatz (x0 im Stamm, y), Ende (x1, y1), Bogen nach oben, Knie kurz nach dem Ansatz, Dicke am Ansatz, Blattbüschel entlang des Asts (Stelle 0 … 1, Zahl der Blöcke)
+    bough = [{ x0: tX + tHw(tYs) * .5, y: tYs + H * .05, x1: S.X(mob ? .66 : .42), y1: tYs + H * .005, up: H * .035, kn: H * .022, th: tW * .4, ph: 1, tf: [[.55, 2], [.98, 3]] },
+             { x0: tX + tHw(tYs) * .5, y: tYs + H * .2, x1: S.X(mob ? 1 : .7), y1: tYs + H * .15, up: H * .06, kn: H * .026, th: tW * .48, ph: 4, tf: [[.36, 3], [.68, 2], [.97, 3]] }];
+    function boughAt(b, t) { var v = 1 - t; return [b.x0 + (b.x1 - b.x0) * t, v * v * b.y + 2 * v * t * (Math.min(b.y, b.y1) - b.up) + t * t * b.y1 - b.kn * Math.exp(-Math.pow((t - .1) / .09, 2)) + Math.sin(t * 10 + b.ph) * b.up * .07 * t]; }
+    function limbPts(at, w0, tp, ph, n) {   // Umriss eines Asts: am Ansatz ein Wulst, zum Ende schlank, in der Dicke leicht unregelmässig. Zurück: die Seite zur Sonne (mit innerer Linie für das Licht) und die andere
+      var A = [], B = [], i, t, q, q2, d, nx, ny, wd;
+      for (i = 0; i <= n; i++) {
+        t = i / n; q = at(t); q2 = at(t + .02); d = Math.hypot(q2[0] - q[0], q2[1] - q[1]) || 1; nx = -(q2[1] - q[1]) / d; ny = (q2[0] - q[0]) / d;
+        wd = w0 * (1 - tp * t) * (1 + .1 * Math.sin(t * 13 + ph)) / 2 + w0 * .18 * Math.exp(-t * t / .012);
+        A.push([q[0] + nx * wd, q[1] + ny * wd, q[0] + nx * wd * .25, q[1] + ny * wd * .25]); B.unshift([q[0] - nx * wd, q[1] - ny * wd]);
       }
-      bough.forEach(function (b, k) {
-        wd = tW * (k ? .12 : .15);
-        for (i = 0; i < 2; i++) { x.beginPath(); x.moveTo(tX, b[0]); x.quadraticCurveTo((tX + b[1]) / 2, Math.min(b[0], b[2]) - b[3], b[1], b[2]); ol(x, i ? wd : wd + lw * 2.4, i ? tC : INK); }
-      });
-      side(-1, 1); x.fillStyle = tC; x.fill();
+      return [A, B];
+    }
+    function hangB(qx) {   // Lianen hängen unter den Blattbüscheln der Äste, sonst vom Blätterdach
+      var k, j, b, q;
+      for (k = 0; k < 2; k++) for (b = bough[k], j = 0; j < b.tf.length; j++) { q = boughAt(b, b.tf[j][0]); if (Math.abs(qx - q[0]) < tfS * b.tf[j][1] * .4 && R() < .3) return boughAt(b, clamp((qx - b.x0) / (b.x1 - b.x0), 0, 1))[1]; }   // nur wenige (28.11., 09:46: «zu viele Lianen dort»)
+      return topB(qx) - U * size * .04;
+    }
+    function trunkPart(x, ya, yb, C) {   // Stamm zwischen zwei Höhen; C mischt bei Bedarf den Schatten des Urwalds in die Farben
+      var i, q, px, f, yy, len;
+      function st(q) { return q < tY0 + U * .08 ? 2 : 12; }
+      function side(f0, f1) {   // Fläche zwischen zwei Linien, die der Wölbung folgen (in Teilen der halben Breite)
+        x.beginPath(); x.moveTo(tCx(ya) + tHw(ya) * f0, ya);
+        for (q = ya + st(ya); q < yb; q += st(q)) x.lineTo(tCx(q) + tHw(q) * f0, q);
+        x.lineTo(tCx(yb) + tHw(yb) * f0, yb); x.lineTo(tCx(yb) + tHw(yb) * f1, yb);
+        for (q = yb - 12; q > ya; q -= st(q)) x.lineTo(tCx(q) + tHw(q) * f1, q);
+        x.lineTo(tCx(ya) + tHw(ya) * f1, ya); x.closePath();
+      }
+      function rim(f0) { x.beginPath(); x.moveTo(tCx(ya) + tHw(ya) * f0, ya); for (q = ya + st(ya); q < yb; q += st(q)) x.lineTo(tCx(q) + tHw(q) * f0, q); x.lineTo(tCx(yb) + tHw(yb) * f0, yb); ol(x, lw * 1.2, C(INK)); }
+      side(-1, 1); x.fillStyle = C(tC); x.fill();
       x.save(); side(-1, 1); x.clip();
-      side(.2, 1.3); x.fillStyle = mix(tC, '#fff0c0', .3); x.fill();    // Gegenlicht: zur Sonne hin wird der Stamm in zwei Stufen heller,
-      side(.56, 1.3); x.fillStyle = mix(tC, '#fff0c0', .56); x.fill();
-      side(-1.3, -.5); x.fillStyle = mix(tC, INK, .2); x.fill();        // aussen dunkler
-      for (i = 0; i < 8; i++) {   // Rinde: lange Furchen, die dem Stamm folgen (vorher Ringe – sie sahen aus wie Mauerwerk)
-        f = -.84 + i * .24; q = tY0 + U * rr(.1, .3);
-        while (q < tY1) {
+      side(.2, 1.3); x.fillStyle = C(mix(tC, '#fff0c0', .3)); x.fill();    // Gegenlicht: zur Sonne hin wird der Stamm in zwei Stufen heller,
+      side(.56, 1.3); x.fillStyle = C(mix(tC, '#fff0c0', .56)); x.fill();
+      side(-1.3, -.5); x.fillStyle = C(mix(tC, INK, .2)); x.fill();        // aussen dunkler
+      for (i = 0; i < 8; i++) {   // Rinde: lange Furchen, die dem Stamm folgen
+        f = -.84 + i * .24; q = ya + U * rr(0, .3);
+        while (q < yb) {
           len = U * rr(.16, .46); x.beginPath();
-          for (yy = q; yy <= Math.min(q + len, tY1); yy += 10) { wd = tCx(yy) + tHw(yy) * f + Math.sin(yy / U * 3.1 + i * 1.7) * tW * .014; if (yy === q) x.moveTo(wd, yy); else x.lineTo(wd, yy); }
-          ol(x, lw * 1.2, f > .2 ? mix(tC, '#ffffff', .34) : mix(tC, INK, .22));
+          for (yy = q; yy <= Math.min(q + len, yb); yy += 10) { px = tCx(yy) + tHw(yy) * f + Math.sin(yy / U * 3.1 + i * 1.7) * tW * .014; if (yy === q) x.moveTo(px, yy); else x.lineTo(px, yy); }
+          ol(x, lw * 1.2, C(f > .2 ? mix(tC, '#ffffff', .34) : mix(tC, INK, .22)));
           q += len + U * rr(.05, .16);
         }
       }
-      x.restore(); side(-1, 1); ol(x, lw * 1.2);
-      [[.2, 1, 3], [.44, -1, 6], [.7, 1, 9]].forEach(function (q) { var oy = tY0 + tH * q[0]; orchidSpray(x, tCx(oy) + q[1] * tHw(oy) * .34, oy, q[1], U * size * .9, q[2], [q[2] === 6 ? pick(P_FLOWER) : '#f6f2ff', '#ffd75e'], lw); });   // Orchideen am Stamm: Rispen zu 3, 6 und 9 Blüten
+      x.restore(); rim(-1); rim(1);   // nur die Seiten bekommen eine Kontur: An der Naht steht kein Strich quer über den Stamm
+    }
+    TB.add(tY0 - H * .3, tYj + H * .47, function (x) {   // oben, hinten: Krone, lange Äste, Stamm bis unter die Naht
+      var sh = [], hwT = tHw(tYs), i, A;
+      function cap() { x.beginPath(); x.ellipse(tX, tYs + 1, hwT, U * .05, 0, Math.PI, Math.PI * 2); x.closePath(); }
+      limbs.forEach(function (l, k) { sh.push(limbPts(l.at, l.w, .6, k * 2.1 + .4, 12)); });
+      bough.forEach(function (b) { sh.push(limbPts(function (t) { return boughAt(b, t); }, b.th, .72, b.ph, 24)); });
+      sh.forEach(function (q) { polyline(x, q[0].concat(q[1])); x.closePath(); ol(x, lw * 2.4); });   // erst alle Konturen, dann der Stamm, dann alle Flächen:
+      cap(); ol(x, lw * 2.4);                                                                          // so verschmelzen Stamm und Äste zu einer Form, ohne Strich am Ansatz
+      trunkPart(x, tYs, tYj + H * .45, function (c) { return c; });
+      cap(); x.fillStyle = tC; x.fill();
+      x.save(); cap(); x.clip();   // die Schulter trägt dasselbe Gegenlicht wie der Stamm darunter
+      x.fillStyle = mix(tC, '#fff0c0', .3); x.fillRect(tX + hwT * .2, tYs - U * .06, hwT, U * .08); x.fillStyle = mix(tC, '#fff0c0', .56); x.fillRect(tX + hwT * .56, tYs - U * .06, hwT, U * .08);
+      x.fillStyle = mix(tC, INK, .2); x.fillRect(tX - hwT * 1.3, tYs - U * .06, hwT * .8, U * .08); x.restore();
+      sh.forEach(function (q) {
+        A = q[0]; polyline(x, A.concat(q[1])); x.closePath(); x.fillStyle = tC; x.fill();
+        x.beginPath(); x.moveTo(A[0][0], A[0][1]); for (i = 1; i < A.length; i++) x.lineTo(A[i][0], A[i][1]); for (i = A.length - 1; i >= 0; i--) x.lineTo(A[i][2], A[i][3]); x.closePath(); x.fillStyle = mix(tC, '#fff0c0', .42); x.fill();   // die Seite zur Sonne fängt das Licht
+      });
+      bough.forEach(function (b, k) {   // ein paar Lianen liegen auf den Ästen («du kannst ja ein paar auch drauf legen»): Sie winden sich um den Ast und lassen ein kurzes Ende hängen
+        [[.2, .5], [.6, .9]].slice(0, k ? 2 : 1).forEach(function (sg, j) {
+          var pts = [], n = 20, t, q, q2, d, wd, of, col = pick(Z_GREEN), lf = U * .03, e;
+          for (i = 0; i <= n; i++) {
+            t = sg[0] + (sg[1] - sg[0]) * i / n; q = boughAt(b, t); q2 = boughAt(b, t + .02); d = Math.hypot(q2[0] - q[0], q2[1] - q[1]) || 1; wd = b.th * (1 - .72 * t) / 2;
+            of = Math.sin(i / n * Math.PI * (k ? 3 : 2) + j * 1.3) * wd * 1.08 - wd * .12; pts.push([q[0] - (q2[1] - q[1]) / d * of, q[1] + (q2[0] - q[0]) / d * of]);
+          }
+          e = pts[n]; for (i = 1; i <= 5; i++) pts.push([e[0] + Math.sin(i * .9 + j) * U * .008, e[1] + i * U * (.028 + j * .008)]);
+          smooth(x, pts); ol(x, lw * 3.2); ol(x, lw * 1.7, col);
+          for (i = 2; i < pts.length - 1; i += 3) leaf(x, { x: pts[i][0], y: pts[i][1], a: (i % 2 ? -1 : 1) * Math.PI / 2 + rr(-.5, .5), len: lf * 2, wid: lf * .7, bend: .15, col: R() < .25 ? pick(Z_TEAL) : col, lw: lw * .8 });
+          e = pts[pts.length - 1]; if (j) flowerB(x, e[0], e[1] + lf * .5, lf * .8, pick(P_FLOWER), lw * .7); else { x.beginPath(); x.arc(e[0], e[1] + lw * 2, lw * 3, 0, 7); x.fillStyle = pick(P_ACC); x.fill(); ol(x, lw * .8); }
+        });
+      });
+      orchidSpray(x, tX + tHw(bough[0].y) * 1.02, bough[0].y - bough[0].th * .12, 1, U * size * .9, 6, ['#f6f2ff', '#ffd75e'], lw);   // die Orchidee sitzt an der Verbindung von Stamm und oberem Ast, gut sichtbar über dem Blätterdach (Rispe mit 6 Blüten; 3 und 9 stehen unten am Stamm)
     });
     function pushB(y) { return U * .07 * clamp((y - yAb) / (U * .3), 0, 1); }   // an den Seiten bleibt die hintere Ebene hinter dem Rahmen davor (oben am Bogen sieht man sie als zweiten Bogen)
     plants(TB, yCb, bot, function (y) { return eLb(y) - pushB(y); }, function (y) { return eRb(y) + pushB(y); }, { size: size * 1.05, dens: mob ? 1.45 : 1.3, topFn: topB, hang: hangB,
+      noCap: function (qx, qy) { return qy < yCb - U * .2; },   // Lianen an den Ästen: ihren Ansatz decken die Blattbüschel des Baobabs
       calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75],   // neben dem Text bleiben auch hier die Pflanzen klein
-      skip: function (qx, qy) { return qy > tY0 && qy < tYm - tH * .12 && Math.abs(qx - tCx(qy)) < tHw(qy) * .6 && R() < .5; } });   // vor dem Stamm steht nur die Hälfte der Pflanzen: er liegt hinter dem Gebüsch, bleibt aber zu erkennen
-    TB.add(yCb - U, bot + 4, function (x) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(30,28,96,.36)'; x.fillRect(-20, yCb - U * 2, w + 40, bot - yCb + U * 3); });   // Schatten über allem, was auf dieser Ebene gemalt ist
+      skip: function (qx, qy) { return qy > yCb + U * .3 && qy < tYj && Math.abs(qx - tCx(qy)) < tHw(qy) * .6 && R() < .5; } });   // vor dem Stamm steht nur die Hälfte der Pflanzen: er liegt hinter dem Gebüsch, bleibt aber zu erkennen
+    [[0, 0, 0], [1, 0, 1], [1, 2, 2]].forEach(function (q) {   // nur noch drei Ranken hängen unter den Blattbüscheln Richtung Urwald (vorher zwei bis drei je Büschel): eine mit Glyzinien, eine mit Blüten, eine mit Blättern
+      var b = bough[q[0]], px = boughAt(b, b.tf[q[1]][0])[0] + tfS * rr(-.3, .3), y0 = boughAt(b, clamp((px - b.x0) / (b.x1 - b.x0), 0, 1))[1] + tfS * .1, len = Math.min(topB(px) + U * rr(0, .25) - y0, U * rr(.5, 1.1));
+      if (len < U * .2) return;
+      TB.add(y0 - 4, y0 + len + U * .2, q[2] === 0 ? function (x) { wistVine(x, px, y0, len, lw * .9); } : q[2] === 1 ? function (x) { flowerVine(x, px, y0, len, U * .02, lw * .9); } : function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); });
+    });
+    TB.add(tY0 - H * .32, tY0 + H * .42, function (x) {   // Blattbüschel der Krone und der Äste: liegen vor den Lianen, die darunter hervorkommen
+      function look(sz, n) { return { n: n, lw: Math.max(1, sz * .035), line: INK, rim: mix(lvB[0], '#ffffff', .4), inF: 'rgba(255,255,255,.14)', c0: lvB[0], c2: lvB[1] }; }
+      bough.forEach(function (b) { b.tf.forEach(function (q) { var e = boughAt(b, q[0]); glyphCloud(x, e[0], e[1] + tfS * .34, tfS, look(tfS, q[1])); }); });
+      limbs.forEach(function (l) { var e = l.at(1), sz = tfS * (l.n > 2 ? 1.12 : .96); glyphCloud(x, e[0], e[1] + sz * .42, sz, look(sz, l.n)); });   // an den Enden der Kronenäste
+    });
+    TB.add(yCb - H * .1, bot + 4, function (x) {   // Schatten des Urwalds über allem, was auf dieser Ebene gemalt ist; er beginnt weich am Blätterdach: Was darüber hinausragt, steht im Licht
+      var g = x.createLinearGradient(0, yCb - H * .08, 0, yCb + H * .1); g.addColorStop(0, rgba(SHB, 0)); g.addColorStop(1, rgba(SHB, .36));
+      x.globalCompositeOperation = 'source-atop'; x.fillStyle = g; x.fillRect(-20, yCb - H * .1, w + 40, bot - yCb + H * .2);
+    });
+    S.add(tYj - 4, tY1 + 8, function (x) {   // unterer Teil des Stamms, auf der vorderen Ebene: steht fest auf der Wiese, hinter den Pflanzen davor
+      var g;
+      trunkPart(x, tYj, tY1, function (c) { return mix(c, SHB, .36); });
+      orchidSpray(x, tCx(vy - H * .62) + tHw(vy - H * .62) * .3, vy - H * .62, 1, U * size * .9, 3, ['#f6f2ff', '#ffd75e'], lw);   // Orchideen am Stamm: Rispen zu 3, 6 (oben) und 9 Blüten
+      orchidSpray(x, tCx(vy - H * .3) + tHw(vy - H * .3) * .3, vy - H * .3, 1, U * size * .9, 9, ['#f6f2ff', '#ffd75e'], lw);
+      x.globalCompositeOperation = 'destination-out'; g = x.createLinearGradient(0, tYj, 0, tYj + H * .1); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');   // oben läuft er weich aus: dahinter steht der obere Teil
+      x.fillStyle = g; x.fillRect(tX - tW, tYj - 6, tW * 2, H * .1 + 6);
+    });
     // davor: Pflanzen und Blüten
     plants(S, yC, bot, eL, eR, { size: size, dens: mob ? 1.5 : 1.3, topFn: topFn, calm: [vy - H * (mob ? .22 : .03), yU + H * .03, mob ? .3 : .75], sway: [vy - H * .06, mob ? 4 : 1], ground: 1,
-      skip: function (qx, qy) { return qy > tY0 + U * .05 && qy < tYm - tH * .1 && Math.abs(qx - tCx(qy)) < tHw(qy) * .5 && R() < .35; } });   // am Handy steht der Titel ganz oben: auch dort bleiben die Randpflanzen klein
+      skip: function (qx, qy) { return qy > tYj && qy < tYm - H * .07 && Math.abs(qx - tCx(qy)) < tHw(qy) * .5 && R() < .35; } });   // am Handy steht der Titel ganz oben: auch dort bleiben die Randpflanzen klein
     // Lianen und Ranken hängen vom Bogen in die Lichtung und wiegen sich; viele tragen Blüten.
     // Über dem Titel bleiben sie kurz, aussen neben dem Text dürfen sie lang herunterhängen.
+    var hvX = cx - W * .02;   // Platz von Hugos Liane (siehe unten)
     for (i = 0; i < (mob ? 8 : 18); i++) (function (i) {
       var out = i % 3 !== 2, sd = i % 2 ? 1 : -1, px = cx + sd * HW * (out ? rr(mob ? .95 : .84, 1.05) : rr(.08, .8)), y0 = archY(px) - U * .04,
           len = out ? Math.min(U * rr(.45, 1.15), vy + LT.band + H * rr(0, .1) - y0) : Math.min(U * rr(.25, .6), vy + Math.max(0, LT.lead - H * (mob ? .26 : .2)) - y0), amp = U * rr(.014, .03), fl = R() < .68, r0 = Math.max(7, Math.min(len * .05, U * .034)), fn;
-      if (len < U * .12) return;
-      fn = fl ? function (x) { flowerVine(x, px, y0, len, amp, lw * .9); }
+      if (!out) { len = Math.min(len, (vy + LT.kick - H * .014 - y0) / 1.19); r0 = Math.max(7, Math.min(len * .05, U * .034)); }   // über dem Titel: Die Ranke endet mit ihrer Blüte knapp über «Velo Atelier» (Hugo 28.11., 09:46)
+      if (len < U * .12 || (!out && Math.abs(px - hvX) < U * .12)) return;
+      var f0 = i % 4 === 1 ? function (x) { wistVine(x, px, y0, len, lw * .9); }       // jede vierte trägt Glyzinien-Trauben (28.11.)
+        : fl ? function (x) { flowerVine(x, px, y0, len, amp, lw * .9); }
         : i % 3 === 0 ? function (x) { jadeVine(x, px, y0, len, lw * .9, .62); }       // statt schlichter Ranken auch Jadewein und Medinilla, schmal: der Text bleibt frei
         : i % 3 === 1 ? function (x) { medinilla(x, px, y0, len, lw * .9, .62); }
         : function (x) { vine(x, px, y0, len, pick(Z_GREEN), lw * .9, P_ACC); };
+      fn = function (x) { f0(x); capTuft(x, px, y0 + U * .012, U * (mob ? .07 : .085), lw * .9); };   // der Ansatz liegt hinter einem Blattbüschel (es wiegt sich mit)
       if (SWAY && y0 + len > vy - H * .1) S.sway(px, y0, (len + r0 * 4 + 16) / 2, 1, fn, amp + r0 * 3.6 + 16); else S.add(y0 - 4, y0 + len + r0 * 4 + 12, fn);
     })(i);
     // vorn: einzelne grosse Pflanzen dicht vor der Kamera. Sie liegen nur über dem dichten Urwald, nie frei vor Himmel oder Lichtung
-    var nf = Math.round(w * H * .72 / Math.pow(U * size * 1.3, 2) / .42 * 1.6), fl2 = [];   // seit 27.11., 22:16 rund doppelt so viele und grösser, vor allem Blätter (Hugo: «die Blätter ganz nah am Display fand ich super»)
-    for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.32, -.6), pick([0, 0, 1, 9, 9, 7, 7, 3, 10, 13, 14, 16, 12]), rr(1.2, 1.9)]);
+    var nf = Math.round(w * H * 1.15 / Math.pow(U * size * 1.3, 2) / .42 * 1.6), fl2 = [];   // seit 27.11., 22:16 rund doppelt so viele und grösser, vor allem Blätter (Hugo: «die Blätter ganz nah am Display fand ich super»)
+    for (i = 0; i < nf; i++) fl2.push([rr(-10, w + 10), vy + H * rr(-1.75, -.6), pick([0, 0, 1, 9, 9, 7, 7, 3, 10, 13, 14, 16, 12]), rr(1.2, 1.9)]);   // das Blätterdach liegt seit 28.11. höher: auch diese Pflanzen reichen weiter hinauf
     fl2.sort(function (a, b) { return a[1] - b[1]; });
     exotic(fl2, 11, .6, .5);
-    fl2.forEach(function (q) {   // jede steht auf einem langen Stiel, der unten aus dem Urwald kommt (von oben gehängt, ragten die Lianen in den Himmel)
-      var th = U * rr(.008, .013), col = pick(Z_GREEN), yb = q[1] + U * rr(1.1, 1.5), ph = R() * 6, fx = function (y) { return q[0] + Math.sin((y - q[1]) / U * 2.4) * U * .05 + Math.sin((y - q[1]) / U * 6.1 + ph) * U * .012; };
-      TF.add(q[1] - 4, yb + 4, function (x) {   // Stiel mit Blättchen (27.11., 22:16: als kahle Stange wirkte er wie ein Stab)
+    fl2.forEach(function (q) {   // jede steht auf einem langen Stiel, der unten aus dem Urwald kommt (von oben gehängt, ragten die Lianen in den Himmel); er endet über dem Schlussbild, damit sein Blattbüschel nicht in den Titel ragt
+      var th = U * rr(.008, .013), col = pick(Z_GREEN), yb = Math.min(q[1] + U * rr(1.1, 1.5), vy - H * .1), ph = R() * 6, fx = function (y) { return q[0] + Math.sin((y - q[1]) / U * 2.4) * U * .05 + Math.sin((y - q[1]) / U * 6.1 + ph) * U * .012; };
+      TF.add(q[1] - 4, yb + U * .08, function (x) {   // Stiel mit Blättchen (27.11., 22:16: als kahle Stange wirkte er wie ein Stab); unten kommt er aus einem Blattbüschel (28.11.)
         var y, k = 0, sd;
         x.beginPath(); x.moveTo(q[0], q[1]); for (y = q[1] + 10; y < yb; y += 10) x.lineTo(fx(y), y); ol(x, th + lw * 1.8); ol(x, th, col); ol(x, th * .3, mix(col, '#ffffff', .45));
         for (y = q[1] + U * rr(.16, .22); y < yb - U * .04; y += U * rr(.09, .15)) { sd = k++ % 2 ? 1 : -1; leaf(x, { x: fx(y), y: y, a: -Math.PI / 2 + sd * rr(.85, 1.2), len: U * rr(.05, .075), wid: U * rr(.017, .024), bend: sd * .15, col: R() < .2 ? pick(Z_TEAL) : col, lw: lw * .8 }); }
+        frond(x, { x: fx(yb), y: yb + U * .02, a: -Math.PI / 2 + rr(-.3, .3), spread: rr(1.9, 2.7), n: 6 + Math.floor(R() * 3), len: U * rr(.1, .15), wid: U * .024, droop: .4, cols: Z_GREEN.concat(Z_TEAL), lw: lw * .9, rib: 0 });
       });
       plant(TF, q[0], q[1], q[2], lw * 1.15, U * size * q[3]);
     });
@@ -1675,11 +1707,20 @@
         wrap.appendChild(c.c); el.appendChild(wrap);
       });
     });
+    // Hugos Liane (28.11., 09:46, zum Mockup: «ich liebe die Liane, die da runterhängt»): Sie hängt fest in der Mitte über dem Titel, mit Blattpaaren,
+    // kleinen Blüten und einer blauen Hibiskusblüte am Ende, und endet knapp über «Velo Atelier». Im Mockup stand sie dort durch Zufall; jetzt hat sie ihren
+    // festen Platz und eigene Zufallszahlen, damit sie auf jedem Gerät da ist. Steht am Ende, damit alle anderen wiegenden Teile ihre Zufallszahlen behalten.
+    (function () {
+      var r0 = U * .03, y0 = archY(hvX) - U * .04, len = vy + LT.kick - H * .014 - r0 * 3.5 - y0,
+          fn = function (x) { flowerVine(x, hvX, y0, len, U * .02, lw * .9, { fc: '#6aa8ff', end: 1, r0: r0 }); capTuft(x, hvX, y0 + U * .012, U * (mob ? .07 : .085), lw * .9); };
+      if (len < U * .1) return;
+      if (SWAY) S.sway(hvX, y0, (len + r0 * 4 + 16) / 2, 1, fn, U * .02 + r0 * 3.6 + 16); else S.add(y0 - 4, y0 + len + r0 * 4 + 12, fn, AK.seed * 7919 + 3 * 100003 + 950001);
+    })();
   }
 
   // einzelnes Teil mit eigener Tiefe (Wolke, vorbeiziehendes Blatt): liegt beim Fortschritt ci am Bildschirm bei fr
-  function flyer(wd, hd, f, ci, xc, fr, fn, vx) {
-    var c = canvas(wd, hd, f > 1.9 ? 1 : QF); fn(c.x, wd, hd);
+  function flyer(wd, hd, f, ci, xc, fr, fn, vx, dq) {
+    var c = canvas(wd, hd, dq || (f > 1.9 ? 1 : QF)); fn(c.x, wd, hd);
     c.c.className = 'ak-sprite'; c.c.style.width = wd + 'px'; c.c.style.height = hd + 'px'; c.c.style.visibility = 'hidden';
     fliers.push({ el: c.c, x: xc - wd / 2, y: -ci * camRef * f + fr * H - hd / 2, f: f, w: wd, h: hd, on: 0, vx: vx || 0 });
     world.appendChild(c.c);
@@ -1690,13 +1731,71 @@
       flyer(cw, chh, d[4], d[0], d[1] * W, d[2], function (x) { glyphCloud(x, cw / 2, chh * .86, s, cloudLook(s)); }, vx);
     });
   }
-  function flyLeaves() {   // grosse Wedel ziehen kurz vor der Landung dicht an der Kamera vorbei
-    [[.3, 0, .5, 2.1], [.25, 1, .4, 2.4], [.18, 0, .6, 2], [.13, 1, .5, 2.6], [.08, 0, .35, 2.2], [.36, 1, .62, 2.3], [.22, 0, .22, 2.5], [.16, 1, .78, 2.2], [.11, 0, .68, 2.7]].forEach(function (d) {   // neun statt fünf (27.11., 22:16)
-      var s = U * rr(.9, 1.3), z = pick([Z_PURP, Z_TEAL, Z_GREEN, Z_MAG, Z_BLUE]);
+  // Blätter und Blüten ziehen im Flug dicht an der Kamera vorbei. Jedes Teil wächst von einem Bildrand herein (nichts hängt in der Luft).
+  // Seit 28.11. (Hugo 09:13): mehr Arten statt nur Wedel, dazu drei ganz nahe mit grossen Blüten (Orchideen, Hibiskus, Passionsblume), und sie
+  // bleiben nach dem Flug stehen – wer das Bild von Hand nach oben schiebt, trifft sie wieder. Vorher verschwanden sie 3,2 s nach der Landung.
+  function flyLeaves() {
+    var L = LW0 * 1.6, GR = Z_GREEN.concat(Z_TEAL);
+    function stem(x, x0, y0, x1, y1, th, col) { x.beginPath(); x.moveTo(x0, y0); x.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 - (x1 - x0) * .06, x1, y1); ol(x, th + L * 2); ol(x, th, col); }
+    function onStem(x, w, h, leafFn, fx, fy, r, a, col) {   // breites Blatt an einem Stiel, der vom Rand kommt
+      stem(x, w * .02, h * .5, w * fx - Math.sin(a) * r * .8, h * fy + Math.cos(a) * r * .8, w * .02, mix(col.pop ? col[0] : col, INK, .3)); leafFn(x, w * fx, h * fy, r, col, L, a);
+    }
+    function orchidBranch(x, w, h, cols, k) {   // Rispe im Bogen, daran sechs Orchideen, zur Spitze hin kleiner; am Ansatz zwei Riemenblätter
+      var a = [w * .02, h * .56], c = [w * .45, h * .16], e = [w * .88, h * .44], i, t, v, q, r, sd;
+      for (i = 0; i < 2; i++) bigLeaf(x, a[0], a[1], .2 + i * .8, w * (.44 - i * .1), w * .07, .2, pick(Z_GREEN), L);
+      x.beginPath(); x.moveTo(a[0], a[1]); x.quadraticCurveTo(c[0], c[1], e[0], e[1]); ol(x, w * .016 + L * 2); ol(x, w * .016, '#6fbf3a');
+      for (i = 5; i >= 0; i--) {
+        t = .28 + i * .14; v = 1 - t; q = [v * v * a[0] + 2 * v * t * c[0] + t * t * e[0], v * v * a[1] + 2 * v * t * c[1] + t * t * e[1]]; r = w * (.118 - i * .009) * k; sd = i % 2 ? -1 : 1;
+        x.beginPath(); x.moveTo(q[0], q[1]); x.lineTo(q[0] + sd * r * .2, q[1] + r * .7); ol(x, L * 2.4); ol(x, L * 1.2, '#6fbf3a');
+        orchid(x, q[0] + sd * r * .25, q[1] + r * 1.05, r, cols, L * .9);
+      }
+      x.beginPath(); x.arc(e[0] + w * .015, e[1] + w * .012, w * .014, 0, 7); x.fillStyle = cols[0]; x.fill(); ol(x, L * .8);
+    }
+    var kinds = [
+      function (x, w, h, z) { frond(x, { x: w * .03, y: h * .5, a: 0, spread: 2.2, n: 9, len: w * .8, wid: w * .05, droop: .3, cols: z, lw: L, rib: 1 }); },   // 0 Wedelfächer (wie bisher)
+      function (x, w, h) { onStem(x, w, h, monstera, .56, .3, w * .3, 1.15, pick(GR)); onStem(x, w, h, monstera, .5, .72, w * .25, 2, pick(GR)); },             // 1 Monstera
+      function (x, w, h) { for (var i = 0; i < 3; i++) bigLeaf(x, w * .02, h * .5, (i - 1) * .52 + rr(-.08, .08), w * rr(.72, .9), w * .12, (i - 1) * .2, pick(GR), L); },   // 2 Bananenblätter
+      function (x, w, h) {                                                                                                                                         // 3 Korbmarante und hängende Helikonie (bis 28.11., 09:46 Strahlenpalme)
+        onStem(x, w, h, calathea, .55, .3, w * .28, 1.2, pick(GR)); stem(x, w * .02, h * .5, w * .52, h * .56, w * .02, '#238a52');
+        heliconia(x, w * .52, h * .6, w * .34, [pick(['#e0402a', '#f07a2a', '#d0379a', '#ff5a8a']), '#ffd75e'], L);
+      },
+      function (x, w, h) { orchidBranch(x, w, h, [pick(['#f6f2ff', '#ffe0ec', '#fff3c4']), pick(['#ff7ab8', '#d0379a', '#ffd75e'])], 1); },                          // 4 Orchideen-Rispe, hell
+      function (x, w, h) { onStem(x, w, h, alocasia, .56, .31, w * .3, 1.2, pick(GR)); onStem(x, w, h, calathea, .5, .72, w * .26, 2, pick(GR)); },               // 5 Pfeilblatt und Korbmarante
+      function (x, w, h) {                                                                                                                                         // 6 Paradiesvogelblume mit Blättern
+        for (var i = 0; i < 2; i++) bigLeaf(x, w * .02, h * .5, -.5 + i * 1.05, w * rr(.6, .74), w * .11, (i ? 1 : -1) * .2, pick(GR), L);
+        stem(x, w * .02, h * .5, w * .5, h * .5, w * .02, '#2f9a4a');
+        x.save(); x.translate(w * .56, h * .47); x.rotate(1.05); crane(x, 0, 0, w * .24, [pick(['#f07a2a', '#f2b830', '#ff6a4a']), '#3560c0', pick(Z_GREEN)], L); x.restore();
+      },
+      function (x, w, h) {                                                                                                                                         // 7 Buntwurz und Frangipani
+        onStem(x, w, h, caladium, .55, .3, w * .26, 1.15, [pick(Z_GREEN), pick(['#ff9ac0', '#ffd0e0', '#fff3f0']), pick(['#e0409a', '#d0379a'])]);
+        stem(x, w * .02, h * .5, w * .44, h * .7, w * .018, '#2f9a4a');
+        [[.44, .7, .1], [.56, .64, .085], [.52, .8, .08]].forEach(function (q) { plumeria(x, w * q[0], h * q[1], w * q[2], [pick(['#fffaf0', '#ffe0ec', '#ffb8d4', '#fff3c4']), '#ffd75e'], L * .9); });
+      },
+      function (x, w, h) { orchidBranch(x, w, h, [pick(['#d0379a', '#c58cf0', '#ff7ab8']), '#ffd75e'], 1.3); },                                                     // 8 ganz nah: grosse Orchideen
+      function (x, w, h) {                                                                                                                                         // 9 ganz nah: Hibiskus
+        for (var i = 0; i < 2; i++) bigLeaf(x, w * .02, h * .5, -.55 + i * 1.1, w * rr(.56, .7), w * .12, (i ? 1 : -1) * .2, pick(GR), L);
+        stem(x, w * .02, h * .5, w * .5, h * .36, w * .02, '#2f9a4a'); stem(x, w * .02, h * .5, w * .4, h * .7, w * .018, '#2f9a4a');
+        hibiscus(x, w * .54, h * .35, w * .21, [pick(['#ff5a8a', '#e0402a', '#ff6a4a']), '#b8288a'], L); hibiscus(x, w * .43, h * .71, w * .16, [pick(['#f07a2a', '#ffd75e', '#ff7ab8']), '#b8288a'], L);
+      },
+      function (x, w, h) {                                                                                                                                         // 10 ganz nah: Passionsblume und hängende Helikonie
+        stem(x, w * .02, h * .5, w * .72, h * .26, w * .022, '#238a52');
+        bigLeaf(x, w * .3, h * .4, .5, w * .46, w * .1, .2, pick(GR), L);
+        heliconia(x, w * .66, h * .34, w * .42, [pick(['#e0402a', '#f07a2a', '#d0379a']), '#ffd75e'], L);
+        passion(x, w * .4, h * .62, w * .19, [pick(['#c58cf0', '#9b6ff0', '#f6f2ff']), pick(Z_PURP), '#ffd75e'], L);
+      }];
+    // [Fortschritt des Flugs, Seite (0 links, 1 rechts), Höhe am Bildschirm, Tiefe, Art, Grösse]
+    // Über den ganzen Weg durch den Urwald verteilt (er beginnt seit 28.11. weiter oben), abwechselnd links und rechts und in verschiedenen Höhen:
+    // So stehen im Stand nie zu viele gleichzeitig im Bild. Breite Blätter sind kleiner als die luftigen Wedel, damit die Mitte frei bleibt.
+    [[.08, 0, .35, 2.2, 0, 1.05], [.12, 1, .52, 2.6, 1, .84], [.17, 0, .7, 2.7, 7, .86], [.27, 0, .3, 2.1, 2, .9], [.32, 1, .42, 2.4, 4, .92], [.37, 0, .64, 2.3, 3, .84],
+     [.42, 1, .26, 2.5, 5, .84], [.52, 1, .72, 2.2, 6, .9], [.57, 0, .8, 2.2, 0, 1.05],
+     [.22, 1, .74, 3.3, 9, 1.15], [.47, 0, .5, 3.2, 8, 1.2], [.55, 1, .86, 3.1, 10, 1.15]       // ganz nah: grosse Blüten dicht vor der Kamera
+    ].forEach(function (d) {
+      var s = U * d[5] * rr(.94, 1.06), z = pick([Z_PURP, Z_TEAL, Z_GREEN, Z_MAG, Z_BLUE]), fl = d[4] === 4 || d[4] >= 6;
       flyer(s, s, d[3], d[0], d[1] ? W - s * .1 : s * .1, d[2], function (x, w, h) {
-        frond(x, { x: d[1] ? w * .97 : w * .03, y: h * .5, a: d[1] ? Math.PI : 0, spread: 2.2, n: 9, len: w * .8, wid: w * .05, droop: .3, cols: z, lw: LW0 * 1.6, rib: 1 });
-      });
-      fliers[fliers.length - 1].leaf = 1;
+        if (d[1]) { x.translate(w, 0); x.scale(-1, 1); }
+        x.translate(w * .02, h * .5); x.scale(.84, .84); x.translate(-w * .02, -h * .5);   // Luft bis zum Rand des Bildes: nichts wird abgeschnitten
+        kinds[d[4]](x, w, h, z);
+      }, 0, fl ? Math.min(DPR, 1.5) : 1);   // Blüten schärfer als die Blätter: man sieht sie auch im Stand
     });
   }
 
@@ -1817,7 +1916,7 @@
     dc.c.style.cssText = 'width:' + W + 'px;height:' + H + 'px;' + (reduce ? '' : 'animation:akSpot 13s ease-in-out infinite;');
     dapple.appendChild(dc.c); world.appendChild(dapple);
     sprites.forEach(function (s) { world.appendChild(s.el); });
-    if (fly) flyLeaves();   // nur im Flug; danach verschwinden sie (sonst hingen sie beim Verschieben in der Luft)
+    var r0 = R; R = rng(AK.seed * 31); flyLeaves(); R = r0;   // immer da, mit eigenem Zufall (seit 28.11.; vorher nur im Flug)
 
     // Glühwürmchen, Glitzer, Fahrtwind
     var fxc = canvas(W, H, 1);   // weiche Lichtpunkte: gröber genügt, und das Bild wird laufend neu gemalt fxC = fxc.c; fxX = fxc.x; fxC.className = 'ak-fx'; fxC.style.width = W + 'px'; fxC.style.height = H + 'px'; world.appendChild(fxC);
@@ -2279,7 +2378,6 @@
       if (!shown && fl.u >= 1) reveal();   // erst wenn die Kamera steht: das Einblenden kostete auf Hugos iPhone eine Zehntelsekunde (Video 16:00) – im Stand sieht man sie nicht
       if (fl.u >= 1) {
         fl = null; cam = tgY = 0;
-        setTimeout(function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); }, 3200);   // die grossen Wedel gehörten nur zum Flug (weg, sobald alles ruhig steht)
       }
     } else if (AK.freePan) {   // von Hand: die Kamera zieht gemütlich nach
       var kk = 1 - Math.exp(-dt / AK.panSoft);
@@ -2413,7 +2511,7 @@
   }
   // Noch einmal fliegen: Ein Tipp auf den Titel (Velo Atelier, Alchemist, Slogan) spielt den Flug vom Laden wieder ab.
   // Weich: Text und Menü-Knopf blenden aus, das Perlweiss vom Laden blendet ein, dahinter springt die Kamera nach oben, dann beginnt der Flug
-  // wie beim ersten Mal. Das Bild wird nicht neu gemalt; nur die grossen Wedel, die dicht an der Kamera vorbeiziehen, kommen wieder dazu.
+  // wie beim ersten Mal. Das Bild wird nicht neu gemalt (auch die Blätter und Blüten dicht an der Kamera stehen seit 28.11. immer bereit).
   function replay() {
     if (reOn || fl || !shown || reduce || !(AK.flightMs > 0) || !world || performance.now() - tStart < 1800) return;   // nicht gleich nach der Landung: wer den Flug mit Tippen abkürzt, soll ihn nicht versehentlich neu starten
     reOn = 1; drag = null; clearTimeout(covT);
@@ -2425,7 +2523,6 @@
     setTimeout(function () {
       shown = false; flown = true; cam = tgY = camT; ptr.tx = ptr.ty = 0;
       html.classList.remove('ak-on'); html.classList.remove('ak-re');
-      var r0 = R; R = rng(AK.seed * 31); flyLeaves(); R = r0;
       var n = performance.now(); pw.t = n + 900; pw.n = pw.slow = 0;
       fl = { u: 0, last: n, D: AK.flightMs, rate: 1 };
       requestAnimationFrame(function () { requestAnimationFrame(function () { cover.className = 'ak-cover is-off'; reOn = 0; }); });
@@ -2504,7 +2601,6 @@
     if (location.hash === '#ak-test') {   // nur für Tests: Standbild bei Fortschritt u; Kamera von Hand an eine Stelle setzen
       window.__akSeek = function (u) { stop(); run = true; flown = true; fl = null; cam = tgY = camT * (1 - swing(u)); if (u >= .92) { reveal(); tStart = Math.min(tStart, performance.now() - 1000); } raf = 0; frameOnce(); };
       window.__akSunStill = function () { sunRC = null; };
-      window.__akNoLeaves = function () { fliers = fliers.filter(function (F) { if (F.leaf && F.el.parentNode) F.el.parentNode.removeChild(F.el); return !F.leaf; }); };   // wie 3,2 s nach der Landung: die grossen Wedel des Flugs sind weg   // Messung: Strahlen der Sonne nicht mehr neu malen
       window.__akDraw = function (x, k, px, py, u, seed) { R = rng(seed || k * 7 + 1); plant({ add: function (a, b, fn) { fn(x); } }, px, py, k, LW0, u); };   // eine Pflanze einzeln malen (Musterblatt)
       window.__akPan = function (fy) { stop(); run = true; flown = true; fl = null; reveal(); tStart = Math.min(tStart, performance.now() - 1000); cam = tgY = clamp(fy, 0, 1) * camT; raf = 0; frameOnce(); return [sways.length, fliers.length]; };
     }
