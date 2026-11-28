@@ -208,8 +208,11 @@
     /* Slogan: steht nur noch im offenen Menü, oben unter dem Knopf «Ausführliche Website» (topToMenu). Auf der Seite bleibt sein Platz frei */
     '[data-ak] .ak-lead.ak-moved { visibility: hidden; }',
     /* Ersatzwerte, falls die Webflow-Klassen menu-top und menu-slogan einmal fehlen (sonst gelten die Klassen: :where zählt nicht mit) */
-    ':where(.menu-panel) > :where(.menu-top) { order: -1; align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; margin: min(19vw, 11vh) 0 min(8vw, 4vh); row-gap: min(3.6vw, 1.8vh); }',
+    ':where(.menu-panel) > :where(.menu-top) { position: absolute; top: min(15vw, 11vh); left: 0; right: 0; margin: 0 auto; width: fit-content; display: flex; flex-direction: column; align-items: center; text-align: center; row-gap: min(3.6vw, 1.8vh); }',
     ':where(.menu-top) > :where(.menu-slogan) { margin: 0; max-width: min(82vw, 45svh); font-size: min(4.2vw, 2.31svh); line-height: 1.45; font-weight: 400; text-transform: uppercase; color: #3d3657; }',
+    /* Niedrige Handy-Bildschirme: Im Menü der ausführlichen Seite käme der Slogan der Liste der Abschnitte in die Quere, dort fällt er darum weg
+       (gleiche Regel im Seiten-Head von /mechanic). Hier genauso, damit beide Menüs gleich aussehen */
+    '@media (max-width: 479px) and (min-aspect-ratio: 5/8) { .menu-top > .menu-slogan { display: none; } }',
     /* Noch einmal fliegen (replay): Antippen des Titels. Text und Menü-Knopf blenden weich aus, das Perlweiss vom Laden blendet ein, dann beginnt der Flug */
     'html.ak-on [data-ak] .ak-head { cursor: pointer; }',
     'html.ak-re [data-ak] .ak-inner { pointer-events: none; }',
@@ -2533,7 +2536,8 @@
   }
   // Oben im Menü (Hugo 28.11., 11:02): «Ausführliche Website» in der Mitte, darunter der Slogan als reine Schrift. Es ist derselbe Block wie im
   // Menü der ausführlichen Seite (dort «Kurze Website» und der Slogan): gleiche Webflow-Klassen menu-top und menu-slogan, darum stehen beide
-  // Knöpfe auf derselben Höhe. Lage und Schrift stellt man in Webflow an diesen zwei Klassen ein, sie gelten für beide Menüs.
+  // Knöpfe auf derselben Höhe (der Block hängt fest oben am Menü, unabhängig davon, wie viele Knöpfe darunter stehen). Lage und Schrift stellt man
+  // in Webflow an diesen zwei Klassen ein, sie gelten für beide Menüs.
   // Der Link (ak-long) und der Slogan (ak-lead) stehen weiter in Webflow auf dieser Seite, Text und Ziel sind dort änderbar. Der Slogan hält auf
   // der Seite unsichtbar seinen Platz frei, so bleibt das Bild, wie es ist. Gibt es kein Menü, bleiben beide auf der Seite.
   function topToMenu() {
