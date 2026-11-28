@@ -23,10 +23,10 @@
 
    Aufbau in Webflow (Texte und Aussehen im Designer änderbar):
      section.ak [data-ak]
-       .ak-inner > .ak-head (.ak-kicker, h1.ak-title, .ak-lead: hält nur noch seinen Platz, sichtbar ist der Slogan im offenen Menü, siehe leadToMenu)
+       .ak-inner > .ak-head (.ak-kicker, h1.ak-title, .ak-lead: hält nur noch seinen Platz, sichtbar ist der Slogan im offenen Menü, siehe topToMenu)
                  > .ak-wheel [data-ak-wheel] > .ak-item [data-ak-item] (.ak-item-name, .ak-item-price, .ak-item-info)
                  > .ak-caption [data-ak-caption]   (Kasten im Aussehen der Glas-Knöpfe; der Text steht fest oben und schreibt sich um, wenn das Rad steht)
-                 > .ak-contact (a.grey …, ausgeblendet) > a.ak-long (wandert als Knopf ins Menü, siehe linkToMenu)
+                 > .ak-contact (a.grey …, ausgeblendet) > a.ak-long (wandert als Knopf oben ins Menü, siehe topToMenu)
    Werte zum Feinschliff in AK. Frühere Fassungen (Aquarell-Wald, erster Flug) stehen im Verlauf des Repos. */
 (function () {
   'use strict';
@@ -52,6 +52,7 @@
     fireflies: 9,         // Glühwürmchen (nur ein paar, klein, ruhig; Handy etwas weniger)
     glitter: 22,          // Glitzer-Funken
     introMs: 1500,        // Einblenden ohne Flug (Bewegungssystem: page)
+    skyMs: 1500,          // Flug: so lange blendet das Perlweiss in den Himmel (bis 28.11., 11:02: 700)
     flyInMs: [2200, 4200] // Glühwürmchen fliegen so lange ein (von – bis)
   };
   var EASE_OUT = 'cubic-bezier(.22,1,.36,1)';
@@ -167,7 +168,7 @@
     '.ak-world:not(.ak-lit) .ak-rays canvas, .ak-world:not(.ak-lit) .ak-dapple canvas { animation-play-state: paused; }',
     '.ak-cover { position: absolute; inset: 0; z-index: 30; background: #f3f1f9; pointer-events: none; transition: opacity ' + AK.introMs + 'ms ' + EASE_OUT + '; }',
     'html.ak-on .ak-cover { opacity: 0; }',
-    '.ak-cover.is-off { opacity: 0; transition: opacity 700ms ease; }',   /* Flug: aus dem Perlweiss in den Himmel */
+    '.ak-cover.is-off { opacity: 0; transition: opacity ' + AK.skyMs + 'ms cubic-bezier(.37,0,.63,1); }',   /* Flug: aus dem Perlweiss in den Himmel, weich ein- und auslaufend (Hugo 28.11., 11:02) */
     /* Einblenden des Inhalts, gestaffelt */
     '[data-ak] .ak-inner > * { transition: opacity 900ms ' + EASE_OUT + ', transform 1200ms ' + EASE_OUT + '; }',
     'html:not(.ak-on) [data-ak] .ak-inner > * { opacity: 0; transform: translate3d(0, 2.5vh, 0); }',
@@ -204,9 +205,11 @@
     /* Gewählte Zeile: schwarze Schrift mit weissem Schein wie im Menü-Knopf (sie steht auf dem Glas der Kapsel) */
     '[data-ak] [data-ak-item] { transition: color .25s ease, text-shadow .25s ease; }',
     '[data-ak] [data-ak-item].is-sel { color: var(--farbe--schwarz, #000); text-shadow: 0 0 1px #fff, 0 0 4px #fff, 0 0 1rem #fff; }',
-    /* Slogan: steht nur noch im offenen Menü, genau an seinem Platz unter dem Titel und ohne Kasten (leadToMenu). Auf der Seite bleibt sein Platz frei */
+    /* Slogan: steht nur noch im offenen Menü, oben unter dem Knopf «Ausführliche Website» (topToMenu). Auf der Seite bleibt sein Platz frei */
     '[data-ak] .ak-lead.ak-moved { visibility: hidden; }',
-    '.menu-panel > .ak-menu-lead { position: absolute; margin: 0; max-width: none; pointer-events: none; }',
+    /* Ersatzwerte, falls die Webflow-Klassen menu-top und menu-slogan einmal fehlen (sonst gelten die Klassen: :where zählt nicht mit) */
+    ':where(.menu-panel) > :where(.menu-top) { order: -1; align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; margin: min(19vw, 11vh) 0 min(8vw, 4vh); row-gap: min(3.6vw, 1.8vh); }',
+    ':where(.menu-top) > :where(.menu-slogan) { margin: 0; max-width: min(82vw, 45svh); font-size: min(4.2vw, 2.31svh); line-height: 1.45; font-weight: 400; text-transform: uppercase; color: #3d3657; }',
     /* Noch einmal fliegen (replay): Antippen des Titels. Text und Menü-Knopf blenden weich aus, das Perlweiss vom Laden blendet ein, dann beginnt der Flug */
     'html.ak-on [data-ak] .ak-head { cursor: pointer; }',
     'html.ak-re [data-ak] .ak-inner { pointer-events: none; }',
@@ -2523,45 +2526,30 @@
     setTimeout(function () {
       shown = false; flown = true; cam = tgY = camT; ptr.tx = ptr.ty = 0;
       html.classList.remove('ak-on'); html.classList.remove('ak-re');
-      var n = performance.now(); pw.t = n + 900; pw.n = pw.slow = 0;
+      var n = performance.now(); pw.t = n + Math.max(900, AK.skyMs + 100); pw.n = pw.slow = 0;
       fl = { u: 0, last: n, D: AK.flightMs, rate: 1 };
       requestAnimationFrame(function () { requestAnimationFrame(function () { cover.className = 'ak-cover is-off'; reOn = 0; }); });
     }, 720);
   }
-  // «Ausführliche Website»: Der Link steht in Webflow auf der Seite (Text und Ziel sind dort änderbar) und wandert als Knopf ins Menü,
-  // links über «Studio». Auf der Seite selbst steht er nicht mehr. Gibt es das Menü nicht, bleibt er als Link stehen.
-  function linkToMenu() {
-    var a = root.querySelector('.ak-long'), list = document.querySelector('[data-menu-panel] .menu-list:not(.is-contact)');
-    if (!a || !list) return;
-    a.className = 'grey is-menu'; list.appendChild(a);
-  }
-  // Slogan: Er steht im offenen Menü, genau dort, wo er auf der Seite unter dem Titel stand, als reine Schrift ohne Kasten (Hugo 27.11., 19:14).
-  // Das Element bleibt in Webflow auf der Seite (Text und Aussehen dort änderbar: Klasse ak-lead) und hält unsichtbar seinen Platz frei; so bleibt
-  // das Bild, wie es ist. Ins Menü kommt eine Kopie. Das Menü hängt neben dem body, erbt also nichts von der Seite: Lage und Schrift werden
-  // darum vom Original abgelesen (placeLead) – beim Start, bei neuer Grösse und beim Öffnen des Menüs. Ohne Menü bleibt der Slogan auf der Seite.
-  var mLead = null, oLead = null;
-  function leadToMenu() {
-    var panel = document.querySelector('[data-menu-panel]'); oLead = root.querySelector('.ak-lead');
-    if (!oLead || !panel) return;
-    mLead = oLead.cloneNode(true); mLead.removeAttribute('id'); mLead.classList.add('ak-menu-lead');
-    panel.insertBefore(mLead, panel.firstChild); oLead.classList.add('ak-moved');
-    document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-menu-open]')) placeLead(); }, true);
-    document.addEventListener('keydown', function (e) { if (e.target.closest && e.target.closest('[data-menu-open]')) placeLead(); }, true);
-    placeLead();
-  }
-  function placeLead() {
-    if (!mLead) return;
-    var x = 0, y = 0, el = oLead, cs = getComputedStyle(oLead), st = mLead.style;
-    while (el) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }   // Lage im Layout: unabhängig davon, dass die Seite hinter dem offenen Menü vergrössert ist
-    st.left = x + 'px'; st.top = (y - window.scrollY) + 'px'; st.width = oLead.offsetWidth + 'px';
-    ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing', 'textTransform', 'textAlign', 'color'].forEach(function (k) { st[k] = cs[k]; });
+  // Oben im Menü (Hugo 28.11., 11:02): «Ausführliche Website» in der Mitte, darunter der Slogan als reine Schrift. Es ist derselbe Block wie im
+  // Menü der ausführlichen Seite (dort «Kurze Website» und der Slogan): gleiche Webflow-Klassen menu-top und menu-slogan, darum stehen beide
+  // Knöpfe auf derselben Höhe. Lage und Schrift stellt man in Webflow an diesen zwei Klassen ein, sie gelten für beide Menüs.
+  // Der Link (ak-long) und der Slogan (ak-lead) stehen weiter in Webflow auf dieser Seite, Text und Ziel sind dort änderbar. Der Slogan hält auf
+  // der Seite unsichtbar seinen Platz frei, so bleibt das Bild, wie es ist. Gibt es kein Menü, bleiben beide auf der Seite.
+  function topToMenu() {
+    var panel = document.querySelector('[data-menu-panel]'), a = root.querySelector('.ak-long'), lead = root.querySelector('.ak-lead');
+    if (!panel || (!a && !lead)) return;
+    var top = document.createElement('div'); top.className = 'menu-top';
+    if (a) { a.className = 'grey is-menu'; top.appendChild(a); }
+    if (lead) { var p = document.createElement('p'); p.className = 'menu-slogan'; p.textContent = lead.textContent; top.appendChild(p); lead.classList.add('ak-moved'); }
+    panel.insertBefore(top, panel.firstChild);
   }
   // Grösse: nur bei neuer Breite neu malen (Safari-Leisten ändern nur die Höhe); dann ohne Flug
   var lastW = 0, rsT = 0;
   window.addEventListener('resize', function () {
     clearTimeout(rsT);
     rsT = setTimeout(function () {
-      W = root.clientWidth; measureWheel(); placeLead(); capRedraw();
+      W = root.clientWidth; measureWheel(); capRedraw();
       if (Math.abs(W - lastW) > 20) { lastW = W; fl = null; paintScene(false); litOn = null; reveal(); measureWheel(); }
     }, 180);
   });
@@ -2574,7 +2562,7 @@
     try { fly = AK.flightMs > 0 && !reduce && (sessionStorage.getItem('ak-fly') === '1' || !sessionStorage.getItem('ak-seen')); sessionStorage.removeItem('ak-fly'); sessionStorage.setItem('ak-seen', '1'); } catch (e) {}
     var t0 = performance.now();
     W = root.clientWidth;
-    linkToMenu(); leadToMenu();
+    topToMenu();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { capRedraw(); });   // kam die Schrift erst nach dem Start, wird der Text im Kasten noch einmal mit ihr gemalt
     var head = root.querySelector('.ak-head');
     if (head) head.addEventListener('click', function (e) { if (Math.abs(e.clientX - dn[0]) < 10 && Math.abs(e.clientY - dn[1]) < 10 && e.timeStamp - dn[2] < 450) replay(); });   // nur ein kurzer Tipp an Ort und Stelle: kein Wischen über den Titel, kein aufgelegter Finger (der schiebt das Bild)
@@ -2591,7 +2579,7 @@
     measureWheel();
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        tBoot = performance.now(); pw.t = tBoot + 700;
+        tBoot = performance.now(); pw.t = tBoot + (fly ? Math.max(700, AK.skyMs) : 700);
         if (fly) { flown = true; fl = { u: 0, last: tBoot, D: AK.flightMs, rate: 1 }; cover.classList.add('is-off'); }
         else reveal();
         start();
